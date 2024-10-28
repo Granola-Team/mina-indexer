@@ -33,17 +33,50 @@ class GraphQLFormatter
           query_body = extract_query_body(query_part)
           inlined_query = inline_variables(query_body, variables)
           unquoted_query = remove_sort_by_quotes(inlined_query)
-        else
+          reordered_query = reorder_arguments(unquoted_query)
+          formatted_query = format_with_biome(reordered_query)
+          "```graphql\n#{formatted_query}\n```"
+        elsif needs_processing?(query_section)
+          # Only process if it's not already in the desired format
           cleaned_query = remove_query_definition(query_section)
           unquoted_query = remove_sort_by_quotes(cleaned_query)
+          reordered_query = reorder_arguments(unquoted_query)
+          formatted_query = format_with_biome(reordered_query)
+          "```graphql\n#{formatted_query}\n```"
+        else
+          "```graphql\n#{query_section}\n```"
         end
-        reordered_query = reorder_arguments(unquoted_query)
-        formatted_query = format_with_biome(reordered_query)
-        "```graphql\n#{formatted_query}\n```"
       end
     end
 
     private
+
+    def needs_processing?(query)
+      # Check if the query has variables that need to be inlined
+      return true if query.include?("variables {")
+
+      # Check if the query has a query definition
+      return true if query.match?(/^query\s+\w+.*?{/m)
+
+      # Check if sortBy has quotes
+      return true if query.match?(/sortBy:\s*"[A-Z_]+"/)
+
+      # Check if arguments need reordering
+      if query =~ /\w+\(([\s\S]*?)\)/
+        args_str = $1
+        args = parse_arguments(args_str)
+        return false if args.empty?
+
+        ordered_keys = ["limit", "sortBy", "query"]
+        current_order = args.keys
+
+        # Check if the current order matches our desired order
+        current_ordered_keys = ordered_keys & current_order
+        return true if current_ordered_keys != current_order.select { |k| ordered_keys.include?(k) }
+      end
+
+      false
+    end
 
     def remove_sort_by_quotes(query)
       query.gsub(/sortBy:\s*"([A-Z_]+)"/, 'sortBy: \1')
@@ -102,11 +135,12 @@ class GraphQLFormatter
     end
 
     def reorder_arguments(query)
-      query.gsub(/(\w+)\((.*?)\)(?=\s*{)/m) do |match|
+      query.gsub(/(\w+)\(([\s\S]*?)\)(\s*{)/) do |match|
         field_name = $1
         args_str = $2
+        trailing_brace = $3
 
-        # Handle nested objects
+        # Parse arguments more carefully to handle nested objects
         args = parse_arguments(args_str)
         ordered_args = {}
 
@@ -122,7 +156,7 @@ class GraphQLFormatter
           "#{key}: #{ordered_args[key]}"
         end.join(", ")
 
-        "#{field_name}(#{formatted_args})"
+        "#{field_name}(#{formatted_args})#{trailing_brace}"
       end
     end
 

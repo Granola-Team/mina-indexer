@@ -280,7 +280,7 @@ jsonpath "$.data.transactions[3].canonical" == true
 duration < 100
 
 #
-# Transactions blockHeight_gt/lt filters are exclusive 
+# Transactions blockHeight_gt/lt filters are exclusive
 #
 
 POST {{url}}
@@ -628,9 +628,12 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  transactions(query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
-    blockHeight
-    globalSlot
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_DESC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
+      blockHeight
+      globalSlot
   }
 }
 ```
@@ -662,10 +665,13 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  transactions(query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
-    blockHeight
-    globalSlot
-  }
+  transactions(
+    limit: 25
+    sortBy: GLOBALSLOT_ASC
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
+      blockHeight
+      globalSlot
+    }
 }
 ```
 HTTP 200
