@@ -1,0 +1,473 @@
+{
+    "fee_payer": {
+        "body": {
+            "public_key": "B62qmYPgVboW3JhtmzCKDtgL9EPEz7rfwbTwdbLZCU8x8fGeH2X6JUL",
+            "fee": "0.1",
+            "valid_until": null,
+            "nonce": "8"
+        },
+        "authorization": "7mWyKyJrJLK6RoB9LH2391aWkNqSj8HG7fQvxUzjUC5mJWugZuvSA9r44WgfGXzTUMg2XXnihd7roCjw5it3fWx5UB9geJP7"
+    },
+    "account_updates": [
+        {
+            "elt": {
+                "account_update": {
+                    "body": {
+                        "public_key": "B62qmYPgVboW3JhtmzCKDtgL9EPEz7rfwbTwdbLZCU8x8fGeH2X6JUL",
+                        "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                        "update": {
+                            "app_state": [
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ],
+                                [
+                                    "Keep"
+                                ]
+                            ],
+                            "delegate": [
+                                "Keep"
+                            ],
+                            "verification_key": [
+                                "Keep"
+                            ],
+                            "permissions": [
+                                "Keep"
+                            ],
+                            "zkapp_uri": [
+                                "Keep"
+                            ],
+                            "token_symbol": [
+                                "Keep"
+                            ],
+                            "timing": [
+                                "Keep"
+                            ],
+                            "voting_for": [
+                                "Keep"
+                            ]
+                        },
+                        "balance_change": {
+                            "magnitude": "1000000000",
+                            "sgn": [
+                                "Neg"
+                            ]
+                        },
+                        "increment_nonce": false,
+                        "events": [],
+                        "actions": [],
+                        "call_data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                        "preconditions": {
+                            "network": {
+                                "snarked_ledger_hash": [
+                                    "Ignore"
+                                ],
+                                "blockchain_length": [
+                                    "Ignore"
+                                ],
+                                "min_window_density": [
+                                    "Ignore"
+                                ],
+                                "total_currency": [
+                                    "Ignore"
+                                ],
+                                "global_slot_since_genesis": [
+                                    "Ignore"
+                                ],
+                                "staking_epoch_data": {
+                                    "ledger": {
+                                        "hash": [
+                                            "Ignore"
+                                        ],
+                                        "total_currency": [
+                                            "Ignore"
+                                        ]
+                                    },
+                                    "seed": [
+                                        "Ignore"
+                                    ],
+                                    "start_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "lock_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "epoch_length": [
+                                        "Ignore"
+                                    ]
+                                },
+                                "next_epoch_data": {
+                                    "ledger": {
+                                        "hash": [
+                                            "Ignore"
+                                        ],
+                                        "total_currency": [
+                                            "Ignore"
+                                        ]
+                                    },
+                                    "seed": [
+                                        "Ignore"
+                                    ],
+                                    "start_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "lock_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "epoch_length": [
+                                        "Ignore"
+                                    ]
+                                }
+                            },
+                            "account": {
+                                "balance": [
+                                    "Ignore"
+                                ],
+                                "nonce": [
+                                    "Ignore"
+                                ],
+                                "receipt_chain_hash": [
+                                    "Ignore"
+                                ],
+                                "delegate": [
+                                    "Ignore"
+                                ],
+                                "state": [
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ]
+                                ],
+                                "action_state": [
+                                    "Ignore"
+                                ],
+                                "proved_state": [
+                                    "Ignore"
+                                ],
+                                "is_new": [
+                                    "Ignore"
+                                ]
+                            },
+                            "valid_while": [
+                                "Ignore"
+                            ]
+                        },
+                        "use_full_commitment": true,
+                        "implicit_account_creation_fee": false,
+                        "may_use_token": [
+                            "No"
+                        ],
+                        "authorization_kind": [
+                            "Signature"
+                        ]
+                    },
+                    "authorization": [
+                        "Signature",
+                        "7mWyKyJrJLK6RoB9LH2391aWkNqSj8HG7fQvxUzjUC5mJWugZuvSA9r44WgfGXzTUMg2XXnihd7roCjw5it3fWx5UB9geJP7"
+                    ]
+                },
+                "account_update_digest": "0x36338B3BC12429004B08AE418A7BF1CFBCB735896B2B999CCE0D004A3FBFD37E",
+                "calls": []
+            },
+            "stack_hash": "0x23BBB3151E3C93E2A5321D928E3EFD7FADD83B4AD3B2E3A834CF8AF8644E07AF"
+        },
+        {
+            "elt": {
+                "account_update": {
+                    "body": {
+                        "public_key": "B62qmivFXZzyvFacoEBpzvG12XLodNMxdyvW5B5PS47P8f4PSTqrcts",
+                        "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                        "update": {
+                            "app_state": [
+                                [
+                                    "Set",
+                                    "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ],
+                                [
+                                    "Set",
+                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                ]
+                            ],
+                            "delegate": [
+                                "Keep"
+                            ],
+                            "verification_key": [
+                                "Set",
+                                {
+                                    "data": "zCJCXTUHKg4hedj1YF5VQthg7QZgWxwxegUB5pzvgAFW4thEZyYxxfu1zAMG6oLZKV5ezWnWVrvcc2qsvHLAGafcRGr9Tcbnn9Lp3JSbNLZgTr48wcLC76252HSqo33RAfrMtT38HxKNU8BRHZsWdrt39GG3adY3Abi6MWjpKsNJeSstppgHuUHygZKncr8tmf3FsgXUdUXCgdNQfbASGUZ7UCSvKLzqBYCQv66nwcaBZoeFPKbfxRbbt38NGMosDTFMMtpDJA4hwX4sM2dmcjqfiuQMgTuLJrE4jV6EzDw43dSDdddYZCczW7UCNoWpPp5jCbnyj1vcqtqLj3MzTyVivZZyEDpwpZYQSxK4pgD3Z38fr92Lgt4HeHb1y3tHbAcZaumWkajbMDCHyRt3g943tKaNsMPdBgKHeNJoyG685hk7W5o5VwhHDacP4isqVRNouMmbj3S4JXKXYKWo56f7ZFVMukpVk65rriUAnJZnMg8K9E7HcAcHKdmYQ68w2YAWfkBDmBwwW4B5enKBnRZYwK7szXfT5NzczPryPytEW9JUpXrU5D2m5PqEPp8rQzJJWEQ9rW7LXKfMwv9LptSfQWirbTkjj3donT2odzZAqYNkbPm5sPEY7bXFoQGndXgECc4RmD8nhLxRpc12kuiVKmFfiw1yowJh3zwjfc3s5RTojv4YUT6fWJzrCXGpXUx9hwhYuiVdLHKGk68frf6UHhBsN7UmcgoWWw9uWXsoLRZ6eE3E6G82TKuBSr5f1Qq7cAXb1Bej89uv86SrCZMo8RYWnhd2acHLepRL9cxryteKEXzFveR5StwGp74vf8GFvHqYnxYZfLFtN2ip153Mf3JE274FyHe9f5Mi7e56jiQQjFkbAagzCeJecvXJtuqNmDwftnbmBQcd7L2w5LUnRUEgPKAf3k3vNXigVSJr6JSZon8uoH6hQxCt9z7KCT9WTbt8gVjGx4CNP2AXsTNFP4iiSNR6iVhKrpBgVpswCKapreQjq4AAtfdxSFp3Xk1XmzETVcx8uqrQZpmJdJ5KDvT7bzgtZgNpcERWSZbHFxGzaaSJ5zyHLfP4zbakwDjk9QxoxqtYFEqqYcP2iAWGjGf7TgJwfAf49hWo6Vqqrg7T3hpjHVtgeLQWrTzdAzquXbpqn75RFKkBkf8vJGCecbBCVyoi1g2STDsGDhqxfiiFXU8bAdbbsxq4yhRm1jwQoK45xrMXAQRQTmzWnw9JZgFNtqKckDtgpgYpTX7zibcUPNF257tzcTZEZgXrxZg1CNpduZygv3oJYBkV94aZtxGCiCCCzPnPbiDpQEo1HBRU8siJUAKFJP6vz4oqMs1YniLrJnsm1VgJVP3q2AL8w8ccPHWYApGUEMWdNR8uTD1A745GzXjykYxdaWroxcmVKkAsZo7Ec3nrx1FknSn7W3RDY43pBR3a4iSSNcjP9FAANNk4Ae3Tk7CnZjcbqGYXvPjoUNZWHteZMZXewLSMZsuworS2ovTwQTL994w4cfw424X6qVrsXCWtyRxD6umowCwWBfsxxxBvcpLgA89P9r8pzHrU6iU1aGDzLhNuzRkdWMtMDgN1mkwNVLsGyWVaGzEU2NGucvzz8QFLRPhdiq7voeHvtQSUK8VbkeJZ1MQ4Kg7deSuFn6o66fN6BF9yyk6mqZcLm1o8qyjAJpkbMWae6NA1u11czYFh2xfMQcwpyJip7Yg2ajUpBQXShCax939ud92TrmA6mjdSQWiB9FySsQGekVUSBR9BtPnxudqjN2Rq9XDN6WUu4ar26VkG53xJybdAhmiHpRK7jRaJmHKmMJWrBCwcFtGkAEsCCxa2gvWMrynaTd5bGGMQUsjkiEJqRUwxuduZWjPtBFh7jY1vF2hD9DaABLFbd2J72mNjMaX5cvyguaojE1sA2WQgevfGv68n3D3DYtqEJFescfMKmLuLN19tqDL5NC3f4Fixdf7wdeerm3GycFzmREHNT8P6mYSj9xK3jZHX5EEF8jz9DUb54rwNuPretgCAw6L517L73aZUDwSJ5SfAirJQCmYrgQy8m6hqToAj7aoFmsr9dkduxoyNX1DETAvx4tRgN5TciJ4jqddsLnwi2sZ4iwT7XobPec3j4TeNJ8pPt1P2Rrth6AUWmKj487xkGQ1wcJGm3DSgAkwUdbXrq1ctH4LSvkwdKcKoeRFsNQKp6tFpvr3HhmsbqgjqZQNncrXy3TCc26AxZAAigBqXZczR6JgSeg7nJ5Xbitozx7N9hRsA8zn3taKDQFJ78QqeYsxJr2HAE2ud9RqKCwKETBKbwJgdLrnS3ZAFjbsArV8WwBsiZdgQHSVGATD5VhjiStaLVMtuB3tB8bV85Q6f8DrV7NrisEHVHyFeEX2Txv1zxCxD18GEFWue8zTJvkYbLXzduV7vsZSnKP6n4TUGHfQzJYhcKJ3R5QLS6gHLPC3YX4T",
+                                    "hash": "0x04AD2A6223E9568403BE5FCF321439AA9ECD472B9C9277D9E90831DD58C95F7E"
+                                }
+                            ],
+                            "permissions": [
+                                "Set",
+                                {
+                                    "edit_state": [
+                                        "Proof"
+                                    ],
+                                    "access": [
+                                        "None"
+                                    ],
+                                    "send": [
+                                        "Proof"
+                                    ],
+                                    "receive": [
+                                        "None"
+                                    ],
+                                    "set_delegate": [
+                                        "Signature"
+                                    ],
+                                    "set_permissions": [
+                                        "Signature"
+                                    ],
+                                    "set_verification_key": [
+                                        [
+                                            "Signature"
+                                        ],
+                                        "3"
+                                    ],
+                                    "set_zkapp_uri": [
+                                        "Signature"
+                                    ],
+                                    "edit_action_state": [
+                                        "Proof"
+                                    ],
+                                    "set_token_symbol": [
+                                        "Signature"
+                                    ],
+                                    "increment_nonce": [
+                                        "Signature"
+                                    ],
+                                    "set_voting_for": [
+                                        "Signature"
+                                    ],
+                                    "set_timing": [
+                                        "Signature"
+                                    ]
+                                }
+                            ],
+                            "zkapp_uri": [
+                                "Keep"
+                            ],
+                            "token_symbol": [
+                                "Keep"
+                            ],
+                            "timing": [
+                                "Keep"
+                            ],
+                            "voting_for": [
+                                "Keep"
+                            ]
+                        },
+                        "balance_change": {
+                            "magnitude": "0",
+                            "sgn": [
+                                "Pos"
+                            ]
+                        },
+                        "increment_nonce": true,
+                        "events": [],
+                        "actions": [],
+                        "call_data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                        "preconditions": {
+                            "network": {
+                                "snarked_ledger_hash": [
+                                    "Ignore"
+                                ],
+                                "blockchain_length": [
+                                    "Ignore"
+                                ],
+                                "min_window_density": [
+                                    "Ignore"
+                                ],
+                                "total_currency": [
+                                    "Ignore"
+                                ],
+                                "global_slot_since_genesis": [
+                                    "Ignore"
+                                ],
+                                "staking_epoch_data": {
+                                    "ledger": {
+                                        "hash": [
+                                            "Ignore"
+                                        ],
+                                        "total_currency": [
+                                            "Ignore"
+                                        ]
+                                    },
+                                    "seed": [
+                                        "Ignore"
+                                    ],
+                                    "start_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "lock_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "epoch_length": [
+                                        "Ignore"
+                                    ]
+                                },
+                                "next_epoch_data": {
+                                    "ledger": {
+                                        "hash": [
+                                            "Ignore"
+                                        ],
+                                        "total_currency": [
+                                            "Ignore"
+                                        ]
+                                    },
+                                    "seed": [
+                                        "Ignore"
+                                    ],
+                                    "start_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "lock_checkpoint": [
+                                        "Ignore"
+                                    ],
+                                    "epoch_length": [
+                                        "Ignore"
+                                    ]
+                                }
+                            },
+                            "account": {
+                                "balance": [
+                                    "Ignore"
+                                ],
+                                "nonce": [
+                                    "Check",
+                                    {
+                                        "lower": "0",
+                                        "upper": "0"
+                                    }
+                                ],
+                                "receipt_chain_hash": [
+                                    "Ignore"
+                                ],
+                                "delegate": [
+                                    "Ignore"
+                                ],
+                                "state": [
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ],
+                                    [
+                                        "Ignore"
+                                    ]
+                                ],
+                                "action_state": [
+                                    "Ignore"
+                                ],
+                                "proved_state": [
+                                    "Check",
+                                    false
+                                ],
+                                "is_new": [
+                                    "Ignore"
+                                ]
+                            },
+                            "valid_while": [
+                                "Ignore"
+                            ]
+                        },
+                        "use_full_commitment": false,
+                        "implicit_account_creation_fee": false,
+                        "may_use_token": [
+                            "No"
+                        ],
+                        "authorization_kind": [
+                            "Signature"
+                        ]
+                    },
+                    "authorization": [
+                        "Signature",
+                        "7mXVT4rSHZtV3cdBXVR4NsA7bEZ2Ps4rUujUgF78VJJmciG5UAZ6Ki313kCdb6vSsJ1GHxaQ3LJfejVT5B3rCfQRzM7Qn4ks"
+                    ]
+                },
+                "account_update_digest": "0x3A83007E281AEB66AEB9F6B2ABECA0B8EB03A7A1B4CF1F40943B228D266E483B",
+                "calls": []
+            },
+            "stack_hash": "0x228D6843E7577285CEF1E626F6C63CCA5AE428EC61E63CA05DD784ABD89B76C5"
+        }
+    ],
+    "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+}
