@@ -1100,12 +1100,8 @@ test_rest_blocks() {
     curl --silent http://localhost:${port}/blocks/3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 > output.json
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .state_hash)
 
-    # /blocks/height={height} endpoint
-    curl --silent http://localhost:${port}/blocks/height=100 > output.json
-    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
-
-    # /blocks/slot={globl_slot} endpoint
-    curl --silent http://localhost:${port}/blocks/slot=145 > output.json
+    # /blocks?height={height} endpoint
+    curl --silent http://localhost:${port}/blocks?height=100 > output.json
     assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
 }
 

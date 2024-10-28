@@ -1,6 +1,8 @@
 use crate::{
     block::{
-        is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockWithoutHeight,
+        is_valid_state_hash,
+        precomputed::{PrecomputedBlock, PrecomputedBlockWithCanonicity},
+        store::BlockStore,
     },
     canonicity::store::CanonicityStore,
     store::IndexerStore,
@@ -18,13 +20,14 @@ use std::sync::Arc;
 #[derive(Deserialize)]
 struct Params {
     limit: Option<u32>,
+    height: Option<u32>,
 }
 
 fn get_limit(limit: Option<u32>) -> u32 {
     limit.map(|value| value.min(100)).unwrap_or(10)
 }
 
-fn format_blocks(blocks: Vec<BlockWithoutHeight>) -> String {
+fn format_blocks(blocks: Vec<PrecomputedBlockWithCanonicity>) -> String {
     format!("{blocks:#?}").replace(",\n]", "\n]")
 }
 
@@ -35,6 +38,32 @@ pub async fn get_blocks(
 ) -> HttpResponse {
     let db = store.as_ref();
     let limit = get_limit(params.limit);
+
+    // Check for height query parameter
+    if let Some(height) = params.height {
+        if let Ok(blocks) = db.get_blocks_at_height(height) {
+            let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks
+                .iter()
+                .flat_map(|state_hash| {
+                    if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                        let block = db
+                            .get_block(state_hash)
+                            .with_context(|| format!("block missing from store {state_hash}"))
+                            .unwrap()
+                            .unwrap()
+                            .0;
+                        Some(PrecomputedBlock::with_canonicity(&block, canonicity))
+                    } else {
+                        None
+                    }
+                })
+                .take(limit as usize)
+                .collect();
+            return HttpResponse::Ok()
+                .content_type(ContentType::json())
+                .body(format_blocks(blocks));
+        }
+    }
 
     if let Ok(Some(best_tip)) = db.get_best_block() {
         let mut best_chain: Box<Vec<PrecomputedBlock>> = Box::new(vec![best_tip.clone()]);
@@ -54,11 +83,11 @@ pub async fn get_blocks(
             }
         }
 
-        let best_chain: Vec<BlockWithoutHeight> = best_chain
+        let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
             .iter()
             .flat_map(|block| {
                 if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
-                    Some(BlockWithoutHeight::with_canonicity(block, canonicity))
+                    Some(PrecomputedBlock::with_canonicity(block, canonicity))
                 } else {
                     None
                 }
@@ -71,72 +100,20 @@ pub async fn get_blocks(
     HttpResponse::NotFound().finish()
 }
 
-#[get("/blocks/{input}")]
-pub async fn get_block(store: Data<Arc<IndexerStore>>, input: web::Path<String>) -> HttpResponse {
+#[get("/blocks/{state_hash}")]
+pub async fn get_block(
+    store: Data<Arc<IndexerStore>>,
+    state_hash: web::Path<String>,
+) -> HttpResponse {
     let db = store.as_ref();
 
-    // via state hash
-    if is_valid_state_hash(&input) {
-        if let Ok(Some((ref block, _))) = db.get_block(&input.clone().into()) {
-            let block: BlockWithoutHeight = block.into();
-            return HttpResponse::Ok()
-                .content_type(ContentType::json())
-                .body(format!("{block:?}"));
-        }
-    }
-
-    // via blockchain length
-    let height_prefix = "height=";
-    if (*input).starts_with(height_prefix) {
-        if let Ok(height) = input[height_prefix.len()..].parse::<u32>() {
-            if let Ok(blocks) = db.get_blocks_at_height(height) {
-                let blocks: Vec<BlockWithoutHeight> = blocks
-                    .iter()
-                    .flat_map(|state_hash| {
-                        if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                            let block = db
-                                .get_block(state_hash)
-                                .with_context(|| format!("block missing from store {state_hash}"))
-                                .unwrap()
-                                .unwrap()
-                                .0;
-                            Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+    if is_valid_state_hash(&state_hash) {
+        if let Ok(Some((ref block, _))) = db.get_block(&state_hash.clone().into()) {
+            if let Ok(Some(canonicity)) = db.get_block_canonicity(&block.state_hash()) {
+                let block_with_canonicity = PrecomputedBlock::with_canonicity(block, canonicity);
                 return HttpResponse::Ok()
                     .content_type(ContentType::json())
-                    .body(format_blocks(blocks));
-            }
-        }
-    }
-
-    // via global slot
-    let slot_prefix = "slot=";
-    if (*input).starts_with(slot_prefix) {
-        if let Ok(slot) = input[slot_prefix.len()..].parse::<u32>() {
-            if let Ok(blocks) = db.get_blocks_at_slot(slot) {
-                let blocks: Vec<BlockWithoutHeight> = blocks
-                    .iter()
-                    .flat_map(|state_hash| {
-                        if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                            let block = db
-                                .get_block(state_hash)
-                                .with_context(|| format!("block missing from store {state_hash}"))
-                                .unwrap()
-                                .unwrap()
-                                .0;
-                            Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                return HttpResponse::Ok()
-                    .content_type(ContentType::json())
-                    .body(format_blocks(blocks));
+                    .body(format!("{block_with_canonicity:?}"));
             }
         }
     }
