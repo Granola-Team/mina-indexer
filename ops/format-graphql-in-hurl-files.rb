@@ -25,27 +25,26 @@ class GraphQLFormatter
       content.gsub(/```graphql\n(.*?)\n```/m) do |match|
         query_section = $1.strip
 
+        needs_processing = false
+
         if query_section.include?("variables {")
           query_part, variables_part = query_section.split(/\n\nvariables\s*{/)
           variables_json = variables_part.strip.sub(/}\s*$/, "")
           variables = JSON.parse("{#{variables_json}}")
 
           query_body = extract_query_body(query_part)
-          inlined_query = inline_variables(query_body, variables)
-          unquoted_query = remove_sort_by_quotes(inlined_query)
-          reordered_query = reorder_arguments(unquoted_query)
-          formatted_query = format_with_biome(reordered_query)
-          "```graphql\n#{formatted_query}\n```"
-        elsif needs_processing?(query_section)
-          # Only process if it's not already in the desired format
+          query_section = inline_variables(query_body, variables)
+          needs_processing = true
+        end
+
+        if needs_processing || needs_processing?(query_section)
           cleaned_query = remove_query_definition(query_section)
           unquoted_query = remove_sort_by_quotes(cleaned_query)
-          reordered_query = reorder_arguments(unquoted_query)
-          formatted_query = format_with_biome(reordered_query)
-          "```graphql\n#{formatted_query}\n```"
-        else
-          "```graphql\n#{query_section}\n```"
+          query_section = reorder_arguments(unquoted_query)
         end
+
+        formatted_query = format_with_biome(query_section)
+        "```graphql\n#{formatted_query}\n```"
       end
     end
 

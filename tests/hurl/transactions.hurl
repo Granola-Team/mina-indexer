@@ -631,9 +631,10 @@ POST {{url}}
   transactions(
     limit: 25
     sortBy: GLOBALSLOT_DESC
-    query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
-      blockHeight
-      globalSlot
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+    globalSlot
   }
 }
 ```
@@ -668,10 +669,11 @@ POST {{url}}
   transactions(
     limit: 25
     sortBy: GLOBALSLOT_ASC
-    query: { blockHeight_lte: 120, blockHeight_gt: 118 }) {
-      blockHeight
-      globalSlot
-    }
+    query: { blockHeight_lte: 120, blockHeight_gt: 118 }
+  ) {
+    blockHeight
+    globalSlot
+  }
 }
 ```
 HTTP 200
