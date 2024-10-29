@@ -204,122 +204,127 @@ async fn insert(
 }
 
 async fn snark_jobs(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
-    for job in diff["completed_works"].as_array().unwrap() {
-        db.execute(
-            format!(
-                "insert SNARKJob {{
-            block := {},
-            prover := {},
-            fee := <decimal>$0
-        }};",
-                block_link(block_hash),
-                account_link(&job["prover"])
-            ),
-            &(to_decimal(&job["fee"]),),
-        )
-        .await?;
+    if let Some(completed_works) = diff["completed_works"].as_array() {
+        for job in completed_works {
+            db.execute(
+                format!(
+                    "insert SNARKJob {{
+                        block := {},
+                        prover := {},
+                        fee := <decimal>$0
+                    }};",
+                    block_link(block_hash),
+                    account_link(&job["prover"])
+                ),
+                &(to_decimal(&job["fee"]),),
+            )
+            .await?;
+        }
     }
     Ok(())
 }
 
 async fn user_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
-    for command in diff["commands"].as_array().unwrap() {
-        let data1 = &command["data"][1];
-        let payload = &data1["payload"];
-        let common = &payload["common"];
-        let body1 = &payload["body"][1];
-        let status = &command["status"];
-        let status_1 = &status[1];
-        let status_2 = &status[2];
+    if let Some(commands) = diff["commands"].as_array() {
+        for command in commands {
+            let data1 = &command["data"][1];
+            let payload = &data1["payload"];
+            let common = &payload["common"];
+            let body1 = &payload["body"][1];
+            let status = &command["status"];
+            let status_1 = &status[1];
+            let status_2 = &status[2];
 
-        // must use format!() since we have more than 12 query params
-        // receiver_balance will be null when status == Failed
-        let command = format!(
-            "block := {},
-        status := '{}',
-        source_balance := {}n,
-        target_balance := {}n,
-        fee := {}n,
-        fee_payer := {},
-        fee_payer_balance := {}n,
-        fee_token := '{}',
-        fee_payer_account_creation_fee_paid := {}n,
-        target_account_creation_fee_paid := {}n,
-        nonce := {},
-        valid_until := {},
-        memo := '{}',
-        signer := {},
-        signature := '{}',
-        created_token := '{}'
-        ",
-            block_link(block_hash),
-            status[0].as_str().unwrap(),
-            to_decimal(&status_2["source_balance"]).unwrap().to_string(),
-            // TODO: or default may be incorrect here since this is optional
-            to_decimal(&status_2["receiver_balance"])
-                .unwrap_or_default()
-                .to_string(),
-            to_decimal(&common["fee"]).unwrap_or_default().to_string(),
-            account_link(&common["fee_payer_pk"]),
-            to_decimal(&status_2["fee_payer_balance"])
-                .unwrap_or_default()
-                .to_string(),
-            common["fee_token"].as_str().unwrap(),
-            to_decimal(&status_1["fee_payer_account_creation_fee_paid"])
-                .unwrap_or_default()
-                .to_string(),
-            to_decimal(&status_1["receiver_account_creation_fee_paid"])
-                .unwrap_or_default()
-                .to_string(),
-            to_i64(&common["nonce"]).unwrap_or_default(),
-            to_i64(&common["valid_until"]).unwrap_or_default(),
-            // TODO: or default may be incorrect here since this is optional
-            common["memo"].as_str().unwrap_or_default(),
-            account_link(&data1["signer"]),
-            data1["signature"].as_str().unwrap(),
-            status_1["created_token"].as_str().unwrap_or_default(),
-        );
+            // must use format!() since we have more than 12 query params
+            // receiver_balance will be null when status == Failed
+            let command = format!(
+                "
+                block := {},
+                status := '{}',
+                source_balance := {}n,
+                target_balance := {}n,
+                fee := {}n,
+                fee_payer := {},
+                fee_payer_balance := {}n,
+                fee_token := '{}',
+                fee_payer_account_creation_fee_paid := {}n,
+                target_account_creation_fee_paid := {}n,
+                nonce := {},
+                valid_until := {},
+                memo := '{}',
+                signer := {},
+                signature := '{}',
+                created_token := '{}'
+                ",
+                block_link(block_hash),
+                status[0].as_str().unwrap(),
+                to_decimal(&status_2["source_balance"]).unwrap().to_string(),
+                // TODO: or default may be incorrect here since this is optional
+                to_decimal(&status_2["receiver_balance"])
+                    .unwrap_or_default()
+                    .to_string(),
+                to_decimal(&common["fee"]).unwrap_or_default().to_string(),
+                account_link(&common["fee_payer_pk"]),
+                to_decimal(&status_2["fee_payer_balance"])
+                    .unwrap_or_default()
+                    .to_string(),
+                common["fee_token"].as_str().unwrap(),
+                to_decimal(&status_1["fee_payer_account_creation_fee_paid"])
+                    .unwrap_or_default()
+                    .to_string(),
+                to_decimal(&status_1["receiver_account_creation_fee_paid"])
+                    .unwrap_or_default()
+                    .to_string(),
+                to_i64(&common["nonce"]).unwrap_or_default(),
+                to_i64(&common["valid_until"]).unwrap_or_default(),
+                // TODO: or default may be incorrect here since this is optional
+                common["memo"].as_str().unwrap_or_default(),
+                account_link(&data1["signer"]),
+                data1["signature"].as_str().unwrap(),
+                status_1["created_token"].as_str().unwrap_or_default(),
+            );
 
-        match payload["body"][0].as_str().unwrap() {
-            "Stake_delegation" => {
-                let delegation = &body1[1];
-                db.execute(
-                    format!(
-                        "
-                    insert StakingDelegation {{
-                        {},
-                        source := {},
-                        target := {},
-                    }};",
-                        command,
-                        account_link(&delegation["delegator"]),
-                        account_link(&delegation["new_delegate"])
-                    ),
-                    &(),
-                )
-                .await?;
-            }
-            "Payment" => {
-                db.execute(
-                    format!(
-                        "
-                insert Payment {{
-                    {},
-                    source := {},
-                    target := {},
-                    amount := <decimal>$0,
-                    token_id := <int64>$1,
-                }};",
-                        command,
-                        account_link(&body1["source_pk"]),
-                        account_link(&body1["receiver_pk"]),
-                    ),
-                    &(to_decimal(&body1["amount"]), to_i64(&body1["token_id"])),
-                )
-                .await?;
-            }
-            _ => {
-                println!("Unmatched {:?}", payload["body"][0].as_str().unwrap())
+            match payload["body"][0].as_str().unwrap() {
+                "Stake_delegation" => {
+                    let delegation = &body1[1];
+                    db.execute(
+                        format!(
+                            "
+                            insert StakingDelegation {{
+                                {},
+                                source := {},
+                                target := {},
+                            }};",
+                            command,
+                            account_link(&delegation["delegator"]),
+                            account_link(&delegation["new_delegate"])
+                        ),
+                        &(),
+                    )
+                    .await?;
+                }
+                "Payment" => {
+                    db.execute(
+                        format!(
+                            "
+                            insert Payment {{
+                                {},
+                                source := {},
+                                target := {},
+                                amount := <decimal>$0,
+                                token_id := <int64>$1,
+                            }};",
+                            command,
+                            account_link(&body1["source_pk"]),
+                            account_link(&body1["receiver_pk"]),
+                        ),
+                        &(to_decimal(&body1["amount"]), to_i64(&body1["token_id"])),
+                    )
+                    .await?;
+                }
+                _ => {
+                    println!("Unmatched {:?}", payload["body"][0].as_str().unwrap())
+                }
             }
         }
     }
@@ -327,40 +332,42 @@ async fn user_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyh
 }
 
 async fn internal_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> anyhow::Result<()> {
-    for internal_command in diff["internal_command_balances"].as_array().unwrap() {
-        let internal_command_1 = &internal_command[1];
-        match internal_command[0].as_str().unwrap() {
-            "Coinbase" => {
-                db.execute(
-                    format!(
-                        "insert Coinbase {{
-                            block := {},
-                            target_balance := <decimal>$0
-                        }};",
-                        block_link(block_hash)
-                    ),
-                    &(to_decimal(&internal_command_1["coinbase_receiver_balance"]),),
-                )
-                .await?;
+    if let Some(balances) = diff["internal_command_balances"].as_array() {
+        for internal_command in balances {
+            let internal_command_1 = &internal_command[1];
+            match internal_command[0].as_str().unwrap() {
+                "Coinbase" => {
+                    db.execute(
+                        format!(
+                            "insert Coinbase {{
+                                block := {},
+                                target_balance := <decimal>$0
+                            }};",
+                            block_link(block_hash)
+                        ),
+                        &(to_decimal(&internal_command_1["coinbase_receiver_balance"]),),
+                    )
+                    .await?;
+                }
+                "Fee_transfer" => {
+                    db.execute(
+                        format!(
+                            "insert FeeTransfer {{
+                                block := {},
+                                target1_balance := <decimal>$0,
+                                target2_balance := <optional decimal>$1
+                            }};",
+                            block_link(block_hash)
+                        ),
+                        &(
+                            to_decimal(&internal_command_1["receiver1_balance"]),
+                            to_decimal(&internal_command_1["receiver2_balance"]),
+                        ),
+                    )
+                    .await?;
+                }
+                _ => {}
             }
-            "Fee_transfer" => {
-                db.execute(
-                    format!(
-                        "insert FeeTransfer {{
-                            block := {},
-                            target1_balance := <decimal>$0,
-                            target2_balance := <optional decimal>$1
-                        }};",
-                        block_link(block_hash)
-                    ),
-                    &(
-                        to_decimal(&internal_command_1["receiver1_balance"]),
-                        to_decimal(&internal_command_1["receiver2_balance"]),
-                    ),
-                )
-                .await?;
-            }
-            _ => {}
         }
     }
     Ok(())
