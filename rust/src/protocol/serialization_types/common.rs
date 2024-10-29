@@ -33,9 +33,6 @@ impl_from_for_newtype!(U64Json, TokenIdV1);
 /// u64 representing a block time (v1)
 pub type BlockTimeV1 = Versioned2<u64, 1, 1>;
 
-/// u64 representing an account nonce (v1) // This should also be an extendedu32
-pub type AccountNonceV1 = Versioned2<u32, 1, 1>;
-
 /// u32 wrapper (json)
 /// Note that integers are represented as string in mina json
 #[derive(Clone, Debug, Eq, PartialEq, derive_more::From)]
