@@ -1,10 +1,9 @@
 use super::{
-    db, gen::BlockProtocolStateConsensusStateQueryInput, get_block, get_block_canonicity,
-    millis_to_iso_date_string, transactions::TransactionWithoutBlock, MAINNET_COINBASE_REWARD,
-    MAINNET_EPOCH_SLOT_COUNT, PK,
+    db, get_block_canonicity, millis_to_iso_date_string, transactions::TransactionWithoutBlock,
+    MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT, PK,
 };
 use crate::{
-    block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
     command::{
         internal::{store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData},
         signed::SignedCommandWithData,
@@ -14,7 +13,10 @@ use crate::{
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
     utility::store::{block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN},
-    web::graphql::gen::BlockQueryInput,
+    web::graphql::{
+        gen::{BlockProtocolStateConsensusStateQueryInput, BlockQueryInput},
+        get_block,
+    },
 };
 use async_graphql::{self, Enum, Object, Result, SimpleObject};
 use log::error;
@@ -32,61 +34,13 @@ impl BlocksQueryRoot {
         query: Option<BlockQueryInput>,
     ) -> Result<Option<Block>> {
         let db = db(ctx);
-        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
-        let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
-        let epoch_num_supercharged_blocks =
-            db.get_block_production_supercharged_epoch_count(None)?;
-        let total_num_blocks = db.get_block_production_total_count()?;
-        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
-        let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
-        let epoch_num_user_commands = db
-            .get_user_commands_epoch_count(None)
-            .expect("epoch user command count");
-        let total_num_user_commands = db
-            .get_user_commands_total_count()
-            .expect("total user command count");
-        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
         // no query filters => get the best block
         if query.is_none() {
-            return Ok(db.get_best_block().map(|b| {
-                b.map(|pcb| {
-                    let state_hash = pcb.state_hash();
-                    let canonical = get_block_canonicity(db, &state_hash);
-                    let block_num_snarks = db
-                        .get_block_snarks_count(&state_hash)
-                        .expect("snark counts")
-                        .unwrap_or_default();
-                    let block_num_user_commands = db
-                        .get_block_user_commands_count(&state_hash)
-                        .expect("user command counts")
-                        .unwrap_or_default();
-                    let block_num_internal_commands = db
-                        .get_block_internal_commands_count(&state_hash)
-                        .expect("internal command counts")
-                        .unwrap_or_default();
-                    Block {
-                        canonical,
-                        epoch_num_blocks,
-                        epoch_num_canonical_blocks,
-                        epoch_num_supercharged_blocks,
-                        total_num_blocks,
-                        total_num_canonical_blocks,
-                        total_num_supercharged_blocks,
-                        block_num_snarks,
-                        block_num_user_commands,
-                        block_num_internal_commands,
-                        block: BlockWithoutCanonicity::new(
-                            &pcb,
-                            canonical,
-                            epoch_num_user_commands,
-                            total_num_user_commands,
-                        ),
-                        epoch_num_slots_produced,
-                        num_unique_block_producers_last_n_blocks: None,
-                    }
-                })
-            })?);
+            let counts = get_counts(db).await?;
+            return Ok(db
+                .get_best_block()
+                .map(|b| b.map(|pcb| Block::from_precomputed(db, &pcb, counts)))?);
         }
 
         // Use constant time access if we have the state hash
@@ -95,44 +49,11 @@ impl BlocksQueryRoot {
                 return Ok(None);
             }
 
-            let state_hash = BlockHash::from(state_hash);
-            let pcb = match db.get_block(&state_hash)? {
+            let pcb = match db.get_block(&state_hash.into())? {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
-            let canonical = get_block_canonicity(db, &state_hash);
-            let block_num_snarks = db
-                .get_block_snarks_count(&state_hash)
-                .expect("snark counts")
-                .unwrap_or_default();
-            let block_num_user_commands = db
-                .get_block_user_commands_count(&state_hash)
-                .expect("user command counts")
-                .unwrap_or_default();
-            let block_num_internal_commands = db
-                .get_block_internal_commands_count(&state_hash)
-                .expect("internal command counts")
-                .unwrap_or_default();
-            let block = Block {
-                canonical,
-                epoch_num_blocks,
-                epoch_num_canonical_blocks,
-                epoch_num_supercharged_blocks,
-                total_num_blocks,
-                total_num_canonical_blocks,
-                total_num_supercharged_blocks,
-                block_num_snarks,
-                block_num_user_commands,
-                block_num_internal_commands,
-                block: BlockWithoutCanonicity::new(
-                    &pcb,
-                    canonical,
-                    epoch_num_user_commands,
-                    total_num_user_commands,
-                ),
-                epoch_num_slots_produced,
-                num_unique_block_producers_last_n_blocks: None,
-            };
+            let block = Block::from_precomputed(db, &pcb, get_counts(db).await?);
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
             }
@@ -146,39 +67,8 @@ impl BlocksQueryRoot {
         {
             let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
-            let canonical = get_block_canonicity(db, &state_hash);
-            let block_num_snarks = db
-                .get_block_snarks_count(&state_hash)
-                .expect("snark counts")
-                .unwrap_or_default();
-            let block_num_user_commands = db
-                .get_block_user_commands_count(&state_hash)
-                .expect("user command counts")
-                .unwrap_or_default();
-            let block_num_internal_commands = db
-                .get_block_internal_commands_count(&state_hash)
-                .expect("internal command counts")
-                .unwrap_or_default();
-            let block = Block {
-                canonical,
-                epoch_num_blocks,
-                epoch_num_canonical_blocks,
-                epoch_num_supercharged_blocks,
-                total_num_blocks,
-                total_num_canonical_blocks,
-                total_num_supercharged_blocks,
-                block_num_snarks,
-                block_num_user_commands,
-                block_num_internal_commands,
-                block: BlockWithoutCanonicity::new(
-                    &pcb,
-                    canonical,
-                    epoch_num_user_commands,
-                    total_num_user_commands,
-                ),
-                epoch_num_slots_produced,
-                num_unique_block_producers_last_n_blocks: None,
-            };
+
+            let block = Block::from_precomputed(db, &pcb, get_counts(db).await?);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 return Ok(Some(block));
@@ -235,43 +125,7 @@ impl BlocksQueryRoot {
             }
         }
 
-        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
-        let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
-        let epoch_num_supercharged_blocks =
-            db.get_block_production_supercharged_epoch_count(None)?;
-        let total_num_blocks = db.get_block_production_total_count()?;
-        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
-        let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
-        let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
-        let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
-        let epoch_num_user_commands = db
-            .get_user_commands_epoch_count(None)
-            .expect("epoch user command count");
-        let total_num_user_commands = db
-            .get_user_commands_total_count()
-            .expect("total user command count");
-        let epoch_num_internal_commands = db
-            .get_internal_commands_epoch_count(None)
-            .expect("epoch internal command count");
-        let total_num_internal_commands = db
-            .get_internal_commands_total_count()
-            .expect("total internal command count");
-        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
-        let counts = [
-            epoch_num_blocks,
-            epoch_num_canonical_blocks,
-            epoch_num_supercharged_blocks,
-            total_num_blocks,
-            total_num_canonical_blocks,
-            total_num_supercharged_blocks,
-            epoch_num_snarks,
-            total_num_snarks,
-            epoch_num_user_commands,
-            total_num_user_commands,
-            epoch_num_internal_commands,
-            total_num_internal_commands,
-            epoch_num_slots_produced,
-        ];
+        let counts = get_counts(db).await?;
         let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
@@ -1306,6 +1160,46 @@ impl Block {
             num_unique_block_producers_last_n_blocks: None,
         }
     }
+}
+
+pub async fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 13]> {
+    let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
+    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
+    let epoch_num_supercharged_blocks = db.get_block_production_supercharged_epoch_count(None)?;
+    let total_num_blocks = db.get_block_production_total_count()?;
+    let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
+    let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
+    let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
+    let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
+    let epoch_num_user_commands = db
+        .get_user_commands_epoch_count(None)
+        .expect("epoch user command count");
+    let total_num_user_commands = db
+        .get_user_commands_total_count()
+        .expect("total user command count");
+    let epoch_num_internal_commands = db
+        .get_internal_commands_epoch_count(None)
+        .expect("epoch internal command count");
+    let total_num_internal_commands = db
+        .get_internal_commands_total_count()
+        .expect("total internal command count");
+    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
+
+    Ok([
+        epoch_num_blocks,
+        epoch_num_canonical_blocks,
+        epoch_num_supercharged_blocks,
+        total_num_blocks,
+        total_num_canonical_blocks,
+        total_num_supercharged_blocks,
+        epoch_num_snarks,
+        total_num_snarks,
+        epoch_num_user_commands,
+        total_num_user_commands,
+        epoch_num_internal_commands,
+        total_num_internal_commands,
+        epoch_num_slots_produced,
+    ])
 }
 
 impl From<DbInternalCommandWithData> for BlockFeetransfer {
