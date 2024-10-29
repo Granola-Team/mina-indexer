@@ -374,14 +374,14 @@ async fn internal_commands(db: &Arc<Client>, block_hash: &str, diff: &Value) -> 
 }
 
 fn account_link(public_key: &Value) -> String {
-    return format!(
+    format!(
         "(select Account filter .public_key = '{}')",
         public_key.as_str().unwrap()
-    );
+    )
 }
 
 fn block_link(hash: &str) -> String {
-    return format!("assert_single((select Block filter .hash = '{}'))", hash);
+    format!("assert_single((select Block filter .hash = '{}'))", hash)
 }
 
 const ACCOUNTS_REGEX: LazyLock<Regex> =
