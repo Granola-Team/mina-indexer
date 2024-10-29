@@ -19,6 +19,7 @@ use crate::{
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
+use serde::Serialize;
 use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
 
@@ -40,7 +41,7 @@ pub enum TransactionSortByInput {
     GlobalSlotDesc,
 }
 
-#[derive(Clone, Debug, SimpleObject)]
+#[derive(Clone, Debug, SimpleObject, Serialize)]
 pub struct TransactionWithoutBlock {
     amount: u64,
     block_height: u32,
