@@ -98,7 +98,7 @@ pub async fn get_blocks(
 }
 
 #[get("/blocks/{state_hash}")]
-pub async fn get_block(
+pub async fn get_block_by_state_hash(
     store: Data<Arc<IndexerStore>>,
     state_hash: web::Path<String>,
 ) -> HttpResponse {

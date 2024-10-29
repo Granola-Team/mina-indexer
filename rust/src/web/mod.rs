@@ -37,7 +37,7 @@ pub async fn start_web_server<A: net::ToSocketAddrs>(
             .app_data(Data::new(state.clone()))
             .app_data(Data::new(locked.clone()))
             .service(blocks::get_blocks)
-            .service(blocks::get_block)
+            .service(blocks::get_block_by_state_hash)
             .service(accounts::get_account)
             .service(blockchain::get_blockchain_summary)
             .service(
