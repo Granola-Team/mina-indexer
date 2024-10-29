@@ -1094,15 +1094,15 @@ test_rest_blocks() {
 
     # /blocks endpoint
     curl --silent http://localhost:${port}/blocks > output.json
-    assert $(idxr summary --json | jq -r .witness_tree.best_tip_hash) $(cat output.json | jq -r .[0].state_hash)
+    assert $(idxr summary --json | jq -r .witness_tree.best_tip_hash) $(cat output.json | jq -r .[0].block.state_hash)
 
     # /blocks/{state_hash} endpoint
     curl --silent http://localhost:${port}/blocks/3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 > output.json
-    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .state_hash)
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .block.state_hash)
 
     # /blocks?height={height} endpoint
     curl --silent http://localhost:${port}/blocks?height=100 > output.json
-    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].state_hash)
+    assert '3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4' $(cat output.json | jq -r .[0].block.state_hash)
 }
 
 test_best_chain_many_blocks() {
