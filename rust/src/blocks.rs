@@ -374,7 +374,7 @@ fn account_link(public_key: &Value) -> String {
 }
 
 fn block_link(hash: &str) -> String {
-    return format!("(select Block filter .hash = '{}')", hash);
+    return format!("assert_single((select Block filter .hash = '{}'))", hash);
 }
 
 const ACCOUNTS_REGEX: LazyLock<Regex> =
