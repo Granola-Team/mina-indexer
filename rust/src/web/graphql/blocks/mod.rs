@@ -20,6 +20,7 @@ use crate::{
 };
 use async_graphql::{self, Enum, Object, Result, SimpleObject};
 use log::error;
+use serde::Serialize;
 use speedb::{Direction, IteratorMode};
 use std::{collections::HashSet, sync::Arc};
 
@@ -461,7 +462,7 @@ pub enum BlockSortByInput {
     GlobalSlotDesc,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 pub struct Block {
     /// Value canonical
     pub canonical: bool,
@@ -515,7 +516,22 @@ pub struct Block {
     pub block: BlockWithoutCanonicity,
 }
 
-#[derive(Default, SimpleObject)]
+impl std::fmt::Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
+impl std::fmt::Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match serde_json::to_string_pretty(self) {
+            Ok(s) => write!(f, "{s}"),
+            Err(_) => Err(std::fmt::Error),
+        }
+    }
+}
+
+#[derive(Default, SimpleObject, Serialize)]
 pub struct BlockWithoutCanonicity {
     /// Value state_hash
     state_hash: String,
@@ -560,8 +576,7 @@ pub struct BlockWithoutCanonicity {
     snark_jobs: Vec<SnarkJob>,
 }
 
-#[derive(SimpleObject)]
-
+#[derive(SimpleObject, Serialize)]
 struct SnarkJob {
     /// Value block state hash
     block_state_hash: String,
@@ -579,7 +594,7 @@ struct SnarkJob {
     prover: String,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct Transactions {
     /// Value coinbase
     coinbase: String,
@@ -594,7 +609,7 @@ struct Transactions {
     user_commands: Vec<TransactionWithoutBlock>,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct BlockFeetransfer {
     pub fee: String,
     pub recipient: String,
@@ -603,7 +618,7 @@ struct BlockFeetransfer {
     pub feetransfer_kind: String,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct ConsensusState {
     /// Value total currency
     total_currency: u64,
@@ -642,7 +657,7 @@ struct ConsensusState {
     staking_epoch_data: StakingEpochData,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct StakingEpochData {
     /// Value seed
     seed: String,
@@ -660,7 +675,7 @@ struct StakingEpochData {
     ledger: StakingEpochDataLedger,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct NextEpochData {
     /// Value seed
     seed: String,
@@ -678,7 +693,7 @@ struct NextEpochData {
     ledger: NextEpochDataLedger,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct NextEpochDataLedger {
     /// Value hash
     hash: String,
@@ -687,7 +702,7 @@ struct NextEpochDataLedger {
     total_currency: u64,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct StakingEpochDataLedger {
     /// Value hash
     hash: String,
@@ -696,7 +711,7 @@ struct StakingEpochDataLedger {
     total_currency: u64,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct BlockchainState {
     /// Value utc_date as numeric string
     utc_date: String,
@@ -711,7 +726,7 @@ struct BlockchainState {
     staged_ledger_hash: String,
 }
 
-#[derive(Default, SimpleObject)]
+#[derive(Default, SimpleObject, Serialize)]
 struct ProtocolState {
     /// Value parent state hash
     previous_state_hash: String,

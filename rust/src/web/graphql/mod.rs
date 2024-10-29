@@ -22,6 +22,7 @@ use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
     InputValueResult, MergedObject, Scalar, ScalarType, Schema, SimpleObject, Value,
 };
+use serde::Serialize;
 use std::sync::Arc;
 
 #[derive(MergedObject, Default)]
@@ -136,7 +137,7 @@ pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> Preco
         .0
 }
 
-#[derive(Default, Clone, Debug, PartialEq, SimpleObject)]
+#[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 #[graphql(name = "PublicKey")]
 pub(crate) struct PK {
     pub public_key: String,
