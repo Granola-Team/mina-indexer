@@ -1,166 +1,148 @@
+use bigdecimal::BigDecimal;
+use futures::future::try_join_all;
+use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
 use std::{collections::HashSet, sync::Arc};
 
-use edgedb_tokio::Client;
-use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
-use tokio::sync::Semaphore;
-
-use crate::{
-    extract_digits_from_file_name, extract_hash_from_file_name, get_db, get_file_paths,
-    insert_accounts, to_decimal, to_i64, to_json,
-};
-
-const CONCURRENT_TASKS: usize = 10;
+use crate::{account_link, chunk_size, db::DbPool, insert_accounts, process_files, to_decimal};
 
 /// Ingest staking ledger files (JSON) into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
-    let semaphore = Arc::new(Semaphore::new(CONCURRENT_TASKS));
-    let mut handles = vec![];
-
-    let db = get_db(CONCURRENT_TASKS * 2).await?;
-
-    for path in get_file_paths(staking_ledgers_dir)? {
-        // clone the Arc to the semaphore for each task
-        let sem = Arc::clone(&semaphore);
-        let db = Arc::clone(&db);
-
-        let handle = tokio::spawn(async move {
-            let _permit = sem.acquire().await.unwrap();
-
-            match to_json(&path).await {
-                Ok(json) => {
-                    let ledger_hash = extract_hash_from_file_name(&path);
-                    let epoch = extract_digits_from_file_name(&path);
-
-                    let a = insert(&db, json, ledger_hash, epoch).await;
-                    match a {
-                        Ok(_) => (),
-                        Err(e) => panic!("Ruhroh {:?}", e),
-                    };
-                }
-                Err(e) => {
-                    match e.kind() {
-                        std::io::ErrorKind::InvalidData => {
-                            println!("Error - Contains invalid UTF-8 data: {:?}", &path);
-                        }
-                        _ => {
-                            // Handle other types of IO errors
-                            println!("Error - Failed to read file {:?}: {}", &path, e);
-                        }
-                    }
-                }
-            }
-
-            // permit is auto released when _permit goes out of scope
-        });
-
-        handles.push(handle);
-    }
-
-    for handle in handles {
-        handle.await?;
-    }
-    Ok(())
+    let pool = Arc::new(DbPool::new().await?);
+    process_files(staking_ledgers_dir, pool, process_ledger).await
 }
 
-async fn insert(
-    db: &Arc<Client>,
+async fn process_ledger(
+    pool: Arc<DbPool>,
     json: Value,
-    ledger_hash: &str,
+    ledger_hash: String,
     epoch: i64,
-) -> anyhow::Result<()> {
+) -> Result<(), edgedb_tokio::Error> {
     let json = json.as_array().unwrap();
     let accounts = extract_accounts(json);
-    insert_accounts(db, accounts).await?;
+    let ledger_hash = Arc::new(ledger_hash);
 
-    db.execute(
-        "insert StakingEpoch {
+    // Run account insertion and epoch creation concurrently
+    let query = "insert StakingEpoch {
             hash := <str>$0,
             epoch := <int64>$1
-        } unless conflict;",
-        &(ledger_hash, epoch),
-    )
-    .await?;
+        } unless conflict;"
+        .to_string();
 
-    for activity in json {
-        let source = activity["pk"].as_str();
-        let balance = to_decimal(&activity["balance"]);
-        let target = activity["delegate"].as_str();
-        let token = to_i64(&activity["token"]);
-        let nonce = to_i64(&activity["nonce"]);
-        let receipt_chain_hash = activity["receipt_chain_hash"].as_str();
-        let voting_for = activity["voting_for"].as_str();
+    let ledger_hash_str = ledger_hash.as_str().to_string();
+    let (_, _) = tokio::try_join!(
+        insert_accounts(&pool, accounts),
+        pool.execute(query, (ledger_hash_str, epoch))
+    )?;
 
-        if let Some(timing) = activity["timing"].as_object() {
-            let initial_minimum_balance = to_decimal(&timing["initial_minimum_balance"]);
-            let cliff_time = to_i64(&timing["cliff_time"]);
-            let cliff_amount = to_decimal(&timing["cliff_amount"]);
-            let vesting_period = to_i64(&timing["vesting_period"]);
-            let vesting_increment = to_decimal(&timing["vesting_increment"]);
+    let json = Arc::new(json.to_vec());
 
-            db.execute(
-                format!("
-                    with ledger := (
+    for chunk in json.chunks(chunk_size()) {
+        let mut futures = Vec::new();
+
+        for activity in chunk {
+            let activity = activity.clone();
+            let ledger_hash = Arc::clone(&ledger_hash);
+
+            let balance = to_decimal(&activity["balance"]);
+            let token = activity["token"].as_i64();
+            let nonce = activity["nonce"].as_i64();
+            let receipt_chain_hash = activity["receipt_chain_hash"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            let voting_for = activity["voting_for"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+
+            let (query, params) = if let Some(timing) = activity["timing"].as_object() {
+                let query = format!(
+                    "with ledger := (
                         insert StakingLedger {{
                             epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-                            source := (select Account filter .public_key = <str>$0),
-                            balance := <decimal>$1,
-                            target := (select Account filter .public_key = <str>$2),
-                            token := <int64>$3,
-                            nonce := <optional int64>$4,
-                            receipt_chain_hash := <str>$5,
-                            voting_for := <str>$6
+                            source := {},
+                            balance := <decimal>$0,
+                            target := {},
+                            token := <int64>$1,
+                            nonce := <optional int64>$2,
+                            receipt_chain_hash := <str>$3,
+                            voting_for := <str>$4
                         }} unless conflict
                     )
                     insert StakingTiming {{
                         ledger := ledger,
-                        initial_minimum_balance := <decimal>$7,
-                        cliff_time := <int64>$8,
-                        cliff_amount := <decimal>$9,
-                        vesting_period := <int64>$10,
-                        vesting_increment := <decimal>$11
-                    }} unless conflict;", epoch, ledger_hash),
-                &(
-                    source,
-                    balance,
-                    target,
-                    token,
-                    nonce,
-                    receipt_chain_hash,
-                    voting_for,
-                    initial_minimum_balance,
-                    cliff_time,
-                    cliff_amount,
-                    vesting_period,
-                    vesting_increment,
-                ),
-            )
-            .await?;
-        } else {
-            db.execute(
-                "insert StakingLedger {
-                    epoch := assert_single((select StakingEpoch filter .epoch = <int64>$0 and .hash = <str>$1)),
-                    source := (select Account filter .public_key = <str>$2),
-                    balance := <decimal>$3,
-                    target := (select Account filter .public_key = <str>$4),
-                    token := <int64>$5,
-                    nonce := <optional int64>$6,
-                    receipt_chain_hash := <str>$7,
-                    voting_for := <str>$8
-                } unless conflict;",
-                &(
+                        initial_minimum_balance := <decimal>$5,
+                        cliff_time := <int64>$6,
+                        cliff_amount := <decimal>$7,
+                        vesting_period := <int64>$8,
+                        vesting_increment := <decimal>$9
+                    }} unless conflict;",
                     epoch,
                     ledger_hash,
-                    source,
-                    balance,
-                    target,
-                    token,
-                    nonce,
-                    receipt_chain_hash,
-                    voting_for,
-                ),
-            )
-            .await?;
+                    account_link(&activity["pk"]),
+                    account_link(&activity["delegate"])
+                );
+
+                let initial_minimum_balance = to_decimal(&timing["initial_minimum_balance"]);
+                let cliff_time = timing["cliff_time"].as_i64();
+                let cliff_amount = to_decimal(&timing["cliff_amount"]);
+                let vesting_period = timing["vesting_period"].as_i64();
+                let vesting_increment = to_decimal(&timing["vesting_increment"]);
+
+                (
+                    query,
+                    (
+                        balance,
+                        token,
+                        nonce,
+                        receipt_chain_hash,
+                        voting_for,
+                        initial_minimum_balance,
+                        cliff_time,
+                        cliff_amount,
+                        vesting_period,
+                        vesting_increment,
+                    ),
+                )
+            } else {
+                let query = format!(
+                    "insert StakingLedger {{
+                        epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
+                        source := {},
+                        balance := <decimal>$0,
+                        target := {},
+                        token := <int64>$1,
+                        nonce := <optional int64>$2,
+                        receipt_chain_hash := <str>$3,
+                        voting_for := <str>$4
+                    }} unless conflict;",
+                    epoch,
+                    ledger_hash,
+                    account_link(&activity["pk"]),
+                    account_link(&activity["delegate"])
+                );
+
+                (
+                    query,
+                    (
+                        balance,
+                        token,
+                        nonce,
+                        receipt_chain_hash,
+                        voting_for,
+                        None::<BigDecimal>, // initial_minimum_balance
+                        None::<i64>,        // cliff_time
+                        None::<BigDecimal>, // cliff_amount
+                        None::<i64>,        // vesting_period
+                        None::<BigDecimal>, // vesting_increment
+                    ),
+                )
+            };
+
+            futures.push(pool.execute(query, params));
         }
+
+        try_join_all(futures).await?;
     }
 
     Ok(())

@@ -1,19 +1,31 @@
 use bigdecimal::BigDecimal;
-use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
+use db::DbPool;
+use futures::future::try_join_all;
 use rayon::prelude::*;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
-use std::{cmp::Ordering, collections::HashSet, fs, io, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::Mutex;
+use stats::ProcessingStats;
+use std::{
+    cmp::Ordering, collections::HashSet, fs, future::Future, io, path::PathBuf, str::FromStr,
+    sync::Arc, time::Instant,
+};
 
 pub mod blocks;
+mod db;
 pub mod staking;
+pub mod stats;
+
+const ACCOUNTS_BATCH_SIZE: usize = 1000;
+
+#[inline]
+pub(crate) fn chunk_size() -> usize {
+    let cpu_count = num_cpus::get();
+    std::cmp::min(32, std::cmp::max(8, cpu_count * 2))
+}
 
 /// Get (and sort) file paths for a given directory
+#[inline]
 fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
-    // Read directory entries
     let entries = fs::read_dir(dir)?;
-
-    // Collect and filter entries in parallel
     let paths: Vec<PathBuf> = entries
         .par_bridge()
         .filter_map(|entry| {
@@ -28,7 +40,6 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
         })
         .collect();
 
-    // Parallel sorting
     let mut sorted_paths = paths;
     sorted_paths.par_sort_unstable_by(|a, b| {
         natural_sort(
@@ -65,33 +76,66 @@ fn natural_sort(a: &str, b: &str) -> Ordering {
     }
 }
 
-/// Get a [database][Client] connection pool
-async fn get_db_raw(num_connections: usize) -> Result<Client, edgedb_tokio::Error> {
-    let db_builder = Client::new(
-        &Builder::new()
-            .max_concurrency(num_connections)
-            .build_env()
-            .await?,
-    );
+pub async fn process_files<F, Fut>(dir: &str, pool: Arc<DbPool>, processor: F) -> anyhow::Result<()>
+where
+    F: Fn(Arc<DbPool>, Value, String, i64) -> Fut + Send + Sync + Clone + 'static,
+    Fut: Future<Output = Result<(), edgedb_tokio::Error>> + Send,
+{
+    let paths = get_file_paths(dir)?;
+    let chunks: Vec<_> = paths.chunks(chunk_size()).map(|c| c.to_vec()).collect();
+    let mut stats = ProcessingStats::new(chunks.len());
 
-    let retry_opts = RetryOptions::default().with_rule(
-        RetryCondition::TransactionConflict,
-        // No. of retries
-        8,
-        |_| std::time::Duration::from_millis(800),
-    );
+    for (chunk_index, chunk) in chunks.iter().enumerate() {
+        let chunk_start = Instant::now();
+        let mut chunk_handles = vec![];
 
-    Ok(db_builder.with_retry_options(retry_opts))
-}
+        for path in chunk {
+            let pool = Arc::clone(&pool);
+            let path = path.clone();
+            let processor = processor.clone();
 
-/// Get a [database][Client] connection pool
-async fn get_db(num_connections: usize) -> Result<Arc<Client>, edgedb_tokio::Error> {
-    Ok(Arc::new(get_db_raw(num_connections).await?))
-}
+            let handle = tokio::spawn(async move {
+                match to_json(&path).await {
+                    Ok(json) => {
+                        let hash = extract_hash_from_file_name(&path);
+                        let number = extract_digits_from_file_name(&path);
 
-/// Get a [database][Client] connection pool
-async fn get_db_locking(num_connections: usize) -> Result<Arc<Mutex<Client>>, edgedb_tokio::Error> {
-    Ok(Arc::new(Mutex::new(get_db_raw(num_connections).await?)))
+                        match processor(pool, json, hash.clone(), number).await {
+                            Ok(_) => println!("Processed: {}", hash),
+                            Err(e) => eprintln!("Error processing {}: {:?}", hash, e),
+                        }
+                    }
+                    Err(e) => match e.kind() {
+                        std::io::ErrorKind::InvalidData => {
+                            println!("Error - Contains invalid UTF-8 data: {:?}", &path);
+                        }
+                        _ => println!("Error - Failed to read file {:?}: {}", &path, e),
+                    },
+                }
+            });
+
+            chunk_handles.push(handle);
+        }
+
+        for handle in chunk_handles {
+            if let Err(e) = handle.await {
+                eprintln!("Task failed: {:?}", e);
+            }
+        }
+
+        stats.update(chunk_start.elapsed());
+        let pool_stats = pool.get_pool_stats().await;
+
+        println!(
+            "Chunk {}/{} completed. Pool stats: {:?}. {}",
+            chunk_index + 1,
+            chunks.len(),
+            pool_stats,
+            stats.get_stats()
+        );
+    }
+
+    Ok(())
 }
 
 fn to_titlecase(s: &str) -> String {
@@ -104,7 +148,7 @@ fn to_titlecase(s: &str) -> String {
 }
 
 /// Extract the hash part from a Mina block or staking ledger file name
-fn extract_hash_from_file_name(path: &PathBuf) -> &str {
+fn extract_hash_from_file_name(path: &PathBuf) -> String {
     let file_name = path.file_name().unwrap().to_str().unwrap();
     file_name
         .split('-')
@@ -113,6 +157,7 @@ fn extract_hash_from_file_name(path: &PathBuf) -> &str {
         .split('.')
         .next()
         .unwrap()
+        .to_string()
 }
 
 /// Extract the digits part from a Mina block (the height) or staking ledger (the epoch) file name
@@ -130,23 +175,27 @@ fn extract_digits_from_file_name(path: &PathBuf) -> i64 {
 }
 
 async fn insert_accounts(
-    db: &Arc<Client>,
+    pool: &DbPool,
     accounts: HashSet<String>,
 ) -> Result<(), edgedb_tokio::Error> {
-    for account in accounts {
-        db.execute(
-            "insert Account {public_key := <str>$0} unless conflict;",
-            &(account,),
-        )
-        .await?;
+    let accounts_vec: Vec<String> = accounts.into_iter().collect();
+
+    for chunk in accounts_vec.chunks(ACCOUNTS_BATCH_SIZE) {
+        let mut futures = Vec::new();
+
+        for account in chunk {
+            let account = account.clone();
+            let future = pool.execute(
+                "insert Account {public_key := <str>$0} unless conflict;".to_string(),
+                (account,),
+            );
+            futures.push(future);
+        }
+
+        try_join_all(futures).await?;
     }
 
     Ok(())
-}
-
-/// These should really all be u64 but the conversion to EdgeDB requires i64
-fn to_i64(value: &Value) -> Option<i64> {
-    value.as_str().and_then(|s| s.parse().ok())
 }
 
 fn to_decimal(value: &Value) -> Option<BigDecimal> {
@@ -177,4 +226,11 @@ async fn to_json(path: &PathBuf) -> io::Result<Value> {
         Ok(value) => Ok(value),
         Err(e) => Err(io::Error::new(io::ErrorKind::InvalidData, e)),
     }
+}
+
+fn account_link(public_key: &Value) -> String {
+    format!(
+        "(select Account filter .public_key = '{}')",
+        public_key.as_str().unwrap()
+    )
 }
