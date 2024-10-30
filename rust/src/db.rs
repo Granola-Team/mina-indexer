@@ -2,8 +2,9 @@ use anyhow::Result;
 use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
+use tracing::{debug, error, info};
 
 const MIN_CONNECTIONS: usize = 4;
 const MAX_CONNECTIONS: usize = 32;
@@ -55,11 +56,24 @@ impl DbPool {
 
     pub async fn execute_internal<F, T>(&self, operation: F) -> Result<T, edgedb_tokio::Error>
     where
-        F: FnOnce(&Client) -> futures::future::BoxFuture<'_, Result<T, edgedb_tokio::Error>>,
+        F: FnOnce(&Client) -> futures::future::BoxFuture<'_, Result<T, edgedb_tokio::Error>>
+            + Send
+            + 'static,
     {
+        let start = Instant::now();
         self.active_connections.fetch_add(1, Ordering::SeqCst);
+
         let client = self.inner.lock().await;
         let result = operation(&client).await;
+
+        let duration = start.elapsed();
+        match &result {
+            Ok(_) => debug!("EdgeDB query completed in {:?}", duration),
+            Err(e) => {
+                error!("EdgeDB query failed after {:?}", duration);
+            }
+        }
+
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         result
     }
@@ -68,6 +82,12 @@ impl DbPool {
     where
         T: edgedb_protocol::query_arg::QueryArgs + Send + Sync + 'static,
     {
+        info!(
+            "Executing EdgeDB query with {} parameters",
+            std::any::type_name::<T>()
+        );
+        info!("Query text: {}", query);
+
         self.execute_internal(|client| {
             Box::pin(async move { client.execute(&query, &params).await })
         })
