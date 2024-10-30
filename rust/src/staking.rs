@@ -3,7 +3,9 @@ use futures::future::try_join_all;
 use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
 use std::{collections::HashSet, sync::Arc};
 
-use crate::{account_link, chunk_size, db::DbPool, insert_accounts, process_files, to_decimal};
+use crate::{
+    account_link, chunk_size, db::DbPool, insert_accounts, process_files, to_decimal, to_i64,
+};
 
 /// Ingest staking ledger files (JSON) into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
@@ -44,8 +46,8 @@ async fn process_ledger(
             let ledger_hash = Arc::clone(&ledger_hash);
 
             let balance = to_decimal(&activity["balance"]);
-            let token = activity["token"].as_i64();
-            let nonce = activity["nonce"].as_i64();
+            let token = to_i64(&activity["token"]);
+            let nonce = to_i64(&activity["nonce"]);
             let receipt_chain_hash = activity["receipt_chain_hash"]
                 .as_str()
                 .unwrap_or_default()
@@ -84,9 +86,9 @@ async fn process_ledger(
                 );
 
                 let initial_minimum_balance = to_decimal(&timing["initial_minimum_balance"]);
-                let cliff_time = timing["cliff_time"].as_i64();
+                let cliff_time = to_i64(&timing["cliff_time"]);
                 let cliff_amount = to_decimal(&timing["cliff_amount"]);
-                let vesting_period = timing["vesting_period"].as_i64();
+                let vesting_period = to_i64(&timing["vesting_period"]);
                 let vesting_increment = to_decimal(&timing["vesting_increment"]);
 
                 (

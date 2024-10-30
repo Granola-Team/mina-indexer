@@ -5,7 +5,9 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use crate::{account_link, db::DbPool, insert_accounts, process_files, to_decimal, to_titlecase};
+use crate::{
+    account_link, db::DbPool, insert_accounts, process_files, to_decimal, to_i64, to_titlecase,
+};
 
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new().await?);
@@ -88,7 +90,7 @@ async fn process_block_data(
                 block := block,
                 snarked_ledger_hash := '{}',
                 genesis_ledger_hash := '{}',
-                snarked_next_available_token := <int64>$8,
+                snarked_next_available_token := <opt int64>$8,
                 timestamp := <int64>$9
             }}
         )
@@ -128,21 +130,22 @@ async fn process_block_data(
     .to_string();
 
     // Clone/convert all numeric values needed in the closure
-    let blockchain_length = height;
-    let epoch_count = consensus_state["epoch_count"].as_i64();
-    let global_slot = consensus_state["global_slot_since_genesis"].as_i64();
-    let scheduled_time = body["scheduled_time"].as_i64();
-    let total_currency = consensus_state["total_currency"].as_i64();
+    let epoch_count = to_i64(&consensus_state["epoch_count"]);
+    let global_slot = to_i64(&consensus_state["global_slot_since_genesis"]);
+    let scheduled_time = to_i64(&body["scheduled_time"]);
+    let total_currency = to_i64(&consensus_state["total_currency"]);
     let supercharge_coinbase = consensus_state["supercharge_coinbase"].as_bool();
     let has_ancestor = consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool();
-    let min_window_density = consensus_state["min_window_density"].as_i64();
-    let snarked_next_token = blockchain_state["snarked_next_available_token"].as_i64();
-    let timestamp = blockchain_state["timestamp"].as_i64();
+    let min_window_density = to_i64(&consensus_state["min_window_density"]);
+    let snarked_next_token = to_i64(&blockchain_state["snarked_next_available_token"]);
+    let timestamp = to_i64(&blockchain_state["timestamp"]);
+
+    println!("scheduled_time: {:?}", scheduled_time);
 
     pool.execute(
         query,
         (
-            blockchain_length,
+            height,
             epoch_count,
             global_slot,
             scheduled_time,
@@ -180,11 +183,11 @@ async fn process_epoch_data(
     .to_string();
 
     let ledger_hash = ledger["hash"].to_string();
-    let total_currency = ledger["total_currency"].as_i64();
+    let total_currency = to_i64(&ledger["total_currency"]);
     let seed = epoch_data["seed"].to_string();
     let start_checkpoint = epoch_data["start_checkpoint"].to_string();
     let lock_checkpoint = epoch_data["lock_checkpoint"].to_string();
-    let epoch_length = epoch_data["epoch_length"].as_i64();
+    let epoch_length = to_i64(&epoch_data["epoch_length"]);
 
     pool.execute(
         query,
@@ -322,8 +325,8 @@ async fn user_commands(
                 to_decimal(&status_1["receiver_account_creation_fee_paid"])
                     .unwrap_or_default()
                     .to_string(),
-                common["nonce"].as_i64().unwrap_or_default(),
-                common["valid_until"].as_i64().unwrap_or_default(),
+                to_i64(&common["nonce"]).unwrap_or_default(),
+                to_i64(&common["valid_until"]).unwrap_or_default(),
                 common["memo"].as_str().unwrap_or_default(),
                 account_link(&data1["signer"]),
                 data1["signature"].as_str().unwrap(),
@@ -363,7 +366,7 @@ async fn user_commands(
                     .to_string();
 
                     let amount = to_decimal(&body1["amount"]);
-                    let token_id = body1["token_id"].as_i64();
+                    let token_id = to_i64(&body1["token_id"]);
 
                     pool.execute(query, (amount, token_id)).await?;
                 }

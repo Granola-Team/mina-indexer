@@ -198,6 +198,12 @@ async fn insert_accounts(
     Ok(())
 }
 
+/// These should really all be u64 but the conversion to EdgeDB requires i64
+/// For some reason parsing `as_number` doesn't work
+fn to_i64(value: &Value) -> Option<i64> {
+    value.as_str().and_then(|s| s.parse().ok())
+}
+
 fn to_decimal(value: &Value) -> Option<BigDecimal> {
     match value.get_type() {
         JsonType::Number => {
