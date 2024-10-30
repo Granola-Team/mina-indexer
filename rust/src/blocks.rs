@@ -428,7 +428,7 @@ async fn internal_commands(
 }
 
 fn block_link(block_hash: &str) -> String {
-    format!("assert_single((select Block filter .hash = '{block_hash}'))")
+    format!("(select Block filter .hash = '{block_hash}')")
 }
 
 const ACCOUNTS_REGEX: LazyLock<Regex> =

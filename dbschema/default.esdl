@@ -8,7 +8,10 @@ module default {
   }
 
   type Block {
-    required hash: str;
+    required hash: str {
+      constraint exclusive;
+      constraint regexp(r"^3N[A-Za-z].{49}$");
+    }
     required previous_hash: str {
         constraint max_len_value(52);
     }
@@ -34,7 +37,10 @@ module default {
   }
 
   type BlockchainState {
-    required block: Block;
+    required block: Block {
+      constraint exclusive;
+      on target delete restrict;
+    }
     required snarked_ledger_hash: str {
         constraint max_len_value(52);
     }
