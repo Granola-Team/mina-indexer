@@ -1,6 +1,5 @@
 use bigdecimal::BigDecimal;
 use db::{DbPool, MAX_CONNECTIONS};
-use futures::future::try_join_all;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
 use std::{collections::HashSet, str::FromStr};
 
@@ -25,21 +24,27 @@ async fn insert_accounts(
     pool: &DbPool,
     accounts: HashSet<String>,
 ) -> Result<(), edgedb_tokio::Error> {
-    let accounts_vec: Vec<String> = accounts.into_iter().collect();
+    // Process all accounts in a single transaction with conflict handling
+    for chunk in accounts
+        .into_iter()
+        .collect::<Vec<String>>()
+        .chunks(ACCOUNTS_BATCH_SIZE)
+    {
+        let query = format!(
+            "FOR account_pk IN {{{}}}
+             UNION (
+                INSERT Account {{
+                    public_key := account_pk
+                }} UNLESS CONFLICT
+             )",
+            chunk
+                .iter()
+                .map(|a| format!("'{}'", a))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
 
-    for chunk in accounts_vec.chunks(ACCOUNTS_BATCH_SIZE) {
-        let mut futures = Vec::new();
-
-        for account in chunk {
-            let account = account.clone();
-            let future = pool.execute(
-                "insert Account {public_key := <str>$0} unless conflict;".to_string(),
-                (account,),
-            );
-            futures.push(future);
-        }
-
-        try_join_all(futures).await?;
+        pool.execute(query, ()).await?;
     }
 
     Ok(())
