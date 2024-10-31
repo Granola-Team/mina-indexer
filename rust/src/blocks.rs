@@ -316,22 +316,14 @@ async fn user_commands(
                 created_token := '{}'",
                 block_link(block_hash),
                 status[0].as_str().unwrap(),
-                to_decimal(&status_2["source_balance"]).unwrap().to_string(),
-                to_decimal(&status_2["receiver_balance"])
-                    .unwrap_or_default()
-                    .to_string(),
-                to_decimal(&common["fee"]).unwrap_or_default().to_string(),
+                to_decimal(&status_2["source_balance"]).unwrap_or_default(),
+                to_decimal(&status_2["receiver_balance"]).unwrap_or_default(),
+                to_decimal(&common["fee"]).unwrap_or_default(),
                 account_link(&common["fee_payer_pk"]),
-                to_decimal(&status_2["fee_payer_balance"])
-                    .unwrap_or_default()
-                    .to_string(),
+                to_decimal(&status_2["fee_payer_balance"]).unwrap_or_default(),
                 common["fee_token"].as_str().unwrap(),
-                to_decimal(&status_1["fee_payer_account_creation_fee_paid"])
-                    .unwrap_or_default()
-                    .to_string(),
-                to_decimal(&status_1["receiver_account_creation_fee_paid"])
-                    .unwrap_or_default()
-                    .to_string(),
+                to_decimal(&status_1["fee_payer_account_creation_fee_paid"]).unwrap_or_default(),
+                to_decimal(&status_1["receiver_account_creation_fee_paid"]).unwrap_or_default(),
                 to_i64(&common["nonce"]).unwrap_or_default(),
                 to_i64(&common["valid_until"]).unwrap_or_default(),
                 common["memo"].as_str().unwrap_or_default(),
