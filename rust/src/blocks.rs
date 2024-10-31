@@ -189,11 +189,17 @@ async fn process_epoch_data(
     )
     .to_string();
 
-    let ledger_hash = ledger["hash"].to_string();
+    let ledger_hash = ledger["hash"].as_str().expect("ledger hash").to_string();
     let total_currency = to_i64(&ledger["total_currency"]);
-    let seed = epoch_data["seed"].to_string();
-    let start_checkpoint = epoch_data["start_checkpoint"].to_string();
-    let lock_checkpoint = epoch_data["lock_checkpoint"].to_string();
+    let seed = epoch_data["seed"].as_str().expect("seed").to_string();
+    let start_checkpoint = epoch_data["start_checkpoint"]
+        .as_str()
+        .expect("start_checkpoint")
+        .to_string();
+    let lock_checkpoint = epoch_data["lock_checkpoint"]
+        .as_str()
+        .expect("lock_checkpoint")
+        .to_string();
     let epoch_length = to_i64(&epoch_data["epoch_length"]);
 
     pool.execute(
