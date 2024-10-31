@@ -53,25 +53,15 @@ impl DbPool {
         })
     }
 
-    pub async fn execute_internal<F, T>(&self, operation: F) -> Result<T, edgedb_tokio::Error>
-    where
-        F: FnOnce(&Client) -> futures::future::BoxFuture<'_, Result<T, edgedb_tokio::Error>>,
-    {
-        self.active_connections.fetch_add(1, Ordering::SeqCst);
-        let client = self.inner.lock().await;
-        let result = operation(&client).await;
-        self.active_connections.fetch_sub(1, Ordering::SeqCst);
-        result
-    }
-
     pub async fn execute<T>(&self, query: String, params: T) -> Result<(), edgedb_tokio::Error>
     where
         T: edgedb_protocol::query_arg::QueryArgs + Send + Sync + 'static,
     {
-        self.execute_internal(|client| {
-            Box::pin(async move { client.execute(&query, &params).await })
-        })
-        .await
+        self.active_connections.fetch_add(1, Ordering::SeqCst);
+        let client = self.inner.lock().await;
+        let result = client.execute(&query, &params).await;
+        self.active_connections.fetch_sub(1, Ordering::SeqCst);
+        result
     }
 
     pub async fn get_pool_stats(&self) -> PoolStats {
