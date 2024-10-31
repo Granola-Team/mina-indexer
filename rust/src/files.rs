@@ -7,8 +7,10 @@ use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
 use crate::db::DbPool;
@@ -141,7 +143,40 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     Ok(paths)
 }
 
-pub async fn process_files<F>(dir: &str, pool: Arc<DbPool>, process_block: F) -> anyhow::Result<()>
+fn spawn_workers<F>(
+    initial_workers: usize,
+    max_workers: usize,
+    processor: Arc<ChunkProcessor<F>>,
+    pool: Arc<DbPool>,
+) -> Vec<JoinHandle<()>>
+where
+    F: Fn(
+            Arc<DbPool>,
+            Value,
+            String,
+            i64,
+        ) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>>
+        + Send
+        + Sync
+        + 'static,
+{
+    let mut handles = Vec::with_capacity(max_workers - initial_workers);
+
+    for _ in initial_workers..max_workers {
+        let processor = Arc::clone(&processor);
+        let pool = Arc::clone(&pool);
+
+        let handle = tokio::spawn(async move {
+            while let Some(_) = processor.process_next_chunk(&pool).await {}
+        });
+
+        handles.push(handle);
+    }
+
+    handles
+}
+
+pub async fn process_files<F>(dir: &str, pool: Arc<DbPool>, processor_fn: F) -> anyhow::Result<()>
 where
     F: Fn(
             Arc<DbPool>,
@@ -154,23 +189,29 @@ where
         + 'static,
 {
     let paths = get_file_paths(dir)?;
-    let processor = Arc::new(ChunkProcessor::new(paths, process_block));
+    let processor = Arc::new(ChunkProcessor::new(paths, processor_fn));
 
-    let mut handles = Vec::new();
-    let num_workers = num_cpus::get() * 2;
+    let initial_workers = 2;
+    let max_workers = num_cpus::get() * 2;
 
-    for _ in 0..num_workers {
-        let processor = Arc::clone(&processor);
-        let pool = Arc::clone(&pool);
+    // Start with few workers initially, then scale up
+    let mut handles = spawn_workers(
+        0,
+        initial_workers,
+        Arc::clone(&processor),
+        Arc::clone(&pool),
+    );
 
-        let handle = tokio::spawn(async move {
-            while let Some(_) = processor.process_next_chunk(&pool).await {
-                // Progress is now handled in process_next_chunk via ProcessingStats
-            }
-        });
+    // After 4 minutes, add more workers
+    tokio::time::sleep(Duration::from_secs(240)).await;
+    println!("Adding more workers");
 
-        handles.push(handle);
-    }
+    handles.extend(spawn_workers(
+        initial_workers,
+        max_workers,
+        Arc::clone(&processor),
+        Arc::clone(&pool),
+    ));
 
     for handle in handles {
         if let Err(e) = handle.await {
