@@ -4,13 +4,19 @@ use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
-    account_link, chunk_size, db::DbPool, insert_accounts, process_files, to_decimal, to_i64,
+    account_link,
+    db::DbPool,
+    files::{process_files, CHUNK_SIZE},
+    insert_accounts, to_decimal, to_i64,
 };
 
 /// Ingest staking ledger files (JSON) into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new().await?);
-    process_files(staking_ledgers_dir, pool, process_ledger).await
+    process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
+        Box::pin(process_ledger(pool, json, hash, number))
+    })
+    .await
 }
 
 async fn process_ledger(
@@ -38,7 +44,7 @@ async fn process_ledger(
 
     let json = Arc::new(json.to_vec());
 
-    for chunk in json.chunks(chunk_size()) {
+    for chunk in json.chunks(CHUNK_SIZE) {
         let mut futures = Vec::new();
 
         for activity in chunk {

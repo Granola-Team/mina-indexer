@@ -6,12 +6,16 @@ use std::{
 };
 
 use crate::{
-    account_link, db::DbPool, insert_accounts, process_files, to_decimal, to_i64, to_titlecase,
+    account_link, db::DbPool, files::process_files, insert_accounts, to_decimal, to_i64,
+    to_titlecase,
 };
 
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new().await?);
-    process_files(blocks_dir, pool, process_block).await
+    process_files(blocks_dir, pool, |pool, json, hash, number| {
+        Box::pin(process_block(pool, json, hash, number))
+    })
+    .await
 }
 
 async fn process_block(
