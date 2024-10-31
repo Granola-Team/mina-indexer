@@ -21,7 +21,6 @@ async fn process_block(
     height: i64,
 ) -> Result<(), edgedb_tokio::Error> {
     let accounts = extract_accounts(&json);
-    let block_hash = Arc::new(block_hash);
 
     // First insert all accounts and wait for completion since blocks link to accounts
     insert_accounts(&pool, accounts).await?;
@@ -30,9 +29,11 @@ async fn process_block(
     let body = &protocol_state["body"];
     let blockchain_state = &body["blockchain_state"];
     let consensus_state = &body["consensus_state"];
+    let scheduled_time = to_i64(&json["scheduled_time"]).expect("scheduled_time");
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
     let diffs = (&json["staged_ledger_diff"]["diff"]).as_array();
+    let block_hash = Arc::new(block_hash);
 
     process_block_data(
         &pool,
@@ -40,6 +41,7 @@ async fn process_block(
         protocol_state,
         body,
         blockchain_state,
+        scheduled_time,
         consensus_state,
         staged_ledger_hash,
         non_snark,
@@ -59,6 +61,7 @@ async fn process_block_data(
     protocol_state: &Value,
     body: &Value,
     blockchain_state: &Value,
+    scheduled_time: i64,
     consensus_state: &Value,
     staged_ledger_hash: &Value,
     non_snark: &Value,
@@ -90,7 +93,7 @@ async fn process_block_data(
                 block := block,
                 snarked_ledger_hash := '{}',
                 genesis_ledger_hash := '{}',
-                snarked_next_available_token := <opt int64>$8,
+                snarked_next_available_token := <int64>$8,
                 timestamp := <int64>$9
             }}
         )
@@ -104,43 +107,43 @@ async fn process_block_data(
         block_hash.as_str(),
         protocol_state["previous_state_hash"]
             .as_str()
-            .unwrap_or_default(),
-        body["genesis_state_hash"].as_str().unwrap_or_default(),
+            .expect("previous_state_hash"),
+        body["genesis_state_hash"]
+            .as_str()
+            .expect("genesis_state_hash"),
         account_link(&consensus_state["block_stake_winner"]),
         account_link(&consensus_state["block_creator"]),
         account_link(&consensus_state["coinbase_receiver"]),
         consensus_state["last_vrf_output"]
             .as_str()
-            .unwrap_or_default(),
+            .expect("last_vrf_output"),
         blockchain_state["snarked_ledger_hash"]
             .as_str()
-            .unwrap_or_default(),
+            .expect("snarked_ledger_hash"),
         blockchain_state["genesis_ledger_hash"]
             .as_str()
-            .unwrap_or_default(),
-        non_snark["ledger_hash"].as_str().unwrap_or_default(),
-        non_snark["aux_hash"].as_str().unwrap_or_default(),
+            .expect("genesis_ledger_hash"),
+        non_snark["ledger_hash"].as_str().expect("ledger_hash"),
+        non_snark["aux_hash"].as_str().expect("aux_hash"),
         non_snark["pending_coinbase_aux"]
             .as_str()
-            .unwrap_or_default(),
+            .expect("pending_coinbase_aux"),
         staged_ledger_hash["pending_coinbase_hash"]
             .as_str()
-            .unwrap_or_default()
+            .expect("pending_coinbase_hash")
     )
     .to_string();
 
     // Clone/convert all numeric values needed in the closure
     let epoch_count = to_i64(&consensus_state["epoch_count"]);
     let global_slot = to_i64(&consensus_state["global_slot_since_genesis"]);
-    let scheduled_time = to_i64(&body["scheduled_time"]);
+
     let total_currency = to_i64(&consensus_state["total_currency"]);
     let supercharge_coinbase = consensus_state["supercharge_coinbase"].as_bool();
     let has_ancestor = consensus_state["has_ancestor_in_same_checkpoint_window"].as_bool();
     let min_window_density = to_i64(&consensus_state["min_window_density"]);
     let snarked_next_token = to_i64(&blockchain_state["snarked_next_available_token"]);
     let timestamp = to_i64(&blockchain_state["timestamp"]);
-
-    println!("scheduled_time: {:?}", scheduled_time);
 
     pool.execute(
         query,
