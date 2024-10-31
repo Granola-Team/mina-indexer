@@ -1,5 +1,5 @@
 use bigdecimal::BigDecimal;
-use db::DbPool;
+use db::{DbPool, MAX_CONNECTIONS};
 use futures::future::try_join_all;
 use rayon::prelude::*;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
@@ -14,7 +14,7 @@ mod db;
 pub mod staking;
 pub mod stats;
 
-const ACCOUNTS_BATCH_SIZE: usize = 1000;
+const ACCOUNTS_BATCH_SIZE: usize = MAX_CONNECTIONS / 3;
 
 #[inline]
 pub(crate) fn chunk_size() -> usize {
