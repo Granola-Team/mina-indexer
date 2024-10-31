@@ -5,9 +5,10 @@ use rayon::prelude::*;
 use sonic_rs::{JsonType, JsonValueTrait, Value};
 use stats::ProcessingStats;
 use std::{
-    cmp::Ordering, collections::HashSet, fs, future::Future, io, path::PathBuf, str::FromStr,
-    sync::Arc, time::Instant,
+    collections::HashSet, fs, future::Future, io, os::unix::fs::MetadataExt, path::PathBuf,
+    str::FromStr, sync::Arc, time::Instant,
 };
+use walkdir::WalkDir;
 
 pub mod blocks;
 mod db;
@@ -16,64 +17,52 @@ pub mod stats;
 
 const ACCOUNTS_BATCH_SIZE: usize = MAX_CONNECTIONS / 3;
 
+const BLOCK_FILE_PREFIX: &str = "mainnet-";
+
 #[inline]
 pub(crate) fn chunk_size() -> usize {
     let cpu_count = num_cpus::get();
     std::cmp::min(32, std::cmp::max(8, cpu_count * 2))
 }
 
-/// Get (and sort) file paths for a given directory
 #[inline]
 fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
-    let entries = fs::read_dir(dir)?;
-    let paths: Vec<PathBuf> = entries
-        .par_bridge()
-        .filter_map(|entry| {
-            entry.ok().and_then(|e| {
-                let path = e.path();
-                if path.is_file() && path.extension().map_or(false, |ext| ext == "json") {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-        })
-        .collect();
+    let mut paths: Vec<PathBuf> = Vec::with_capacity(900_000);
 
-    let mut sorted_paths = paths;
-    sorted_paths.par_sort_unstable_by(|a, b| {
-        natural_sort(
-            a.file_name().unwrap().to_str().unwrap(),
-            b.file_name().unwrap().to_str().unwrap(),
-        )
+    WalkDir::new(dir)
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            e.file_type().is_file()
+                && e.path().extension().map_or(false, |ext| ext == "json")
+                && e.file_name()
+                    .to_str()
+                    .map_or(false, |name| name.starts_with(BLOCK_FILE_PREFIX))
+        })
+        .for_each(|e| paths.push(e.into_path()));
+
+    // Sort by block number (second part of the filename)
+    paths.par_sort_unstable_by(|a, b| {
+        let get_block_num = |p: &PathBuf| -> u32 {
+            p.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .split('-')
+                .nth(1) // Get the second part after splitting by '-'
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0)
+        };
+
+        let a_num = get_block_num(a);
+        let b_num = get_block_num(b);
+
+        a_num.cmp(&b_num)
     });
 
-    Ok(sorted_paths)
-}
-
-fn natural_sort(a: &str, b: &str) -> Ordering {
-    let mut a_parts = a.split(|c: char| !c.is_numeric());
-    let mut b_parts = b.split(|c: char| !c.is_numeric());
-
-    loop {
-        match (a_parts.next(), b_parts.next()) {
-            (Some(a_part), Some(b_part)) => {
-                if let (Ok(a_num), Ok(b_num)) = (a_part.parse::<u32>(), b_part.parse::<u32>()) {
-                    match a_num.cmp(&b_num) {
-                        Ordering::Equal => continue,
-                        other => return other,
-                    }
-                }
-                match a_part.cmp(b_part) {
-                    Ordering::Equal => continue,
-                    other => return other,
-                }
-            }
-            (None, None) => return Ordering::Equal,
-            (None, _) => return Ordering::Less,
-            (_, None) => return Ordering::Greater,
-        }
-    }
+    Ok(paths)
 }
 
 pub async fn process_files<F, Fut>(dir: &str, pool: Arc<DbPool>, processor: F) -> anyhow::Result<()>
