@@ -8,7 +8,7 @@ pub mod blocks;
 mod db;
 mod files;
 pub mod staking;
-pub mod stats;
+mod stats;
 
 const ACCOUNTS_BATCH_SIZE: usize = MAX_CONNECTIONS / 3;
 

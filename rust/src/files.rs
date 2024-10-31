@@ -7,7 +7,6 @@ use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::io::AsyncReadExt;
 use tokio::sync::Mutex;
 use walkdir::WalkDir;
@@ -49,7 +48,6 @@ where
     }
 
     async fn process_next_chunk(&self, pool: &Arc<DbPool>) -> Option<()> {
-        let chunk_start = Instant::now();
         let chunk = {
             let mut queue = self.queue.lock().await;
             queue.pop_front()?
@@ -75,7 +73,7 @@ where
                     let hash = extract_hash_from_file_name(&path);
                     let number = extract_digits_from_file_name(&path);
 
-                    match processor(pool, json, hash.clone(), number).await {
+                    match (processor)(pool, json, hash.clone(), number).await {
                         Ok(_) => {
                             println!("Block {} (height: {}) processed", hash, number);
                             Ok(())
@@ -92,11 +90,12 @@ where
             }
         }
 
-        let chunk_duration = chunk_start.elapsed();
-        self.stats.update(chunk_duration).await;
+        self.stats.update();
 
-        let stats = self.stats.get_stats().await;
-        println!("{}", stats);
+        let processed = self.stats.processed_count();
+        if processed % 10 == 0 {
+            println!("{}", self.stats.get_stats());
+        }
 
         Some(())
     }

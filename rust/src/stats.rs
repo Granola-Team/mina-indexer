@@ -1,12 +1,10 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
 
 pub struct ProcessingStats {
     start_time: Instant,
     processed_chunks: AtomicUsize,
     total_chunks: usize,
-    moving_avg_duration: Mutex<Option<Duration>>,
 }
 
 impl ProcessingStats {
@@ -15,22 +13,11 @@ impl ProcessingStats {
             start_time: Instant::now(),
             processed_chunks: AtomicUsize::new(0),
             total_chunks,
-            moving_avg_duration: Mutex::new(None),
         }
     }
 
-    pub async fn update(&self, chunk_duration: Duration) {
+    pub fn update(&self) {
         self.processed_chunks.fetch_add(1, Ordering::SeqCst);
-
-        // Update moving average with exponential weighting
-        let mut avg = self.moving_avg_duration.lock().await;
-        *avg = Some(match *avg {
-            Some(avg_dur) => {
-                let alpha = 0.2; // Smoothing factor
-                avg_dur.mul_f64(1.0 - alpha) + chunk_duration.mul_f64(alpha)
-            }
-            None => chunk_duration,
-        });
     }
 
     fn format_duration(duration: Duration) -> String {
@@ -45,21 +32,30 @@ impl ProcessingStats {
         }
     }
 
-    pub async fn get_stats(&self) -> String {
+    pub fn get_stats(&self) -> String {
         let elapsed = self.start_time.elapsed();
         let processed = self.processed_chunks.load(Ordering::Relaxed);
-        let avg_duration = self.moving_avg_duration.lock().await;
 
-        let remaining = avg_duration.map_or(Duration::ZERO, |avg_dur| {
-            avg_dur * (self.total_chunks - processed) as u32
-        });
+        let percentage = (processed as f64 / self.total_chunks as f64 * 100.0).round() as u32;
+
+        let remaining = if processed > 0 {
+            let avg_time_per_chunk = elapsed.div_f64(processed as f64);
+            avg_time_per_chunk.mul_f64((self.total_chunks - processed) as f64)
+        } else {
+            Duration::ZERO
+        };
 
         format!(
-            "Progress: {}/{} chunks, elapsed: {}, remaining: {}",
+            "Progress: {}/{} chunks ({}%), elapsed: {}, remaining: {}",
             processed,
             self.total_chunks,
+            percentage,
             Self::format_duration(elapsed),
             Self::format_duration(remaining)
         )
+    }
+
+    pub fn processed_count(&self) -> usize {
+        self.processed_chunks.load(Ordering::SeqCst)
     }
 }
