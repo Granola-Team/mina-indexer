@@ -3,7 +3,6 @@ use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
 
 const MIN_CONNECTIONS: usize = 4;
 pub const MAX_CONNECTIONS: usize = 32;
@@ -18,7 +17,7 @@ fn calculate_pool_size() -> usize {
 }
 
 pub struct DbPool {
-    inner: Arc<Mutex<Client>>,
+    client: Arc<Client>,
     active_connections: AtomicUsize,
 }
 
@@ -27,6 +26,7 @@ impl DbPool {
         let client = Client::new(
             &Builder::new()
                 .max_concurrency(calculate_pool_size())
+                .branch("concurrency")?
                 .build_env()
                 .await?,
         )
@@ -48,7 +48,7 @@ impl DbPool {
         );
 
         Ok(Self {
-            inner: Arc::new(Mutex::new(client)),
+            client: Arc::new(client),
             active_connections: AtomicUsize::new(0),
         })
     }
@@ -58,8 +58,7 @@ impl DbPool {
         T: edgedb_protocol::query_arg::QueryArgs + Send + Sync + 'static,
     {
         self.active_connections.fetch_add(1, Ordering::SeqCst);
-        let client = self.inner.lock().await;
-        let result = client.execute(&query, &params).await;
+        let result = self.client.execute(&query, &params).await;
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         result
     }
