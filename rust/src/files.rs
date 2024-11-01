@@ -77,10 +77,13 @@ where
 
                     match (processor)(pool, json, hash.clone(), number).await {
                         Ok(_) => {
-                            println!("Block {} (height: {}) processed", hash, number);
+                            //println!("Hash {} (height {}) processed", hash, number);
                             Ok(())
                         }
-                        Err(e) => Err(io::Error::new(io::ErrorKind::Other, e.to_string())),
+                        Err(e) => {
+                            println!("Error processing {} ({})", hash, number);
+                            Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+                        }
                     }
                 }
             })
@@ -88,7 +91,7 @@ where
 
         for future in futures {
             if let Err(e) = future.await {
-                eprintln!("Error processing file: {}", e);
+                eprintln!("{}", e);
             }
         }
 
@@ -188,6 +191,7 @@ where
         + Sync
         + 'static,
 {
+    println!("Processing files in: {}", dir);
     let paths = get_file_paths(dir)?;
     let processor = Arc::new(ChunkProcessor::new(paths, processor_fn));
 
