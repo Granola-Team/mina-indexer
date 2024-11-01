@@ -1,4 +1,6 @@
 use anyhow::Result;
+use edgedb_protocol::query_arg::QueryArgs;
+use edgedb_protocol::QueryResult;
 use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -53,12 +55,31 @@ impl DbPool {
         })
     }
 
-    pub async fn execute<T>(&self, query: String, params: T) -> Result<(), edgedb_tokio::Error>
+    pub async fn execute<T>(
+        &self,
+        query: impl AsRef<str>,
+        arguments: T,
+    ) -> Result<(), edgedb_tokio::Error>
     where
-        T: edgedb_protocol::query_arg::QueryArgs + Send + Sync + 'static,
+        T: QueryArgs + Send + Sync + 'static,
     {
         self.active_connections.fetch_add(1, Ordering::SeqCst);
-        let result = self.client.execute(&query, &params).await;
+        let result = self.client.execute(&query, &arguments).await;
+        self.active_connections.fetch_sub(1, Ordering::SeqCst);
+        result
+    }
+
+    pub async fn query<R, A>(
+        &self,
+        query: impl AsRef<str>,
+        arguments: &A,
+    ) -> Result<Vec<R>, edgedb_tokio::Error>
+    where
+        R: QueryResult,
+        A: QueryArgs,
+    {
+        self.active_connections.fetch_add(1, Ordering::SeqCst);
+        let result = self.client.query(&query, arguments).await;
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         result
     }

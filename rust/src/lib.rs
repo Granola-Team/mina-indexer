@@ -4,7 +4,7 @@ use sonic_rs::{JsonType, JsonValueTrait, Value};
 use std::{collections::HashSet, str::FromStr};
 
 pub mod blocks;
-mod db;
+pub mod db;
 mod files;
 pub mod staking;
 mod stats;
