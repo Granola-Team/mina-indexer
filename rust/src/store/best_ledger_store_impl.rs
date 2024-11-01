@@ -79,11 +79,17 @@ impl BestLedgerStore for IndexerStore {
             pk.0.as_bytes(),
             serde_json::to_vec(&account)?,
         )?;
-        self.database.put_cf(
-            self.best_ledger_accounts_balance_sort_cf(),
-            u64_prefix_key(balance, pk),
-            serde_json::to_vec(&account)?,
-        )?;
+
+        if let Some(_zkapp) = account.zkapp {
+            // populate index for best_ledger_zkapps_balance_sort_cf
+            // populate index for best_ledger_tokens_balance_sort_cf
+        } else {
+            self.database.put_cf(
+                self.best_ledger_accounts_balance_sort_cf(),
+                u64_prefix_key(balance, pk),
+                serde_json::to_vec(&account)?,
+            )?;
+        }
         Ok(())
     }
 
