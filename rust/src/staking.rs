@@ -1,6 +1,6 @@
 use bigdecimal::BigDecimal;
 use futures::future::try_join_all;
-use sonic_rs::{JsonContainerTrait, JsonValueTrait, Value};
+use sonic_rs::{Array, JsonContainerTrait, JsonValueTrait, Value};
 use std::{collections::HashSet, sync::Arc};
 
 use crate::{
@@ -10,31 +10,36 @@ use crate::{
     insert_accounts, to_decimal, to_i64,
 };
 
-/// Ingest staking ledger files (JSON) into the database
+/// Ingest staking ledger files (JSON) from `staking_ledgers_dir` into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new(None).await?);
     process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
-        Box::pin(process_ledger(pool, json, hash, number))
+        Box::pin(process_ledger(
+            pool,
+            json.as_array().expect("ledger").to_owned(),
+            hash,
+            number,
+        ))
     })
     .await
 }
 
+/// Process ledger
 async fn process_ledger(
     pool: Arc<DbPool>,
-    json: Value,
+    json: Array,
     ledger_hash: String,
     epoch: i64,
 ) -> Result<(), edgedb_tokio::Error> {
-    let json = json.as_array().unwrap();
-    let accounts = extract_accounts(json);
+    let accounts = extract_accounts(&json);
 
-    // Run account insertion and epoch creation concurrently
     let query = "insert StakingEpoch {
             hash := <str>$0,
             epoch := <int64>$1
         } unless conflict;"
         .to_string();
 
+    // Run account insertion and epoch creation concurrently
     let (_, _) = tokio::try_join!(
         insert_accounts(&pool, accounts),
         pool.execute(query, (ledger_hash.clone(), epoch))
@@ -153,6 +158,7 @@ async fn process_ledger(
     Ok(())
 }
 
+/// Extract a [list][HashSet] of accounts (public keys)
 fn extract_accounts(json_array: &[Value]) -> HashSet<String> {
     json_array
         .iter()
