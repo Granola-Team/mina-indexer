@@ -99,7 +99,9 @@ where
 
         let processed = self.stats.processed_count();
         if processed % 10 == 0 {
-            println!("{}", self.stats.get_stats());
+            let mut progress = self.stats.get_stats();
+            progress.push_str(pool.get_pool_stats().as_str());
+            println!("{}", progress);
         }
 
         Some(())

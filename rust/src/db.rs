@@ -21,13 +21,15 @@ fn calculate_pool_size() -> usize {
 pub struct DbPool {
     client: Arc<Client>,
     active_connections: AtomicUsize,
+    max_connections: usize,
 }
 
 impl DbPool {
     pub async fn new(branch: Option<&str>) -> Result<Self, edgedb_tokio::Error> {
+        let max_connections = calculate_pool_size();
         let client = Client::new(
             &Builder::new()
-                .max_concurrency(calculate_pool_size())
+                .max_concurrency(max_connections)
                 .branch(branch.unwrap_or("main"))?
                 .build_env()
                 .await?,
@@ -52,6 +54,7 @@ impl DbPool {
         Ok(Self {
             client: Arc::new(client),
             active_connections: AtomicUsize::new(0),
+            max_connections,
         })
     }
 
@@ -84,19 +87,11 @@ impl DbPool {
         result
     }
 
-    pub async fn get_pool_stats(&self) -> PoolStats {
-        PoolStats {
-            active_connections: self.active_connections.load(Ordering::Relaxed),
-            available_permits: calculate_pool_size(),
-            max_connections: calculate_pool_size(),
-        }
+    pub fn get_pool_stats(&self) -> String {
+        format!(
+            ", DB connections: {}/{} active",
+            self.active_connections.load(Ordering::Relaxed),
+            self.max_connections
+        )
     }
-}
-
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct PoolStats {
-    pub active_connections: usize,
-    pub available_permits: usize,
-    pub max_connections: usize,
 }

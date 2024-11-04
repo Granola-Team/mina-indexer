@@ -27,7 +27,6 @@ async fn process_ledger(
 ) -> Result<(), edgedb_tokio::Error> {
     let json = json.as_array().unwrap();
     let accounts = extract_accounts(json);
-    let ledger_hash = Arc::new(ledger_hash);
 
     // Run account insertion and epoch creation concurrently
     let query = "insert StakingEpoch {
@@ -36,10 +35,9 @@ async fn process_ledger(
         } unless conflict;"
         .to_string();
 
-    let ledger_hash_str = ledger_hash.as_str().to_string();
     let (_, _) = tokio::try_join!(
         insert_accounts(&pool, accounts),
-        pool.execute(query, (ledger_hash_str, epoch))
+        pool.execute(query, (ledger_hash.clone(), epoch))
     )?;
 
     let json = Arc::new(json.to_vec());
@@ -49,7 +47,6 @@ async fn process_ledger(
 
         for activity in chunk {
             let activity = activity.clone();
-            let ledger_hash = Arc::clone(&ledger_hash);
 
             let balance = to_decimal(&activity["balance"]);
             let token = to_i64(&activity["token"]);
