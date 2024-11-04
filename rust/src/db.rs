@@ -18,6 +18,7 @@ fn calculate_pool_size() -> usize {
     std::cmp::min(MAX_CONNECTIONS, std::cmp::max(MIN_CONNECTIONS, base_size))
 }
 
+/// Database pool
 pub struct DbPool {
     client: Arc<Client>,
     active_connections: AtomicUsize,
@@ -25,6 +26,7 @@ pub struct DbPool {
 }
 
 impl DbPool {
+    /// Create a new [DbPool]. If [branch] is [None], the branch will default to "main"
     pub async fn new(branch: Option<&str>) -> Result<Self, edgedb_tokio::Error> {
         let max_connections = calculate_pool_size();
         let client = Client::new(
@@ -58,6 +60,7 @@ impl DbPool {
         })
     }
 
+    /// Execute a query and don't expect result.
     pub async fn execute<T>(
         &self,
         query: impl AsRef<str>,
@@ -72,6 +75,7 @@ impl DbPool {
         result
     }
 
+    // Execute a query and return a collection of results.
     pub async fn query<R, A>(
         &self,
         query: impl AsRef<str>,

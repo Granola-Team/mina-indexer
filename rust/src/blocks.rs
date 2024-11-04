@@ -382,6 +382,7 @@ async fn user_commands(
     Ok(())
 }
 
+/// Handles Fee Transfers and Coinbase
 async fn internal_commands(
     pool: &DbPool,
     block_hash: &str,

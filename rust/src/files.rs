@@ -109,6 +109,7 @@ where
 }
 
 #[inline]
+/// Get [file paths][PathBuf] from `dir`
 fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     let mut paths: Vec<PathBuf> = Vec::with_capacity(900_000);
 
