@@ -11,13 +11,13 @@ mod stats;
 
 const ACCOUNTS_BATCH_SIZE: usize = MAX_CONNECTIONS / 3;
 
+#[inline]
 fn to_titlecase(s: &str) -> String {
-    s.chars()
-        .next()
-        .map(|c| c.to_ascii_uppercase())
-        .into_iter()
-        .chain(s.chars().skip(1))
-        .collect()
+    let mut chars = s.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+    }
 }
 
 async fn insert_accounts(
@@ -77,9 +77,10 @@ fn to_decimal(value: &Value) -> Option<BigDecimal> {
     }
 }
 
+#[inline]
 fn account_link(public_key: &Value) -> String {
     format!(
         "(select Account filter .public_key = '{}')",
-        public_key.as_str().unwrap()
+        public_key.as_str().expect("public_key")
     )
 }

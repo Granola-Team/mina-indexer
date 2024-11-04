@@ -75,7 +75,7 @@ where
                     let hash = extract_hash_from_file_name(&path);
                     let number = extract_digits_from_file_name(&path);
 
-                    match (processor)(pool, json, hash.clone(), number).await {
+                    match (processor)(pool, json, hash.to_owned(), number).await {
                         Ok(_) => {
                             //println!("Hash {} (height {}) processed", hash, number);
                             Ok(())
@@ -195,7 +195,8 @@ where
 {
     println!("Processing files in: {}", dir);
     let paths = get_file_paths(dir)?;
-    let processor = Arc::new(ChunkProcessor::new(paths, processor_fn));
+    let processor = ChunkProcessor::new(paths, processor_fn);
+    let processor = Arc::new(processor);
 
     let initial_workers = 2;
     let max_workers = num_cpus::get() * 2;
@@ -229,28 +230,22 @@ where
 }
 
 /// Extract the hash part from a Mina block or staking ledger file name
-fn extract_hash_from_file_name(path: &PathBuf) -> String {
-    let file_name = path.file_name().unwrap().to_str().unwrap();
-    file_name
-        .split('-')
-        .nth(2)
-        .unwrap()
-        .split('.')
-        .next()
-        .unwrap()
-        .to_string()
+#[inline]
+fn extract_hash_from_file_name(path: &PathBuf) -> &str {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|s| s.split('-').nth(2))
+        .and_then(|s| s.split('.').next())
+        .expect("Invalid file name format")
 }
 
 /// Extract the digits part from a Mina block (the height) or staking ledger (the epoch) file name
+#[inline]
 fn extract_digits_from_file_name(path: &PathBuf) -> i64 {
-    let file_name = path.file_name().unwrap().to_str().unwrap();
-    file_name
-        .split('-')
-        .nth(1)
-        .unwrap()
-        .split('-')
-        .next()
-        .unwrap()
-        .parse::<i64>()
-        .unwrap()
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|s| s.split('-').nth(1))
+        .and_then(|s| s.split('-').next())
+        .and_then(|s| s.parse().ok())
+        .expect("Invalid file name format")
 }

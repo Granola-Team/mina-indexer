@@ -37,7 +37,6 @@ async fn process_block(
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
     let diffs = (&json["staged_ledger_diff"]["diff"]).as_array();
-    let block_hash = Arc::new(block_hash);
 
     process_block_data(
         &pool,
@@ -61,7 +60,7 @@ async fn process_block(
 
 async fn process_block_data(
     pool: &DbPool,
-    block_hash: &Arc<String>,
+    block_hash: &str,
     protocol_state: &Value,
     body: &Value,
     blockchain_state: &Value,
@@ -108,7 +107,7 @@ async fn process_block_data(
             non_snark_pending_coinbase_aux := '{}',
             pending_coinbase_hash := '{}'
         }};",
-        block_hash.as_str(),
+        block_hash,
         protocol_state["previous_state_hash"]
             .as_str()
             .expect("previous_state_hash"),
@@ -218,7 +217,7 @@ async fn process_epoch_data(
 
 async fn process_epoch_and_commands(
     pool: &DbPool,
-    block_hash: &Arc<String>,
+    block_hash: &str,
     consensus_state: &Value,
     diffs: Option<&Array>,
 ) -> Result<(), edgedb_tokio::Error> {
@@ -242,20 +241,19 @@ async fn process_epoch_and_commands(
 
 async fn process_commands(
     pool: &DbPool,
-    block_hash: &String,
+    block_hash: &str,
     diffs: Option<&Array>,
 ) -> Result<(), edgedb_tokio::Error> {
     if let Some(diffs) = diffs {
         for diff in diffs {
             // Clone values needed for the closure
-            let block_hash = block_hash.clone();
             let diff = diff.clone();
 
             // Process each command type in parallel
             let (_, _, _) = tokio::try_join!(
-                snark_jobs(pool, &block_hash, &diff),
-                user_commands(pool, &block_hash, &diff),
-                internal_commands(pool, &block_hash, &diff)
+                snark_jobs(pool, block_hash, &diff),
+                user_commands(pool, block_hash, &diff),
+                internal_commands(pool, block_hash, &diff)
             )?;
         }
     }
@@ -264,7 +262,7 @@ async fn process_commands(
 
 async fn snark_jobs(
     pool: &DbPool,
-    block_hash: &String,
+    block_hash: &str,
     diff: &Value,
 ) -> Result<(), edgedb_tokio::Error> {
     if let Some(completed_works) = diff["completed_works"].as_array() {
@@ -290,7 +288,7 @@ async fn snark_jobs(
 
 async fn user_commands(
     pool: &DbPool,
-    block_hash: &String,
+    block_hash: &str,
     diff: &Value,
 ) -> Result<(), edgedb_tokio::Error> {
     if let Some(commands) = diff["commands"].as_array() {
@@ -386,7 +384,7 @@ async fn user_commands(
 
 async fn internal_commands(
     pool: &DbPool,
-    block_hash: &String,
+    block_hash: &str,
     diff: &Value,
 ) -> Result<(), edgedb_tokio::Error> {
     if let Some(balances) = diff["internal_command_balances"].as_array() {
@@ -432,6 +430,7 @@ async fn internal_commands(
     Ok(())
 }
 
+#[inline]
 fn block_link(block_hash: &str) -> String {
     format!("(select Block filter .hash = '{block_hash}')")
 }
@@ -446,7 +445,7 @@ fn extract_accounts(value: &Value) -> HashSet<String> {
         JsonType::String => {
             if let Some(s) = value.as_str() {
                 if ACCOUNTS_REGEX.is_match(s) {
-                    accounts.insert(s.to_string());
+                    accounts.insert(s.to_owned());
                 }
             }
         }
