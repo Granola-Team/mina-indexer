@@ -19,7 +19,7 @@ end
 
 desc 'Clean the directory tree of build artifacts'
 task :clean do
-  rm_f 'result' 
+  rm_f 'result'
   chdir 'rust'
   sh 'cargo', 'clean'
 end
@@ -47,4 +47,9 @@ task :lint => :check_format do
   formatted_flake = `nixfmt < flake.nix`
   flake = File.read('flake.nix')
   flake == formatted_flake || abort('rbb')
+end
+
+desc 'Deploy Indexer'
+task :deploy do
+  ruby "ops/deploy-indexer.rb"
 end
