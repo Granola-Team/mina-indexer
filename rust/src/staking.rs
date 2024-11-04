@@ -68,16 +68,7 @@ async fn process_ledger(
             let (query, params) = if let Some(timing) = activity["timing"].as_object() {
                 let query = format!(
                     "with ledger := (
-                        insert StakingLedger {{
-                            epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-                            source := {},
-                            balance := <decimal>$0,
-                            target := {},
-                            token := <int64>$1,
-                            nonce := <optional int64>$2,
-                            receipt_chain_hash := <str>$3,
-                            voting_for := <str>$4
-                        }} unless conflict
+                        {}
                     )
                     insert StakingTiming {{
                         ledger := ledger,
@@ -87,26 +78,16 @@ async fn process_ledger(
                         vesting_period := <int64>$8,
                         vesting_increment := <decimal>$9
                     }} unless conflict;",
-                    epoch,
-                    ledger_hash,
-                    account_link(&activity["pk"]),
-                    account_link(&activity["delegate"])
+                    staking_ledger_insert_statement(&activity, epoch, &ledger_hash)
                 );
-
                 let initial_minimum_balance = to_decimal(&timing["initial_minimum_balance"]);
                 let cliff_time = to_i64(&timing["cliff_time"]);
                 let cliff_amount = to_decimal(&timing["cliff_amount"]);
                 let vesting_period = to_i64(&timing["vesting_period"]);
                 let vesting_increment = to_decimal(&timing["vesting_increment"]);
-
                 (
                     query,
                     (
-                        balance,
-                        token,
-                        nonce,
-                        receipt_chain_hash,
-                        voting_for,
                         initial_minimum_balance,
                         cliff_time,
                         cliff_amount,
@@ -115,39 +96,30 @@ async fn process_ledger(
                     ),
                 )
             } else {
-                let query = format!(
-                    "insert StakingLedger {{
-                        epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-                        source := {},
-                        balance := <decimal>$0,
-                        target := {},
-                        token := <int64>$1,
-                        nonce := <optional int64>$2,
-                        receipt_chain_hash := <str>$3,
-                        voting_for := <str>$4
-                    }} unless conflict;",
-                    epoch,
-                    ledger_hash,
-                    account_link(&activity["pk"]),
-                    account_link(&activity["delegate"])
-                );
-
                 (
-                    query,
+                    staking_ledger_insert_statement(&activity, epoch, &ledger_hash),
                     (
-                        balance,
-                        token,
-                        nonce,
-                        receipt_chain_hash,
-                        voting_for,
-                        None::<BigDecimal>, // initial_minimum_balance
-                        None::<i64>,        // cliff_time
-                        None::<BigDecimal>, // cliff_amount
-                        None::<i64>,        // vesting_period
-                        None::<BigDecimal>, // vesting_increment
+                        None::<BigDecimal>,
+                        None::<i64>,
+                        None::<BigDecimal>,
+                        None::<i64>,
+                        None::<BigDecimal>,
                     ),
                 )
             };
+
+            let params = (
+                balance,
+                token,
+                nonce,
+                receipt_chain_hash,
+                voting_for,
+                params.0,
+                params.1,
+                params.2,
+                params.3,
+                params.4,
+            );
 
             futures.push(pool.execute(query, params));
         }
@@ -156,6 +128,25 @@ async fn process_ledger(
     }
 
     Ok(())
+}
+
+fn staking_ledger_insert_statement(activity: &Value, epoch: i64, ledger_hash: &String) -> String {
+    format!(
+        "insert StakingLedger {{
+            epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
+            source := {},
+            balance := <decimal>$0,
+            target := {},
+            token := <int64>$1,
+            nonce := <optional int64>$2,
+            receipt_chain_hash := <str>$3,
+            voting_for := <str>$4
+        }} unless conflict",
+        epoch,
+        ledger_hash,
+        account_link(&activity["pk"]),
+        account_link(&activity["delegate"])
+    )
 }
 
 /// Extract a [list][HashSet] of accounts (public keys)
