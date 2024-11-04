@@ -12,7 +12,7 @@ use crate::{
 
 /// Ingest staking ledger files (JSON) into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
-    let pool = Arc::new(DbPool::new().await?);
+    let pool = Arc::new(DbPool::new(None).await?);
     process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
         Box::pin(process_ledger(pool, json, hash, number))
     })

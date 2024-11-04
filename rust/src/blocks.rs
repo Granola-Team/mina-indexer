@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
-    let pool = Arc::new(DbPool::new().await?);
+    let pool = Arc::new(DbPool::new(Some("concurrency")).await?);
     process_files(blocks_dir, pool, |pool, json, hash, number| {
         Box::pin(process_block(pool, json, hash, number))
     })

@@ -24,11 +24,11 @@ pub struct DbPool {
 }
 
 impl DbPool {
-    pub async fn new() -> Result<Self, edgedb_tokio::Error> {
+    pub async fn new(branch: Option<&str>) -> Result<Self, edgedb_tokio::Error> {
         let client = Client::new(
             &Builder::new()
                 .max_concurrency(calculate_pool_size())
-                .branch("concurrency")?
+                .branch(branch.unwrap_or("main"))?
                 .build_env()
                 .await?,
         )
