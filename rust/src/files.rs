@@ -6,15 +6,15 @@ use std::future::Future;
 use std::io;
 use std::path::PathBuf;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use walkdir::WalkDir;
 
 use crate::db::DbPool;
-use crate::stats::ProcessingStats;
 
 const BLOCK_FILE_PREFIX: &str = "mainnet-";
 pub const CHUNK_SIZE: usize = 100;
@@ -22,7 +22,9 @@ const BUFFER_SIZE: usize = 16 * 1024; // 16KB buffer
 
 struct ChunkProcessor<F> {
     queue: Mutex<VecDeque<Vec<PathBuf>>>,
-    stats: Arc<ProcessingStats>,
+    processed_chunks: AtomicUsize,
+    total_chunks: usize,
+    start_time: Instant,
     processor: F,
 }
 
@@ -44,9 +46,47 @@ where
 
         Self {
             queue: Mutex::new(chunks),
-            stats: Arc::new(ProcessingStats::new(total_chunks)),
+            processed_chunks: AtomicUsize::new(0),
+            total_chunks,
+            start_time: Instant::now(),
             processor,
         }
+    }
+
+    fn format_duration(duration: Duration) -> String {
+        let total_secs = duration.as_secs();
+        let hours = total_secs / 3600;
+        let mins = (total_secs % 3600) / 60;
+
+        if hours > 0 {
+            format!("{}h {}m", hours, mins)
+        } else {
+            format!("{}m", mins)
+        }
+    }
+
+    fn get_stats(&self, pool: &DbPool) -> String {
+        let elapsed = self.start_time.elapsed();
+        let processed = self.processed_chunks.load(Ordering::Relaxed);
+
+        let percentage = (processed as f64 / self.total_chunks as f64 * 100.0).round() as u32;
+
+        let remaining = if processed > 0 {
+            let avg_time_per_chunk = elapsed.div_f64(processed as f64);
+            avg_time_per_chunk.mul_f64((self.total_chunks - processed) as f64)
+        } else {
+            Duration::ZERO
+        };
+
+        format!(
+            "Progress: {}/{} chunks ({}%), elapsed: {}, remaining: {}{}",
+            processed,
+            self.total_chunks,
+            percentage,
+            Self::format_duration(elapsed),
+            Self::format_duration(remaining),
+            pool.get_pool_stats()
+        )
     }
 
     async fn process_next_chunk(&self, pool: &Arc<DbPool>) -> Option<()> {
@@ -76,10 +116,7 @@ where
                     let number = extract_digits_from_file_name(&path);
 
                     match (processor)(pool, json, hash.to_owned(), number).await {
-                        Ok(_) => {
-                            //println!("Hash {} (height {}) processed", hash, number);
-                            Ok(())
-                        }
+                        Ok(_) => Ok(()),
                         Err(e) => {
                             println!("Error processing {} ({})", hash, number);
                             Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
@@ -95,13 +132,11 @@ where
             }
         }
 
-        self.stats.update();
+        self.processed_chunks.fetch_add(1, Ordering::SeqCst);
 
-        let processed = self.stats.processed_count();
+        let processed = self.processed_chunks.load(Ordering::SeqCst);
         if processed % 10 == 0 {
-            let mut progress = self.stats.get_stats();
-            progress.push_str(pool.get_pool_stats().as_str());
-            println!("{}", progress);
+            println!("{}", self.get_stats(pool));
         }
 
         Some(())
