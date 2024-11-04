@@ -75,6 +75,21 @@ enum ServerCommand {
 
 #[derive(Subcommand, Debug)]
 enum DatabaseCommand {
+    Ingest {
+        /// Max stdout log level
+        #[arg(long, default_value_t = LogLevelFilter::default())]
+        log_level: LogLevelFilter,
+
+        /// Full path to a mina indexer database directory.
+        /// If null, snapshot a running indexer database.
+        #[arg(long)]
+        database_dir: Option<PathBuf>,
+
+        /// Directory of precomputed blocks
+        #[arg(long)]
+        blocks_dir: Option<PathBuf>,
+    },
+
     /// Create a new mina indexer database to use with `mina-indexer start`
     Create(Box<DatabaseArgs>),
 
@@ -380,6 +395,15 @@ impl DatabaseCommand {
             } => {
                 info!("Restoring mina indexer database from snapshot file {snapshot_file:#?} to {restore_dir:#?}");
                 restore_snapshot(&snapshot_file, &restore_dir).unwrap_or_else(|e| error!("{e}"))
+            }
+            Self::Ingest {
+                log_level,
+                database_dir,
+                blocks_dir,
+            } => {
+                info!(
+                    "Ingesting blocks from {blocks_dir:#?} into {database_dir:#?} ({log_level:#?})"
+                )
             }
             Self::Create(args) => {
                 let database_dir = args.database_dir.clone();

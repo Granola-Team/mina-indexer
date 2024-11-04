@@ -1,5 +1,7 @@
 task :default => :menu
 
+working_dir = pwd
+
 desc 'Print the menu of targets'
 task :menu do
   sh 'rake', '-T'
@@ -50,6 +52,8 @@ task :lint => :check_format do
 end
 
 desc 'Deploy Indexer'
-task :deploy do
-  ruby "ops/deploy-indexer.rb"
+task :deploy, [:deploy_type, :build_type, :blocks_count] => [:build] do |t, args|
+  chdir working_dir
+  args.with_defaults(deploy_type: 'prod', build_type: 'nix', blocks_count: '5000')
+  sh "ruby ops/ingest-blocks.rb #{args[:deploy_type]} #{args[:build_type]} #{args[:blocks_count]}"
 end
