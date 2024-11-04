@@ -7,7 +7,7 @@ Files in this directory:
 ```
 ./calculate-archive-ledgers.sh
 ./correct-file-names.sh
-./deploy.rb
+./create-database.rb
 ./download-mina-blocks.rb
 ./download-staking-ledgers.rb
 ./format-graphql-in-hurl-files.rb
@@ -22,6 +22,7 @@ Files in this directory:
 ./rclone.conf
 ./recycle-pcbs.rb
 ./stage-blocks.rb
+./start-server.rb
 ./traverse-canonical-chain.sh
 ./unformat-pcbs.sh
 ./upload-mina-blocks.sh

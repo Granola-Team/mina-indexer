@@ -41,7 +41,8 @@ nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" 
 DEBUG_MODE := "debug"
 PROD_MODE := "nix"
 REGRESSION_TEST := "./ops/regression-test.rb"
-DEPLOY := "./ops/deploy.rb"
+CREATE_DATABASE := "./ops/create-database.rb"
+START_SERVER := "./ops/start-server.rb"
 UTILS := "./ops/utils.rb"
 
 default:
@@ -266,12 +267,14 @@ tier2-dev: tier2-prereqs debug-build \
 # Run the 3rd tier of tests with Nix-built binary.
 tier3 blocks='5000': nix-build test-unit-mina-rs
   @echo "--- Performing tier3 regression tests with Nix-built binary"
-  time {{DEPLOY}} test nix {{blocks}}
+  time {{CREATE_DATABASE}} test nix {{blocks}}
+  {{START_SERVER}} test {{blocks}}
 
 # Run the 3rd tier of tests with debug build & no unit tests.
 tier3-dev blocks='5000': debug-build
   @echo "--- Performing tier3 regression tests with debug-built binary"
-  time {{DEPLOY}} test debug {{blocks}}
+  time {{CREATE_DATABASE}} test debug {{blocks}}
+  {{START_SERVER}} test {{blocks}}
 
 #
 # Deploy local prod
@@ -280,12 +283,14 @@ tier3-dev blocks='5000': debug-build
 # Run a server as if in production with the Nix-built binary.
 deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying prod indexer"
-  time {{DEPLOY}} prod nix {{blocks}} {{web_port}}
+  time {{CREATE_DATABASE}} prod nix {{blocks}}
+  {{START_SERVER}} prod {{blocks}} {{web_port}}
 
 # Run a server as if in production with the debug-built binary.
 deploy-local-prod-dev blocks='5000' web_port='': debug-build
   @echo "--- Deploying dev prod indexer"
-  time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
+  time {{CREATE_DATABASE}} prod debug {{blocks}}
+  {{START_SERVER}} prod {{blocks}} {{web_port}}
 
 # Shutdown a running local prod indexer.
 shutdown rev=GIT_COMMIT_HASH:
