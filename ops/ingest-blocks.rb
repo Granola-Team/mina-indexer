@@ -29,14 +29,13 @@ if File.exist?(db_dir(BLOCKS_COUNT))
   exit 0
 else
   puts "Ingesting Blocks..."
-  success = system(
-    EXE,
+  command = [EXE,
     "database", "ingest",
-    "--log-level", "DEBUG",
     "--database-dir", db_dir(BLOCKS_COUNT),
-    "--blocks-dir", blocks_dir(BLOCKS_COUNT)
-  )
-  puts success ? "Database creation succeeded." : "Database creation failed."
+    "--blocks-dir", blocks_dir(BLOCKS_COUNT)]
+  puts command.join(" ")
+  success = system(*command)
+  puts success ? "Block ingestion complete." : "Block ingestion failed."
 
   exit success ? 0 : 1
 end
