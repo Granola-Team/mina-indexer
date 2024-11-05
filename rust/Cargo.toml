@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 sonic-rs = "0.3"
+async-trait = "0.1.83"
 regex = "1.5"
 bigdecimal = "0.4"
 edgedb-protocol = { version = "*", features = ["with-bigdecimal"] }
