@@ -19,18 +19,17 @@ impl Actor for PCBBlockPathActor {
     }
     async fn on_event(&self, event: Event) {
         if let EventType::PrecomputedBlockPath = event.event_type {
-            if let Some(keys) = get_top_level_keys_from_json_file(&event.payload).ok() {
-                if keys == vec!["data".to_string(), "version".to_string()] {
-                    self.publish(Event {
-                        event_type: EventType::BerkeleyBlockPath,
-                        payload: event.payload.clone(),
-                    });
-                } else {
-                    self.publish(Event {
-                        event_type: EventType::MainnetBlockPath,
-                        payload: event.payload,
-                    });
-                }
+            let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
+            if keys == vec!["data".to_string(), "version".to_string()] {
+                self.publish(Event {
+                    event_type: EventType::BerkeleyBlockPath,
+                    payload: event.payload.clone(),
+                });
+            } else {
+                self.publish(Event {
+                    event_type: EventType::MainnetBlockPath,
+                    payload: event.payload,
+                });
             }
         }
     }
