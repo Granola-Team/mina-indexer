@@ -13,6 +13,7 @@ use mina_indexer::{
         initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
     },
     store::{restore_snapshot, version::IndexerStoreVersion, IndexerStore},
+    stream::process_blocks_dir,
     unix_socket_server::remove_unix_socket,
     web::start_web_server,
 };
@@ -396,7 +397,14 @@ impl DatabaseCommand {
                 database_dir,
                 blocks_dir,
             } => {
-                info!("Ingesting blocks from {blocks_dir:?} into {database_dir:?}")
+                info!("Ingesting blocks from {blocks_dir:?} info {database_dir:?}");
+
+                if blocks_dir.is_none() {
+                    error!("No blocks dir provided");
+                    process::exit(1);
+                }
+                let dir = blocks_dir.unwrap();
+                process_blocks_dir(dir).await?;
             }
             Self::Create(args) => {
                 let database_dir = args.database_dir.clone();

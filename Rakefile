@@ -51,8 +51,8 @@ task :lint => :check_format do
   flake == formatted_flake || abort('rbb')
 end
 
-desc 'Deploy Indexer'
-task :deploy, [:deploy_type, :build_type, :blocks_count] => [:build] do |t, args|
+desc 'Ingest Blocks'
+task :ingest, [:deploy_type, :build_type, :blocks_count] => [:build] do |t, args|
   chdir working_dir
   args.with_defaults(deploy_type: 'prod', build_type: 'nix', blocks_count: '5000')
   sh "ruby ops/ingest-blocks.rb #{args[:deploy_type]} #{args[:build_type]} #{args[:blocks_count]}"

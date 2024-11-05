@@ -19,6 +19,7 @@ browser = []
 
 [dependencies]
 anyhow = "1.0.89"
+async-trait = "0.1.83"
 # https://github.com/bincode-org/bincode/issues/674
 bincode = "2.0.0-rc.3"
 derive_more = { version = "0.99", default-features = false }
