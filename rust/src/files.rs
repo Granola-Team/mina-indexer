@@ -16,7 +16,7 @@ use walkdir::WalkDir;
 
 use crate::db::DbPool;
 
-const BLOCK_FILE_PREFIX: &str = "mainnet-";
+const FILE_PREFIX: &str = "mainnet-";
 pub const CHUNK_SIZE: usize = 100;
 const BUFFER_SIZE: usize = 16 * 1024; // 16KB buffer
 
@@ -158,11 +158,11 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
                 && e.path().extension().map_or(false, |ext| ext == "json")
                 && e.file_name()
                     .to_str()
-                    .map_or(false, |name| name.starts_with(BLOCK_FILE_PREFIX))
+                    .map_or(false, |name| name.starts_with(FILE_PREFIX))
         })
         .for_each(|e| paths.push(e.into_path()));
 
-    // Sort by block number (second part of the filename)
+    // Sort by number
     paths.par_sort_unstable_by(|a, b| {
         let get_block_num = |p: &PathBuf| -> u32 {
             p.file_name()
