@@ -1,7 +1,7 @@
-use bigdecimal::BigDecimal;
 use futures::future::try_join_all;
 use sonic_rs::{Array, JsonContainerTrait, JsonValueTrait, Value};
 use std::{collections::HashSet, sync::Arc};
+use tracing::{debug, info};
 
 use crate::{
     account_link,
@@ -12,7 +12,7 @@ use crate::{
 
 /// Ingest staking ledger files (JSON) from `staking_ledgers_dir` into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
-    let pool = Arc::new(DbPool::new(None).await?);
+    let pool = Arc::new(DbPool::new(Some("trunk")).await?);
     process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
         Box::pin(process_ledger(
             pool,
@@ -24,6 +24,11 @@ pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     .await
 }
 
+const INSERT_EPOCH: &str = "insert StakingEpoch {
+    hash := <str>$0,
+    epoch := <int64>$1
+} unless conflict;";
+
 /// Process ledger
 async fn process_ledger(
     pool: Arc<DbPool>,
@@ -31,30 +36,70 @@ async fn process_ledger(
     ledger_hash: String,
     epoch: i64,
 ) -> Result<(), edgedb_tokio::Error> {
+    info!("Processing ledger {} at epoch {}", ledger_hash, epoch);
     let accounts = extract_accounts(&json);
+    debug!("Extracted accounts");
 
-    let query = "insert StakingEpoch {
-            hash := <str>$0,
-            epoch := <int64>$1
-        } unless conflict;"
-        .to_string();
+    let insert_ledger = |source: &str, target: &str| {
+        format!(
+            "insert StakingLedger {{
+                epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
+                source := {},
+                balance := <decimal>$0,
+                target := {},
+                token := <int64>$1,
+                nonce := <optional int64>$2,
+                receipt_chain_hash := <str>$3,
+                voting_for := <str>$4
+            }}",
+            epoch, ledger_hash, source, target
+        )
+    };
 
-    // Run account insertion and epoch creation concurrently
+    let insert_timing = |source: &str, target: &str| {
+        format!(
+            "with ledger := (
+            {}
+        )
+        insert StakingTiming {{
+            ledger := ledger,
+            initial_minimum_balance := <decimal>$5,
+            cliff_time := <int64>$6,
+            cliff_amount := <decimal>$7,
+            vesting_period := <int64>$8,
+            vesting_increment := <decimal>$9
+        }};",
+            insert_ledger(source, target)
+        )
+    };
+
+    let epoch_params = (ledger_hash.clone(), epoch);
     let (_, _) = tokio::try_join!(
         insert_accounts(&pool, accounts),
-        pool.execute(query, (ledger_hash.clone(), epoch))
+        pool.execute(INSERT_EPOCH, &epoch_params)
     )?;
-
-    let json = Arc::new(json.to_vec());
 
     for chunk in json.chunks(CHUNK_SIZE) {
         let mut futures = Vec::new();
 
         for activity in chunk {
-            let activity = activity.clone();
+            let pool = Arc::clone(&pool);
 
+            // Extract account links for formatting into query
+            let source = account_link(&activity["pk"]);
+            let delegate = &activity["delegate"];
+            // You must have a delegate and if it's not stated, you are delegating to yourself
+            let target = if let Some(_) = delegate.as_str() {
+                account_link(delegate)
+            } else {
+                source.clone()
+            };
+            let ledger_query = insert_ledger(&source, &target);
+            let timing_query = insert_timing(&source, &target);
+
+            // Extract remaining values before the async move
             let balance = to_decimal(&activity["balance"]);
-            let token = to_i64(&activity["token"]);
+            let token = to_i64(&activity["token"]).unwrap_or(0);
             let nonce = to_i64(&activity["nonce"]);
             let receipt_chain_hash = activity["receipt_chain_hash"]
                 .as_str()
@@ -65,88 +110,47 @@ async fn process_ledger(
                 .unwrap_or_default()
                 .to_string();
 
-            let (query, params) = if let Some(timing) = activity["timing"].as_object() {
-                let query = format!(
-                    "with ledger := (
-                        {}
-                    )
-                    insert StakingTiming {{
-                        ledger := ledger,
-                        initial_minimum_balance := <decimal>$5,
-                        cliff_time := <int64>$6,
-                        cliff_amount := <decimal>$7,
-                        vesting_period := <int64>$8,
-                        vesting_increment := <decimal>$9
-                    }} unless conflict;",
-                    staking_ledger_insert_statement(&activity, epoch, &ledger_hash)
-                );
-                let initial_minimum_balance = to_decimal(&timing["initial_minimum_balance"]);
-                let cliff_time = to_i64(&timing["cliff_time"]);
-                let cliff_amount = to_decimal(&timing["cliff_amount"]);
-                let vesting_period = to_i64(&timing["vesting_period"]);
-                let vesting_increment = to_decimal(&timing["vesting_increment"]);
-                (
-                    query,
-                    (
-                        initial_minimum_balance,
-                        cliff_time,
-                        cliff_amount,
-                        vesting_period,
-                        vesting_increment,
-                    ),
-                )
+            let base_params = (balance, token, nonce, receipt_chain_hash, voting_for);
+
+            let timing_data = if let Some(timing) = activity["timing"].as_object() {
+                Some((
+                    to_decimal(&timing["initial_minimum_balance"]),
+                    to_i64(&timing["cliff_time"]),
+                    to_decimal(&timing["cliff_amount"]),
+                    to_i64(&timing["vesting_period"]),
+                    to_decimal(&timing["vesting_increment"]),
+                ))
             } else {
-                (
-                    staking_ledger_insert_statement(&activity, epoch, &ledger_hash),
-                    (
-                        None::<BigDecimal>,
-                        None::<i64>,
-                        None::<BigDecimal>,
-                        None::<i64>,
-                        None::<BigDecimal>,
-                    ),
-                )
+                None
             };
 
-            let params = (
-                balance,
-                token,
-                nonce,
-                receipt_chain_hash,
-                voting_for,
-                params.0,
-                params.1,
-                params.2,
-                params.3,
-                params.4,
-            );
+            let future = async move {
+                if let Some(timing_values) = timing_data {
+                    let timing_params = (
+                        base_params.0,
+                        base_params.1,
+                        base_params.2,
+                        base_params.3,
+                        base_params.4,
+                        timing_values.0,
+                        timing_values.1,
+                        timing_values.2,
+                        timing_values.3,
+                        timing_values.4,
+                    );
+                    pool.execute(&timing_query, &timing_params).await
+                } else {
+                    pool.execute(&ledger_query, &base_params).await
+                }
+            };
 
-            futures.push(pool.execute(query, params));
+            futures.push(future);
         }
 
         try_join_all(futures).await?;
     }
 
     Ok(())
-}
-
-fn staking_ledger_insert_statement(activity: &Value, epoch: i64, ledger_hash: &String) -> String {
-    format!(
-        "insert StakingLedger {{
-            epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-            source := {},
-            balance := <decimal>$0,
-            target := {},
-            token := <int64>$1,
-            nonce := <optional int64>$2,
-            receipt_chain_hash := <str>$3,
-            voting_for := <str>$4
-        }} unless conflict",
-        epoch,
-        ledger_hash,
-        account_link(&activity["pk"]),
-        account_link(&activity["delegate"])
-    )
 }
 
 /// Extract a [list][HashSet] of accounts (public keys)
