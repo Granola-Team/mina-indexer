@@ -150,7 +150,7 @@ async fn process_block_data(
 
     pool.execute(
         query,
-        (
+        &(
             height,
             epoch_count,
             global_slot,
@@ -203,7 +203,7 @@ async fn process_epoch_data(
 
     pool.execute(
         query,
-        (
+        &(
             ledger_hash,
             total_currency,
             seed,
@@ -280,7 +280,7 @@ async fn snark_jobs(
 
             let fee = to_decimal(&job["fee"]);
 
-            pool.execute(query, (fee,)).await?;
+            pool.execute(query, &(fee,)).await?;
         }
     }
     Ok(())
@@ -351,7 +351,7 @@ async fn user_commands(
                     )
                     .to_string();
 
-                    pool.execute(query, ()).await?;
+                    pool.execute(query, &()).await?;
                 }
                 "Payment" => {
                     let query = format!(
@@ -371,7 +371,7 @@ async fn user_commands(
                     let amount = to_decimal(&body1["amount"]);
                     let token_id = to_i64(&body1["token_id"]);
 
-                    pool.execute(query, (amount, token_id)).await?;
+                    pool.execute(query, &(amount, token_id)).await?;
                 }
                 _ => {
                     println!("Unmatched {:?}", payload["body"][0].as_str().unwrap())
@@ -405,7 +405,7 @@ async fn internal_commands(
                     let target_balance =
                         to_decimal(&internal_command_1["coinbase_receiver_balance"]);
 
-                    pool.execute(query, (target_balance,)).await?;
+                    pool.execute(query, &(target_balance,)).await?;
                 }
                 "Fee_transfer" => {
                     let query = format!(
@@ -421,7 +421,7 @@ async fn internal_commands(
                     let target1_balance = to_decimal(&internal_command_1["receiver1_balance"]);
                     let target2_balance = to_decimal(&internal_command_1["receiver2_balance"]);
 
-                    pool.execute(query, (target1_balance, target2_balance))
+                    pool.execute(query, &(target1_balance, target2_balance))
                         .await?;
                 }
                 _ => {}

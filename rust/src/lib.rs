@@ -45,7 +45,7 @@ async fn insert_accounts(
                 .join(", ")
         );
 
-        pool.execute(query, ()).await?;
+        pool.execute(query, &()).await?;
     }
 
     Ok(())

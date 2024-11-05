@@ -47,13 +47,13 @@ impl DbPool {
     pub async fn execute<T>(
         &self,
         query: impl AsRef<str>,
-        arguments: T,
+        arguments: &T,
     ) -> Result<(), edgedb_tokio::Error>
     where
         T: QueryArgs + Send + Sync + 'static,
     {
         self.active_connections.fetch_add(1, Ordering::SeqCst);
-        let result = self.client.execute(&query, &arguments).await;
+        let result = self.client.execute(&query, arguments).await;
         self.active_connections.fetch_sub(1, Ordering::SeqCst);
         result
     }
