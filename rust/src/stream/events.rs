@@ -4,6 +4,8 @@ pub enum EventType {
     BerkeleyBlockPath,
     MainnetBlockPath,
     BlockAncestor,
+    BerkeleyBlock,
+    MainnetBlock,
 }
 
 #[derive(Debug, Clone, PartialEq)]

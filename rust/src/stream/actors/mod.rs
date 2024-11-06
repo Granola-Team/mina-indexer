@@ -1,4 +1,6 @@
+pub(crate) mod berkeley_block_parser_actor;
 pub(crate) mod block_ancestor_actor;
+pub(crate) mod mainnet_block_parser_actor;
 pub(crate) mod pcb_path_actor;
 
 use super::events::Event;

@@ -6,6 +6,12 @@ pub struct BerkeleyBlock {
     pub data: Data,
 }
 
+impl BerkeleyBlock {
+    pub fn get_previous_state_hash(&self) -> String {
+        self.data.protocol_state.previous_state_hash.clone()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Data {
     pub scheduled_time: String,

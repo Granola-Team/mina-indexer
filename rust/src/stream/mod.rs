@@ -1,4 +1,8 @@
-use actors::{block_ancestor_actor::BlockAncestorActor, pcb_path_actor::PCBBlockPathActor, Actor};
+use actors::{
+    berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    block_ancestor_actor::BlockAncestorActor, mainnet_block_parser_actor::MainnetBlockParserActor,
+    pcb_path_actor::PCBBlockPathActor, Actor,
+};
 use events::Event;
 use futures::future::try_join_all;
 use shared_publisher::SharedPublisher;
@@ -24,6 +28,14 @@ pub async fn process_blocks_dir(blocks_dir: PathBuf) -> anyhow::Result<()> {
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
         Arc::new(PCBBlockPathActor {
             id: "PCBBlockPathActor".to_string(),
+            shared_publisher: Arc::clone(&shared_publisher),
+        }),
+        Arc::new(BerkeleyBlockParserActor {
+            id: "BerkeleyBlockParserActor".to_string(),
+            shared_publisher: Arc::clone(&shared_publisher),
+        }),
+        Arc::new(MainnetBlockParserActor {
+            id: "BerkeleyBlockParserActor".to_string(),
             shared_publisher: Arc::clone(&shared_publisher),
         }),
         Arc::new(BlockAncestorActor {
