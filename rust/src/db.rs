@@ -1,14 +1,18 @@
 use anyhow::Result;
 use edgedb_protocol::{query_arg::QueryArgs, QueryResult};
-use edgedb_tokio::{Builder, Client, RetryOptions};
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use edgedb_tokio::{Builder, Client, RetryCondition, RetryOptions};
+use std::{
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
 
 const MIN_CONNECTIONS: usize = 4;
 pub const MAX_CONNECTIONS: usize = 32;
 const CONNECTIONS_PER_CORE: usize = 4;
+const RETRY_ATTEMPTS: u32 = 5;
 
 #[inline]
 fn calculate_pool_size() -> usize {
@@ -35,7 +39,16 @@ impl DbPool {
                 .build_env()
                 .await?,
         )
-        .with_retry_options(RetryOptions::default());
+        .with_retry_options(
+            RetryOptions::default()
+                .with_rule(RetryCondition::TransactionConflict, RETRY_ATTEMPTS, |attempt| {
+                    let base = Duration::from_millis(100);
+                    let max_delay = Duration::from_secs(5);
+                    let delay = base.mul_f64(1.5f64.powi(attempt as i32));
+                    std::cmp::min(delay, max_delay)
+                })
+                .with_rule(RetryCondition::NetworkError, 3, |_| Duration::from_millis(500)),
+        );
 
         Ok(Self {
             client: Arc::new(client),
