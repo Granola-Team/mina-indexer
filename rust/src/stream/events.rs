@@ -3,6 +3,7 @@ pub enum EventType {
     PrecomputedBlockPath,
     BerkeleyBlockPath,
     MainnetBlockPath,
+    BlockAncestor,
 }
 
 #[derive(Debug, Clone, PartialEq)]

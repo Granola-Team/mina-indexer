@@ -1,3 +1,4 @@
+pub(crate) mod block_ancestor_actor;
 pub(crate) mod pcb_path_actor;
 
 use super::events::Event;
