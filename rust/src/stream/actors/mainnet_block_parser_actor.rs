@@ -8,11 +8,16 @@ use crate::{
     utility::extract_height_and_hash,
 };
 use async_trait::async_trait;
-use std::{fs, path::Path, sync::Arc};
+use std::{
+    fs,
+    path::Path,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 pub struct MainnetBlockParserActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
+    pub events_processed: AtomicUsize,
 }
 
 #[async_trait]
@@ -20,8 +25,11 @@ impl Actor for MainnetBlockParserActor {
     fn id(&self) -> String {
         self.id.clone()
     }
-    async fn on_event(&self, event: Event) {
-        if let EventType::MainnetBlock = event.event_type {
+    fn events_processed(&self) -> &AtomicUsize {
+        &self.events_processed
+    }
+    async fn handle_event(&self, event: Event) {
+        if let EventType::MainnetBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
             let file_content = fs::read_to_string(Path::new(&event.payload))
                 .expect("Failed to read JSON file from disk");
@@ -35,6 +43,7 @@ impl Actor for MainnetBlockParserActor {
                 event_type: EventType::MainnetBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
             });
+            self.incr_event_processed();
         }
     }
 
@@ -47,12 +56,14 @@ impl Actor for MainnetBlockParserActor {
 async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::MainnetBlockPayload;
     use std::io::Write;
+    use std::sync::atomic::Ordering;
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
     let actor = MainnetBlockParserActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
+        events_processed: AtomicUsize::new(0),
     };
 
     // Create a temporary file for the MainnetBlock JSON
@@ -76,7 +87,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
 
     // Create an event pointing to the temporary file with the correct event type
     let event = Event {
-        event_type: EventType::MainnetBlock,
+        event_type: EventType::MainnetBlockPath,
         payload: block_file.path().to_str().unwrap().to_string(),
     };
 
@@ -100,6 +111,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
             payload.previous_state_hash,
             "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
         );
+        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }

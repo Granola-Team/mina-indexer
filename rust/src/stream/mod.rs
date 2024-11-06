@@ -6,7 +6,11 @@ use actors::{
 use events::Event;
 use futures::future::try_join_all;
 use shared_publisher::SharedPublisher;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{atomic::AtomicUsize, Arc},
+};
 use tokio::{signal, sync::broadcast, task};
 
 mod actors;
@@ -29,18 +33,22 @@ pub async fn process_blocks_dir(blocks_dir: PathBuf) -> anyhow::Result<()> {
         Arc::new(PCBBlockPathActor {
             id: "PCBBlockPathActor".to_string(),
             shared_publisher: Arc::clone(&shared_publisher),
+            events_processed: AtomicUsize::new(0),
         }),
         Arc::new(BerkeleyBlockParserActor {
             id: "BerkeleyBlockParserActor".to_string(),
             shared_publisher: Arc::clone(&shared_publisher),
+            events_processed: AtomicUsize::new(0),
         }),
         Arc::new(MainnetBlockParserActor {
-            id: "BerkeleyBlockParserActor".to_string(),
+            id: "MainnetBlockParserActor".to_string(),
             shared_publisher: Arc::clone(&shared_publisher),
+            events_processed: AtomicUsize::new(0),
         }),
         Arc::new(BlockAncestorActor {
             id: "BlockAncestorActor".to_string(),
             shared_publisher: Arc::clone(&shared_publisher),
+            events_processed: AtomicUsize::new(0),
         }),
     ];
 
@@ -101,7 +109,7 @@ async fn setup_actor<A>(
                 }
             },
             _ = shutdown_rx.recv() => {
-                println!("Actor {} is shutting down.", actor.id());
+                actor.shutdown(); // Generalized shutdown call
                 break;
             }
         }

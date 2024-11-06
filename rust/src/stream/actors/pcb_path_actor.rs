@@ -5,11 +5,12 @@ use super::super::{
 };
 use crate::utility::get_top_level_keys_from_json_file;
 use async_trait::async_trait;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct PCBBlockPathActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
+    pub events_processed: AtomicUsize,
 }
 
 #[async_trait]
@@ -17,7 +18,11 @@ impl Actor for PCBBlockPathActor {
     fn id(&self) -> String {
         self.id.clone()
     }
-    async fn on_event(&self, event: Event) {
+
+    fn events_processed(&self) -> &AtomicUsize {
+        &self.events_processed
+    }
+    async fn handle_event(&self, event: Event) {
         if let EventType::PrecomputedBlockPath = event.event_type {
             let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
             if keys == vec!["data".to_string(), "version".to_string()] {
@@ -31,6 +36,7 @@ impl Actor for PCBBlockPathActor {
                     payload: event.payload,
                 });
             }
+            self.incr_event_processed();
         }
     }
 
@@ -41,6 +47,7 @@ impl Actor for PCBBlockPathActor {
 
 #[tokio::test]
 async fn test_precomputed_block_path_identity_actor() {
+    use std::sync::atomic::Ordering;
     use tempfile::NamedTempFile;
     // Initialize shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -49,6 +56,7 @@ async fn test_precomputed_block_path_identity_actor() {
     let actor = PCBBlockPathActor {
         id: "PCBBlockPathActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
+        events_processed: AtomicUsize::new(0),
     };
 
     // Subscribe to the shared publisher to listen for actor responses
@@ -74,6 +82,7 @@ async fn test_precomputed_block_path_identity_actor() {
             received_event.payload,
             temp_file_berkeley.path().to_str().unwrap().to_string()
         );
+        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BerkeleyBlockPath event from actor.");
     }

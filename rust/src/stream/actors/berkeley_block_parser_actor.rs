@@ -8,11 +8,16 @@ use crate::{
     utility::extract_height_and_hash,
 };
 use async_trait::async_trait;
-use std::{fs, path::Path, sync::Arc};
+use std::{
+    fs,
+    path::Path,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 pub struct BerkeleyBlockParserActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
+    pub events_processed: AtomicUsize,
 }
 
 #[async_trait]
@@ -20,7 +25,12 @@ impl Actor for BerkeleyBlockParserActor {
     fn id(&self) -> String {
         self.id.clone()
     }
-    async fn on_event(&self, event: Event) {
+
+    fn events_processed(&self) -> &AtomicUsize {
+        &self.events_processed
+    }
+
+    async fn handle_event(&self, event: Event) {
         if let EventType::BerkeleyBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
             let file_content = fs::read_to_string(Path::new(&event.payload))
@@ -35,6 +45,7 @@ impl Actor for BerkeleyBlockParserActor {
                 event_type: EventType::BerkeleyBlock,
                 payload: sonic_rs::to_string(&berkeley_block_payload).unwrap(),
             });
+            self.incr_event_processed();
         }
     }
 
@@ -47,12 +58,14 @@ impl Actor for BerkeleyBlockParserActor {
 async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::BerkeleyBlockPayload;
     use std::io::Write;
+    use std::sync::atomic::Ordering;
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
     let actor = BerkeleyBlockParserActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
+        events_processed: AtomicUsize::new(0),
     };
 
     // Create a temporary file for the BerkeleyBlock JSON
@@ -103,6 +116,7 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
             payload.previous_state_hash,
             "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu"
         );
+        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }
