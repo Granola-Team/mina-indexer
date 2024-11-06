@@ -1,4 +1,4 @@
-use mina_db::staking;
+use mina_indexer::staking;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {

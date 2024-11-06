@@ -1,4 +1,4 @@
-use mina_db::stream::process_blocks_dir;
+use mina_indexer::stream::process_blocks_dir;
 use std::{path::PathBuf, str::FromStr};
 use tokio::{signal, sync::broadcast};
 

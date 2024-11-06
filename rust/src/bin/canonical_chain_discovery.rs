@@ -10,7 +10,7 @@ use std::{
 use tracing::{error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
 
-use mina_db::db::DbPool;
+use mina_indexer::db::DbPool;
 
 const BLOCK_REPORTING_FREQ: usize = 1000;
 const MAINNET_CANONICAL_THRESHOLD: usize = 290;
