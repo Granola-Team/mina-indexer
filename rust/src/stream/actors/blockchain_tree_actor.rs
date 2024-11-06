@@ -49,37 +49,34 @@ impl Actor for BlockchainTreeActor {
     }
 
     async fn handle_event(&self, event: Event) {
-        match event.event_type {
-            EventType::BlockAncestor => {
-                let block_payload: BlockAncestorPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::BlockAncestor {
+            let block_payload: BlockAncestorPayload = sonic_rs::from_str(&event.payload).unwrap();
 
-                let new_block = StateHash(block_payload.state_hash.clone());
-                let previous_block = PreviousStateHash(block_payload.previous_state_hash.clone());
+            let new_block = StateHash(block_payload.state_hash.clone());
+            let previous_block = PreviousStateHash(block_payload.previous_state_hash.clone());
 
-                let mut blockchain_tree = self.blockchain_tree.lock().await;
-                if blockchain_tree.contains_key(&StateHash(block_payload.previous_state_hash)) {
-                    // Insert the new block into the main tree
-                    blockchain_tree.insert(new_block.clone(), previous_block);
-                    drop(blockchain_tree); // Drop the lock before proceeding
+            let mut blockchain_tree = self.blockchain_tree.lock().await;
+            if blockchain_tree.contains_key(&StateHash(block_payload.previous_state_hash)) {
+                // Insert the new block into the main tree
+                blockchain_tree.insert(new_block.clone(), previous_block);
+                drop(blockchain_tree); // Drop the lock before proceeding
 
-                    // Publish the addition of the new block
-                    let added_payload = NewBlockAddedPayload {
-                        height: block_payload.height,
-                        state_hash: new_block.0.clone(),
-                    };
-                    self.publish(Event {
-                        event_type: EventType::BlockAddedToTree,
-                        payload: sonic_rs::to_string(&added_payload).unwrap(),
-                    });
-                    self.incr_event_processed();
-                } else {
-                    self.publish(Event {
-                        event_type: EventType::BlockAncestor,
-                        payload: event.payload,
-                    });
-                }
+                // Publish the addition of the new block
+                let added_payload = NewBlockAddedPayload {
+                    height: block_payload.height,
+                    state_hash: new_block.0.clone(),
+                };
+                self.publish(Event {
+                    event_type: EventType::BlockAddedToTree,
+                    payload: sonic_rs::to_string(&added_payload).unwrap(),
+                });
+                self.incr_event_processed();
+            } else {
+                self.publish(Event {
+                    event_type: EventType::BlockAncestor,
+                    payload: event.payload,
+                });
             }
-            _ => {}
         }
     }
 

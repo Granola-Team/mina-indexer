@@ -30,7 +30,7 @@ impl Actor for MainnetBlockParserActor {
     }
     async fn handle_event(&self, event: Event) {
         if let EventType::MainnetBlockPath = event.event_type {
-            let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
+            let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
             let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
             let block: MainnetBlock = sonic_rs::from_str(&file_content).unwrap();
             let block_payload = MainnetBlockPayload {

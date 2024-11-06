@@ -32,7 +32,7 @@ impl Actor for BerkeleyBlockParserActor {
 
     async fn handle_event(&self, event: Event) {
         if let EventType::BerkeleyBlockPath = event.event_type {
-            let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
+            let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
             let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
             let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
             let berkeley_block_payload = BerkeleyBlockPayload {
