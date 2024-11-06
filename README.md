@@ -12,18 +12,4 @@
 
 You must first enter the Flox environment by using `flox activate`.
 
-#### Format
-
-`cargo-fmt --all`
-
-#### Check
-
-`cargo-fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings`
-
-#### Build
-
-`cargo build`
-
-#### Run
-
-`cargo run --bin ingest_staking_ledgers`
+Running any [`rake`](Rakefile) task will automatically enter the Flox environment.

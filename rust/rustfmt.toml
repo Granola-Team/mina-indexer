@@ -1,4 +1,6 @@
 imports_granularity = "Crate"
 group_imports = "One"
 wrap_comments = true
+comment_width = 180
+max_width = 180
 newline_style = "Unix"
