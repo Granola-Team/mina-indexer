@@ -33,7 +33,10 @@ impl BlockchainTreeActor {
             id: "BlockchainTreeActor".to_string(),
             shared_publisher,
             events_processed: AtomicUsize::new(0),
-            blockchain_tree: Arc::new(Mutex::new(HashMap::from([(StateHash(GENESIS_STATE_HASH.to_string()), PreviousStateHash("".to_string()))]))),
+            blockchain_tree: Arc::new(Mutex::new(HashMap::from([(
+                StateHash(GENESIS_STATE_HASH.to_string()),
+                PreviousStateHash("".to_string()),
+            )]))),
         }
     }
 }

@@ -75,7 +75,11 @@ async fn process_ledger(pool: Arc<DbPool>, json: Array, ledger_hash: String, epo
             let source = account_link(&activity["pk"]);
             let delegate = &activity["delegate"];
             // You must have a delegate and if it's not stated, you are delegating to yourself
-            let target = if delegate.as_str().is_some() { account_link(delegate) } else { source.clone() };
+            let target = if delegate.as_str().is_some() {
+                account_link(delegate)
+            } else {
+                source.clone()
+            };
             let ledger_query = insert_ledger(&source, &target);
             let timing_query = insert_timing(&source, &target);
 
@@ -88,13 +92,15 @@ async fn process_ledger(pool: Arc<DbPool>, json: Array, ledger_hash: String, epo
 
             let base_params = (balance, token, nonce, receipt_chain_hash, voting_for);
 
-            let timing_data = activity["timing"].as_object().map(|timing| (
+            let timing_data = activity["timing"].as_object().map(|timing| {
+                (
                     to_decimal(&timing["initial_minimum_balance"]),
                     to_i64(&timing["cliff_time"]),
                     to_decimal(&timing["cliff_amount"]),
                     to_i64(&timing["vesting_period"]),
                     to_decimal(&timing["vesting_increment"]),
-                ));
+                )
+            });
 
             let future = async move {
                 if let Some(timing_values) = timing_data {

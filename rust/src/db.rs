@@ -28,7 +28,14 @@ impl DbPool {
     /// Create a new [DbPool]. If [branch] is [None], the branch will default to "main"
     pub async fn new(branch: Option<&str>) -> Result<Self, edgedb_tokio::Error> {
         let max_connections = calculate_pool_size();
-        let client = Client::new(&Builder::new().max_concurrency(max_connections).branch(branch.unwrap_or("main"))?.build_env().await?).with_retry_options(RetryOptions::default());
+        let client = Client::new(
+            &Builder::new()
+                .max_concurrency(max_connections)
+                .branch(branch.unwrap_or("main"))?
+                .build_env()
+                .await?,
+        )
+        .with_retry_options(RetryOptions::default());
 
         Ok(Self {
             client: Arc::new(client),
@@ -61,6 +68,10 @@ impl DbPool {
     }
 
     pub fn get_pool_stats(&self) -> String {
-        format!(", DB connections: {}/{} active", self.active_connections.load(Ordering::Relaxed), self.max_connections)
+        format!(
+            ", DB connections: {}/{} active",
+            self.active_connections.load(Ordering::Relaxed),
+            self.max_connections
+        )
     }
 }
