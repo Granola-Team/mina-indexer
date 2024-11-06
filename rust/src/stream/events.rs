@@ -6,6 +6,7 @@ pub enum EventType {
     BlockAncestor,
     BerkeleyBlock,
     MainnetBlock,
+    BlockAddedToTree,
 }
 
 #[derive(Debug, Clone, PartialEq)]

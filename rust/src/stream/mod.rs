@@ -1,3 +1,4 @@
+use crate::stream::actors::blockchain_tree_actor::BlockchainTreeActor;
 use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, block_ancestor_actor::BlockAncestorActor, mainnet_block_parser_actor::MainnetBlockParserActor,
     pcb_path_actor::PCBBlockPathActor, Actor,
@@ -25,7 +26,7 @@ pub async fn process_blocks_dir(
 ) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
-    let shared_publisher = Arc::new(SharedPublisher::new(1056)); // Initialize publisher
+    let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -49,6 +50,7 @@ pub async fn process_blocks_dir(
             shared_publisher: Arc::clone(&shared_publisher),
             events_processed: AtomicUsize::new(0),
         }),
+        Arc::new(BlockchainTreeActor::new(Arc::clone(&shared_publisher))),
     ];
 
     // Spawn tasks for each actor and collect their handles

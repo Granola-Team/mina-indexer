@@ -38,8 +38,7 @@ impl Actor for BlockAncestorActor {
                 self.incr_event_processed();
             }
             EventType::MainnetBlock => {
-                let block_payload: MainnetBlockPayload =
-                    sonic_rs::from_str(&event.payload).unwrap();
+                let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let block_ancestor_payload = BlockAncestorPayload {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash.clone(),
@@ -144,14 +143,8 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
         // Deserialize the payload and check values
         let payload: BlockAncestorPayload = sonic_rs::from_str(&received_event.payload).unwrap();
         assert_eq!(payload.height, 101);
-        assert_eq!(
-            payload.state_hash,
-            "4MTNpwef32H67dHk9Mx25ZLpHfVz27QXECm8C4o5eyRa5LgJ1qLScCwpJM"
-        );
-        assert_eq!(
-            payload.previous_state_hash,
-            "4MPXcYhJY8URpwZxBEmv9C7kXf5h41PLXeX9GoTwFg3TuL2Q9zMn"
-        );
+        assert_eq!(payload.state_hash, "4MTNpwef32H67dHk9Mx25ZLpHfVz27QXECm8C4o5eyRa5LgJ1qLScCwpJM");
+        assert_eq!(payload.previous_state_hash, "4MPXcYhJY8URpwZxBEmv9C7kXf5h41PLXeX9GoTwFg3TuL2Q9zMn");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
