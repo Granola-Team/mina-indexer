@@ -24,7 +24,7 @@ async fn process_block(pool: Arc<DbPool>, json: Value, block_hash: String, heigh
     let scheduled_time = to_i64(&json["scheduled_time"]).expect("scheduled_time");
     let staged_ledger_hash = &blockchain_state["staged_ledger_hash"];
     let non_snark = &staged_ledger_hash["non_snark"];
-    let diffs = (&json["staged_ledger_diff"]["diff"]).as_array();
+    let diffs = json["staged_ledger_diff"]["diff"].as_array();
 
     process_block_data(
         &pool,
@@ -46,6 +46,7 @@ async fn process_block(pool: Arc<DbPool>, json: Value, block_hash: String, heigh
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn process_block_data(
     pool: &DbPool,
     block_hash: &str,
@@ -365,7 +366,7 @@ fn block_link(block_hash: &str) -> String {
     format!("(select Block filter .hash = '{block_hash}')")
 }
 
-const ACCOUNTS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"B62.{52}$").expect("Failed to compile accounts regex"));
+static ACCOUNTS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"B62.{52}$").expect("Failed to compile accounts regex"));
 
 fn extract_accounts(value: &Value) -> HashSet<String> {
     let mut accounts = HashSet::new();

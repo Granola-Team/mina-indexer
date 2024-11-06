@@ -8,7 +8,7 @@ use std::{
     collections::VecDeque,
     future::Future,
     io,
-    path::PathBuf,
+    path::{Path, PathBuf},
     pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -36,7 +36,7 @@ where
     F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
 {
     fn new(paths: Vec<PathBuf>, processor: F) -> Self {
-        let total_chunks = (paths.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        let total_chunks = paths.len().div_ceil(CHUNK_SIZE);
         let chunks: VecDeque<Vec<PathBuf>> = paths.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
 
         Self {
@@ -148,7 +148,9 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
-            e.file_type().is_file() && e.path().extension().map_or(false, |ext| ext == "json") && e.file_name().to_str().map_or(false, |name| name.starts_with(FILE_PREFIX))
+            e.file_type().is_file()
+                && e.path().extension().map_or(false, |ext| ext == "json")
+                && e.file_name().to_str().map_or(false, |name| name.starts_with(FILE_PREFIX))
         })
         .for_each(|e| paths.push(e.into_path()));
 
@@ -184,7 +186,7 @@ where
         let processor = Arc::clone(&processor);
         let pool = Arc::clone(&pool);
 
-        let handle = tokio::spawn(async move { while let Some(_) = processor.process_next_chunk(&pool).await {} });
+        let handle = tokio::spawn(async move { while processor.process_next_chunk(&pool).await.is_some() {} });
 
         handles.push(handle);
     }
@@ -224,7 +226,7 @@ where
 
 /// Extract the hash part from a Mina block or staking ledger file name
 #[inline]
-fn extract_hash_from_file_name(path: &PathBuf) -> &str {
+fn extract_hash_from_file_name(path: &Path) -> &str {
     path.file_name()
         .and_then(|n| n.to_str())
         .and_then(|s| s.split('-').nth(2))
@@ -234,7 +236,7 @@ fn extract_hash_from_file_name(path: &PathBuf) -> &str {
 
 /// Extract the digits part from a Mina block (the height) or staking ledger (the epoch) file name
 #[inline]
-fn extract_digits_from_file_name(path: &PathBuf) -> i64 {
+fn extract_digits_from_file_name(path: &Path) -> i64 {
     path.file_name()
         .and_then(|n| n.to_str())
         .and_then(|s| s.split('-').nth(1))

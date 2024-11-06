@@ -14,7 +14,7 @@ const CONNECTIONS_PER_CORE: usize = 4;
 fn calculate_pool_size() -> usize {
     let cpu_count = num_cpus::get();
     let base_size = cpu_count * CONNECTIONS_PER_CORE;
-    std::cmp::min(MAX_CONNECTIONS, std::cmp::max(MIN_CONNECTIONS, base_size))
+    base_size.clamp(MIN_CONNECTIONS, MAX_CONNECTIONS)
 }
 
 /// Database pool

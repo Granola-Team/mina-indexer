@@ -25,7 +25,7 @@ mod extract_height_and_hash_tests {
     #[test]
     fn test_extract_height_and_hash_valid_format() {
         let path = Path::new("prefix-1234-hashpart.extension");
-        let (height, hash) = extract_height_and_hash(&path);
+        let (height, hash) = extract_height_and_hash(path);
         assert_eq!(height, 1234);
         assert_eq!(hash, "hashpart");
     }
@@ -34,21 +34,21 @@ mod extract_height_and_hash_tests {
     #[should_panic(expected = "Filename format is invalid")]
     fn test_extract_height_and_hash_invalid_format() {
         let path = Path::new("invalid-format");
-        let _ = extract_height_and_hash(&path); // This should panic
+        let _ = extract_height_and_hash(path); // This should panic
     }
 
     #[test]
     #[should_panic(expected = "Failed to parse block height")]
     fn test_extract_height_and_hash_non_numeric_height() {
         let path = Path::new("prefix-notanumber-hash.extension");
-        let _ = extract_height_and_hash(&path); // This should panic due to non-numeric height
+        let _ = extract_height_and_hash(path); // This should panic due to non-numeric height
     }
 
     #[test]
     #[should_panic(expected = "Failed to extract filename from path")]
     fn test_extract_height_and_hash_empty_path() {
         let path = Path::new("");
-        let _ = extract_height_and_hash(&path); // This should panic due to missing filename
+        let _ = extract_height_and_hash(path); // This should panic due to missing filename
     }
 }
 
