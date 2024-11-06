@@ -124,13 +124,15 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     let process_handle = task::spawn(process_blocks_dir(blocks_dir, shutdown_receiver));
 
     // Allow some time for processing
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Send the shutdown signal
     let _ = shutdown_sender.send(());
 
     // Wait for the task to handle shutdown and finish
     let _ = process_handle.await;
+
+    // TODO: Need to find a way to check log output
 
     Ok(())
 }
