@@ -1,0 +1,667 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "libiconv": {
+        "pkg-path": "libiconv",
+        "systems": [
+          "aarch64-darwin",
+          "x86_64-darwin"
+        ]
+      },
+      "mold": {
+        "pkg-path": "mold",
+        "systems": [
+          "aarch64-linux",
+          "x86_64-linux"
+        ]
+      },
+      "nightly-rust": {
+        "flake": "github:nix-community/fenix/monthly#default.toolchain"
+      },
+      "ruby": {
+        "pkg-path": "ruby"
+      },
+      "rust-analyzer": {
+        "pkg-path": "rust-analyzer",
+        "pkg-group": "rust-analyzer"
+      },
+      "rust-lib-src": {
+        "pkg-path": "rustPlatform.rustLibSrc",
+        "pkg-group": "rust-toolchain"
+      },
+      "zld": {
+        "pkg-path": "zld",
+        "systems": [
+          "aarch64-darwin",
+          "x86_64-darwin"
+        ]
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {
+      "systems": [
+        "aarch64-darwin",
+        "x86_64-darwin",
+        "aarch64-linux",
+        "x86_64-linux"
+      ],
+      "allow": {
+        "licenses": []
+      },
+      "semver": {}
+    }
+  },
+  "packages": [
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/5nwq6n5kfc3pf2gpzs42k4v0ds1p31d2-rust-analyzer-2024-09-02.drv",
+      "description": "Modular compiler frontend for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-analyzer-2024-09-02",
+      "pname": "rust-analyzer",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2024-09-02",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/6mk1mh8fzxywqpsyy44l71riy9n151qs-rust-analyzer-2024-09-02"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-analyzer",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/80l20kwix4l5zc1szsgd7z6aw74m3ka2-rust-analyzer-2024-09-02.drv",
+      "description": "Modular compiler frontend for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-analyzer-2024-09-02",
+      "pname": "rust-analyzer",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2024-09-02",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/4gz4abd241flc4ys0nmylnmkyvp04acm-rust-analyzer-2024-09-02"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-analyzer",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/wxrgx0jrgxky38j9h3fdz78qqc705fij-rust-analyzer-2024-09-02.drv",
+      "description": "Modular compiler frontend for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-analyzer-2024-09-02",
+      "pname": "rust-analyzer",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2024-09-02",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/iiwhmdn85zayh1hsyv4s261v8bx179x6-rust-analyzer-2024-09-02"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-analyzer",
+      "priority": 5
+    },
+    {
+      "attr_path": "rust-analyzer",
+      "broken": false,
+      "derivation": "/nix/store/agk03jjsgwl5lpz9kfpg7gnb8gmsrc0b-rust-analyzer-2024-09-02.drv",
+      "description": "Modular compiler frontend for the Rust language",
+      "install_id": "rust-analyzer",
+      "license": "[ MIT, Apache-2.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-analyzer-2024-09-02",
+      "pname": "rust-analyzer",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2024-09-02",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/21m9bqyzqb6jw3xmscc7qfirhpbc4wm7-rust-analyzer-2024-09-02"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-analyzer",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/ff1b02sbawgqbxf12idp25na91vb82gi-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/5ls52qv7vk6z8xkvr2vwm24kzjs2gqxf-rust-lib-src"
+      },
+      "system": "aarch64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/sh6m3i4v1bvsf590jgr1lci23crv6gci-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/ya7q5lncvd2i57is0g6w1mkl9282xi7c-rust-lib-src"
+      },
+      "system": "x86_64-darwin",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/1qgf1icj9izym2dfhn0aayavrf4hkl61-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/v0yfhkszbg3j07rh939qp8xqvir3i440-rust-lib-src"
+      },
+      "system": "aarch64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "rustPlatform.rustLibSrc",
+      "broken": false,
+      "derivation": "/nix/store/jgvjdc8mja2lv31id558m0qvvghp3nym-rust-lib-src.drv",
+      "install_id": "rust-lib-src",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "rust-lib-src",
+      "pname": "rustLibSrc",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "rust-lib-src",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/4j0ahwzkbz0gz655swdqkliz5rgwznfh-rust-lib-src"
+      },
+      "system": "x86_64-linux",
+      "group": "rust-toolchain",
+      "priority": 5
+    },
+    {
+      "attr_path": "libiconv",
+      "broken": false,
+      "derivation": "/nix/store/6kpkqjrhf3rm839rwxbggzcnly41lf8m-libiconv-107.drv",
+      "description": "Iconv(3) implementation",
+      "install_id": "libiconv",
+      "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "libiconv-107",
+      "pname": "libiconv",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "107",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/8fr60sg82dqy3pvh03wpl63wzcnkaa79-libiconv-107-dev",
+        "out": "/nix/store/dvmq3xa54hfik85259wyf281m076s14h-libiconv-107"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "libiconv",
+      "broken": false,
+      "derivation": "/nix/store/h4dxaicxrzc5r4rr1405yd4syxvvwmqz-libiconv-107.drv",
+      "description": "Iconv(3) implementation",
+      "install_id": "libiconv",
+      "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "libiconv-107",
+      "pname": "libiconv",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "107",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/a58arvl3qhqr3iyxxrc8bxh2ww7n1vdn-libiconv-107-dev",
+        "out": "/nix/store/gkxkraki0lmpz4dkzfn6h87jb6ry5hwf-libiconv-107"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "mold",
+      "broken": false,
+      "derivation": "/nix/store/8b6qvj0aqmwghxvjwwla6wdgjcg1dqky-mold-2.34.1.drv",
+      "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
+      "install_id": "mold",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "mold-2.34.1",
+      "pname": "mold",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.34.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/49qfbwkii3nvfm2c6qfmq2kb0l6v6gqy-mold-2.34.1"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "mold",
+      "broken": false,
+      "derivation": "/nix/store/xmb2ahyzy8q4bbn0phx2znic2zgrf6w4-mold-2.34.1.drv",
+      "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
+      "install_id": "mold",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "mold-2.34.1",
+      "pname": "mold",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.34.1",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/625h5ych6nvd0qm29liq43600k8ilf6x-mold-2.34.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "ruby",
+      "broken": false,
+      "derivation": "/nix/store/0qr7zkxfy4jn533fclik3dg1gdcf7dlw-ruby-3.3.5.drv",
+      "description": "Object-oriented language for quick and easy programming",
+      "install_id": "ruby",
+      "license": "Ruby",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "ruby-3.3.5",
+      "pname": "ruby",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "devdoc": "/nix/store/5yb1vvik4y7vccdb8fja78dj944bsxhk-ruby-3.3.5-devdoc",
+        "out": "/nix/store/v8ls0ws5j9wlghn7v0mvnxq4fwp5xlgv-ruby-3.3.5"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "ruby",
+      "broken": false,
+      "derivation": "/nix/store/5nhhqhx53d1hscs44xih3zdjbg8qj6wf-ruby-3.3.5.drv",
+      "description": "Object-oriented language for quick and easy programming",
+      "install_id": "ruby",
+      "license": "Ruby",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "ruby-3.3.5",
+      "pname": "ruby",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "devdoc": "/nix/store/0h2cgyr9z93ygvh6n3qlabghz10axra4-ruby-3.3.5-devdoc",
+        "out": "/nix/store/aksb2bb4nfjkznd1l72qbsh1qyb2jvwg-ruby-3.3.5"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "ruby",
+      "broken": false,
+      "derivation": "/nix/store/80dly904xdzvy60wzv2y3a6rw4c25xk4-ruby-3.3.5.drv",
+      "description": "Object-oriented language for quick and easy programming",
+      "install_id": "ruby",
+      "license": "Ruby",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "ruby-3.3.5",
+      "pname": "ruby",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "devdoc": "/nix/store/jv04q86hk83mmkss25vy4yypnqmna3y8-ruby-3.3.5-devdoc",
+        "out": "/nix/store/pyb6l1ch48zr4kwp1wy7669aflwbr6hs-ruby-3.3.5"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "ruby",
+      "broken": false,
+      "derivation": "/nix/store/3ydj0bg23xa2fag6fb5b4niglqqasjzm-ruby-3.3.5.drv",
+      "description": "Object-oriented language for quick and easy programming",
+      "install_id": "ruby",
+      "license": "Ruby",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "ruby-3.3.5",
+      "pname": "ruby",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "devdoc": "/nix/store/6y208gd4f6578jls5bdsmy883ps5aybx-ruby-3.3.5-devdoc",
+        "out": "/nix/store/zv3lmwvsv80ycb163a20dkcczgblgr71-ruby-3.3.5"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zld",
+      "broken": false,
+      "derivation": "/nix/store/280nbn95v0xnj9284mdrikgxazqgqb75-zld-1.3.4.drv",
+      "description": "Faster version of Apple's linker",
+      "install_id": "zld",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "zld-1.3.4",
+      "pname": "zld",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.3.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wh35kcnc6ngpn0af1vgdg9r5xv2hxsf4-zld-1.3.4"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zld",
+      "broken": false,
+      "derivation": "/nix/store/lgpbyv8s5hvdnxd7395iy2wzj927z9vc-zld-1.3.4.drv",
+      "description": "Faster version of Apple's linker",
+      "install_id": "zld",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "name": "zld-1.3.4",
+      "pname": "zld",
+      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "rev_count": 702572,
+      "rev_date": "2024-11-02T07:13:23Z",
+      "scrape_date": "2024-11-04T04:02:54Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.3.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/40xamqpmjl24avyplbynbvzxmvblavpp-zld-1.3.4"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "install_id": "nightly-rust",
+      "locked-url": "github:nix-community/fenix/87b4d20f896c99018dde4702a9c6157b516f2a76",
+      "flake-description": "Rust toolchains and rust analyzer nightly for nix",
+      "locked-flake-attr-path": "packages.aarch64-darwin.default.toolchain",
+      "derivation": "/nix/store/nyik0ygfhci75vlizzwyv279qgy23y7f-rust-nightly-default-2024-11-01.drv",
+      "outputs": {
+        "out": "/nix/store/1h9zdzg3rjif68qh8a6cakz9ah1dw0wj-rust-nightly-default-2024-11-01"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "package-system": "aarch64-darwin",
+      "system": "aarch64-darwin",
+      "name": "rust-nightly-default-2024-11-01",
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "nightly-rust",
+      "locked-url": "github:nix-community/fenix/87b4d20f896c99018dde4702a9c6157b516f2a76",
+      "flake-description": "Rust toolchains and rust analyzer nightly for nix",
+      "locked-flake-attr-path": "packages.x86_64-darwin.default.toolchain",
+      "derivation": "/nix/store/7y45wwngm5bknc7kpyqr139d5qjb2w6r-rust-nightly-default-2024-11-01.drv",
+      "outputs": {
+        "out": "/nix/store/32cbkjy97cswqim2zmhhzdigczm4j5dh-rust-nightly-default-2024-11-01"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "package-system": "x86_64-darwin",
+      "system": "x86_64-darwin",
+      "name": "rust-nightly-default-2024-11-01",
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "nightly-rust",
+      "locked-url": "github:nix-community/fenix/87b4d20f896c99018dde4702a9c6157b516f2a76",
+      "flake-description": "Rust toolchains and rust analyzer nightly for nix",
+      "locked-flake-attr-path": "packages.aarch64-linux.default.toolchain",
+      "derivation": "/nix/store/1w60pjkjq2x0ff8gai5q28f5a1nshx7d-rust-nightly-default-2024-11-01.drv",
+      "outputs": {
+        "out": "/nix/store/1chwbwajbdzx80v3pxd2dgisp18jhvbn-rust-nightly-default-2024-11-01"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "package-system": "aarch64-linux",
+      "system": "aarch64-linux",
+      "name": "rust-nightly-default-2024-11-01",
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    },
+    {
+      "install_id": "nightly-rust",
+      "locked-url": "github:nix-community/fenix/87b4d20f896c99018dde4702a9c6157b516f2a76",
+      "flake-description": "Rust toolchains and rust analyzer nightly for nix",
+      "locked-flake-attr-path": "packages.x86_64-linux.default.toolchain",
+      "derivation": "/nix/store/3ri8scdh6vr0dc5bza3np6jnp8p1js46-rust-nightly-default-2024-11-01.drv",
+      "outputs": {
+        "out": "/nix/store/x2jd4iiykahfyb475j616swg670vyxyp-rust-nightly-default-2024-11-01"
+      },
+      "output-names": [
+        "out"
+      ],
+      "outputs-to-install": [
+        "out"
+      ],
+      "package-system": "x86_64-linux",
+      "system": "x86_64-linux",
+      "name": "rust-nightly-default-2024-11-01",
+      "broken": false,
+      "unfree": false,
+      "priority": 5
+    }
+  ]
+}
