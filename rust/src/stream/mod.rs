@@ -11,7 +11,7 @@ use std::{
     path::PathBuf,
     sync::{atomic::AtomicUsize, Arc},
 };
-use tokio::{signal, sync::broadcast, task};
+use tokio::{sync::broadcast, task};
 
 mod actors;
 pub mod berkeley_block_models;
@@ -20,13 +20,13 @@ pub mod mainnet_block_models;
 pub mod payloads;
 pub mod shared_publisher;
 
-pub async fn process_blocks_dir(blocks_dir: PathBuf) -> anyhow::Result<()> {
+pub async fn process_blocks_dir(
+    blocks_dir: PathBuf,
+    mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
+) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
-    let shared_publisher = Arc::new(SharedPublisher::new(1056)); // Initialize publisher with buffer size
-
-    // Initialize a shutdown channel for graceful termination
-    let (shutdown_sender, _) = broadcast::channel(1);
+    let shared_publisher = Arc::new(SharedPublisher::new(1056)); // Initialize publisher
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -56,8 +56,8 @@ pub async fn process_blocks_dir(blocks_dir: PathBuf) -> anyhow::Result<()> {
     let mut actor_handles = Vec::new();
     for actor in actors {
         let receiver = shared_publisher.subscribe();
-        let shutdown_receiver = shutdown_sender.subscribe();
-        let handle = task::spawn(setup_actor(receiver, shutdown_receiver, actor));
+        let actor_shutdown_rx = shutdown_receiver.resubscribe(); // Use resubscribe for each actor
+        let handle = task::spawn(setup_actor(receiver, actor_shutdown_rx, actor));
         actor_handles.push(handle);
     }
 
@@ -74,18 +74,10 @@ pub async fn process_blocks_dir(blocks_dir: PathBuf) -> anyhow::Result<()> {
         });
     }
 
-    println!("Finished publishing files. Waiting indefinitely for SIGINT...");
+    println!("Finished publishing files. Waiting for shutdown signal...");
 
-    // Wait indefinitely for SIGINT signal to terminate
-    tokio::select! {
-        _ = signal::ctrl_c() => {
-            println!("SIGINT received, sending shutdown signal...");
-        }
-    }
-
-    // Send the shutdown signal to terminate the actors
-    println!("Sending shutdown signal to actors.");
-    let _ = shutdown_sender.send(());
+    // Wait for the shutdown signal to terminate
+    let _ = shutdown_receiver.recv().await;
 
     // Await all actor handles to ensure they shut down gracefully
     println!("Waiting for all actors to shut down...");
@@ -114,4 +106,31 @@ async fn setup_actor<A>(
             }
         }
     }
+}
+
+#[tokio::test]
+async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
+    use std::{path::PathBuf, str::FromStr};
+    use tokio::{sync::broadcast, task, time::Duration};
+
+    // Create a shutdown channel for the test
+    let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
+
+    // Path to the directory with 100 mainnet block files
+    let blocks_dir = PathBuf::from_str("../test_data/100_mainnet_blocks")
+        .expect("Directory with mainnet blocks should exist");
+
+    // Spawn the process_blocks_dir task with the shutdown receiver
+    let process_handle = task::spawn(process_blocks_dir(blocks_dir, shutdown_receiver));
+
+    // Allow some time for processing
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    // Send the shutdown signal
+    let _ = shutdown_sender.send(());
+
+    // Wait for the task to handle shutdown and finish
+    let _ = process_handle.await;
+
+    Ok(())
 }
