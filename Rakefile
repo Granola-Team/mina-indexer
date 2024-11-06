@@ -5,7 +5,7 @@ root_dir = pwd
 if ENV['FLOX_ENV'].nil?
   sh 'flox activate' do |ok, status|
     if !ok
-      puts "Failed to activate Flox environment"
+      puts "Failed to activate Flox environment. Is Flox installed? https://flox.dev/docs/install-flox/"
       exit 1
     end
   end
