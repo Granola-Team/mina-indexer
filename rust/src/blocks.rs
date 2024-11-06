@@ -1,3 +1,4 @@
+use crate::{account_link, db::DbPool, files::process_files, insert_accounts, to_decimal, to_i64, to_titlecase};
 use regex::Regex;
 use sonic_rs::{Array, JsonContainerTrait, JsonType, JsonValueTrait, Value};
 use std::{
@@ -5,25 +6,12 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use crate::{
-    account_link, db::DbPool, files::process_files, insert_accounts, to_decimal, to_i64,
-    to_titlecase,
-};
-
 pub async fn run(blocks_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new(Some("concurrency")).await?);
-    process_files(blocks_dir, pool, |pool, json, hash, number| {
-        Box::pin(process_block(pool, json, hash, number))
-    })
-    .await
+    process_files(blocks_dir, pool, |pool, json, hash, number| Box::pin(process_block(pool, json, hash, number))).await
 }
 
-async fn process_block(
-    pool: Arc<DbPool>,
-    json: Value,
-    block_hash: String,
-    height: i64,
-) -> Result<(), edgedb_tokio::Error> {
+async fn process_block(pool: Arc<DbPool>, json: Value, block_hash: String, height: i64) -> Result<(), edgedb_tokio::Error> {
     let accounts = extract_accounts(&json);
 
     // First insert all accounts and wait for completion since blocks link to accounts
@@ -108,32 +96,18 @@ async fn process_block_data(
             pending_coinbase_hash := '{}'
         }};",
         block_hash,
-        protocol_state["previous_state_hash"]
-            .as_str()
-            .expect("previous_state_hash"),
-        body["genesis_state_hash"]
-            .as_str()
-            .expect("genesis_state_hash"),
+        protocol_state["previous_state_hash"].as_str().expect("previous_state_hash"),
+        body["genesis_state_hash"].as_str().expect("genesis_state_hash"),
         account_link(&consensus_state["block_stake_winner"]),
         account_link(&consensus_state["block_creator"]),
         account_link(&consensus_state["coinbase_receiver"]),
-        consensus_state["last_vrf_output"]
-            .as_str()
-            .expect("last_vrf_output"),
-        blockchain_state["snarked_ledger_hash"]
-            .as_str()
-            .expect("snarked_ledger_hash"),
-        blockchain_state["genesis_ledger_hash"]
-            .as_str()
-            .expect("genesis_ledger_hash"),
+        consensus_state["last_vrf_output"].as_str().expect("last_vrf_output"),
+        blockchain_state["snarked_ledger_hash"].as_str().expect("snarked_ledger_hash"),
+        blockchain_state["genesis_ledger_hash"].as_str().expect("genesis_ledger_hash"),
         non_snark["ledger_hash"].as_str().expect("ledger_hash"),
         non_snark["aux_hash"].as_str().expect("aux_hash"),
-        non_snark["pending_coinbase_aux"]
-            .as_str()
-            .expect("pending_coinbase_aux"),
-        staged_ledger_hash["pending_coinbase_hash"]
-            .as_str()
-            .expect("pending_coinbase_hash")
+        non_snark["pending_coinbase_aux"].as_str().expect("pending_coinbase_aux"),
+        staged_ledger_hash["pending_coinbase_hash"].as_str().expect("pending_coinbase_hash")
     )
     .to_string();
 
@@ -166,13 +140,7 @@ async fn process_block_data(
     .await
 }
 
-async fn process_epoch_data(
-    pool: &DbPool,
-    epoch_type: &str,
-    block_hash: &str,
-    epoch_data: &Value,
-    ledger: &Value,
-) -> Result<(), edgedb_tokio::Error> {
+async fn process_epoch_data(pool: &DbPool, epoch_type: &str, block_hash: &str, epoch_data: &Value, ledger: &Value) -> Result<(), edgedb_tokio::Error> {
     let query = format!(
         "insert {}EpochData {{
             block := {},
@@ -191,36 +159,15 @@ async fn process_epoch_data(
     let ledger_hash = ledger["hash"].as_str().expect("ledger hash").to_string();
     let total_currency = to_i64(&ledger["total_currency"]);
     let seed = epoch_data["seed"].as_str().expect("seed").to_string();
-    let start_checkpoint = epoch_data["start_checkpoint"]
-        .as_str()
-        .expect("start_checkpoint")
-        .to_string();
-    let lock_checkpoint = epoch_data["lock_checkpoint"]
-        .as_str()
-        .expect("lock_checkpoint")
-        .to_string();
+    let start_checkpoint = epoch_data["start_checkpoint"].as_str().expect("start_checkpoint").to_string();
+    let lock_checkpoint = epoch_data["lock_checkpoint"].as_str().expect("lock_checkpoint").to_string();
     let epoch_length = to_i64(&epoch_data["epoch_length"]);
 
-    pool.execute(
-        query,
-        &(
-            ledger_hash,
-            total_currency,
-            seed,
-            start_checkpoint,
-            lock_checkpoint,
-            epoch_length,
-        ),
-    )
-    .await
+    pool.execute(query, &(ledger_hash, total_currency, seed, start_checkpoint, lock_checkpoint, epoch_length))
+        .await
 }
 
-async fn process_epoch_and_commands(
-    pool: &DbPool,
-    block_hash: &str,
-    consensus_state: &Value,
-    diffs: Option<&Array>,
-) -> Result<(), edgedb_tokio::Error> {
+async fn process_epoch_and_commands(pool: &DbPool, block_hash: &str, consensus_state: &Value, diffs: Option<&Array>) -> Result<(), edgedb_tokio::Error> {
     for epoch_type in ["staking", "next"] {
         let epoch_data = &consensus_state[format!("{}_epoch_data", epoch_type).as_str()];
         let ledger = &epoch_data["ledger"];
@@ -239,11 +186,7 @@ async fn process_epoch_and_commands(
     Ok(())
 }
 
-async fn process_commands(
-    pool: &DbPool,
-    block_hash: &str,
-    diffs: Option<&Array>,
-) -> Result<(), edgedb_tokio::Error> {
+async fn process_commands(pool: &DbPool, block_hash: &str, diffs: Option<&Array>) -> Result<(), edgedb_tokio::Error> {
     if let Some(diffs) = diffs {
         for diff in diffs {
             // Clone values needed for the closure
@@ -260,11 +203,7 @@ async fn process_commands(
     Ok(())
 }
 
-async fn snark_jobs(
-    pool: &DbPool,
-    block_hash: &str,
-    diff: &Value,
-) -> Result<(), edgedb_tokio::Error> {
+async fn snark_jobs(pool: &DbPool, block_hash: &str, diff: &Value) -> Result<(), edgedb_tokio::Error> {
     if let Some(completed_works) = diff["completed_works"].as_array() {
         for job in completed_works {
             let query = format!(
@@ -286,11 +225,7 @@ async fn snark_jobs(
     Ok(())
 }
 
-async fn user_commands(
-    pool: &DbPool,
-    block_hash: &str,
-    diff: &Value,
-) -> Result<(), edgedb_tokio::Error> {
+async fn user_commands(pool: &DbPool, block_hash: &str, diff: &Value) -> Result<(), edgedb_tokio::Error> {
     if let Some(commands) = diff["commands"].as_array() {
         for command in commands {
             let data1 = &command["data"][1];
@@ -383,11 +318,7 @@ async fn user_commands(
 }
 
 /// Handles Fee Transfers and Coinbase
-async fn internal_commands(
-    pool: &DbPool,
-    block_hash: &str,
-    diff: &Value,
-) -> Result<(), edgedb_tokio::Error> {
+async fn internal_commands(pool: &DbPool, block_hash: &str, diff: &Value) -> Result<(), edgedb_tokio::Error> {
     if let Some(balances) = diff["internal_command_balances"].as_array() {
         for internal_command in balances {
             let internal_command_1 = &internal_command[1];
@@ -402,8 +333,7 @@ async fn internal_commands(
                     )
                     .to_string();
 
-                    let target_balance =
-                        to_decimal(&internal_command_1["coinbase_receiver_balance"]);
+                    let target_balance = to_decimal(&internal_command_1["coinbase_receiver_balance"]);
 
                     pool.execute(query, &(target_balance,)).await?;
                 }
@@ -421,8 +351,7 @@ async fn internal_commands(
                     let target1_balance = to_decimal(&internal_command_1["receiver1_balance"]);
                     let target2_balance = to_decimal(&internal_command_1["receiver2_balance"]);
 
-                    pool.execute(query, &(target1_balance, target2_balance))
-                        .await?;
+                    pool.execute(query, &(target1_balance, target2_balance)).await?;
                 }
                 _ => {}
             }
@@ -436,8 +365,7 @@ fn block_link(block_hash: &str) -> String {
     format!("(select Block filter .hash = '{block_hash}')")
 }
 
-const ACCOUNTS_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"B62.{52}$").expect("Failed to compile accounts regex"));
+const ACCOUNTS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"B62.{52}$").expect("Failed to compile accounts regex"));
 
 fn extract_accounts(value: &Value) -> HashSet<String> {
     let mut accounts = HashSet::new();

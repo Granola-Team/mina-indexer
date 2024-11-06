@@ -21,16 +21,9 @@ fn to_titlecase(s: &str) -> String {
     }
 }
 
-async fn insert_accounts(
-    pool: &DbPool,
-    accounts: HashSet<String>,
-) -> Result<(), edgedb_tokio::Error> {
+async fn insert_accounts(pool: &DbPool, accounts: HashSet<String>) -> Result<(), edgedb_tokio::Error> {
     // Process all accounts in a single transaction with conflict handling
-    for chunk in accounts
-        .into_iter()
-        .collect::<Vec<String>>()
-        .chunks(ACCOUNTS_BATCH_SIZE)
-    {
+    for chunk in accounts.into_iter().collect::<Vec<String>>().chunks(ACCOUNTS_BATCH_SIZE) {
         let query = format!(
             "FOR account_pk IN {{{}}}
              UNION (
@@ -38,11 +31,7 @@ async fn insert_accounts(
                     public_key := account_pk
                 }} UNLESS CONFLICT
              )",
-            chunk
-                .iter()
-                .map(|a| format!("'{}'", a))
-                .collect::<Vec<_>>()
-                .join(", ")
+            chunk.iter().map(|a| format!("'{}'", a)).collect::<Vec<_>>().join(", ")
         );
 
         pool.execute(query, &()).await?;
@@ -80,8 +69,5 @@ fn to_decimal(value: &Value) -> Option<BigDecimal> {
 
 #[inline]
 fn account_link(public_key: &Value) -> String {
-    format!(
-        "(select Account filter .public_key = '{}')",
-        public_key.as_str().expect("public_key")
-    )
+    format!("(select Account filter .public_key = '{}')", public_key.as_str().expect("public_key"))
 }

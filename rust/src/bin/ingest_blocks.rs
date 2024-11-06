@@ -10,8 +10,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
     // Path to the blocks directory
-    let blocks_dir = PathBuf::from_str("src/stream/test_data/100_mainnet_blocks")
-        .expect("blocks dir to be present");
+    let blocks_dir = PathBuf::from_str("src/stream/test_data/100_mainnet_blocks").expect("blocks dir to be present");
 
     // Spawn the process_blocks_dir task with the shutdown receiver
     let process_handle = tokio::spawn(async move {

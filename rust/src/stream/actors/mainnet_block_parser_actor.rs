@@ -31,8 +31,7 @@ impl Actor for MainnetBlockParserActor {
     async fn handle_event(&self, event: Event) {
         if let EventType::MainnetBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
-            let file_content = fs::read_to_string(Path::new(&event.payload))
-                .expect("Failed to read JSON file from disk");
+            let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
             let block: MainnetBlock = sonic_rs::from_str(&file_content).unwrap();
             let block_payload = MainnetBlockPayload {
                 height: height as u64,
@@ -55,8 +54,7 @@ impl Actor for MainnetBlockParserActor {
 #[tokio::test]
 async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::MainnetBlockPayload;
-    use std::io::Write;
-    use std::sync::atomic::Ordering;
+    use std::{io::Write, sync::atomic::Ordering};
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -104,13 +102,8 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         // Deserialize the payload and check values
         let payload: MainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
         assert_eq!(payload.height, 89); // Ensure this matches extract_height_and_hash
-        assert!(payload
-            .state_hash
-            .contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
-        assert_eq!(
-            payload.previous_state_hash,
-            "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw"
-        );
+        assert!(payload.state_hash.contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
+        assert_eq!(payload.previous_state_hash, "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");

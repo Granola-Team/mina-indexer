@@ -1,6 +1,5 @@
 use actors::{
-    berkeley_block_parser_actor::BerkeleyBlockParserActor,
-    block_ancestor_actor::BlockAncestorActor, mainnet_block_parser_actor::MainnetBlockParserActor,
+    berkeley_block_parser_actor::BerkeleyBlockParserActor, block_ancestor_actor::BlockAncestorActor, mainnet_block_parser_actor::MainnetBlockParserActor,
     pcb_path_actor::PCBBlockPathActor, Actor,
 };
 use events::Event;
@@ -62,10 +61,7 @@ pub async fn process_blocks_dir(
     }
 
     // Iterate over files in the directory and publish events
-    for entry in fs::read_dir(blocks_dir)?
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-    {
+    for entry in fs::read_dir(blocks_dir)?.filter_map(Result::ok).filter(|e| e.path().is_file()) {
         let path = entry.path();
 
         shared_publisher.publish(Event {
@@ -86,11 +82,8 @@ pub async fn process_blocks_dir(
     Ok(())
 }
 
-async fn setup_actor<A>(
-    mut receiver: broadcast::Receiver<Event>,
-    mut shutdown_rx: broadcast::Receiver<()>,
-    actor: Arc<A>,
-) where
+async fn setup_actor<A>(mut receiver: broadcast::Receiver<Event>, mut shutdown_rx: broadcast::Receiver<()>, actor: Arc<A>)
+where
     A: Actor + Send + Sync + 'static + ?Sized,
 {
     loop {
@@ -117,8 +110,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
     // Path to the directory with 100 mainnet block files
-    let blocks_dir = PathBuf::from_str("../test_data/100_mainnet_blocks")
-        .expect("Directory with mainnet blocks should exist");
+    let blocks_dir = PathBuf::from_str("../test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
 
     // Spawn the process_blocks_dir task with the shutdown receiver
     let process_handle = task::spawn(process_blocks_dir(blocks_dir, shutdown_receiver));

@@ -15,11 +15,7 @@ pub trait Actor: Send + Sync {
     // Default implementation of `shutdown` to log the count
     fn shutdown(&self) {
         let count = self.events_processed().load(Ordering::SeqCst);
-        println!(
-            "Actor {} processed {} events before shutdown.",
-            self.id(),
-            count
-        );
+        println!("Actor {} processed {} events before shutdown.", self.id(), count);
     }
 
     async fn on_event(&self, event: Event) {

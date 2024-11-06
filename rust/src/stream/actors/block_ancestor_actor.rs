@@ -25,8 +25,7 @@ impl Actor for BlockAncestorActor {
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BerkeleyBlock => {
-                let block_payload: BerkeleyBlockPayload =
-                    sonic_rs::from_str(&event.payload).unwrap();
+                let block_payload: BerkeleyBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let block_ancestor_payload = BlockAncestorPayload {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash.clone(),
@@ -84,14 +83,8 @@ async fn test_block_ancestor_actor_with_berkeley_block() -> anyhow::Result<()> {
         // Deserialize the payload and check values
         let payload: BlockAncestorPayload = sonic_rs::from_str(&received_event.payload).unwrap();
         assert_eq!(payload.height, 89);
-        assert_eq!(
-            payload.state_hash,
-            "3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"
-        );
-        assert_eq!(
-            payload.previous_state_hash,
-            "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu"
-        );
+        assert_eq!(payload.state_hash, "3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON");
+        assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");

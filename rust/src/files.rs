@@ -1,20 +1,23 @@
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rayon::slice::ParallelSliceMut;
-use sonic_rs::Value;
-use std::collections::VecDeque;
-use std::future::Future;
-use std::io;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::io::AsyncReadExt;
-use tokio::sync::Mutex;
-use tokio::task::JoinHandle;
-use walkdir::WalkDir;
-
 use crate::db::DbPool;
+use rayon::{
+    iter::{IntoParallelIterator, ParallelIterator},
+    slice::ParallelSliceMut,
+};
+use sonic_rs::Value;
+use std::{
+    collections::VecDeque,
+    future::Future,
+    io,
+    path::PathBuf,
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, Instant},
+};
+use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinHandle};
+use walkdir::WalkDir;
 
 const FILE_PREFIX: &str = "mainnet-";
 pub const CHUNK_SIZE: usize = 100;
@@ -30,15 +33,7 @@ struct ChunkProcessor<F> {
 
 impl<F> ChunkProcessor<F>
 where
-    F: Fn(
-            Arc<DbPool>,
-            Value,
-            String,
-            i64,
-        ) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>>
-        + Send
-        + Sync
-        + 'static,
+    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
 {
     fn new(paths: Vec<PathBuf>, processor: F) -> Self {
         let total_chunks = (paths.len() + CHUNK_SIZE - 1) / CHUNK_SIZE;
@@ -109,8 +104,7 @@ where
                     let mut contents = Vec::with_capacity(metadata.len() as usize);
                     reader.read_to_end(&mut contents).await?;
 
-                    let json = sonic_rs::from_slice(&contents)
-                        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                    let json = sonic_rs::from_slice(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
                     let hash = extract_hash_from_file_name(&path);
                     let number = extract_digits_from_file_name(&path);
@@ -154,11 +148,7 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
-            e.file_type().is_file()
-                && e.path().extension().map_or(false, |ext| ext == "json")
-                && e.file_name()
-                    .to_str()
-                    .map_or(false, |name| name.starts_with(FILE_PREFIX))
+            e.file_type().is_file() && e.path().extension().map_or(false, |ext| ext == "json") && e.file_name().to_str().map_or(false, |name| name.starts_with(FILE_PREFIX))
         })
         .for_each(|e| paths.push(e.into_path()));
 
@@ -184,22 +174,9 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     Ok(paths)
 }
 
-fn spawn_workers<F>(
-    initial_workers: usize,
-    max_workers: usize,
-    processor: Arc<ChunkProcessor<F>>,
-    pool: Arc<DbPool>,
-) -> Vec<JoinHandle<()>>
+fn spawn_workers<F>(initial_workers: usize, max_workers: usize, processor: Arc<ChunkProcessor<F>>, pool: Arc<DbPool>) -> Vec<JoinHandle<()>>
 where
-    F: Fn(
-            Arc<DbPool>,
-            Value,
-            String,
-            i64,
-        ) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>>
-        + Send
-        + Sync
-        + 'static,
+    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
 {
     let mut handles = Vec::with_capacity(max_workers - initial_workers);
 
@@ -207,9 +184,7 @@ where
         let processor = Arc::clone(&processor);
         let pool = Arc::clone(&pool);
 
-        let handle = tokio::spawn(async move {
-            while let Some(_) = processor.process_next_chunk(&pool).await {}
-        });
+        let handle = tokio::spawn(async move { while let Some(_) = processor.process_next_chunk(&pool).await {} });
 
         handles.push(handle);
     }
@@ -219,15 +194,7 @@ where
 
 pub async fn process_files<F>(dir: &str, pool: Arc<DbPool>, processor_fn: F) -> anyhow::Result<()>
 where
-    F: Fn(
-            Arc<DbPool>,
-            Value,
-            String,
-            i64,
-        ) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>>
-        + Send
-        + Sync
-        + 'static,
+    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
 {
     println!("Processing files in: {}", dir);
     let paths = get_file_paths(dir)?;
@@ -238,23 +205,13 @@ where
     let max_workers = num_cpus::get() * 2;
 
     // Start with few workers initially, then scale up
-    let mut handles = spawn_workers(
-        0,
-        initial_workers,
-        Arc::clone(&processor),
-        Arc::clone(&pool),
-    );
+    let mut handles = spawn_workers(0, initial_workers, Arc::clone(&processor), Arc::clone(&pool));
 
     // After 4 minutes, add more workers
     tokio::time::sleep(Duration::from_secs(240)).await;
     println!("Adding more workers");
 
-    handles.extend(spawn_workers(
-        initial_workers,
-        max_workers,
-        Arc::clone(&processor),
-        Arc::clone(&pool),
-    ));
+    handles.extend(spawn_workers(initial_workers, max_workers, Arc::clone(&processor), Arc::clone(&pool)));
 
     for handle in handles {
         if let Err(e) = handle.await {

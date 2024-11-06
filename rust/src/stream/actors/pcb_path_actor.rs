@@ -64,11 +64,7 @@ async fn test_precomputed_block_path_identity_actor() {
 
     // Scenario 1: File with "data" and "version" keys (should trigger BerkeleyBlockPath)
     let temp_file_berkeley = NamedTempFile::new().unwrap();
-    std::fs::write(
-        temp_file_berkeley.path(),
-        r#"{"data": {}, "version": "1.0"}"#,
-    )
-    .unwrap();
+    std::fs::write(temp_file_berkeley.path(), r#"{"data": {}, "version": "1.0"}"#).unwrap();
     let berkeley_event = Event {
         event_type: EventType::PrecomputedBlockPath,
         payload: temp_file_berkeley.path().to_str().unwrap().to_string(),
@@ -78,10 +74,7 @@ async fn test_precomputed_block_path_identity_actor() {
     // Check that the actor publishes a BerkeleyBlockPath event
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::BerkeleyBlockPath);
-        assert_eq!(
-            received_event.payload,
-            temp_file_berkeley.path().to_str().unwrap().to_string()
-        );
+        assert_eq!(received_event.payload, temp_file_berkeley.path().to_str().unwrap().to_string());
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BerkeleyBlockPath event from actor.");
@@ -89,11 +82,7 @@ async fn test_precomputed_block_path_identity_actor() {
 
     // Scenario 2: File with different keys (should trigger MainnetBlockPath)
     let temp_file_mainnet = NamedTempFile::new().unwrap();
-    std::fs::write(
-        temp_file_mainnet.path(),
-        r#"{"other_key": {}, "another_key": "1.0"}"#,
-    )
-    .unwrap();
+    std::fs::write(temp_file_mainnet.path(), r#"{"other_key": {}, "another_key": "1.0"}"#).unwrap();
     let mainnet_event = Event {
         event_type: EventType::PrecomputedBlockPath,
         payload: temp_file_mainnet.path().to_str().unwrap().to_string(),
@@ -103,10 +92,7 @@ async fn test_precomputed_block_path_identity_actor() {
     // Check that the actor publishes a MainnetBlockPath event
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::MainnetBlockPath);
-        assert_eq!(
-            received_event.payload,
-            temp_file_mainnet.path().to_str().unwrap().to_string()
-        );
+        assert_eq!(received_event.payload, temp_file_mainnet.path().to_str().unwrap().to_string());
     } else {
         panic!("Did not receive expected MainnetBlockPath event from actor.");
     }

@@ -1,25 +1,19 @@
-use futures::future::try_join_all;
-use sonic_rs::{Array, JsonContainerTrait, JsonValueTrait, Value};
-use std::{collections::HashSet, sync::Arc};
-use tracing::{debug, info};
-
 use crate::{
     account_link,
     db::DbPool,
     files::{process_files, CHUNK_SIZE},
     insert_accounts, to_decimal, to_i64,
 };
+use futures::future::try_join_all;
+use sonic_rs::{Array, JsonContainerTrait, JsonValueTrait, Value};
+use std::{collections::HashSet, sync::Arc};
+use tracing::{debug, info};
 
 /// Ingest staking ledger files (JSON) from `staking_ledgers_dir` into the database
 pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
     let pool = Arc::new(DbPool::new(Some("trunk")).await?);
     process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
-        Box::pin(process_ledger(
-            pool,
-            json.as_array().expect("ledger").to_owned(),
-            hash,
-            number,
-        ))
+        Box::pin(process_ledger(pool, json.as_array().expect("ledger").to_owned(), hash, number))
     })
     .await
 }
@@ -30,12 +24,7 @@ const INSERT_EPOCH: &str = "insert StakingEpoch {
 } unless conflict;";
 
 /// Process ledger
-async fn process_ledger(
-    pool: Arc<DbPool>,
-    json: Array,
-    ledger_hash: String,
-    epoch: i64,
-) -> Result<(), edgedb_tokio::Error> {
+async fn process_ledger(pool: Arc<DbPool>, json: Array, ledger_hash: String, epoch: i64) -> Result<(), edgedb_tokio::Error> {
     info!("Processing ledger {} at epoch {}", ledger_hash, epoch);
     let accounts = extract_accounts(&json);
     debug!("Extracted accounts");
@@ -74,10 +63,7 @@ async fn process_ledger(
     };
 
     let epoch_params = (ledger_hash.clone(), epoch);
-    let (_, _) = tokio::try_join!(
-        insert_accounts(&pool, accounts),
-        pool.execute(INSERT_EPOCH, &epoch_params)
-    )?;
+    let (_, _) = tokio::try_join!(insert_accounts(&pool, accounts), pool.execute(INSERT_EPOCH, &epoch_params))?;
 
     for chunk in json.chunks(CHUNK_SIZE) {
         let mut futures = Vec::new();
@@ -89,11 +75,7 @@ async fn process_ledger(
             let source = account_link(&activity["pk"]);
             let delegate = &activity["delegate"];
             // You must have a delegate and if it's not stated, you are delegating to yourself
-            let target = if let Some(_) = delegate.as_str() {
-                account_link(delegate)
-            } else {
-                source.clone()
-            };
+            let target = if let Some(_) = delegate.as_str() { account_link(delegate) } else { source.clone() };
             let ledger_query = insert_ledger(&source, &target);
             let timing_query = insert_timing(&source, &target);
 
@@ -101,14 +83,8 @@ async fn process_ledger(
             let balance = to_decimal(&activity["balance"]);
             let token = to_i64(&activity["token"]).unwrap_or(0);
             let nonce = to_i64(&activity["nonce"]);
-            let receipt_chain_hash = activity["receipt_chain_hash"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            let voting_for = activity["voting_for"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            let receipt_chain_hash = activity["receipt_chain_hash"].as_str().unwrap_or_default().to_string();
+            let voting_for = activity["voting_for"].as_str().unwrap_or_default().to_string();
 
             let base_params = (balance, token, nonce, receipt_chain_hash, voting_for);
 

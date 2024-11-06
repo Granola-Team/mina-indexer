@@ -33,8 +33,7 @@ impl Actor for BerkeleyBlockParserActor {
     async fn handle_event(&self, event: Event) {
         if let EventType::BerkeleyBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(&Path::new(&event.payload));
-            let file_content = fs::read_to_string(Path::new(&event.payload))
-                .expect("Failed to read JSON file from disk");
+            let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
             let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
             let berkeley_block_payload = BerkeleyBlockPayload {
                 height: height as u64,
@@ -57,8 +56,7 @@ impl Actor for BerkeleyBlockParserActor {
 #[tokio::test]
 async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::BerkeleyBlockPayload;
-    use std::io::Write;
-    use std::sync::atomic::Ordering;
+    use std::{io::Write, sync::atomic::Ordering};
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -109,13 +107,8 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
         // Deserialize the payload and check values
         let payload: BerkeleyBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
         assert_eq!(payload.height, 89); // Ensure this matches extract_height_and_hash
-        assert!(payload
-            .state_hash
-            .contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
-        assert_eq!(
-            payload.previous_state_hash,
-            "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu"
-        );
+        assert!(payload.state_hash.contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
+        assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");

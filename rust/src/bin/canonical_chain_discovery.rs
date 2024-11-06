@@ -1,5 +1,6 @@
 use anyhow::Result;
 use edgedb_derive::Queryable;
+use mina_indexer::db::DbPool;
 use std::{
     collections::{HashMap, VecDeque},
     fs::OpenOptions,
@@ -9,8 +10,6 @@ use std::{
 };
 use tracing::{error, info, warn, Level};
 use tracing_subscriber::FmtSubscriber;
-
-use mina_indexer::db::DbPool;
 
 const BLOCK_REPORTING_FREQ: usize = 1000;
 const MAINNET_CANONICAL_THRESHOLD: usize = 290;
@@ -27,9 +26,7 @@ struct Block {
 #[allow(dead_code)]
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
+    let subscriber = FmtSubscriber::builder().with_max_level(Level::INFO).finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
@@ -86,10 +83,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let highest_canonical_block = match highest_canonical_block {
         Some(block) => block,
         None => {
-            error!(
-                "No block found with at least {} blocks in its chain",
-                MAINNET_CANONICAL_THRESHOLD
-            );
+            error!("No block found with at least {} blocks in its chain", MAINNET_CANONICAL_THRESHOLD);
             return Err(anyhow::anyhow!("No suitable canonical block found"));
         }
     };
@@ -108,11 +102,7 @@ async fn main() -> Result<(), anyhow::Error> {
         canonical_chain.push_front((block.hash.as_str(), block.blockchain_length));
 
         if canonical_chain.len() % BLOCK_REPORTING_FREQ == 0 {
-            info!(
-                "Found {} canonical blocks in {:?}",
-                canonical_chain.len(),
-                time.elapsed()
-            );
+            info!("Found {} canonical blocks in {:?}", canonical_chain.len(), time.elapsed());
         }
 
         if block.blockchain_length == 1 {
@@ -122,27 +112,16 @@ async fn main() -> Result<(), anyhow::Error> {
         if let Some(parent) = block_map.get(block.previous_hash.as_str()) {
             current_block = parent;
         } else {
-            warn!(
-                "Gap found at block height {}. Ending chain discovery.",
-                block.blockchain_length - 1
-            );
+            warn!("Gap found at block height {}. Ending chain discovery.", block.blockchain_length - 1);
             break;
         }
     }
 
     info!("Canonical chain discovery finished");
-    info!(
-        "Found {} blocks in the canonical chain in {:?}",
-        canonical_chain.len(),
-        time.elapsed()
-    );
+    info!("Found {} blocks in the canonical chain in {:?}", canonical_chain.len(), time.elapsed());
 
     // Write results to output file
-    let mut output_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("chain.csv")?;
+    let mut output_file = OpenOptions::new().write(true).create(true).truncate(true).open("chain.csv")?;
 
     let time = Instant::now();
 
