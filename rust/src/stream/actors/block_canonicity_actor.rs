@@ -141,6 +141,119 @@ impl Actor for BlockCanonicityActor {
     }
 }
 
+async fn find_ancestry_until_common_ancestor(
+    blockchain_tree: &Arc<Mutex<HashMap<Height, Vec<CompoundCanonicalEntry>>>>,
+    mut prior_block: CompoundCanonicalEntry,
+    mut new_block: CompoundCanonicalEntry,
+) -> Option<(Vec<CompoundCanonicalEntry>, Vec<CompoundCanonicalEntry>, CompoundCanonicalEntry)> {
+    let mut prior_ancestry = vec![prior_block.clone()];
+    let mut new_ancestry = vec![new_block.clone()];
+
+    loop {
+        // Check if both blocks share the same state_hash, indicating a common ancestor
+        if prior_block.state_hash == new_block.state_hash {
+            // Remove the last item (common ancestor) from both lineages
+            prior_ancestry.pop();
+            new_ancestry.pop();
+            // Return lineages without the common ancestor and the common ancestor separately
+            return Some((prior_ancestry, new_ancestry, prior_block));
+        }
+
+        // Lock the blockchain tree once for both ancestry checks
+        let blockchain_tree = blockchain_tree.lock().await;
+
+        // Step back the prior block's ancestry based on its height
+        let prior_entries_opt = blockchain_tree.get(&Height(prior_block.height - 1)).cloned();
+        let new_entries_opt = blockchain_tree.get(&Height(new_block.height - 1)).cloned();
+
+        drop(blockchain_tree); // Drop the lock
+
+        // Process prior block ancestry
+        if let Some(prior_entries) = prior_entries_opt {
+            if let Some(next_prior_block) = prior_entries.iter().find(|entry| entry.state_hash == prior_block.previous_state_hash) {
+                prior_block = next_prior_block.clone();
+                prior_ancestry.push(prior_block.clone());
+            } else {
+                return None; // No further ancestry for prior_block
+            }
+        } else {
+            return None; // No further ancestry for prior_block
+        }
+
+        // Process new block ancestry
+        if let Some(new_entries) = new_entries_opt {
+            if let Some(next_new_block) = new_entries.iter().find(|entry| entry.state_hash == new_block.previous_state_hash) {
+                new_block = next_new_block.clone();
+                new_ancestry.push(new_block.clone());
+            } else {
+                return None; // No further ancestry for new_block
+            }
+        } else {
+            return None; // No further ancestry for new_block
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_find_ancestry_until_common_ancestor_excluding_common() {
+    let blockchain_tree: Arc<Mutex<HashMap<Height, Vec<CompoundCanonicalEntry>>>> = Arc::new(Mutex::new(HashMap::new()));
+
+    // Define some test blocks
+    let common_ancestor = CompoundCanonicalEntry {
+        height: 1,
+        state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+        previous_state_hash: "genesis".to_string(),
+        last_vrf_output: "ancestor_vrf".to_string(),
+    };
+    let prior_block1 = CompoundCanonicalEntry {
+        height: 2,
+        state_hash: "3NKXkGZpYLHa6Aei1VUuHYeZnacHT1yGZaFFd8suXx8CoKjx5pPw".to_string(),
+        previous_state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+        last_vrf_output: "prior_vrf".to_string(),
+    };
+    let prior_block2 = CompoundCanonicalEntry {
+        height: 3,
+        state_hash: "3NKXjGYqBLHa6Aei1VUuWZeXmacXT2yPZaFDd7suzx8CoKjx6pQw".to_string(),
+        previous_state_hash: "3NKXkGZpYLHa6Aei1VUuHYeZnacHT1yGZaFFd8suXx8CoKjx5pPw".to_string(),
+        last_vrf_output: "prior_vrf2".to_string(),
+    };
+    let new_block1 = CompoundCanonicalEntry {
+        height: 2,
+        state_hash: "3NKPmQXrBQu6Ae1TVVuJYiWbYcHJX4tGZaFCe7suY8CoKjx6wQz".to_string(),
+        previous_state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+        last_vrf_output: "new_vrf".to_string(),
+    };
+    let new_block2 = CompoundCanonicalEntry {
+        height: 3,
+        state_hash: "3NKZnGXpDQu6Afe2VYuHYeYcjbHT5xGZaFDf7suL8QqJkx7pPz".to_string(),
+        previous_state_hash: "3NKPmQXrBQu6Ae1TVVuJYiWbYcHJX4tGZaFCe7suY8CoKjx6wQz".to_string(),
+        last_vrf_output: "new_vrf2".to_string(),
+    };
+
+    // Insert blocks into the blockchain tree at corresponding heights
+    let mut tree = blockchain_tree.lock().await;
+    tree.insert(Height(1), vec![common_ancestor.clone()]);
+    tree.insert(Height(2), vec![prior_block1.clone(), new_block1.clone()]);
+    tree.insert(Height(3), vec![prior_block2.clone()]);
+    tree.insert(Height(4), vec![new_block2.clone()]);
+    drop(tree);
+
+    // Call the function to find ancestry paths until the common ancestor
+    let result = find_ancestry_until_common_ancestor(&blockchain_tree, prior_block2.clone(), new_block2.clone()).await;
+
+    // Expected ancestry paths
+    let expected_prior_ancestry = vec![prior_block2.clone(), prior_block1.clone()];
+    let expected_new_ancestry = vec![new_block2.clone(), new_block1.clone()];
+
+    // Check if the result matches the expected ancestry paths
+    assert!(result.is_some(), "Expected common ancestor but got None");
+    let (prior_ancestry, new_ancestry, ancestor) = result.unwrap();
+
+    assert_eq!(prior_ancestry, expected_prior_ancestry, "Prior ancestry path mismatch");
+    assert_eq!(new_ancestry, expected_new_ancestry, "New ancestry path mismatch");
+    assert_eq!(ancestor, common_ancestor, "Common ancestor mismatch");
+}
+
 #[cfg(test)]
 mod compound_canonical_entry_tests {
     use super::*;
