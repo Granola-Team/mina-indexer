@@ -19,6 +19,7 @@ pub struct MainnetBlockPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,
+    pub last_vrf_output: String,
 }
 
 #[derive(Serialize, Deserialize)]

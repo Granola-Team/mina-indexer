@@ -37,6 +37,7 @@ impl Actor for MainnetBlockParserActor {
                 height: height as u64,
                 state_hash: state_hash.to_string(),
                 previous_state_hash: block.get_previous_state_hash(),
+                last_vrf_output: block.get_last_vrf_output(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,
@@ -72,14 +73,17 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
     writeln!(
         block_file,
         r#"{{
-            "scheduled_time": "1615940848214",
-            "protocol_state": {{
-                "previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
-                "body": {{
-                    "genesis_state_hash": "3..."
+                "scheduled_time": "1615940848214",
+                "protocol_state": {{
+                    "previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
+                    "body": {{
+                        "genesis_state_hash": "3...",
+                        "consensus_state": {{
+                            "last_vrf_output": "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA="
+                        }}
+                    }}
                 }}
-            }}
-        }}"#
+            }}"#
     )
     .unwrap();
 
@@ -104,6 +108,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.height, 89); // Ensure this matches extract_height_and_hash
         assert!(payload.state_hash.contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
         assert_eq!(payload.previous_state_hash, "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw");
+        assert_eq!(payload.last_vrf_output, "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA=");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
