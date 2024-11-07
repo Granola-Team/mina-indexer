@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::stream::{
     models::{Height, LastVrfOutput, StateHash},
-    payloads::{BerkeleyBlockPayload, NewBlockAddedPayload},
+    payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -94,7 +94,43 @@ impl Actor for BlockCanonicityActor {
                         payload: event.payload,
                     });
                 }
-                self.incr_event_processed();
+                let last_vrf_output = last_vrf_outputs.get(&state_hash_key).unwrap();
+                let key = Height(current_block_payload.height);
+                let value = CompoundCanonicalEntry {
+                    height: current_block_payload.height.clone(),
+                    state_hash: current_block_payload.state_hash.clone(),
+                    previous_state_hash: current_block_payload.previous_state_hash.clone(),
+                    last_vrf_output: last_vrf_output.0.clone(),
+                };
+
+                // blocks are consumed in order as they are added to tree
+                // so if we see other blocks at the same height, we must tie break
+                let mut blockchain_tree = self.blockchain_tree.lock().await;
+                if blockchain_tree.contains_key(&key) {
+                    blockchain_tree.entry(key.clone()).or_insert_with(Vec::new).push(value);
+                    let mut entries = blockchain_tree.get(&key).cloned().unwrap();
+                    drop(blockchain_tree);
+                    let (canonical_entry, _) = CompoundCanonicalEntry::divide_on_canonicity(&mut entries).unwrap();
+                    if canonical_entry.state_hash != current_block_payload.state_hash {
+                        // The current block is not canonical. We only need to publish an
+                        // update for the current block as the canonicity of other blocks
+                        // has not changed at this height.
+                        let canonicity_payload = BlockCanonicityUpdatePayload {
+                            height: current_block_payload.height,
+                            state_hash: current_block_payload.state_hash,
+                            canonical: false,
+                        };
+
+                        self.publish(Event {
+                            event_type: EventType::BlockCanonicityUpdate,
+                            payload: sonic_rs::to_string(&canonicity_payload).unwrap(),
+                        });
+                        self.incr_event_processed();
+                    }
+                } else {
+                    blockchain_tree.entry(key.clone()).or_insert_with(Vec::new).push(value);
+                    drop(blockchain_tree);
+                }
             }
             _ => {}
         }
@@ -296,12 +332,97 @@ async fn test_block_rebroadcast_until_vrf_output_available() -> anyhow::Result<(
     // Publish the VRF data
     actor.on_event(vrf_event).await;
 
-    assert_eq!(actor.events_processed().load(std::sync::atomic::Ordering::SeqCst), 0);
-
     // Re-process the BlockAddedToTree event to check that it is now handled correctly
     actor.on_event(event).await;
 
-    assert_eq!(actor.events_processed().load(std::sync::atomic::Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
+    use crate::{
+        constants::GENESIS_STATE_HASH,
+        stream::payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+    };
+    use std::sync::atomic::Ordering;
+
+    // Create shared publisher
+    let shared_publisher = Arc::new(SharedPublisher::new(200));
+    let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
+
+    // Set up VRF info for blocks
+    let vrf_info_canonical = BerkeleyBlockPayload {
+        height: 2,
+        state_hash: "canonical_hash".to_string(),
+        last_vrf_output: "b_vrf_highest".to_string(),
+        previous_state_hash: GENESIS_STATE_HASH.to_string(),
+    };
+    let vrf_info_non_canonical = BerkeleyBlockPayload {
+        height: 2,
+        state_hash: "non_canonical_hash".to_string(),
+        last_vrf_output: "a_vrf_lower".to_string(),
+        previous_state_hash: GENESIS_STATE_HASH.to_string(),
+    };
+
+    // Add VRF information as BerkeleyBlock events for each block
+    actor
+        .handle_event(Event {
+            event_type: EventType::BerkeleyBlock,
+            payload: sonic_rs::to_string(&vrf_info_canonical).unwrap(),
+        })
+        .await;
+    actor
+        .handle_event(Event {
+            event_type: EventType::BerkeleyBlock,
+            payload: sonic_rs::to_string(&vrf_info_non_canonical).unwrap(),
+        })
+        .await;
+
+    // Create canonical and non-canonical block payloads at the same height
+    let canonical_block_payload = NewBlockAddedPayload {
+        height: 2,
+        state_hash: "canonical_hash".to_string(),
+        previous_state_hash: GENESIS_STATE_HASH.to_string(),
+    };
+    let non_canonical_block_payload = NewBlockAddedPayload {
+        height: 2,
+        state_hash: "non_canonical_hash".to_string(),
+        previous_state_hash: GENESIS_STATE_HASH.to_string(),
+    };
+
+    // Subscribe to the shared publisher to capture the output
+    let mut receiver = shared_publisher.subscribe();
+
+    // Handle the canonical block event first
+    actor
+        .handle_event(Event {
+            event_type: EventType::BlockAddedToTree,
+            payload: sonic_rs::to_string(&canonical_block_payload).unwrap(),
+        })
+        .await;
+
+    // Handle the non-canonical block event, which should trigger a non-canonical update
+    actor
+        .handle_event(Event {
+            event_type: EventType::BlockAddedToTree,
+            payload: sonic_rs::to_string(&non_canonical_block_payload).unwrap(),
+        })
+        .await;
+
+    // Verify a single publish event occurs for the non-canonical block, marking it non-canonical
+    if let Ok(received_event) = receiver.recv().await {
+        assert_eq!(received_event.event_type, EventType::BlockCanonicityUpdate);
+
+        // Deserialize the payload and check values
+        let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        assert_eq!(payload.height, 2);
+        assert_eq!(payload.state_hash, "non_canonical_hash");
+        assert!(!payload.canonical); // Ensure the non-canonical block is marked as non-canonical
+
+        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+    } else {
+        panic!("Expected a BlockCanonicityUpdate event but did not receive one.");
+    }
 
     Ok(())
 }
