@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::stream::{
     models::{Height, LastVrfOutput, StateHash},
-    payloads::BerkeleyBlockPayload,
+    payloads::{BerkeleyBlockPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -83,7 +83,19 @@ impl Actor for BlockCanonicityActor {
                     .entry(StateHash(payload.state_hash))
                     .or_insert(LastVrfOutput(payload.last_vrf_output));
             }
-            EventType::BlockAddedToTree => {}
+            EventType::BlockAddedToTree => {
+                let current_block_payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let last_vrf_outputs = self.last_vrf_outputs.lock().await;
+                let state_hash_key = StateHash(current_block_payload.state_hash.clone());
+                if !last_vrf_outputs.contains_key(&state_hash_key) {
+                    // try again later
+                    return self.publish(Event {
+                        event_type: EventType::BlockAddedToTree,
+                        payload: event.payload,
+                    });
+                }
+                self.incr_event_processed();
+            }
             _ => {}
         }
     }
@@ -231,4 +243,65 @@ mod compound_canonical_entry_tests {
         // Should return None for empty input
         assert!(result.is_none());
     }
+}
+
+#[tokio::test]
+async fn test_block_rebroadcast_until_vrf_output_available() -> anyhow::Result<()> {
+    use crate::stream::payloads::{BerkeleyBlockPayload, NewBlockAddedPayload};
+
+    // Create a shared publisher
+    let shared_publisher = Arc::new(SharedPublisher::new(200));
+    let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
+
+    // Create a BlockAddedToTree event without the corresponding VRF data
+    let state_hash = "block_state_hash".to_string();
+    let previous_state_hash = "previous_state_hash".to_string();
+    let event = Event {
+        event_type: EventType::BlockAddedToTree,
+        payload: sonic_rs::to_string(&NewBlockAddedPayload {
+            height: 2,
+            state_hash: state_hash.clone(),
+            previous_state_hash: previous_state_hash.clone(),
+        })
+        .unwrap(),
+    };
+
+    // Subscribe to the shared publisher
+    let mut receiver = shared_publisher.subscribe();
+
+    // Invoke the actor with the BlockAddedToTree event
+    actor.on_event(event.clone()).await;
+
+    // Expect the event to be rebroadcast due to missing VRF data
+    if let Ok(received_event) = receiver.recv().await {
+        assert_eq!(received_event.event_type, EventType::BlockAddedToTree);
+        let payload: NewBlockAddedPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        assert_eq!(payload.state_hash, state_hash);
+    } else {
+        panic!("Did not receive expected rebroadcasted event.");
+    }
+
+    // Now add the VRF data by publishing a BerkeleyBlock event
+    let vrf_event = Event {
+        event_type: EventType::BerkeleyBlock,
+        payload: sonic_rs::to_string(&BerkeleyBlockPayload {
+            height: 2,
+            state_hash: state_hash.clone(),
+            previous_state_hash: previous_state_hash.clone(),
+            last_vrf_output: "valid_vrf_output".to_string(),
+        })
+        .unwrap(),
+    };
+
+    // Publish the VRF data
+    actor.on_event(vrf_event).await;
+
+    assert_eq!(actor.events_processed().load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    // Re-process the BlockAddedToTree event to check that it is now handled correctly
+    actor.on_event(event).await;
+
+    assert_eq!(actor.events_processed().load(std::sync::atomic::Ordering::SeqCst), 1);
+
+    Ok(())
 }
