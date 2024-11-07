@@ -55,7 +55,7 @@ impl Actor for MainnetBlockParserActor {
 #[tokio::test]
 async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::MainnetBlockPayload;
-    use std::{io::Write, sync::atomic::Ordering};
+    use std::sync::atomic::Ordering;
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -65,32 +65,12 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         events_processed: AtomicUsize::new(0),
     };
 
-    // Create a temporary file for the MainnetBlock JSON
-    let mut block_file = tempfile::Builder::new()
-        .prefix("mainnet-89-3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON") // Updated prefix
-        .suffix(".json")
-        .tempfile()?;
-    writeln!(
-        block_file,
-        r#"{{
-                "scheduled_time": "1615940848214",
-                "protocol_state": {{
-                    "previous_state_hash": "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw",
-                    "body": {{
-                        "genesis_state_hash": "3...",
-                        "consensus_state": {{
-                            "last_vrf_output": "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA="
-                        }}
-                    }}
-                }}
-            }}"#
-    )
-    .unwrap();
+    let block_file = "./src/stream/test_data/100_mainnet_blocks/mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json";
 
     // Create an event pointing to the temporary file with the correct event type
     let event = Event {
         event_type: EventType::MainnetBlockPath,
-        payload: block_file.path().to_str().unwrap().to_string(),
+        payload: block_file.to_string(),
     };
 
     // Subscribe to the shared publisher
@@ -105,10 +85,10 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
 
         // Deserialize the payload and check values
         let payload: MainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-        assert_eq!(payload.height, 89); // Ensure this matches extract_height_and_hash
-        assert!(payload.state_hash.contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
-        assert_eq!(payload.previous_state_hash, "3NKknQGpDQu6Afe1VYuHYbEfnjbHT3xGZaFCd8sueL8CoJkx5kPw");
-        assert_eq!(payload.last_vrf_output, "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA=");
+        assert_eq!(payload.height, 100); // Ensure this matches extract_height_and_hash
+        assert_eq!(payload.state_hash, "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4");
+        assert_eq!(payload.previous_state_hash, "3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh");
+        assert_eq!(payload.last_vrf_output, "HXzRY01h73mWXp4cjNwdDTYLDtdFU5mYhTbWWi-1wwE=");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
