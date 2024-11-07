@@ -39,6 +39,7 @@ impl Actor for BerkeleyBlockParserActor {
                 height: height as u64,
                 state_hash: state_hash.to_string(),
                 previous_state_hash: berkeley_block.get_previous_state_hash(),
+                last_vrf_output: berkeley_block.get_last_vrf_output(),
             };
             self.publish(Event {
                 event_type: EventType::BerkeleyBlock,
@@ -56,7 +57,7 @@ impl Actor for BerkeleyBlockParserActor {
 #[tokio::test]
 async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
     use crate::stream::payloads::BerkeleyBlockPayload;
-    use std::{io::Write, sync::atomic::Ordering};
+    use std::sync::atomic::Ordering;
 
     // Create shared publisher
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -66,32 +67,12 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
         events_processed: AtomicUsize::new(0),
     };
 
-    // Create a temporary file for the BerkeleyBlock JSON
-    let mut block_file = tempfile::Builder::new()
-        .prefix("berkeley-89-3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON") // Updated prefix
-        .suffix(".json")
-        .tempfile()?;
-    writeln!(
-        block_file,
-        r#"{{
-            "version": 3,
-            "data": {{
-                "scheduled_time": "1706912533748",
-                "protocol_state": {{
-                    "previous_state_hash": "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu",
-                    "body": {{
-                        "genesis_state_hash": "3..."
-                    }}
-                }}
-            }}
-        }}"#
-    )
-    .unwrap();
+    let block_file = "./src/stream/test_data/berkeley_blocks/berkeley-10-3NL53c8uTVnoFjzh17VAeCR9r3zjmDowNpeFRRVEUqnvX5WdHtWE.json";
 
     // Create event pointing to the temporary file
     let event = Event {
         event_type: EventType::BerkeleyBlockPath,
-        payload: block_file.path().to_str().unwrap().to_string(),
+        payload: block_file.to_string(),
     };
 
     // Subscribe to the shared publisher
@@ -106,9 +87,10 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
 
         // Deserialize the payload and check values
         let payload: BerkeleyBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-        assert_eq!(payload.height, 89); // Ensure this matches extract_height_and_hash
-        assert!(payload.state_hash.contains("3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON"));
+        assert_eq!(payload.height, 10); // Ensure this matches extract_height_and_hash
+        assert_eq!(payload.state_hash, "3NL53c8uTVnoFjzh17VAeCR9r3zjmDowNpeFRRVEUqnvX5WdHtWE");
         assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
+        assert_eq!(payload.last_vrf_output, "hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=");
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
