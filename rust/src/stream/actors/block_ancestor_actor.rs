@@ -30,6 +30,7 @@ impl Actor for BlockAncestorActor {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash.clone(),
                     previous_state_hash: block_payload.previous_state_hash.clone(),
+                    last_vrf_output: block_payload.last_vrf_output,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAncestor,
@@ -43,6 +44,7 @@ impl Actor for BlockAncestorActor {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash.clone(),
                     previous_state_hash: block_payload.previous_state_hash.clone(),
+                    last_vrf_output: block_payload.last_vrf_output,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAncestor,
