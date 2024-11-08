@@ -17,7 +17,7 @@ const FILE_PREFIX: &str = "mainnet-";
 
 #[inline]
 /// Get [file paths][PathBuf] from `dir`
-fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
+pub fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     let mut paths: Vec<PathBuf> = Vec::new();
 
     WalkDir::new(dir)
@@ -152,7 +152,7 @@ where
 
 /// Extract the hash part from a Mina block or staking ledger file name
 #[inline]
-fn extract_hash_from_file_name(path: &Path) -> &str {
+pub fn extract_hash_from_file_name(path: &Path) -> &str {
     path.file_name()
         .and_then(|n| n.to_str())
         .and_then(|s| s.split('-').nth(2))
@@ -162,7 +162,7 @@ fn extract_hash_from_file_name(path: &Path) -> &str {
 
 /// Extract the digits part from a Mina block (the height) or staking ledger (the epoch) file name
 #[inline]
-fn extract_digits_from_file_name(path: &Path) -> i64 {
+pub fn extract_digits_from_file_name(path: &Path) -> i64 {
     path.file_name()
         .and_then(|n| n.to_str())
         .and_then(|s| s.split('-').nth(1))

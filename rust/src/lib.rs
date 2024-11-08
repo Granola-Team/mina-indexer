@@ -19,15 +19,34 @@ const ACCOUNTS_BATCH_SIZE: usize = 100;
 const DB_FILE: &str = "mina.db";
 
 pub fn get_db_connection() -> Result<Connection, duckdb::Error> {
-    let conn = Connection::open(DB_FILE)?;
-    //conn.execute_batch(insert_sql!());
+    let db = Connection::open(DB_FILE)?;
 
-    Ok(conn)
+    db.execute_batch(
+        "
+            SET maximum_object_size='512MB';
+            SET memory_limit='4GB';
+        ",
+    )?;
+
+    Ok(db)
 }
 
 pub fn check_or_create_db_schema() -> Result<(), duckdb::Error> {
     let db = get_db_connection()?;
 
+    // Create staging table for JSON
+    db.execute_batch(
+        "
+                DROP TABLE IF EXISTS raw_json;
+                CREATE TABLE raw_json(
+                    data JSON,
+                    file_hash VARCHAR,
+                    file_number BIGINT
+                );
+            ",
+    )?;
+
+    // Create final schema
     let schema = include_str!("../../db/schema.sql");
     db.execute_batch(schema)?;
 
