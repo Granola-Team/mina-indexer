@@ -8,15 +8,15 @@ pub struct Height(pub u64);
 pub struct Hash(pub String);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Node {
-    height: Height,
-    state_hash: Hash,
-    previous_state_hash: Hash,
-    last_vrf_output: String,
+pub struct Node {
+    pub height: Height,
+    pub state_hash: Hash,
+    pub previous_state_hash: Hash,
+    pub last_vrf_output: String,
 }
 
 #[derive(Debug)]
-struct BlockchainTree {
+pub struct BlockchainTree {
     tree: BTreeMap<Height, Vec<Node>>,
 }
 
