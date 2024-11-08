@@ -1,0 +1,1 @@
+pub const GENESIS_STATE_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";

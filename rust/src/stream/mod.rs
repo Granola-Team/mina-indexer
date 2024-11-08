@@ -1,10 +1,11 @@
 use crate::stream::actors::blockchain_tree_actor::BlockchainTreeActor;
 use actors::{
-    berkeley_block_parser_actor::BerkeleyBlockParserActor, block_ancestor_actor::BlockAncestorActor, mainnet_block_parser_actor::MainnetBlockParserActor,
-    pcb_path_actor::PCBBlockPathActor, Actor,
+    berkeley_block_parser_actor::BerkeleyBlockParserActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
+    mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
+use payloads::BlockCanonicityUpdatePayload;
 use shared_publisher::SharedPublisher;
 use std::{
     fs,
@@ -17,6 +18,7 @@ mod actors;
 pub mod berkeley_block_models;
 pub mod events;
 pub mod mainnet_block_models;
+pub mod models;
 pub mod payloads;
 pub mod shared_publisher;
 
@@ -51,6 +53,7 @@ pub async fn process_blocks_dir(
             events_processed: AtomicUsize::new(0),
         }),
         Arc::new(BlockchainTreeActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(BlockCanonicityActor::new(Arc::clone(&shared_publisher))),
     ];
 
     // Spawn tasks for each actor and collect their handles

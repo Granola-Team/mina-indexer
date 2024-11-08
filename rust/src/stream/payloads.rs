@@ -23,8 +23,16 @@ pub struct MainnetBlockPayload {
     pub last_vrf_output: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewBlockAddedPayload {
     pub height: u64,
     pub state_hash: String,
+    pub previous_state_hash: String,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct BlockCanonicityUpdatePayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub canonical: bool,
 }

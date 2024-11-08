@@ -3,7 +3,13 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{BlockAncestorPayload, NewBlockAddedPayload};
+use crate::{
+    constants::GENESIS_STATE_HASH,
+    stream::{
+        models::{PreviousStateHash, StateHash},
+        payloads::{BlockAncestorPayload, NewBlockAddedPayload},
+    },
+};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::{
@@ -11,20 +17,12 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StateHash(pub String);
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PreviousStateHash(pub String);
-
 pub struct BlockchainTreeActor {
     id: String,
     shared_publisher: Arc<SharedPublisher>,
     events_processed: AtomicUsize,
     blockchain_tree: Arc<Mutex<HashMap<StateHash, PreviousStateHash>>>,
 }
-
-const GENESIS_STATE_HASH: &str = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
 
 /// Publishes blocks as they are connected to the blockchain tree
 impl BlockchainTreeActor {
@@ -61,13 +59,14 @@ impl Actor for BlockchainTreeActor {
             let mut blockchain_tree = self.blockchain_tree.lock().await;
             if blockchain_tree.contains_key(&StateHash(block_payload.previous_state_hash)) {
                 // Insert the new block into the main tree
-                blockchain_tree.insert(new_block.clone(), previous_block);
+                blockchain_tree.insert(new_block.clone(), previous_block.clone());
                 drop(blockchain_tree); // Drop the lock before proceeding
 
                 // Publish the addition of the new block
                 let added_payload = NewBlockAddedPayload {
                     height: block_payload.height,
                     state_hash: new_block.0.clone(),
+                    previous_state_hash: previous_block.0,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAddedToTree,
