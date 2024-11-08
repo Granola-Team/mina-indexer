@@ -3,6 +3,7 @@ use db::{DbPool, MAX_CONNECTIONS};
 use sonic_rs::{JsonType, JsonValueTrait, Value};
 use std::{collections::HashSet, str::FromStr};
 
+pub(crate) mod blockchain_tree;
 pub mod blocks;
 pub mod constants;
 pub mod db;
