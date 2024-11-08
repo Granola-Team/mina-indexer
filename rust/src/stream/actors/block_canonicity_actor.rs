@@ -3,9 +3,12 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::{
-    models::{Height, LastVrfOutput, StateHash},
-    payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, MainnetBlockPayload, NewBlockAddedPayload},
+use crate::{
+    constants::GENESIS_STATE_HASH,
+    stream::{
+        models::{Height, LastVrfOutput, StateHash},
+        payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, MainnetBlockPayload, NewBlockAddedPayload},
+    },
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -59,7 +62,15 @@ impl BlockCanonicityActor {
             id: "BlockCanonicityActor".to_string(),
             shared_publisher,
             events_processed: AtomicUsize::new(0),
-            blockchain_tree: Arc::new(Mutex::new(HashMap::new())),
+            blockchain_tree: Arc::new(Mutex::new(HashMap::from([(
+                Height(1),
+                vec![CompoundCanonicalEntry {
+                    height: 1,
+                    state_hash: GENESIS_STATE_HASH.to_string(),
+                    previous_state_hash: "".to_string(),
+                    last_vrf_output: "".to_string(),
+                }],
+            )]))),
             last_vrf_outputs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -157,6 +168,9 @@ impl Actor for BlockCanonicityActor {
                         }
                     }
                 } else {
+                    // New canonical block added at new height. Old prior canonical block at previous height
+                    // requires canonicity update, and new canonical path from common ancestory requires
+                    // canonicity update
                     blockchain_tree.entry(key.clone()).or_insert_with(Vec::new).push(value.clone());
                     let update = BlockCanonicityUpdatePayload {
                         height: value.height,
@@ -700,3 +714,263 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
 
     Ok(())
 }
+
+// if let Some(last_height_entries) = blockchain_tree.get(&Height(value.height - 1)) {
+//     let (prior_canonical_block, _) = CompoundCanonicalEntry::divide_on_canonicity(&mut last_height_entries.clone()).unwrap();
+//     let canonical_block_parent = last_height_entries
+//         .iter()
+//         .find(|entry| entry.state_hash == value.previous_state_hash)
+//         .cloned()
+//         .unwrap();
+
+//     if let Some((prior_ancestry, mut new_ancestry, _)) =
+//         find_ancestry_until_common_ancestor(&self.blockchain_tree, prior_canonical_block, canonical_block_parent).await
+//     {
+//         for pa in prior_ancestry.iter() {
+//             let payload = BlockCanonicityUpdatePayload {
+//                 height: pa.height,
+//                 state_hash: pa.state_hash.clone(),
+//                 canonical: false,
+//             };
+//             self.publish(Event {
+//                 event_type: EventType::BlockCanonicityUpdate,
+//                 payload: sonic_rs::to_string(&payload).unwrap(),
+//             });
+//             self.incr_event_processed();
+//         }
+//         new_ancestry.reverse();
+//         for na in new_ancestry.iter() {
+//             let payload = BlockCanonicityUpdatePayload {
+//                 height: na.height,
+//                 state_hash: na.state_hash.clone(),
+//                 canonical: true,
+//             };
+//             self.publish(Event {
+//                 event_type: EventType::BlockCanonicityUpdate,
+//                 payload: sonic_rs::to_string(&payload).unwrap(),
+//             });
+//             self.incr_event_processed();
+//         }
+//     }
+// }
+// let payload = BlockCanonicityUpdatePayload {
+//     height: value.height,
+//     state_hash: value.state_hash.clone(),
+//     canonical: true,
+// };
+// self.publish(Event {
+//     event_type: EventType::BlockCanonicityUpdate,
+//     payload: sonic_rs::to_string(&payload).unwrap(),
+// });
+// self.incr_event_processed();
+
+// #[tokio::test]
+// async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> anyhow::Result<()> {
+//     use crate::{
+//         constants::GENESIS_STATE_HASH,
+//         stream::payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+//     };
+//     use std::sync::atomic::Ordering;
+
+//     // Create shared publisher
+//     let shared_publisher = Arc::new(SharedPublisher::new(200));
+//     let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
+
+//     // Set up VRF info for blocks on the original canonical branch
+//     let original_vrf_block1 = BerkeleyBlockPayload {
+//         height: 2,
+//         state_hash: "original_block_1".to_string(),
+//         last_vrf_output: "a_vrf_low_1".to_string(), // Using "a_" prefix for lower VRF values
+//         previous_state_hash: GENESIS_STATE_HASH.to_string(),
+//     };
+//     let original_vrf_block2 = BerkeleyBlockPayload {
+//         height: 3,
+//         state_hash: "original_block_2".to_string(),
+//         last_vrf_output: "b_vrf_high_2".to_string(), // Using "a_" prefix for lower VRF values
+//         previous_state_hash: "original_block_1".to_string(),
+//     };
+
+//     // Set up VRF info for blocks on the competing branch (higher VRF output)
+//     let competing_vrf_block1 = BerkeleyBlockPayload {
+//         height: 2,
+//         state_hash: "competing_block_1".to_string(),
+//         last_vrf_output: "b_vrf_high_1".to_string(), // Using "b_" prefix for higher VRF values
+//         previous_state_hash: GENESIS_STATE_HASH.to_string(),
+//     };
+//     let competing_vrf_block2 = BerkeleyBlockPayload {
+//         height: 3,
+//         state_hash: "competing_block_2".to_string(),
+//         last_vrf_output: "a_vrf_low_2".to_string(), // Using "b_" prefix for higher VRF values
+//         previous_state_hash: "competing_block_1".to_string(),
+//     };
+//     let competing_vrf_block3 = BerkeleyBlockPayload {
+//         height: 4,
+//         state_hash: "competing_block_3".to_string(),
+//         last_vrf_output: "b_vrf_high_3".to_string(), // Using "b_" prefix for higher VRF values
+//         previous_state_hash: "competing_block_2".to_string(),
+//     };
+
+//     // Add VRF information as BerkeleyBlock events
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BerkeleyBlock,
+//             payload: sonic_rs::to_string(&original_vrf_block1).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BerkeleyBlock,
+//             payload: sonic_rs::to_string(&original_vrf_block2).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BerkeleyBlock,
+//             payload: sonic_rs::to_string(&competing_vrf_block1).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BerkeleyBlock,
+//             payload: sonic_rs::to_string(&competing_vrf_block2).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BerkeleyBlock,
+//             payload: sonic_rs::to_string(&competing_vrf_block3).unwrap(),
+//         })
+//         .await;
+
+//     // Create canonical block payloads in the original branch
+//     let original_block1_payload = NewBlockAddedPayload {
+//         height: 2,
+//         state_hash: "original_block_1".to_string(),
+//         previous_state_hash: GENESIS_STATE_HASH.to_string(),
+//     };
+//     let original_block2_payload = NewBlockAddedPayload {
+//         height: 3,
+//         state_hash: "original_block_2".to_string(),
+//         previous_state_hash: "original_block_1".to_string(),
+//     };
+
+//     // Create competing branch payloads
+//     let competing_block1_payload = NewBlockAddedPayload {
+//         height: 2,
+//         state_hash: "competing_block_1".to_string(),
+//         previous_state_hash: GENESIS_STATE_HASH.to_string(),
+//     };
+//     let competing_block2_payload = NewBlockAddedPayload {
+//         height: 3,
+//         state_hash: "competing_block_2".to_string(),
+//         previous_state_hash: "competing_block_1".to_string(),
+//     };
+//     let competing_block3_payload = NewBlockAddedPayload {
+//         height: 4,
+//         state_hash: "competing_block_3".to_string(),
+//         previous_state_hash: "competing_block_2".to_string(),
+//     };
+
+//     // Subscribe to the shared publisher to capture the output
+//     let mut receiver = shared_publisher.subscribe();
+
+//     // Handle events in sequence: original branch then competing branch
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BlockAddedToTree,
+//             payload: sonic_rs::to_string(&original_block1_payload).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BlockAddedToTree,
+//             payload: sonic_rs::to_string(&original_block2_payload).unwrap(),
+//         })
+//         .await;
+
+//     // Competing branch events to outcompete original branch
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BlockAddedToTree,
+//             payload: sonic_rs::to_string(&competing_block1_payload).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BlockAddedToTree,
+//             payload: sonic_rs::to_string(&competing_block2_payload).unwrap(),
+//         })
+//         .await;
+//     actor
+//         .handle_event(Event {
+//             event_type: EventType::BlockAddedToTree,
+//             payload: sonic_rs::to_string(&competing_block3_payload).unwrap(),
+//         })
+//         .await;
+
+//     // Expected sequence of events
+//     let mut expected_events = vec![
+//         // Initially, both original blocks are marked as canonical
+//         BlockCanonicityUpdatePayload {
+//             height: 2,
+//             state_hash: "original_block_1".to_string(),
+//             canonical: true,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 3,
+//             state_hash: "original_block_2".to_string(),
+//             canonical: true,
+//         },
+//         // Competing blocks are added as non-canonical until the tiebreaker
+//         BlockCanonicityUpdatePayload {
+//             height: 2,
+//             state_hash: "competing_block_1".to_string(),
+//             canonical: false,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 3,
+//             state_hash: "competing_block_2".to_string(),
+//             canonical: false,
+//         },
+//         // Competing branch wins, update the blocks
+//         BlockCanonicityUpdatePayload {
+//             height: 3,
+//             state_hash: "original_block_2".to_string(),
+//             canonical: false,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 2,
+//             state_hash: "original_block_1".to_string(),
+//             canonical: false,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 2,
+//             state_hash: "competing_block_1".to_string(),
+//             canonical: true,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 3,
+//             state_hash: "competing_block_2".to_string(),
+//             canonical: true,
+//         },
+//         BlockCanonicityUpdatePayload {
+//             height: 4,
+//             state_hash: "competing_block_3".to_string(),
+//             canonical: true,
+//         },
+//     ];
+
+//     // Verify the sequence of events
+//     let num_expected_events = expected_events.len();
+//     for expected_event in expected_events.into_iter() {
+//         let received_event = receiver.recv().await.expect("Expected event not received");
+//         assert_eq!(received_event.event_type, EventType::BlockCanonicityUpdate);
+
+//         let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&received_event.payload).unwrap();
+//         assert_eq!(payload, expected_event);
+//     }
+
+//     assert_eq!(actor.events_processed().load(Ordering::SeqCst), num_expected_events);
+
+//     Ok(())
+// }
