@@ -4,11 +4,9 @@ use super::super::{
     Actor,
 };
 use crate::{
+    blockchain_tree::{self, BlockchainTree, Hash, Height, Node},
     constants::GENESIS_STATE_HASH,
-    stream::{
-        models::{PreviousStateHash, StateHash},
-        payloads::{BlockAncestorPayload, NewBlockAddedPayload},
-    },
+    stream::payloads::{BlockAncestorPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -21,7 +19,7 @@ pub struct BlockchainTreeActor {
     id: String,
     shared_publisher: Arc<SharedPublisher>,
     events_processed: AtomicUsize,
-    blockchain_tree: Arc<Mutex<HashMap<StateHash, PreviousStateHash>>>,
+    blockchain_tree: Arc<Mutex<BlockchainTree>>,
 }
 
 /// Publishes blocks as they are connected to the blockchain tree
@@ -31,10 +29,7 @@ impl BlockchainTreeActor {
             id: "BlockchainTreeActor".to_string(),
             shared_publisher,
             events_processed: AtomicUsize::new(0),
-            blockchain_tree: Arc::new(Mutex::new(HashMap::from([(
-                StateHash(GENESIS_STATE_HASH.to_string()),
-                PreviousStateHash("".to_string()),
-            )]))),
+            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new())),
         }
     }
 }
@@ -52,21 +47,19 @@ impl Actor for BlockchainTreeActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::BlockAncestor {
             let block_payload: BlockAncestorPayload = sonic_rs::from_str(&event.payload).unwrap();
-
-            let new_block = StateHash(block_payload.state_hash.clone());
-            let previous_block = PreviousStateHash(block_payload.previous_state_hash.clone());
-
             let mut blockchain_tree = self.blockchain_tree.lock().await;
-            if blockchain_tree.contains_key(&StateHash(block_payload.previous_state_hash)) {
-                // Insert the new block into the main tree
-                blockchain_tree.insert(new_block.clone(), previous_block.clone());
-                drop(blockchain_tree); // Drop the lock before proceeding
-
-                // Publish the addition of the new block
+            let next_node = Node {
+                height: Height(block_payload.height),
+                state_hash: Hash(block_payload.state_hash.clone()),
+                previous_state_hash: Hash(block_payload.previous_state_hash.clone()),
+                last_vrf_output: block_payload.last_vrf_output,
+            };
+            if blockchain_tree.has_parent(&next_node) {
+                blockchain_tree.add_node(next_node).unwrap();
                 let added_payload = NewBlockAddedPayload {
                     height: block_payload.height,
-                    state_hash: new_block.0.clone(),
-                    previous_state_hash: previous_block.0,
+                    state_hash: block_payload.state_hash,
+                    previous_state_hash: block_payload.previous_state_hash,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAddedToTree,
@@ -74,6 +67,7 @@ impl Actor for BlockchainTreeActor {
                 });
                 self.incr_event_processed();
             } else {
+                // try again later
                 self.publish(Event {
                     event_type: EventType::BlockAncestor,
                     payload: event.payload,
@@ -102,11 +96,13 @@ async fn test_blockchain_tree_actor_connects_blocks_in_order() {
             height: 2,
             state_hash: "3N8aBlock1".to_string(),
             previous_state_hash: GENESIS_STATE_HASH.to_string(),
+            last_vrf_output: "".to_string(),
         },
         BlockAncestorPayload {
             height: 3,
             state_hash: "3N8aBlock2".to_string(),
             previous_state_hash: "3N8aBlock1".to_string(),
+            last_vrf_output: "".to_string(),
         },
     ];
 
@@ -144,6 +140,7 @@ async fn test_blockchain_tree_actor_rebroadcasts_unconnected_blocks() {
         height: 2,
         state_hash: "3N8aBlock1".to_string(),
         previous_state_hash: "NonExistentParent".to_string(),
+        last_vrf_output: "".to_string(),
     };
 
     let event = Event {
@@ -175,6 +172,7 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
         height: 3,
         state_hash: "3N8aBlock2".to_string(),
         previous_state_hash: "3N8aBlock1".to_string(),
+        last_vrf_output: "".to_string(),
     };
 
     let event = Event {
@@ -196,6 +194,7 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
         height: 2,
         state_hash: "3N8aBlock1".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
+        last_vrf_output: "".to_string(),
     };
 
     let event = Event {
