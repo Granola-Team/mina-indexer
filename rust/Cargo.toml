@@ -9,10 +9,7 @@ serde = { version = "1.0", features = ["derive"] }
 async-trait = "0.1.83"
 regex = "1.11"
 bigdecimal = "0.4"
-edgedb-protocol = { version = "0.6.1", features = ["with-bigdecimal"] }
-edgedb-tokio = "0.5.1"
-edgedb-derive = "0.5.2"
-edgedb-errors = "0.4.2"
+duckdb = "1.1.1"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0"
 futures = "0.3"

@@ -4,9 +4,16 @@ rustdocflags = ["-C", "target-cpu=native"]
 
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=mold",
+    "-C", "link-arg=-L/usr/local/lib"
+]
+
 # ^ https://github.com/rui314/mold#mold-a-modern-linker
 #   Desired, also in rustflags: "-Zshare-generics=y"
 
 [target.x86_64-apple-darwin]
-rustflags = ["-C", "link-arg=-fuse-ld=zld"]
+rustflags = [
+    "-C", "link-arg=-fuse-ld=zld",
+    "-C", "link-arg=-L/usr/local/lib"
+]

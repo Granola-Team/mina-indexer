@@ -1,146 +1,24 @@
-use crate::db::DbPool;
-use rayon::{
-    iter::{IntoParallelIterator, ParallelIterator},
-    slice::ParallelSliceMut,
-};
+use anyhow::Result;
+use rayon::prelude::*;
 use sonic_rs::Value;
 use std::{
-    collections::VecDeque,
     future::Future,
-    io,
+    io::{self, BufReader, Read},
     path::{Path, PathBuf},
-    pin::Pin,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
-    time::{Duration, Instant},
 };
-use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinHandle};
+use tracing::info;
 use walkdir::WalkDir;
 
 const FILE_PREFIX: &str = "mainnet-";
-pub const CHUNK_SIZE: usize = 100;
-const BUFFER_SIZE: usize = 16 * 1024; // 16KB buffer
-
-struct ChunkProcessor<F> {
-    queue: Mutex<VecDeque<Vec<PathBuf>>>,
-    processed_chunks: AtomicUsize,
-    total_chunks: usize,
-    start_time: Instant,
-    processor: F,
-}
-
-impl<F> ChunkProcessor<F>
-where
-    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
-{
-    fn new(paths: Vec<PathBuf>, processor: F) -> Self {
-        let total_chunks = paths.len().div_ceil(CHUNK_SIZE);
-        let chunks: VecDeque<Vec<PathBuf>> = paths.chunks(CHUNK_SIZE).map(|c| c.to_vec()).collect();
-
-        Self {
-            queue: Mutex::new(chunks),
-            processed_chunks: AtomicUsize::new(0),
-            total_chunks,
-            start_time: Instant::now(),
-            processor,
-        }
-    }
-
-    fn format_duration(duration: Duration) -> String {
-        let total_secs = duration.as_secs();
-        let hours = total_secs / 3600;
-        let mins = (total_secs % 3600) / 60;
-
-        if hours > 0 {
-            format!("{}h {}m", hours, mins)
-        } else {
-            format!("{}m", mins)
-        }
-    }
-
-    fn get_stats(&self, pool: &DbPool) -> String {
-        let elapsed = self.start_time.elapsed();
-        let processed = self.processed_chunks.load(Ordering::Relaxed);
-
-        let percentage = (processed as f64 / self.total_chunks as f64 * 100.0).round() as u32;
-
-        let remaining = if processed > 0 {
-            let avg_time_per_chunk = elapsed.div_f64(processed as f64);
-            avg_time_per_chunk.mul_f64((self.total_chunks - processed) as f64)
-        } else {
-            Duration::ZERO
-        };
-
-        format!(
-            "Progress: {}/{} chunks ({}%), elapsed: {}, remaining: {}{}",
-            processed,
-            self.total_chunks,
-            percentage,
-            Self::format_duration(elapsed),
-            Self::format_duration(remaining),
-            pool.get_pool_stats()
-        )
-    }
-
-    async fn process_next_chunk(&self, pool: &Arc<DbPool>) -> Option<()> {
-        let chunk = {
-            let mut queue = self.queue.lock().await;
-            queue.pop_front()?
-        };
-
-        let futures = chunk
-            .into_par_iter()
-            .map(|path| {
-                let pool = Arc::clone(pool);
-                let processor = &self.processor;
-
-                async move {
-                    let file = tokio::fs::File::open(&path).await?;
-                    let metadata = file.metadata().await?;
-
-                    let mut reader = tokio::io::BufReader::with_capacity(BUFFER_SIZE, file);
-                    let mut contents = Vec::with_capacity(metadata.len() as usize);
-                    reader.read_to_end(&mut contents).await?;
-
-                    let json = sonic_rs::from_slice(&contents).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-
-                    let hash = extract_hash_from_file_name(&path);
-                    let number = extract_digits_from_file_name(&path);
-
-                    match (processor)(pool, json, hash.to_owned(), number).await {
-                        Ok(_) => Ok(()),
-                        Err(e) => {
-                            println!("Error processing {} ({})", hash, number);
-                            Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-                        }
-                    }
-                }
-            })
-            .collect::<Vec<_>>();
-
-        for future in futures {
-            if let Err(e) = future.await {
-                eprintln!("{}", e);
-            }
-        }
-
-        self.processed_chunks.fetch_add(1, Ordering::SeqCst);
-
-        let processed = self.processed_chunks.load(Ordering::SeqCst);
-        if processed % 10 == 0 {
-            println!("{}", self.get_stats(pool));
-        }
-
-        Some(())
-    }
-}
 
 #[inline]
 /// Get [file paths][PathBuf] from `dir`
 fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
-    let mut paths: Vec<PathBuf> = Vec::with_capacity(900_000);
+    let mut paths: Vec<PathBuf> = Vec::new();
 
     WalkDir::new(dir)
         .min_depth(1)
@@ -176,49 +54,97 @@ fn get_file_paths(dir: &str) -> Result<Vec<PathBuf>, io::Error> {
     Ok(paths)
 }
 
-fn spawn_workers<F>(initial_workers: usize, max_workers: usize, processor: Arc<ChunkProcessor<F>>, pool: Arc<DbPool>) -> Vec<JoinHandle<()>>
+pub async fn process_files<F, Fut>(dir: &str, processor_fn: F) -> Result<()>
 where
-    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
+    F: Fn(Value, String, i64) -> Fut + Send + Sync + 'static,
+    Fut: Future<Output = Result<(), duckdb::Error>> + Send + 'static,
 {
-    let mut handles = Vec::with_capacity(max_workers - initial_workers);
+    info!("Processing files in: {}", dir);
+    let paths = get_file_paths(dir)?;
+    let total_files = paths.len();
+    let processed = Arc::new(AtomicUsize::new(0));
+    let processor_fn = Arc::new(processor_fn);
 
-    for _ in initial_workers..max_workers {
-        let processor = Arc::clone(&processor);
-        let pool = Arc::clone(&pool);
+    let chunks: Vec<_> = paths.chunks(5).map(|c| c.to_vec()).collect();
 
-        let handle = tokio::spawn(async move { while processor.process_next_chunk(&pool).await.is_some() {} });
+    for chunk in chunks {
+        let futures = chunk
+            .par_iter()
+            .map(|path| {
+                let file = std::fs::File::open(path)?;
+                let metadata = file.metadata()?;
 
-        handles.push(handle);
+                // Use streaming for large files
+                let mut reader = if metadata.len() > 100_000_000 {
+                    BufReader::with_capacity(16 * 1024 * 1024, file) // 16MB buffer for large files
+                } else {
+                    BufReader::with_capacity(1024 * 1024, file) // 1MB buffer for regular files
+                };
+
+                let contents = if metadata.len() > 100_000_000 {
+                    // Stream large files in chunks
+                    let mut buffer = Vec::new();
+                    let mut chunk = vec![0; 1024 * 1024]; // 1MB chunks
+                    loop {
+                        match reader.read(&mut chunk)? {
+                            0 => break,
+                            n => buffer.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    buffer
+                } else {
+                    // Read smaller files directly
+                    let mut buffer = Vec::with_capacity(metadata.len() as usize);
+                    reader.read_to_end(&mut buffer)?;
+                    buffer
+                };
+
+                // Parse JSON with validation
+                let json = match sonic_rs::from_slice::<Value>(&contents) {
+                    Ok(json) => json,
+                    Err(e) => return Err(anyhow::anyhow!("JSON parse error in {}: {}", path.display(), e)),
+                };
+
+                let hash = extract_hash_from_file_name(path);
+                let number = extract_digits_from_file_name(path);
+
+                Ok::<_, anyhow::Error>((json, hash.to_owned(), number))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut handles = Vec::with_capacity(futures.len());
+
+        for (json, hash, number) in futures {
+            let processor_fn = Arc::clone(&processor_fn);
+            let processed = Arc::clone(&processed);
+
+            let handle = tokio::spawn(async move {
+                let result = (processor_fn)(json, hash, number).await;
+                let count = processed.fetch_add(1, Ordering::SeqCst) + 1;
+                if count % 100 == 0 {
+                    println!(
+                        "Progress: {}/{} files ({}%)",
+                        count,
+                        total_files,
+                        (count as f64 / total_files as f64 * 100.0) as u32
+                    );
+                }
+                result
+            });
+            handles.push(handle);
+        }
+
+        // Wait for all handles in current chunk
+        for handle in handles {
+            handle.await??;
+        }
     }
 
-    handles
-}
+    let final_count = processed.load(Ordering::SeqCst);
+    info!("Processing complete. Processed {}/{} files", final_count, total_files);
 
-pub async fn process_files<F>(dir: &str, pool: Arc<DbPool>, processor_fn: F) -> anyhow::Result<()>
-where
-    F: Fn(Arc<DbPool>, Value, String, i64) -> Pin<Box<dyn Future<Output = Result<(), edgedb_tokio::Error>> + Send>> + Send + Sync + 'static,
-{
-    println!("Processing files in: {}", dir);
-    let paths = get_file_paths(dir)?;
-    let processor = ChunkProcessor::new(paths, processor_fn);
-    let processor = Arc::new(processor);
-
-    let initial_workers = 2;
-    let max_workers = num_cpus::get() * 2;
-
-    // Start with few workers initially, then scale up
-    let mut handles = spawn_workers(0, initial_workers, Arc::clone(&processor), Arc::clone(&pool));
-
-    // After 4 minutes, add more workers
-    tokio::time::sleep(Duration::from_secs(240)).await;
-    println!("Adding more workers");
-
-    handles.extend(spawn_workers(initial_workers, max_workers, Arc::clone(&processor), Arc::clone(&pool)));
-
-    for handle in handles {
-        if let Err(e) = handle.await {
-            eprintln!("Task failed: {}", e);
-        }
+    if final_count != total_files {
+        anyhow::bail!("Not all files were processed: {}/{}", final_count, total_files);
     }
 
     Ok(())

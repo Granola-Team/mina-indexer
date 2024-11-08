@@ -1,12 +1,6 @@
-use mina_indexer::staking;
+use mina_indexer::{staking, start};
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
-    println!("Starting...");
-    let _ = tokio::spawn(async move {
-        let _ = staking::run("/Users/jonathan/.mina-indexer/mina-indexer-dev/staking").await;
-    })
-    .await;
-
-    Ok(())
+async fn main() -> anyhow::Result<()> {
+    start("/Users/jonathan/.mina-indexer/mina-indexer-dev/staking", staking::run).await
 }

@@ -1,137 +1,138 @@
-use crate::{
-    account_link,
-    db::DbPool,
-    files::{process_files, CHUNK_SIZE},
-    insert_accounts, to_decimal, to_i64,
-};
-use futures::future::try_join_all;
+use crate::{files::process_files, get_db_connection, insert_accounts, to_decimal, to_i64};
+use anyhow::Result;
 use sonic_rs::{Array, JsonContainerTrait, JsonValueTrait, Value};
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 use tracing::{debug, info};
 
-/// Ingest staking ledger files (JSON) from `staking_ledgers_dir` into the database
-pub async fn run(staking_ledgers_dir: &str) -> anyhow::Result<()> {
-    let pool = Arc::new(DbPool::new(Some("trunk")).await?);
-    process_files(staking_ledgers_dir, pool, |pool, json, hash, number| {
-        Box::pin(process_ledger(pool, json.as_array().expect("ledger").to_owned(), hash, number))
+const BATCH_SIZE: usize = 10_000;
+
+pub async fn run(staking_ledgers_dir: String) -> Result<()> {
+    process_files(&staking_ledgers_dir, |json, hash, number| async move {
+        process_ledger(json.as_array().expect("ledger").to_owned(), hash, number).await
     })
     .await
 }
 
-const INSERT_EPOCH: &str = "insert StakingEpoch {
-    hash := <str>$0,
-    epoch := <int64>$1
-} unless conflict;";
+const INSERT_EPOCH: &str = "
+    INSERT INTO staking_epochs (hash, epoch)
+    VALUES (?, ?)
+    ON CONFLICT (hash, epoch) DO NOTHING
+";
 
-/// Process ledger
-async fn process_ledger(pool: Arc<DbPool>, json: Array, ledger_hash: String, epoch: i64) -> Result<(), edgedb_tokio::Error> {
+const INSERT_LEDGER_BATCH: &str = "
+    INSERT INTO staking_ledgers (
+        epoch_hash, epoch_number, source, balance, target, token,
+        nonce, receipt_chain_hash, voting_for
+    )
+    SELECT * FROM (VALUES %s)
+    RETURNING id
+";
+
+const INSERT_TIMING_BATCH: &str = "
+    INSERT INTO staking_timing (
+        ledger_id, initial_minimum_balance, cliff_time,
+        cliff_amount, vesting_period, vesting_increment
+    )
+    VALUES %s
+";
+
+struct BatchData {
+    ledger_values: Vec<String>,
+    timing_values: Vec<(String, i64, String, i64, String)>,
+}
+
+impl BatchData {
+    fn with_capacity(size: usize) -> Self {
+        Self {
+            ledger_values: Vec::with_capacity(size),
+            timing_values: Vec::with_capacity(size),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.ledger_values.clear();
+        self.timing_values.clear();
+    }
+}
+
+async fn process_ledger(json: Array, ledger_hash: String, epoch: i64) -> Result<(), duckdb::Error> {
     info!("Processing ledger {} at epoch {}", ledger_hash, epoch);
     let accounts = extract_accounts(&json);
     debug!("Extracted accounts");
 
-    let insert_ledger = |source: &str, target: &str| {
-        format!(
-            "insert StakingLedger {{
-                epoch := assert_single((select StakingEpoch filter .epoch = {} and .hash = '{}')),
-                source := {},
-                balance := <decimal>$0,
-                target := {},
-                token := <int64>$1,
-                nonce := <optional int64>$2,
-                receipt_chain_hash := <str>$3,
-                voting_for := <str>$4
-            }}",
-            epoch, ledger_hash, source, target
-        )
-    };
+    insert_accounts(accounts)?;
 
-    let insert_timing = |source: &str, target: &str| {
-        format!(
-            "with ledger := (
-            {}
-        )
-        insert StakingTiming {{
-            ledger := ledger,
-            initial_minimum_balance := <decimal>$5,
-            cliff_time := <int64>$6,
-            cliff_amount := <decimal>$7,
-            vesting_period := <int64>$8,
-            vesting_increment := <decimal>$9
-        }};",
-            insert_ledger(source, target)
-        )
-    };
+    // Create DB connection at start and keep it for entire function
+    let mut db = get_db_connection()?;
+    db.execute(INSERT_EPOCH, [&ledger_hash, &epoch.to_string()])?;
+    let tx = db.transaction()?;
 
-    let epoch_params = (ledger_hash.clone(), epoch);
-    let (_, _) = tokio::try_join!(insert_accounts(&pool, accounts), pool.execute(INSERT_EPOCH, &epoch_params))?;
+    let mut batch = BatchData::with_capacity(BATCH_SIZE);
+    let total_records = json.len();
 
-    for chunk in json.chunks(CHUNK_SIZE) {
-        let mut futures = Vec::new();
+    for chunk_start in (0..total_records).step_by(BATCH_SIZE) {
+        let chunk_end = (chunk_start + BATCH_SIZE).min(total_records);
+        batch.clear();
 
-        for activity in chunk {
-            let pool = Arc::clone(&pool);
+        // Process chunk of records
+        for activity in &json[chunk_start..chunk_end] {
+            let source = activity["pk"].as_str().expect("pk");
+            let delegate = activity["delegate"].as_str().unwrap_or(source);
 
-            // Extract account links for formatting into query
-            let source = account_link(&activity["pk"]);
-            let delegate = &activity["delegate"];
-            // You must have a delegate and if it's not stated, you are delegating to yourself
-            let target = if delegate.as_str().is_some() {
-                account_link(delegate)
-            } else {
-                source.clone()
-            };
-            let ledger_query = insert_ledger(&source, &target);
-            let timing_query = insert_timing(&source, &target);
+            let ledger_value = format!(
+                "('{}', {}, '{}', '{}', '{}', {}, {}, '{}', '{}')",
+                ledger_hash,
+                epoch,
+                source,
+                to_decimal(&activity["balance"]).expect("balance"),
+                delegate,
+                to_i64(&activity["token"]).unwrap_or(0),
+                to_i64(&activity["nonce"]).unwrap_or(0),
+                activity["receipt_chain_hash"].as_str().unwrap_or_default(),
+                activity["voting_for"].as_str().unwrap_or_default()
+            );
+            batch.ledger_values.push(ledger_value);
 
-            // Extract remaining values before the async move
-            let balance = to_decimal(&activity["balance"]);
-            let token = to_i64(&activity["token"]).unwrap_or(0);
-            let nonce = to_i64(&activity["nonce"]);
-            let receipt_chain_hash = activity["receipt_chain_hash"].as_str().unwrap_or_default().to_string();
-            let voting_for = activity["voting_for"].as_str().unwrap_or_default().to_string();
-
-            let base_params = (balance, token, nonce, receipt_chain_hash, voting_for);
-
-            let timing_data = activity["timing"].as_object().map(|timing| {
-                (
-                    to_decimal(&timing["initial_minimum_balance"]),
-                    to_i64(&timing["cliff_time"]),
-                    to_decimal(&timing["cliff_amount"]),
-                    to_i64(&timing["vesting_period"]),
-                    to_decimal(&timing["vesting_increment"]),
-                )
-            });
-
-            let future = async move {
-                if let Some(timing_values) = timing_data {
-                    let timing_params = (
-                        base_params.0,
-                        base_params.1,
-                        base_params.2,
-                        base_params.3,
-                        base_params.4,
-                        timing_values.0,
-                        timing_values.1,
-                        timing_values.2,
-                        timing_values.3,
-                        timing_values.4,
-                    );
-                    pool.execute(&timing_query, &timing_params).await
-                } else {
-                    pool.execute(&ledger_query, &base_params).await
-                }
-            };
-
-            futures.push(future);
+            if let Some(timing) = activity["timing"].as_object() {
+                batch.timing_values.push((
+                    to_decimal(&timing["initial_minimum_balance"]).expect("initial_minimum_balance").to_string(),
+                    to_i64(&timing["cliff_time"]).expect("cliff_time"),
+                    to_decimal(&timing["cliff_amount"]).expect("cliff_amount").to_string(),
+                    to_i64(&timing["vesting_period"]).expect("vesting_period"),
+                    to_decimal(&timing["vesting_increment"]).expect("vesting_increment").to_string(),
+                ));
+            }
         }
 
-        try_join_all(futures).await?;
+        // Bulk insert ledger entries
+        if !batch.ledger_values.is_empty() {
+            let ledger_query = INSERT_LEDGER_BATCH.replace("%s", &batch.ledger_values.join(","));
+            let ledger_ids: Vec<i64> = tx
+                .prepare(&ledger_query)?
+                .query_map([], |row| row.get::<_, i64>(0))?
+                .filter_map(Result::ok)
+                .collect();
+
+            // Bulk insert timing data
+            if !batch.timing_values.is_empty() {
+                let timing_values: Vec<String> = batch
+                    .timing_values
+                    .iter()
+                    .zip(ledger_ids.iter())
+                    .map(|((imb, ct, ca, vp, vi), id)| format!("({}, '{}', {}, '{}', {}, '{}')", id, imb, ct, ca, vp, vi))
+                    .collect();
+
+                let timing_query = INSERT_TIMING_BATCH.replace("%s", &timing_values.join(","));
+                tx.execute(&timing_query, [])?;
+            }
+        }
+
+        tx.commit()?;
     }
 
     Ok(())
 }
 
-/// Extract a [list][HashSet] of accounts (public keys)
 fn extract_accounts(json_array: &[Value]) -> HashSet<String> {
     json_array
         .iter()

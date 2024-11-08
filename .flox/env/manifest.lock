@@ -3,6 +3,9 @@
   "manifest": {
     "version": 1,
     "install": {
+      "duckdb": {
+        "pkg-path": "duckdb"
+      },
       "libiconv": {
         "pkg-path": "libiconv",
         "systems": [
@@ -280,19 +283,143 @@
       "priority": 5
     },
     {
+      "attr_path": "duckdb",
+      "broken": false,
+      "derivation": "/nix/store/dl2jh4k0zvr8cimcrg19c8yxybvhz94n-duckdb-1.1.2.drv",
+      "description": "Embeddable SQL OLAP Database Management System",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "name": "duckdb-1.1.2",
+      "pname": "duckdb",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/gif21ja7pygkxhrv658fnr288xz2vgw3-duckdb-1.1.2-dev",
+        "lib": "/nix/store/scwq06jh4gnlq7jl7wy28niawa6cbv34-duckdb-1.1.2-lib",
+        "out": "/nix/store/47lwhg2j7n7d088zik7hwvq3026x013n-duckdb-1.1.2"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "duckdb",
+      "broken": false,
+      "derivation": "/nix/store/nz6askd2ni5862hqzrb2mzpf2mc86cvp-duckdb-1.1.2.drv",
+      "description": "Embeddable SQL OLAP Database Management System",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "name": "duckdb-1.1.2",
+      "pname": "duckdb",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/qj49niz2wnqrp6my7mn986qmx7yx3qra-duckdb-1.1.2-dev",
+        "lib": "/nix/store/jmmdv3hddpd8an19fwfvmfvbr20aysgz-duckdb-1.1.2-lib",
+        "out": "/nix/store/5l57qmsiinlrnxp4h6y8sixd68nv036b-duckdb-1.1.2"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "duckdb",
+      "broken": false,
+      "derivation": "/nix/store/d8zbxb9b21fap3bskvn3653ygr806hjv-duckdb-1.1.2.drv",
+      "description": "Embeddable SQL OLAP Database Management System",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "name": "duckdb-1.1.2",
+      "pname": "duckdb",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/mwja2bs33229h84f09f3hfyy87w6k6rw-duckdb-1.1.2-dev",
+        "lib": "/nix/store/ms3mkzz0pijm3rms419v4hlzgkmz13wh-duckdb-1.1.2-lib",
+        "out": "/nix/store/cy2f6zgx4chpkdqyz84xq19sm1sdhyrm-duckdb-1.1.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "duckdb",
+      "broken": false,
+      "derivation": "/nix/store/sa6a7hfs7s6x8mkvvi5nmccy6scjm36j-duckdb-1.1.2.drv",
+      "description": "Embeddable SQL OLAP Database Management System",
+      "install_id": "duckdb",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "name": "duckdb-1.1.2",
+      "pname": "duckdb",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.1.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dev": "/nix/store/jjvl3pjgipx3sch6qilvxp6jhfqmd7ym-duckdb-1.1.2-dev",
+        "lib": "/nix/store/billgkvg0azhryxg7v0syr64jk9pyjmz-duckdb-1.1.2-lib",
+        "out": "/nix/store/p9fjs5a606a0zrkb7q62slwy99xkakgg-duckdb-1.1.2"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "libiconv",
       "broken": false,
       "derivation": "/nix/store/6kpkqjrhf3rm839rwxbggzcnly41lf8m-libiconv-107.drv",
       "description": "Iconv(3) implementation",
       "install_id": "libiconv",
       "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "libiconv-107",
       "pname": "libiconv",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -316,13 +443,13 @@
       "description": "Iconv(3) implementation",
       "install_id": "libiconv",
       "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "libiconv-107",
       "pname": "libiconv",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -346,13 +473,13 @@
       "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
       "install_id": "mold",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "mold-2.34.1",
       "pname": "mold",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -375,13 +502,13 @@
       "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
       "install_id": "mold",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "mold-2.34.1",
       "pname": "mold",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -404,13 +531,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -434,13 +561,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -464,13 +591,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -494,13 +621,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -524,13 +651,13 @@
       "description": "Faster version of Apple's linker",
       "install_id": "zld",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "zld-1.3.4",
       "pname": "zld",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],
@@ -553,13 +680,13 @@
       "description": "Faster version of Apple's linker",
       "install_id": "zld",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
       "name": "zld-1.3.4",
       "pname": "zld",
-      "rev": "7ffd9ae656aec493492b44d0ddfb28e79a1ea25d",
-      "rev_count": 702572,
-      "rev_date": "2024-11-02T07:13:23Z",
-      "scrape_date": "2024-11-04T04:02:54Z",
+      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "rev_count": 703931,
+      "rev_date": "2024-11-05T05:43:48Z",
+      "scrape_date": "2024-11-07T03:55:45Z",
       "stabilities": [
         "unstable"
       ],

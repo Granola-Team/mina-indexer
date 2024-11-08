@@ -23,6 +23,9 @@ zld.systems = ["aarch64-darwin", "x86_64-darwin"]
 # Ruby
 ruby.pkg-path = "ruby"
 
+# Database
+duckdb.pkg-path = "duckdb"
+
 [vars]
 
 [hook]

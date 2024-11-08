@@ -30,7 +30,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    let pool: Arc<DbPool> = Arc::new(DbPool::new(Some("trunk")).await?);
+    let pool: Arc<DbPool> = Arc::new(DbPool::new().await?);
     let total = Instant::now();
 
     info!("Querying blocks from EdgeDB...");

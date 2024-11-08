@@ -72,11 +72,12 @@ pub fn get_top_level_keys_from_json_file(file: &str) -> anyhow::Result<Vec<Strin
 #[cfg(test)]
 mod get_top_level_keys_from_json_file_tests {
     use super::*;
+    use anyhow::Result;
     use std::io::Write;
     use tempfile::NamedTempFile;
 
     #[test]
-    fn test_get_top_level_keys_from_json_file_with_object() -> anyhow::Result<()> {
+    fn test_get_top_level_keys_from_json_file_with_object() -> Result<()> {
         // Create a temporary JSON file with known top-level keys
         let mut temp_file = NamedTempFile::new()?;
         writeln!(
@@ -97,7 +98,7 @@ mod get_top_level_keys_from_json_file_tests {
     }
 
     #[test]
-    fn test_get_top_level_keys_from_json_file_with_non_object() -> anyhow::Result<()> {
+    fn test_get_top_level_keys_from_json_file_with_non_object() -> Result<()> {
         // Create a temporary JSON file with a non-object top-level structure
         let mut temp_file = NamedTempFile::new()?;
         writeln!(temp_file, r#"[1, 2, 3]"#)?;
@@ -110,7 +111,7 @@ mod get_top_level_keys_from_json_file_tests {
     }
 
     #[test]
-    fn test_get_top_level_keys_from_json_file_with_empty_object() -> anyhow::Result<()> {
+    fn test_get_top_level_keys_from_json_file_with_empty_object() -> Result<()> {
         // Create a temporary JSON file with an empty object
         let mut temp_file = NamedTempFile::new()?;
         writeln!(temp_file, r#"{{}}"#)?;
