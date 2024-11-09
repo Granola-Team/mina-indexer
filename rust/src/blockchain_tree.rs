@@ -63,7 +63,7 @@ impl BlockchainTree {
         self.get_parent(node).is_some()
     }
 
-    fn sort_entries(entries: &mut Vec<Node>) {
+    fn sort_entries(entries: &mut [Node]) {
         entries.sort_by(|a, b| {
             // First compare by last_vrf_output (descending)
             match b.last_vrf_output.cmp(&a.last_vrf_output) {
