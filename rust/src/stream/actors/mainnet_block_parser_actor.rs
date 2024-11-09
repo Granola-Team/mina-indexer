@@ -48,6 +48,7 @@ impl Actor for MainnetBlockParserActor {
                 state_hash: state_hash.to_string(),
                 previous_state_hash: block.get_previous_state_hash(),
                 last_vrf_output: block.get_last_vrf_output(),
+                user_command_count: block.get_user_commands_count(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,
@@ -75,33 +76,61 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         events_processed: AtomicUsize::new(0),
     };
 
-    let block_file = "./src/stream/test_data/100_mainnet_blocks/mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json";
+    // Define paths for two block files
+    let block_file_100 = "./src/stream/test_data/100_mainnet_blocks/mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json";
+    let block_file_99 = "./src/stream/test_data/100_mainnet_blocks/mainnet-99-3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh.json";
 
-    // Create an event pointing to the temporary file with the correct event type
-    let event = Event {
+    // Test block 100
+    let event_100 = Event {
         event_type: EventType::MainnetBlockPath,
-        payload: block_file.to_string(),
+        payload: block_file_100.to_string(),
     };
 
     // Subscribe to the shared publisher
     let mut receiver = shared_publisher.subscribe();
 
-    // Invoke the actor with the MainnetBlock event
-    actor.on_event(event).await;
+    // Invoke the actor with the MainnetBlock event for block 100
+    actor.on_event(event_100).await;
 
-    // Assert that the correct MainnetBlock event is published
+    // Assert that the correct MainnetBlock event is published for block 100
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::MainnetBlock);
 
-        // Deserialize the payload and check values
+        // Deserialize the payload and check values for block 100
         let payload: MainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-        assert_eq!(payload.height, 100); // Ensure this matches extract_height_and_hash
+        assert_eq!(payload.height, 100);
         assert_eq!(payload.state_hash, "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4");
         assert_eq!(payload.previous_state_hash, "3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh");
         assert_eq!(payload.last_vrf_output, "HXzRY01h73mWXp4cjNwdDTYLDtdFU5mYhTbWWi-1wwE=");
+        assert_eq!(payload.user_command_count, 1);
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
-        panic!("Did not receive expected event from actor.");
+        panic!("Did not receive expected event from actor for block 100.");
+    }
+
+    // Test block 99
+    let event_99 = Event {
+        event_type: EventType::MainnetBlockPath,
+        payload: block_file_99.to_string(),
+    };
+
+    // Invoke the actor with the MainnetBlock event for block 99
+    actor.on_event(event_99).await;
+
+    // Assert that the correct MainnetBlock event is published for block 99
+    if let Ok(received_event) = receiver.recv().await {
+        assert_eq!(received_event.event_type, EventType::MainnetBlock);
+
+        // Deserialize the payload and check values for block 99
+        let payload: MainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        assert_eq!(payload.height, 99);
+        assert_eq!(payload.state_hash, "3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh");
+        assert_eq!(payload.previous_state_hash, "3NLAuBJPgT4Tk4LpufAEDQq4Jv9QVUefq3n3eB9x9VgGqe6LKzWp");
+        assert_eq!(payload.last_vrf_output, "ws1xspEgjEyLiSS0V2-Egf9UzJG3FACpruvvDEsqDAA=");
+        assert_eq!(payload.user_command_count, 3);
+        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 2);
+    } else {
+        panic!("Did not receive expected event from actor for block 99.");
     }
 
     Ok(())

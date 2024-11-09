@@ -22,6 +22,7 @@ pub struct MainnetBlockPayload {
     pub state_hash: String,
     pub previous_state_hash: String,
     pub last_vrf_output: String,
+    pub user_command_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
