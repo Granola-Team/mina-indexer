@@ -1,5 +1,6 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum EventType {
+    GenesisBlock,
     PrecomputedBlockPath,
     BerkeleyBlockPath,
     MainnetBlockPath,
@@ -8,6 +9,7 @@ pub enum EventType {
     MainnetBlock,
     BlockAddedToTree,
     BlockCanonicityUpdate,
+    BestBlock,
 }
 
 #[derive(Debug, Clone, PartialEq)]

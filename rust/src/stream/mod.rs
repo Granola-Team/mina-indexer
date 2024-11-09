@@ -1,10 +1,11 @@
 use crate::stream::actors::blockchain_tree_actor::BlockchainTreeActor;
 use actors::{
-    berkeley_block_parser_actor::BerkeleyBlockParserActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
-    mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
+    berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
+    block_canonicity_actor::BlockCanonicityActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
+use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
 use std::{fs, path::PathBuf, sync::Arc};
 use tokio::{sync::broadcast, task};
@@ -33,6 +34,7 @@ pub async fn process_blocks_dir(
         Arc::new(BlockAncestorActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockchainTreeActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(BestBlockActor::new(Arc::clone(&shared_publisher))),
     ];
 
     // Spawn tasks for each actor and collect their handles
@@ -43,6 +45,11 @@ pub async fn process_blocks_dir(
         let handle = task::spawn(setup_actor(receiver, actor_shutdown_rx, actor));
         actor_handles.push(handle);
     }
+
+    shared_publisher.publish(Event {
+        event_type: events::EventType::GenesisBlock,
+        payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+    });
 
     // Iterate over files in the directory and publish events
     for entry in fs::read_dir(blocks_dir)?.filter_map(Result::ok).filter(|e| e.path().is_file()) {

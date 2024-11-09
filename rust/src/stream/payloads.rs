@@ -38,3 +38,30 @@ pub struct BlockCanonicityUpdatePayload {
     pub state_hash: String,
     pub canonical: bool,
 }
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct GenesisBlockPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub previous_state_hash: String,
+    pub last_vrf_output: String,
+    pub unix_timestamp: u64,
+}
+
+impl Default for GenesisBlockPayload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GenesisBlockPayload {
+    pub fn new() -> Self {
+        Self {
+            height: 1,
+            state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+            previous_state_hash: "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d".to_string(),
+            last_vrf_output: "NfThG1r1GxQuhaGLSJWGxcpv24SudtXG4etB0TnGqwg=".to_string(),
+            unix_timestamp: 1615939200000,
+        }
+    }
+}
