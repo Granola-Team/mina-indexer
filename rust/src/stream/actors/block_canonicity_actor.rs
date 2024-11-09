@@ -17,7 +17,6 @@ pub struct BlockCanonicityActor {
     events_processed: AtomicUsize,
     blockchain_tree: Arc<Mutex<BlockchainTree>>,
 }
-
 impl BlockCanonicityActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
@@ -26,6 +25,56 @@ impl BlockCanonicityActor {
             events_processed: AtomicUsize::new(0),
             blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new())),
         }
+    }
+
+    fn process_equal_height(&self, current_best_block: &Node, next_node: Node, next_best_block: &Node) {
+        let is_canonical = current_best_block != next_best_block;
+        if is_canonical {
+            self.publish_canonical_update(current_best_block.clone(), false);
+            self.publish_canonical_update(next_node, true);
+        } else {
+            self.publish_canonical_update(next_node, false);
+        }
+    }
+
+    fn process_greater_height(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: Node) {
+        let parent = blockchain_tree.get_parent(&next_node).unwrap();
+        if parent != current_best_block {
+            self.update_ancestries(blockchain_tree, current_best_block, &next_node);
+        }
+        self.publish_canonical_update(next_node, true);
+    }
+
+    fn update_ancestries(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: &Node) {
+        let (prior_ancestry, mut new_ancestry, _) = blockchain_tree
+            .get_shared_ancestry(current_best_block, blockchain_tree.get_parent(next_node).unwrap())
+            .unwrap();
+
+        for prior in prior_ancestry.iter() {
+            self.publish_canonical_update(prior.clone(), false);
+        }
+
+        new_ancestry.reverse();
+        for new_a in new_ancestry.iter() {
+            self.publish_canonical_update(new_a.clone(), true);
+        }
+    }
+
+    fn publish_canonical_update(&self, node: Node, canonical: bool) {
+        let update = BlockCanonicityUpdatePayload {
+            height: node.height.0,
+            state_hash: node.state_hash.0.clone(),
+            canonical,
+        };
+        self.publish_event(update);
+    }
+
+    fn publish_event(&self, update: BlockCanonicityUpdatePayload) {
+        self.publish(Event {
+            event_type: EventType::BlockCanonicityUpdate,
+            payload: sonic_rs::to_string(&update).unwrap(),
+        });
+        self.incr_event_processed();
     }
 }
 
@@ -38,6 +87,7 @@ impl Actor for BlockCanonicityActor {
     fn events_processed(&self) -> &AtomicUsize {
         &self.events_processed
     }
+
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::BlockAddedToTree {
             let block_payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
@@ -52,100 +102,16 @@ impl Actor for BlockCanonicityActor {
                 let (height, current_best_block) = blockchain_tree.get_best_tip().unwrap();
                 blockchain_tree.add_node(next_node.clone()).unwrap();
                 let (_, next_best_block) = blockchain_tree.get_best_tip().unwrap();
+
                 match next_node.height.cmp(&height) {
                     std::cmp::Ordering::Equal => {
-                        if current_best_block == next_best_block {
-                            let update = BlockCanonicityUpdatePayload {
-                                height: next_node.height.0,
-                                state_hash: next_node.state_hash.0.clone(),
-                                canonical: false,
-                            };
-                            self.publish(Event {
-                                event_type: EventType::BlockCanonicityUpdate,
-                                payload: sonic_rs::to_string(&update).unwrap(),
-                            });
-                            self.incr_event_processed();
-                        } else {
-                            {
-                                let update = BlockCanonicityUpdatePayload {
-                                    height: current_best_block.height.0,
-                                    state_hash: current_best_block.state_hash.0.clone(),
-                                    canonical: false,
-                                };
-                                self.publish(Event {
-                                    event_type: EventType::BlockCanonicityUpdate,
-                                    payload: sonic_rs::to_string(&update).unwrap(),
-                                });
-                                self.incr_event_processed();
-                            }
-                            {
-                                let update = BlockCanonicityUpdatePayload {
-                                    height: next_node.height.0,
-                                    state_hash: next_node.state_hash.0.clone(),
-                                    canonical: true,
-                                };
-                                self.publish(Event {
-                                    event_type: EventType::BlockCanonicityUpdate,
-                                    payload: sonic_rs::to_string(&update).unwrap(),
-                                });
-                                self.incr_event_processed();
-                            }
-                        }
+                        self.process_equal_height(&current_best_block, next_node, &next_best_block);
                     }
                     std::cmp::Ordering::Greater => {
-                        let parent = blockchain_tree.get_parent(&next_node).unwrap();
-                        if parent != &current_best_block {
-                            let (prior_ancestry, mut new_ancestry, _) = blockchain_tree
-                                .get_shared_ancestry(&current_best_block, blockchain_tree.get_parent(&next_node).unwrap())
-                                .unwrap();
-                            for prior in prior_ancestry.iter() {
-                                let update = BlockCanonicityUpdatePayload {
-                                    height: prior.height.0,
-                                    state_hash: prior.state_hash.0.clone(),
-                                    canonical: false,
-                                };
-                                self.publish(Event {
-                                    event_type: EventType::BlockCanonicityUpdate,
-                                    payload: sonic_rs::to_string(&update).unwrap(),
-                                });
-                                self.incr_event_processed();
-                            }
-                            new_ancestry.reverse();
-                            for new_a in new_ancestry.iter() {
-                                let update = BlockCanonicityUpdatePayload {
-                                    height: new_a.height.0,
-                                    state_hash: new_a.state_hash.0.clone(),
-                                    canonical: true,
-                                };
-                                self.publish(Event {
-                                    event_type: EventType::BlockCanonicityUpdate,
-                                    payload: sonic_rs::to_string(&update).unwrap(),
-                                });
-                                self.incr_event_processed();
-                            }
-                        }
-                        let update = BlockCanonicityUpdatePayload {
-                            height: next_node.height.0,
-                            state_hash: next_node.state_hash.0.clone(),
-                            canonical: true,
-                        };
-                        self.publish(Event {
-                            event_type: EventType::BlockCanonicityUpdate,
-                            payload: sonic_rs::to_string(&update).unwrap(),
-                        });
-                        self.incr_event_processed();
+                        self.process_greater_height(&mut blockchain_tree, &current_best_block, next_node);
                     }
                     std::cmp::Ordering::Less => {
-                        let update = BlockCanonicityUpdatePayload {
-                            height: next_node.height.0,
-                            state_hash: next_node.state_hash.0.clone(),
-                            canonical: false,
-                        };
-                        self.publish(Event {
-                            event_type: EventType::BlockCanonicityUpdate,
-                            payload: sonic_rs::to_string(&update).unwrap(),
-                        });
-                        self.incr_event_processed();
+                        self.publish_canonical_update(next_node, false);
                     }
                 }
             } else {
