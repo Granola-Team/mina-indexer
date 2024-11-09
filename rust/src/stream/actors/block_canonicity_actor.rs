@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
+    stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -138,7 +138,7 @@ impl Actor for BlockCanonicityActor {
 async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
     };
     use std::sync::atomic::Ordering;
 
@@ -222,7 +222,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
 async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
     };
     use std::sync::atomic::Ordering;
 
@@ -312,7 +312,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
 async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
     };
     use std::sync::atomic::Ordering;
 
