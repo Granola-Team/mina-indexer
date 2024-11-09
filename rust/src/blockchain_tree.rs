@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, usize};
 
 #[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Height(pub u64);
@@ -17,15 +17,41 @@ pub struct Node {
 #[derive(Debug)]
 pub struct BlockchainTree {
     tree: BTreeMap<Height, Vec<Node>>,
+    max_ancestors_from_best_tip: usize,
 }
 
 impl BlockchainTree {
-    pub fn new() -> Self {
-        BlockchainTree { tree: BTreeMap::new() }
+    pub fn new(max_ancestors_from_best_tip: usize) -> Self {
+        BlockchainTree {
+            tree: BTreeMap::new(),
+            max_ancestors_from_best_tip,
+        }
     }
 
     pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {
         self.tree.entry(node.height.clone()).or_default().push(node);
+        Ok(())
+    }
+
+    pub fn prune_tree(&mut self) -> Result<(), &'static str> {
+        // Determine the best tip in the tree
+        let (best_tip_height, _) = self.get_best_tip()?;
+
+        // Calculate the minimum height allowed based on the max_ancestors_from_best_tip
+        let min_allowed_height = if best_tip_height.0 > self.max_ancestors_from_best_tip as u64 {
+            best_tip_height.0 - self.max_ancestors_from_best_tip as u64
+        } else {
+            1 // Keep at least the genesis block height
+        };
+
+        // Collect heights to prune (those below the min allowed height)
+        let heights_to_remove: Vec<Height> = self.tree.keys().filter(|&height| height.0 < min_allowed_height).cloned().collect();
+
+        // Remove all nodes below the minimum allowed height
+        for height in heights_to_remove {
+            self.tree.remove(&height);
+        }
+
         Ok(())
     }
 
@@ -122,11 +148,14 @@ impl BlockchainTree {
 #[cfg(test)]
 mod blockchain_tree_tests {
     use super::*;
-    use crate::{constants::GENESIS_STATE_HASH, stream::payloads::GenesisBlockPayload};
+    use crate::{
+        constants::{GENESIS_STATE_HASH, TRANSITION_FRONTIER_DISTANCE},
+        stream::payloads::GenesisBlockPayload,
+    };
 
     #[test]
     fn test_add_node_with_parent() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -151,7 +180,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_add_node_without_parent_fails() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -175,7 +204,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_add_duplicate_node_fails() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -200,7 +229,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_get_best_tip_single_node_at_height() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -228,7 +257,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_get_best_tip_multiple_nodes_at_height() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -292,7 +321,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_get_best_tip_empty_tree() {
-        let empty_tree = BlockchainTree { tree: BTreeMap::new() };
+        let empty_tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
 
         let best_tip = empty_tree.get_best_tip();
         assert!(best_tip.is_err());
@@ -301,7 +330,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_get_shared_ancestry() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -347,7 +376,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_get_shared_ancestry_complex_case() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
         let genesis_payload = GenesisBlockPayload::new();
         let node = Node {
             height: Height(genesis_payload.height),
@@ -433,7 +462,7 @@ mod blockchain_tree_tests {
 
     #[test]
     fn test_set_root() {
-        let mut tree = BlockchainTree::new();
+        let mut tree = BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE);
 
         // Define a new root node to add at height 2
         let root_payload = GenesisBlockPayload::new();
@@ -451,5 +480,111 @@ mod blockchain_tree_tests {
         // Verify that the tree now contains the new root node at height 2
         assert!(tree.tree.contains_key(&Height(root_payload.height)));
         assert_eq!(tree.tree[&Height(root_payload.height)][0], new_root_node);
+    }
+}
+
+#[cfg(test)]
+mod blockchain_tree_prune_tests {
+    use super::*;
+
+    fn setup_tree_with_height(max_height: u64, max_ancestors: usize) -> BlockchainTree {
+        let mut tree = BlockchainTree::new(max_ancestors);
+
+        // Add a series of nodes up to `max_height`
+        for height in 1..=max_height {
+            let node = Node {
+                height: Height(height),
+                state_hash: Hash(format!("hash_{}", height)),
+                previous_state_hash: if height > 1 {
+                    Hash(format!("hash_{}", height - 1))
+                } else {
+                    Hash("genesis".to_string())
+                },
+                last_vrf_output: format!("vrf_{}", height),
+            };
+            tree.set_root(node.clone()).unwrap();
+        }
+
+        tree
+    }
+
+    #[test]
+    fn test_prune_tree_no_pruning_needed() {
+        let mut tree = setup_tree_with_height(10, 11);
+
+        // Call prune_tree on a tree that should not be pruned
+        tree.prune_tree().unwrap();
+
+        // Ensure no nodes were removed
+        assert_eq!(tree.tree.len(), 10);
+        assert!(tree.tree.contains_key(&Height(10)));
+    }
+
+    #[test]
+    fn test_prune_tree_prune_one_node() {
+        let mut tree = setup_tree_with_height(10, 8);
+
+        // Call prune_tree on a tree where only one node (height 1) should be pruned
+        tree.prune_tree().unwrap();
+
+        // Ensure the node at height 1 was removed
+        assert!(!tree.tree.contains_key(&Height(1)));
+
+        // Ensure nodes from height 2 to 10 remain
+        for height in 2..=10 {
+            assert!(tree.tree.contains_key(&Height(height)));
+        }
+    }
+
+    #[test]
+    fn test_prune_tree_prune_multiple_nodes() {
+        let mut tree = setup_tree_with_height(15, 10);
+
+        // Call prune_tree where nodes up to height 5 should be pruned
+        tree.prune_tree().unwrap();
+
+        // Ensure nodes from height 1 to 5 were removed
+        for height in 1..=4 {
+            assert!(!tree.tree.contains_key(&Height(height)));
+        }
+
+        // Ensure nodes from height 6 to 15 remain
+        for height in 5..=15 {
+            assert!(tree.tree.contains_key(&Height(height)));
+        }
+    }
+
+    #[test]
+    fn test_prune_tree_min_allowed_height_equal_to_best_tip() {
+        // Set up a tree with only one node and a high max_ancestors_from_best_tip
+        let mut tree = BlockchainTree::new(100);
+        let genesis_node = Node {
+            height: Height(1),
+            state_hash: Hash("genesis".to_string()),
+            previous_state_hash: Hash("".to_string()),
+            last_vrf_output: "".to_string(),
+        };
+        tree.set_root(genesis_node.clone()).unwrap();
+
+        // Call prune_tree on a tree with only the genesis node
+        tree.prune_tree().unwrap();
+
+        // Ensure the genesis node is not pruned
+        assert!(tree.tree.contains_key(&Height(1)));
+        assert_eq!(tree.tree.len(), 1);
+    }
+
+    #[test]
+    fn test_prune_tree_no_removal_if_within_max_ancestors() {
+        let mut tree = setup_tree_with_height(15, 20);
+
+        // Call prune_tree with a high max_ancestors_from_best_tip
+        tree.prune_tree().unwrap();
+
+        // Ensure all nodes remain
+        assert_eq!(tree.tree.len(), 15);
+        for height in 1..=15 {
+            assert!(tree.tree.contains_key(&Height(height)));
+        }
     }
 }

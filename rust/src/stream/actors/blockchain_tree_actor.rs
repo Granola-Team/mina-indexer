@@ -5,6 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
+    constants::TRANSITION_FRONTIER_DISTANCE,
     stream::payloads::{BlockAncestorPayload, GenesisBlockPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
@@ -25,7 +26,7 @@ impl BlockchainTreeActor {
             id: "BlockchainTreeActor".to_string(),
             shared_publisher,
             events_processed: AtomicUsize::new(0),
-            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new())),
+            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
         }
     }
 }
@@ -71,6 +72,7 @@ impl Actor for BlockchainTreeActor {
                         payload: event.payload,
                     });
                 }
+                blockchain_tree.prune_tree().unwrap();
             }
             EventType::GenesisBlock => {
                 let genesis_payload: GenesisBlockPayload = sonic_rs::from_str(&event.payload).unwrap();

@@ -5,6 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
+    constants::TRANSITION_FRONTIER_DISTANCE,
     stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
@@ -23,7 +24,7 @@ impl BlockCanonicityActor {
             id: "BlockCanonicityActor".to_string(),
             shared_publisher,
             events_processed: AtomicUsize::new(0),
-            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new())),
+            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
         }
     }
 
@@ -119,6 +120,7 @@ impl Actor for BlockCanonicityActor {
                         self.publish_canonical_update(next_node, false);
                     }
                 }
+                blockchain_tree.prune_tree().unwrap();
             } else {
                 // try again later
                 self.publish(Event {
