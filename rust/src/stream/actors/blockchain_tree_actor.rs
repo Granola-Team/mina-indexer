@@ -4,16 +4,12 @@ use super::super::{
     Actor,
 };
 use crate::{
-    blockchain_tree::{self, BlockchainTree, Hash, Height, Node},
-    constants::GENESIS_STATE_HASH,
+    blockchain_tree::{BlockchainTree, Hash, Height, Node},
     stream::payloads::{BlockAncestorPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
-use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct BlockchainTreeActor {
     id: String,
@@ -52,7 +48,7 @@ impl Actor for BlockchainTreeActor {
                 height: Height(block_payload.height),
                 state_hash: Hash(block_payload.state_hash.clone()),
                 previous_state_hash: Hash(block_payload.previous_state_hash.clone()),
-                last_vrf_output: block_payload.last_vrf_output,
+                last_vrf_output: block_payload.last_vrf_output.clone(),
             };
             if blockchain_tree.has_parent(&next_node) {
                 blockchain_tree.add_node(next_node).unwrap();
@@ -60,6 +56,7 @@ impl Actor for BlockchainTreeActor {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash,
                     previous_state_hash: block_payload.previous_state_hash,
+                    last_vrf_output: block_payload.last_vrf_output,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAddedToTree,
@@ -83,7 +80,7 @@ impl Actor for BlockchainTreeActor {
 
 #[tokio::test]
 async fn test_blockchain_tree_actor_connects_blocks_in_order() {
-    use crate::stream::shared_publisher::SharedPublisher;
+    use crate::{constants::GENESIS_STATE_HASH, stream::shared_publisher::SharedPublisher};
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
@@ -160,7 +157,7 @@ async fn test_blockchain_tree_actor_rebroadcasts_unconnected_blocks() {
 
 #[tokio::test]
 async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
-    use crate::stream::shared_publisher::SharedPublisher;
+    use crate::{constants::GENESIS_STATE_HASH, stream::shared_publisher::SharedPublisher};
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));

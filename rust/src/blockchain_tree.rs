@@ -46,7 +46,7 @@ impl BlockchainTree {
             return Err("One or more parent nodes do not exist");
         }
 
-        self.tree.entry(node.height.clone()).or_insert_with(Vec::new).push(node);
+        self.tree.entry(node.height.clone()).or_default().push(node);
 
         Ok(())
     }
@@ -101,8 +101,10 @@ impl BlockchainTree {
         let mut current_node2 = node2.clone();
 
         loop {
-            // If we've reached the same node (i.e., common ancestor), return the result
+            // If we've reached the same node (i.e., common ancestor), remove it from the ancestry lists and return
             if current_node1.state_hash == current_node2.state_hash {
+                ancestry1.pop(); // Remove the common ancestor from ancestry1
+                ancestry2.pop(); // Remove the common ancestor from ancestry2
                 return Ok((ancestry1, ancestry2, current_node1));
             }
 
@@ -304,8 +306,8 @@ mod blockchain_tree_tests {
 
         let (ancestry1, ancestry2, common_ancestor) = result.unwrap();
         assert_eq!(common_ancestor, parent_node);
-        assert_eq!(ancestry1, vec![node1.clone(), parent_node.clone()]);
-        assert_eq!(ancestry2, vec![node2.clone(), parent_node.clone()]);
+        assert_eq!(ancestry1, vec![node1.clone()]);
+        assert_eq!(ancestry2, vec![node2.clone()]);
     }
 
     #[test]
@@ -376,10 +378,10 @@ mod blockchain_tree_tests {
         let (ancestry_a, ancestry_b, common_ancestor_found) = result.unwrap();
 
         // Expected ancestry for node_a should include its chain up to the common ancestor
-        let expected_ancestry_a = vec![node_a.clone(), branch1_node2.clone(), branch1_node1.clone(), common_ancestor.clone()];
+        let expected_ancestry_a = vec![node_a.clone(), branch1_node2.clone(), branch1_node1.clone()];
 
         // Expected ancestry for node_b should include its chain up to the common ancestor
-        let expected_ancestry_b = vec![node_b.clone(), branch2_node2.clone(), branch2_node1.clone(), common_ancestor.clone()];
+        let expected_ancestry_b = vec![node_b.clone(), branch2_node2.clone(), branch2_node1.clone()];
 
         assert_eq!(ancestry_a, expected_ancestry_a);
         assert_eq!(ancestry_b, expected_ancestry_b);

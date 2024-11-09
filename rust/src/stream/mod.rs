@@ -5,7 +5,6 @@ use actors::{
 };
 use events::Event;
 use futures::future::try_join_all;
-use payloads::BlockCanonicityUpdatePayload;
 use shared_publisher::SharedPublisher;
 use std::{
     fs,
