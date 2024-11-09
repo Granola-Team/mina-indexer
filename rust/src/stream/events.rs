@@ -7,7 +7,7 @@ pub enum EventType {
     BlockAncestor,
     BerkeleyBlock,
     MainnetBlock,
-    BlockAddedToTree,
+    NewBlock,
     BlockCanonicityUpdate,
     BestBlock,
 }

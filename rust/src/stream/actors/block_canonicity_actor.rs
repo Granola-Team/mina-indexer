@@ -6,7 +6,7 @@ use super::super::{
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
     constants::TRANSITION_FRONTIER_DISTANCE,
-    stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+    stream::payloads::{BlockCanonicityUpdatePayload, NewBlockPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -90,8 +90,8 @@ impl Actor for BlockCanonicityActor {
     }
 
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::BlockAddedToTree {
-            let block_payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::NewBlock {
+            let block_payload: NewBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
             let mut blockchain_tree = self.blockchain_tree.lock().await;
             let next_node = Node {
                 height: Height(block_payload.height),
@@ -124,7 +124,7 @@ impl Actor for BlockCanonicityActor {
             } else {
                 // try again later
                 self.publish(Event {
-                    event_type: EventType::BlockAddedToTree,
+                    event_type: EventType::NewBlock,
                     payload: event.payload,
                 });
             }
@@ -140,7 +140,7 @@ impl Actor for BlockCanonicityActor {
 async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockPayload},
     };
     use std::sync::atomic::Ordering;
 
@@ -149,13 +149,13 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
 
     // Create canonical and non-canonical block payloads at the same height
-    let canonical_block_payload = NewBlockAddedPayload {
+    let canonical_block_payload = NewBlockPayload {
         height: 2,
         state_hash: "canonical_hash".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
         last_vrf_output: "b_vrf_output".to_string(),
     };
-    let non_canonical_block_payload = NewBlockAddedPayload {
+    let non_canonical_block_payload = NewBlockPayload {
         height: 2,
         state_hash: "non_canonical_hash".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
@@ -164,7 +164,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
 
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
         })
         .await;
@@ -175,7 +175,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     // Handle the canonical block event first
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&canonical_block_payload).unwrap(),
         })
         .await;
@@ -196,7 +196,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     // Handle the non-canonical block event, which should trigger a non-canonical update
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&non_canonical_block_payload).unwrap(),
         })
         .await;
@@ -224,7 +224,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
 async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockPayload},
     };
     use std::sync::atomic::Ordering;
 
@@ -233,13 +233,13 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
 
     // Set up canonical and non-canonical block payloads at the same height
-    let initial_block_payload = NewBlockAddedPayload {
+    let initial_block_payload = NewBlockPayload {
         height: 2,
         state_hash: "initial_block_hash".to_string(),
         last_vrf_output: "a_vrf_output".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
     };
-    let new_canonical_block_payload = NewBlockAddedPayload {
+    let new_canonical_block_payload = NewBlockPayload {
         height: 2,
         state_hash: "new_canonical_hash".to_string(),
         last_vrf_output: "b_vrf_output".to_string(),
@@ -248,7 +248,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
 
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
         })
         .await;
@@ -259,7 +259,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     // Handle the initial block event, which should initially become canonical
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&initial_block_payload).unwrap(),
         })
         .await;
@@ -279,7 +279,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     // Handle the new canonical block event with higher VRF, marking it as canonical
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&new_canonical_block_payload).unwrap(),
         })
         .await;
@@ -314,7 +314,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
 async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> anyhow::Result<()> {
     use crate::{
         constants::GENESIS_STATE_HASH,
-        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
+        stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockPayload},
     };
     use std::sync::atomic::Ordering;
 
@@ -323,13 +323,13 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
 
     // Create canonical block payloads in the original branch
-    let original_block1_payload = NewBlockAddedPayload {
+    let original_block1_payload = NewBlockPayload {
         height: 2,
         state_hash: "original_block_1".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
         last_vrf_output: "b_vrf_output".to_string(),
     };
-    let original_block2_payload = NewBlockAddedPayload {
+    let original_block2_payload = NewBlockPayload {
         height: 3,
         state_hash: "original_block_2".to_string(),
         previous_state_hash: "original_block_1".to_string(),
@@ -337,19 +337,19 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     };
 
     // Create competing branch payloads
-    let competing_block1_payload = NewBlockAddedPayload {
+    let competing_block1_payload = NewBlockPayload {
         height: 2,
         state_hash: "competing_block_1".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
         last_vrf_output: "a_vrf_output".to_string(),
     };
-    let competing_block2_payload = NewBlockAddedPayload {
+    let competing_block2_payload = NewBlockPayload {
         height: 3,
         state_hash: "competing_block_2".to_string(),
         previous_state_hash: "competing_block_1".to_string(),
         last_vrf_output: "a_vrf_output".to_string(),
     };
-    let competing_block3_payload = NewBlockAddedPayload {
+    let competing_block3_payload = NewBlockPayload {
         height: 4,
         state_hash: "competing_block_3".to_string(),
         previous_state_hash: "competing_block_2".to_string(),
@@ -358,7 +358,7 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
 
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
         })
         .await;
@@ -369,13 +369,13 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     // Handle events in sequence: original branch then competing branch
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&original_block1_payload).unwrap(),
         })
         .await;
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&original_block2_payload).unwrap(),
         })
         .await;
@@ -383,19 +383,19 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     // Competing branch events to outcompete original branch
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&competing_block1_payload).unwrap(),
         })
         .await;
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&competing_block2_payload).unwrap(),
         })
         .await;
     actor
         .handle_event(Event {
-            event_type: EventType::BlockAddedToTree,
+            event_type: EventType::NewBlock,
             payload: sonic_rs::to_string(&competing_block3_payload).unwrap(),
         })
         .await;

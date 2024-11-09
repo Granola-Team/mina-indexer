@@ -1,4 +1,4 @@
-use crate::stream::actors::blockchain_tree_actor::BlockchainTreeActor;
+use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
 use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
@@ -32,7 +32,7 @@ pub async fn process_blocks_dir(
         Arc::new(BerkeleyBlockParserActor::new(Arc::clone(&shared_publisher))),
         Arc::new(MainnetBlockParserActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockAncestorActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockchainTreeActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BestBlockActor::new(Arc::clone(&shared_publisher))),
     ];

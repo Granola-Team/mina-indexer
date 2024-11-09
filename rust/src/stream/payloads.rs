@@ -25,7 +25,7 @@ pub struct MainnetBlockPayload {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewBlockAddedPayload {
+pub struct NewBlockPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,

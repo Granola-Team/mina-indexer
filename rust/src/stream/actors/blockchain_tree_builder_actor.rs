@@ -6,13 +6,13 @@ use super::super::{
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
     constants::TRANSITION_FRONTIER_DISTANCE,
-    stream::payloads::{BlockAncestorPayload, GenesisBlockPayload, NewBlockAddedPayload},
+    stream::payloads::{BlockAncestorPayload, GenesisBlockPayload, NewBlockPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
 
-pub struct BlockchainTreeActor {
+pub struct BlockchainTreeBuilderActor {
     id: String,
     shared_publisher: Arc<SharedPublisher>,
     events_processed: AtomicUsize,
@@ -20,7 +20,7 @@ pub struct BlockchainTreeActor {
 }
 
 /// Publishes blocks as they are connected to the blockchain tree
-impl BlockchainTreeActor {
+impl BlockchainTreeBuilderActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
             id: "BlockchainTreeActor".to_string(),
@@ -32,7 +32,7 @@ impl BlockchainTreeActor {
 }
 
 #[async_trait]
-impl Actor for BlockchainTreeActor {
+impl Actor for BlockchainTreeBuilderActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -54,14 +54,14 @@ impl Actor for BlockchainTreeActor {
                 };
                 if blockchain_tree.has_parent(&next_node) {
                     blockchain_tree.add_node(next_node).unwrap();
-                    let added_payload = NewBlockAddedPayload {
+                    let added_payload = NewBlockPayload {
                         height: block_payload.height,
                         state_hash: block_payload.state_hash,
                         previous_state_hash: block_payload.previous_state_hash,
                         last_vrf_output: block_payload.last_vrf_output,
                     };
                     self.publish(Event {
-                        event_type: EventType::BlockAddedToTree,
+                        event_type: EventType::NewBlock,
                         payload: sonic_rs::to_string(&added_payload).unwrap(),
                     });
                     self.incr_event_processed();
@@ -84,14 +84,14 @@ impl Actor for BlockchainTreeActor {
                     last_vrf_output: genesis_payload.last_vrf_output.clone(),
                 };
                 blockchain_tree.set_root(root_node).unwrap();
-                let added_payload = NewBlockAddedPayload {
+                let added_payload = NewBlockPayload {
                     height: genesis_payload.height,
                     state_hash: genesis_payload.state_hash,
                     previous_state_hash: genesis_payload.previous_state_hash,
                     last_vrf_output: genesis_payload.last_vrf_output,
                 };
                 self.publish(Event {
-                    event_type: EventType::BlockAddedToTree,
+                    event_type: EventType::NewBlock,
                     payload: sonic_rs::to_string(&added_payload).unwrap(),
                 });
                 self.incr_event_processed();
@@ -112,7 +112,7 @@ async fn test_blockchain_tree_actor_connects_blocks_in_order() {
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+    let actor = BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher));
 
     actor
         .handle_event(Event {
@@ -150,7 +150,7 @@ async fn test_blockchain_tree_actor_connects_blocks_in_order() {
     let mut last_height = 1; // GENESIS is at height 1
     for _ in 0..blocks.len() {
         if let Ok(event) = receiver.recv().await {
-            let payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+            let payload: NewBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(payload.height, last_height + 1);
             last_height = payload.height;
         }
@@ -165,7 +165,7 @@ async fn test_blockchain_tree_actor_rebroadcasts_unconnected_blocks() {
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+    let actor = BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher));
 
     actor
         .handle_event(Event {
@@ -205,7 +205,7 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+    let actor = BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher));
 
     actor
         .handle_event(Event {
@@ -264,8 +264,8 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
     let mut last_height = 1; // GENESIS is at height 1
     for _ in 0..2 {
         if let Ok(event) = receiver.recv().await {
-            if event.event_type == EventType::BlockAddedToTree {
-                let payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+            if event.event_type == EventType::NewBlock {
+                let payload: NewBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 assert_eq!(payload.height, last_height + 1);
                 last_height = payload.height;
             }
@@ -281,7 +281,7 @@ async fn test_blockchain_tree_actor_adds_genesis_block() {
 
     // Initialize shared publisher and actor
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+    let actor = BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher));
     let mut receiver = shared_publisher.subscribe();
 
     // Create and send the genesis block event
@@ -295,8 +295,8 @@ async fn test_blockchain_tree_actor_adds_genesis_block() {
 
     // Verify that the genesis block was published as the first block
     if let Ok(event) = receiver.recv().await {
-        assert_eq!(event.event_type, EventType::BlockAddedToTree);
-        let payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(event.event_type, EventType::NewBlock);
+        let payload: NewBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
         assert_eq!(payload.height, genesis_payload.height);
         assert_eq!(payload.state_hash, genesis_payload.state_hash);
         assert_eq!(payload.previous_state_hash, genesis_payload.previous_state_hash);
