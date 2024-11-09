@@ -59,19 +59,16 @@ pub fn run(dir: &str) -> Result<()> {
         // Process accounts
         db.execute_batch(
             "
-                    INSERT INTO accounts (public_key)
-                    SELECT DISTINCT pk FROM ledgers
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM accounts WHERE public_key = ledgers.pk
-                    );
-
-                    INSERT INTO accounts (public_key)
-                    SELECT DISTINCT delegate FROM ledgers
-                    WHERE delegate IS NOT NULL
-                    AND NOT EXISTS (
-                        SELECT 1 FROM accounts WHERE public_key = ledgers.delegate
-                    );
-                    ",
+            INSERT INTO accounts (public_key)
+            SELECT DISTINCT val FROM (
+                SELECT pk as val FROM ledgers
+                UNION
+                SELECT delegate as val FROM ledgers WHERE delegate IS NOT NULL
+            ) unique_keys
+            WHERE NOT EXISTS (
+                SELECT 1 FROM accounts WHERE public_key = unique_keys.val
+            );
+            ",
         )?;
 
         // Process staking epochs
