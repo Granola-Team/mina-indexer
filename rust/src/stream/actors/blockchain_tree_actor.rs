@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    stream::payloads::{BlockAncestorPayload, NewBlockAddedPayload},
+    stream::payloads::{BlockAncestorPayload, GenesisBlockPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -41,35 +41,60 @@ impl Actor for BlockchainTreeActor {
     }
 
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::BlockAncestor {
-            let block_payload: BlockAncestorPayload = sonic_rs::from_str(&event.payload).unwrap();
-            let mut blockchain_tree = self.blockchain_tree.lock().await;
-            let next_node = Node {
-                height: Height(block_payload.height),
-                state_hash: Hash(block_payload.state_hash.clone()),
-                previous_state_hash: Hash(block_payload.previous_state_hash.clone()),
-                last_vrf_output: block_payload.last_vrf_output.clone(),
-            };
-            if blockchain_tree.has_parent(&next_node) {
-                blockchain_tree.add_node(next_node).unwrap();
+        match event.event_type {
+            EventType::BlockAncestor => {
+                let block_payload: BlockAncestorPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let mut blockchain_tree = self.blockchain_tree.lock().await;
+                let next_node = Node {
+                    height: Height(block_payload.height),
+                    state_hash: Hash(block_payload.state_hash.clone()),
+                    previous_state_hash: Hash(block_payload.previous_state_hash.clone()),
+                    last_vrf_output: block_payload.last_vrf_output.clone(),
+                };
+                if blockchain_tree.has_parent(&next_node) {
+                    blockchain_tree.add_node(next_node).unwrap();
+                    let added_payload = NewBlockAddedPayload {
+                        height: block_payload.height,
+                        state_hash: block_payload.state_hash,
+                        previous_state_hash: block_payload.previous_state_hash,
+                        last_vrf_output: block_payload.last_vrf_output,
+                    };
+                    self.publish(Event {
+                        event_type: EventType::BlockAddedToTree,
+                        payload: sonic_rs::to_string(&added_payload).unwrap(),
+                    });
+                    self.incr_event_processed();
+                } else {
+                    // try again later
+                    self.publish(Event {
+                        event_type: EventType::BlockAncestor,
+                        payload: event.payload,
+                    });
+                }
+            }
+            EventType::GenesisBlock => {
+                let genesis_payload: GenesisBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let mut blockchain_tree = self.blockchain_tree.lock().await;
+                let root_node = Node {
+                    height: Height(genesis_payload.height),
+                    state_hash: Hash(genesis_payload.state_hash.clone()),
+                    previous_state_hash: Hash(genesis_payload.previous_state_hash.clone()),
+                    last_vrf_output: genesis_payload.last_vrf_output.clone(),
+                };
+                blockchain_tree.set_root(root_node).unwrap();
                 let added_payload = NewBlockAddedPayload {
-                    height: block_payload.height,
-                    state_hash: block_payload.state_hash,
-                    previous_state_hash: block_payload.previous_state_hash,
-                    last_vrf_output: block_payload.last_vrf_output,
+                    height: genesis_payload.height,
+                    state_hash: genesis_payload.state_hash,
+                    previous_state_hash: genesis_payload.previous_state_hash,
+                    last_vrf_output: genesis_payload.last_vrf_output,
                 };
                 self.publish(Event {
                     event_type: EventType::BlockAddedToTree,
                     payload: sonic_rs::to_string(&added_payload).unwrap(),
                 });
                 self.incr_event_processed();
-            } else {
-                // try again later
-                self.publish(Event {
-                    event_type: EventType::BlockAncestor,
-                    payload: event.payload,
-                });
             }
+            _ => {}
         }
     }
 
@@ -80,11 +105,19 @@ impl Actor for BlockchainTreeActor {
 
 #[tokio::test]
 async fn test_blockchain_tree_actor_connects_blocks_in_order() {
+    use super::super::events::EventType;
     use crate::{constants::GENESIS_STATE_HASH, stream::shared_publisher::SharedPublisher};
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
     let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::GenesisBlock,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
     let mut receiver = shared_publisher.subscribe();
 
     // Connect blocks in order after the GENESIS block
@@ -125,11 +158,20 @@ async fn test_blockchain_tree_actor_connects_blocks_in_order() {
 
 #[tokio::test]
 async fn test_blockchain_tree_actor_rebroadcasts_unconnected_blocks() {
+    use super::super::events::EventType;
     use crate::stream::shared_publisher::SharedPublisher;
     use std::sync::Arc;
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
     let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::GenesisBlock,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
+
     let mut receiver = shared_publisher.subscribe();
 
     // Send an unconnected block (no known parent in the blockchain tree)
@@ -162,6 +204,13 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
 
     let shared_publisher = Arc::new(SharedPublisher::new(100));
     let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::GenesisBlock,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
     let mut receiver = shared_publisher.subscribe();
 
     // Send a disconnected block that references a non-existing ancestor
@@ -221,4 +270,42 @@ async fn test_blockchain_tree_actor_reconnects_when_ancestor_arrives() {
         }
     }
     assert_eq!(last_height, 3, "All blocks should be published in the correct order after reconnection");
+}
+
+#[tokio::test]
+async fn test_blockchain_tree_actor_adds_genesis_block() {
+    use crate::stream::shared_publisher::SharedPublisher;
+    use std::sync::Arc;
+
+    // Initialize shared publisher and actor
+    let shared_publisher = Arc::new(SharedPublisher::new(100));
+    let actor = BlockchainTreeActor::new(Arc::clone(&shared_publisher));
+    let mut receiver = shared_publisher.subscribe();
+
+    // Create and send the genesis block event
+    let genesis_payload = GenesisBlockPayload::new();
+    let genesis_event = Event {
+        event_type: EventType::GenesisBlock,
+        payload: sonic_rs::to_string(&genesis_payload).unwrap(),
+    };
+
+    actor.handle_event(genesis_event).await;
+
+    // Verify that the genesis block was published as the first block
+    if let Ok(event) = receiver.recv().await {
+        assert_eq!(event.event_type, EventType::BlockAddedToTree);
+        let payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(payload.height, genesis_payload.height);
+        assert_eq!(payload.state_hash, genesis_payload.state_hash);
+        assert_eq!(payload.previous_state_hash, genesis_payload.previous_state_hash);
+    } else {
+        panic!("Expected the genesis block to be published, but no event was received");
+    }
+
+    // Verify that the genesis block has been processed
+    assert_eq!(
+        actor.events_processed().load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "Expected the genesis block to be processed once"
+    );
 }
