@@ -1,4 +1,4 @@
-use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
+use crate::{stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor, utility::extract_height_and_hash};
 use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
@@ -7,7 +7,7 @@ use events::Event;
 use futures::future::try_join_all;
 use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -51,9 +51,26 @@ pub async fn process_blocks_dir(
         payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
     });
 
+    let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir)?
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_file())
+        .map(|e| e.path())
+        .collect();
+
+    // Sort entries by the extracted number and hash
+    entries.sort_by(|a, b| {
+        let (a_num, a_hash) = extract_height_and_hash(a);
+        let (b_num, b_hash) = extract_height_and_hash(b);
+
+        match a_num.cmp(&b_num) {
+            Ordering::Equal => a_hash.cmp(&b_hash), // Fallback to hash comparison
+            other => other,
+        }
+    });
+
     // Iterate over files in the directory and publish events
-    for entry in fs::read_dir(blocks_dir)?.filter_map(Result::ok).filter(|e| e.path().is_file()) {
-        let path = entry.path();
+    for entry in entries {
+        let path = entry.as_path();
 
         shared_publisher.publish(Event {
             event_type: events::EventType::PrecomputedBlockPath,
@@ -95,7 +112,7 @@ where
 #[tokio::test]
 async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     use std::{path::PathBuf, str::FromStr};
-    use tokio::{sync::broadcast, task, time::Duration};
+    use tokio::{sync::broadcast, time::Duration};
 
     // Create a shutdown channel for the test
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
@@ -104,7 +121,9 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     let blocks_dir = PathBuf::from_str("../test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
 
     // Spawn the process_blocks_dir task with the shutdown receiver
-    let process_handle = task::spawn(process_blocks_dir(blocks_dir, shutdown_receiver));
+    let process_handle = tokio::spawn(async move {
+        let _ = process_blocks_dir(blocks_dir, shutdown_receiver).await;
+    });
 
     // Allow some time for processing
     tokio::time::sleep(Duration::from_secs(1)).await;

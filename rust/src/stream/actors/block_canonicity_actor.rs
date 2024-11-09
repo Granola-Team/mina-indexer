@@ -123,10 +123,10 @@ impl Actor for BlockCanonicityActor {
                 blockchain_tree.prune_tree().unwrap();
             } else {
                 // try again later
-                self.publish(Event {
-                    event_type: EventType::NewBlock,
-                    payload: event.payload,
-                });
+                // self.publish(Event {
+                //     event_type: EventType::NewBlock,
+                //     payload: event.payload,
+                // });
             }
         }
     }
