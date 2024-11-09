@@ -20,6 +20,16 @@ pub struct MainnetBlockParserActor {
     pub events_processed: AtomicUsize,
 }
 
+impl MainnetBlockParserActor {
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "MainnetBlockParserActor".to_string(),
+            shared_publisher,
+            events_processed: AtomicUsize::new(0),
+        }
+    }
+}
+
 #[async_trait]
 impl Actor for MainnetBlockParserActor {
     fn id(&self) -> String {

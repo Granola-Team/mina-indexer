@@ -6,11 +6,7 @@ use actors::{
 use events::Event;
 use futures::future::try_join_all;
 use shared_publisher::SharedPublisher;
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::{fs, path::PathBuf, sync::Arc};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -31,26 +27,10 @@ pub async fn process_blocks_dir(
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
-        Arc::new(PCBBlockPathActor {
-            id: "PCBBlockPathActor".to_string(),
-            shared_publisher: Arc::clone(&shared_publisher),
-            events_processed: AtomicUsize::new(0),
-        }),
-        Arc::new(BerkeleyBlockParserActor {
-            id: "BerkeleyBlockParserActor".to_string(),
-            shared_publisher: Arc::clone(&shared_publisher),
-            events_processed: AtomicUsize::new(0),
-        }),
-        Arc::new(MainnetBlockParserActor {
-            id: "MainnetBlockParserActor".to_string(),
-            shared_publisher: Arc::clone(&shared_publisher),
-            events_processed: AtomicUsize::new(0),
-        }),
-        Arc::new(BlockAncestorActor {
-            id: "BlockAncestorActor".to_string(),
-            shared_publisher: Arc::clone(&shared_publisher),
-            events_processed: AtomicUsize::new(0),
-        }),
+        Arc::new(PCBBlockPathActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(BerkeleyBlockParserActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(MainnetBlockParserActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(BlockAncestorActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockchainTreeActor::new(Arc::clone(&shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(&shared_publisher))),
     ];

@@ -20,6 +20,16 @@ pub struct BerkeleyBlockParserActor {
     pub events_processed: AtomicUsize,
 }
 
+impl BerkeleyBlockParserActor {
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "BerkeleyBlockParserActor".to_string(),
+            shared_publisher,
+            events_processed: AtomicUsize::new(0),
+        }
+    }
+}
+
 #[async_trait]
 impl Actor for BerkeleyBlockParserActor {
     fn id(&self) -> String {

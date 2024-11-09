@@ -13,6 +13,16 @@ pub struct PCBBlockPathActor {
     pub events_processed: AtomicUsize,
 }
 
+impl PCBBlockPathActor {
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "PCBBlockPathActor".to_string(),
+            shared_publisher,
+            events_processed: AtomicUsize::new(0),
+        }
+    }
+}
+
 #[async_trait]
 impl Actor for PCBBlockPathActor {
     fn id(&self) -> String {

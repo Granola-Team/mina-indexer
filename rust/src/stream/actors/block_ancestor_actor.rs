@@ -13,6 +13,16 @@ pub struct BlockAncestorActor {
     pub events_processed: AtomicUsize,
 }
 
+impl BlockAncestorActor {
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "BlockAncestorActor".to_string(),
+            shared_publisher,
+            events_processed: AtomicUsize::new(0),
+        }
+    }
+}
+
 #[async_trait]
 impl Actor for BlockAncestorActor {
     fn id(&self) -> String {
