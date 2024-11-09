@@ -1,4 +1,3 @@
-use crate::constants::GENESIS_STATE_HASH;
 use std::collections::BTreeMap;
 
 #[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash)]
@@ -22,17 +21,12 @@ pub struct BlockchainTree {
 
 impl BlockchainTree {
     pub fn new() -> Self {
-        BlockchainTree {
-            tree: BTreeMap::from([(
-                Height(1),
-                vec![Node {
-                    height: Height(1),
-                    state_hash: Hash(GENESIS_STATE_HASH.to_string()),
-                    previous_state_hash: Hash("".to_string()),
-                    last_vrf_output: "".to_string(),
-                }],
-            )]),
-        }
+        BlockchainTree { tree: BTreeMap::new() }
+    }
+
+    pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {
+        self.tree.entry(node.height.clone()).or_default().push(node);
+        Ok(())
     }
 
     pub fn add_node(&mut self, node: Node) -> Result<(), &'static str> {
@@ -128,18 +122,19 @@ impl BlockchainTree {
 #[cfg(test)]
 mod blockchain_tree_tests {
     use super::*;
-    use crate::constants::GENESIS_STATE_HASH;
-
-    #[test]
-    fn test_initial_tree_contains_genesis_block() {
-        let tree = BlockchainTree::new();
-        assert!(tree.tree.contains_key(&Height(1)));
-        assert_eq!(tree.tree[&Height(1)][0].state_hash, Hash(GENESIS_STATE_HASH.to_string()));
-    }
+    use crate::{constants::GENESIS_STATE_HASH, stream::payloads::GenesisBlockPayload};
 
     #[test]
     fn test_add_node_with_parent() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         let node = Node {
             height: Height(2),
@@ -157,6 +152,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_add_node_without_parent_fails() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         let node = Node {
             height: Height(3),
@@ -173,6 +176,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_add_duplicate_node_fails() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         let node = Node {
             height: Height(2),
@@ -190,6 +201,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_get_best_tip_single_node_at_height() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         let node = Node {
             height: Height(2),
@@ -210,6 +229,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_get_best_tip_multiple_nodes_at_height() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         // Add a parent node at height 2
         let parent_node = Node {
@@ -275,6 +302,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_get_shared_ancestry() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         let parent_node = Node {
             height: Height(2),
@@ -313,6 +348,14 @@ mod blockchain_tree_tests {
     #[test]
     fn test_get_shared_ancestry_complex_case() {
         let mut tree = BlockchainTree::new();
+        let genesis_payload = GenesisBlockPayload::new();
+        let node = Node {
+            height: Height(genesis_payload.height),
+            state_hash: Hash(genesis_payload.state_hash),
+            previous_state_hash: Hash(genesis_payload.previous_state_hash),
+            last_vrf_output: genesis_payload.last_vrf_output,
+        };
+        tree.set_root(node).unwrap();
 
         // Define a chain of ancestry for both nodes, with a common ancestor at height 2
         let common_ancestor = Node {
@@ -386,5 +429,27 @@ mod blockchain_tree_tests {
         assert_eq!(ancestry_a, expected_ancestry_a);
         assert_eq!(ancestry_b, expected_ancestry_b);
         assert_eq!(common_ancestor_found, common_ancestor);
+    }
+
+    #[test]
+    fn test_set_root() {
+        let mut tree = BlockchainTree::new();
+
+        // Define a new root node to add at height 2
+        let root_payload = GenesisBlockPayload::new();
+        let new_root_node = Node {
+            height: Height(root_payload.height),
+            state_hash: Hash(root_payload.state_hash),
+            previous_state_hash: Hash(root_payload.previous_state_hash),
+            last_vrf_output: root_payload.last_vrf_output,
+        };
+
+        // Call set_root to add the new root node
+        let result = tree.set_root(new_root_node.clone());
+        assert!(result.is_ok());
+
+        // Verify that the tree now contains the new root node at height 2
+        assert!(tree.tree.contains_key(&Height(root_payload.height)));
+        assert_eq!(tree.tree[&Height(root_payload.height)][0], new_root_node);
     }
 }
