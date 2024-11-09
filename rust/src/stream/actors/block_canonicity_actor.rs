@@ -42,7 +42,6 @@ impl Actor for BlockCanonicityActor {
         if event.event_type == EventType::BlockAddedToTree {
             let block_payload: NewBlockAddedPayload = sonic_rs::from_str(&event.payload).unwrap();
             let mut blockchain_tree = self.blockchain_tree.lock().await;
-            println!("{:#?}", block_payload.clone());
             let next_node = Node {
                 height: Height(block_payload.height),
                 state_hash: Hash(block_payload.state_hash.clone()),
@@ -53,8 +52,6 @@ impl Actor for BlockCanonicityActor {
                 let (height, current_best_block) = blockchain_tree.get_best_tip().unwrap();
                 blockchain_tree.add_node(next_node.clone()).unwrap();
                 let (_, next_best_block) = blockchain_tree.get_best_tip().unwrap();
-
-                println!("{} =? {}", next_node.height.0, height.0);
                 if next_node.height == height {
                     if current_best_block == next_best_block {
                         let update = BlockCanonicityUpdatePayload {
@@ -95,14 +92,11 @@ impl Actor for BlockCanonicityActor {
                     }
                 } else if next_node.height > height {
                     let parent = blockchain_tree.get_parent(&next_node).unwrap();
-                    println!("{:#?}", parent);
-                    println!("{:#?}", current_best_block);
                     if parent != &current_best_block {
                         let (prior_ancestry, mut new_ancestry, _) = blockchain_tree
                             .get_shared_ancestry(&current_best_block, blockchain_tree.get_parent(&next_node).unwrap())
                             .unwrap();
                         for prior in prior_ancestry.iter() {
-                            println!("new non-canonical {:#?}", prior.clone());
                             let update = BlockCanonicityUpdatePayload {
                                 height: prior.height.0,
                                 state_hash: prior.state_hash.0.clone(),
@@ -116,7 +110,6 @@ impl Actor for BlockCanonicityActor {
                         }
                         new_ancestry.reverse();
                         for new_a in new_ancestry.iter() {
-                            println!("new canonical {:#?}", new_a.clone());
                             let update = BlockCanonicityUpdatePayload {
                                 height: new_a.height.0,
                                 state_hash: new_a.state_hash.0.clone(),
