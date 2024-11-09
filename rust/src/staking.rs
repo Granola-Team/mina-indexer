@@ -3,8 +3,7 @@ use crate::{
     get_db_connection,
 };
 use anyhow::Result;
-use duckdb::{params_from_iter, OptionalExt};
-use tracing::info;
+use tracing::{error, info};
 
 pub fn run(dir: &str) -> Result<()> {
     info!("Processing files in: {}", dir);
@@ -13,132 +12,142 @@ pub fn run(dir: &str) -> Result<()> {
 
     for path in &paths {
         let file_path = path.to_str().unwrap();
-        let hash = extract_hash_from_file_name(path);
-        let number = extract_digits_from_file_name(path);
+        let ledger_hash = extract_hash_from_file_name(path);
+        let epoch = extract_digits_from_file_name(path);
 
-        // Load JSON file into staging table with increased limits
-        db.execute_batch(&format!(
-            "DELETE FROM raw_json;
-                     COPY raw_json (data) FROM '{}' (FORMAT JSON, AUTO_DETECT FALSE);
-                     UPDATE raw_json SET
-                        file_hash = '{}',
-                        file_number = {}
-                     WHERE file_hash IS NULL;",
-            file_path, hash, number
-        ))?;
+        info!("Processing file: {}", file_path);
 
-        // Process staking epochs
-        db.execute(
-            "INSERT INTO staking_epochs (hash, epoch)
-                    SELECT DISTINCT file_hash, file_number
-                    FROM raw_json
-                    ON CONFLICT (hash, epoch) DO NOTHING",
-            [],
-        )?;
+        // First, load the JSON data into ledgers table
+        let sql = format!(
+            r#"WITH
+                    json_data AS (
+                        SELECT * FROM read_json_objects('{}')
+                    )
+                    INSERT INTO ledgers (
+                        pk, balance, delegate, token, nonce, receipt_chain_hash,
+                        voting_for, timing, token_symbol, ledger_hash, epoch
+                    )
+                    SELECT
+                        json_extract_string(json, '$.pk'),
+                        CAST(json_extract_string(json, '$.balance') AS DECIMAL(20,10)),
+                        json_extract_string(json, '$.delegate'),
+                        json_extract_string(json, '$.token'),
+                        CAST(json_extract_string(json, '$.nonce') AS BIGINT),
+                        json_extract_string(json, '$.receipt_chain_hash'),
+                        json_extract_string(json, '$.voting_for'),
+                        CASE
+                            WHEN json_extract_string(json, '$.timing') IS NOT NULL
+                            THEN json_extract_string(json, '$.timing')::JSON
+                            END,
+                        json_extract_string(json, '$.token_symbol'),
+                        '{}',
+                        {}
+                    FROM json_data;"#,
+            file_path, ledger_hash, epoch
+        );
+
+        match db.execute_batch(&sql) {
+            Ok(_) => {
+                info!("Successfully updated ledger_hash {ledger_hash} and epoch {epoch}")
+            }
+            Err(e) => {
+                error!("Error copying data from {}: {}", file_path, e);
+                return Err(e.into());
+            }
+        }
 
         // Process accounts
         db.execute_batch(
             "
-                   WITH RECURSIVE
-                   array_elements AS (
-                       SELECT file_hash,
-                              json_array(data) as items,
-                              generate_series(0, json_array_length(data) - 1) as idx
-                       FROM raw_json
-                   )
-                   INSERT INTO accounts (public_key)
-                   SELECT DISTINCT json_extract_string(items[idx], '$.pk') as pk
-                   FROM array_elements
-                   WHERE json_extract_string(items[idx], '$.pk') IS NOT NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM accounts WHERE public_key = json_extract_string(items[idx], '$.pk')
-                   );
+                    INSERT INTO accounts (public_key)
+                    SELECT DISTINCT pk FROM ledgers
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM accounts WHERE public_key = ledgers.pk
+                    );
 
-                   WITH RECURSIVE
-                   array_elements AS (
-                       SELECT file_hash,
-                              json_array(data) as items,
-                              generate_series(0, json_array_length(data) - 1) as idx
-                       FROM raw_json
-                   )
-                   INSERT INTO accounts (public_key)
-                   SELECT DISTINCT json_extract_string(items[idx], '$.delegate') as delegate
-                   FROM array_elements
-                   WHERE json_extract_string(items[idx], '$.delegate') IS NOT NULL
-                   AND NOT EXISTS (
-                       SELECT 1 FROM accounts WHERE public_key = json_extract_string(items[idx], '$.delegate')
-                   );
-               ",
+                    INSERT INTO accounts (public_key)
+                    SELECT DISTINCT delegate FROM ledgers
+                    WHERE delegate IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM accounts WHERE public_key = ledgers.delegate
+                    );
+                    ",
         )?;
 
-        // Process staking ledgers
+        // Process staking epochs
+        db.execute_batch(&format!(
+            "
+                    INSERT INTO staking_epochs (hash, epoch)
+                    SELECT '{}', {}
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM staking_epochs
+                        WHERE hash = '{}' AND epoch = {}
+                    )
+                    RETURNING id;
+                    ",
+            ledger_hash, epoch, ledger_hash, epoch
+        ))?;
+
+        // Process staking ledgers with new relationship
         db.execute_batch(
             "
-                   WITH RECURSIVE
-                   array_elements AS (
-                       SELECT file_hash,
-                              file_number,
-                              json_array(data) as items,
-                              generate_series(0, json_array_length(data) - 1) as idx
-                       FROM raw_json
-                   )
-                   INSERT INTO staking_ledgers (
-                       epoch_hash, epoch_number, source, balance, target, token,
-                       nonce, receipt_chain_hash, voting_for
-                   )
-                   SELECT
-                       file_hash,
-                       file_number,
-                       json_extract_string(items[idx], '$.pk'),
-                       CAST(json_extract_string(items[idx], '$.balance') AS DECIMAL),
-                       COALESCE(
-                           json_extract_string(items[idx], '$.delegate'),
-                           json_extract_string(items[idx], '$.pk')
-                       ),
-                       COALESCE(CAST(json_extract_string(items[idx], '$.token') AS BIGINT), 0),
-                       COALESCE(CAST(json_extract_string(items[idx], '$.nonce') AS BIGINT), 0),
-                       COALESCE(json_extract_string(items[idx], '$.receipt_chain_hash'), ''),
-                       COALESCE(json_extract_string(items[idx], '$.voting_for'), '')
-                   FROM array_elements
-                   WHERE json_extract_string(items[idx], '$.pk') IS NOT NULL
-                   RETURNING id;
-               ",
+                    INSERT INTO staking_ledgers (
+                        staking_epoch_id, source, balance, target, token,
+                        nonce, receipt_chain_hash, voting_for
+                    )
+                    SELECT
+                        se.id,
+                        l.pk,
+                        l.balance,
+                        COALESCE(l.delegate, l.pk),
+                        COALESCE(l.token, '0'),
+                        l.nonce,
+                        l.receipt_chain_hash,
+                        l.voting_for
+                    FROM ledgers l
+                    JOIN staking_epochs se ON se.hash = l.ledger_hash AND se.epoch = l.epoch
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM staking_ledgers sl
+                        WHERE sl.staking_epoch_id = se.id
+                        AND sl.source = l.pk
+                    );
+                    ",
         )?;
 
         // Process timing data
         db.execute_batch(
             "
-                   WITH RECURSIVE
-                   array_elements AS (
-                       SELECT l.id,
-                              json_array(r.data) as items,
-                              generate_series(0, json_array_length(r.data) - 1) as idx
-                       FROM staking_ledgers l
-                       JOIN raw_json r ON l.epoch_hash = r.file_hash
-                   )
-                   INSERT INTO staking_timing (
-                       ledger_id,
-                       initial_minimum_balance,
-                       cliff_time,
-                       cliff_amount,
-                       vesting_period,
-                       vesting_increment
-                   )
-                   SELECT
-                       id,
-                       CAST(json_extract_string(items[idx], '$.timing.initial_minimum_balance') AS DECIMAL),
-                       CAST(json_extract_string(items[idx], '$.timing.cliff_time') AS BIGINT),
-                       CAST(json_extract_string(items[idx], '$.timing.cliff_amount') AS DECIMAL),
-                       CAST(json_extract_string(items[idx], '$.timing.vesting_period') AS BIGINT),
-                       CAST(json_extract_string(items[idx], '$.timing.vesting_increment') AS DECIMAL)
-                   FROM array_elements
-                   WHERE json_extract_string(items[idx], '$.timing') IS NOT NULL;
-               ",
+                    INSERT INTO staking_timing (
+                        ledger_id,
+                        initial_minimum_balance,
+                        cliff_time,
+                        cliff_amount,
+                        vesting_period,
+                        vesting_increment
+                    )
+                    SELECT
+                        sl.id,
+                        CAST(l.timing->>'initial_minimum_balance' AS DECIMAL),
+                        CAST(l.timing->>'cliff_time' AS BIGINT),
+                        CAST(l.timing->>'cliff_amount' AS DECIMAL),
+                        CAST(l.timing->>'vesting_period' AS BIGINT),
+                        CAST(l.timing->>'vesting_increment' AS DECIMAL)
+                    FROM staking_ledgers sl
+                    JOIN staking_epochs se ON sl.staking_epoch_id = se.id
+                    JOIN ledgers l ON sl.source = l.pk
+                        AND se.hash = l.ledger_hash
+                        AND se.epoch = l.epoch
+                    WHERE l.timing IS NOT NULL
+                    AND NOT EXISTS (
+                        SELECT 1 FROM staking_timing
+                        WHERE ledger_id = sl.id
+                    );
+                    ",
         )?;
-    }
 
-    // Cleanup
-    db.execute_batch("DROP TABLE raw_json;")?;
+        // Clear ledgers table for next file
+        db.execute_batch("DELETE FROM ledgers;")?;
+    }
 
     Ok(())
 }
