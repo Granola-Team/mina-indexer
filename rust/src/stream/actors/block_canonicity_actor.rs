@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    stream::payloads::{BlockCanonicityUpdatePayload, NewBlockAddedPayload},
+    stream::payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload, NewBlockAddedPayload},
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -98,6 +98,11 @@ impl Actor for BlockCanonicityActor {
                 previous_state_hash: Hash(block_payload.previous_state_hash),
                 last_vrf_output: block_payload.last_vrf_output,
             };
+            if next_node.height.0 == 1 {
+                blockchain_tree.set_root(next_node.clone()).unwrap();
+                self.publish_canonical_update(next_node, true);
+                return;
+            }
             if blockchain_tree.has_parent(&next_node) {
                 let (height, current_best_block) = blockchain_tree.get_best_tip().unwrap();
                 blockchain_tree.add_node(next_node.clone()).unwrap();
@@ -155,6 +160,13 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
         last_vrf_output: "a_vrf_output".to_string(),
     };
 
+    actor
+        .handle_event(Event {
+            event_type: EventType::BlockAddedToTree,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
+
     // Subscribe to the shared publisher to capture the output
     let mut receiver = shared_publisher.subscribe();
 
@@ -201,7 +213,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     }
 
     // Verify both events have been processed
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 2);
+    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 3);
 
     Ok(())
 }
@@ -231,6 +243,13 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
         last_vrf_output: "b_vrf_output".to_string(),
         previous_state_hash: GENESIS_STATE_HASH.to_string(),
     };
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::BlockAddedToTree,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
 
     // Subscribe to shared publisher to capture events
     let mut receiver = shared_publisher.subscribe();
@@ -284,7 +303,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     // Assert both canonical and non-canonical updates were received as expected
     assert!(received_new_canonical_update, "New block should be marked as canonical.");
     assert!(received_non_canonical_update, "Initial block should be marked as non-canonical.");
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 3);
+    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 4);
 
     Ok(())
 }
@@ -334,6 +353,13 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
         previous_state_hash: "competing_block_2".to_string(),
         last_vrf_output: "a_vrf_output".to_string(),
     };
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::BlockAddedToTree,
+            payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        })
+        .await;
 
     // Subscribe to the shared publisher to capture the output
     let mut receiver = shared_publisher.subscribe();
@@ -434,7 +460,8 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
         assert_eq!(payload, expected_event);
     }
 
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), num_expected_events);
+    let genesis_event = 1;
+    assert_eq!(actor.events_processed().load(Ordering::SeqCst), num_expected_events + genesis_event);
 
     Ok(())
 }
