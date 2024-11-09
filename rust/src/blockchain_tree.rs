@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, usize};
+use std::collections::BTreeMap;
 
 #[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Height(pub u64);
