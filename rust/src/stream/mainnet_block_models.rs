@@ -10,6 +10,10 @@ pub struct MainnetBlock {
 }
 
 impl MainnetBlock {
+    pub fn get_block_creator(&self) -> String {
+        self.protocol_state.body.consensus_state.block_creator.to_string()
+    }
+
     pub fn get_previous_state_hash(&self) -> String {
         self.protocol_state.previous_state_hash.clone()
     }
@@ -108,6 +112,7 @@ pub struct ConsensusState {
     pub global_slot_since_genesis: String,
     pub supercharge_coinbase: bool,
     pub coinbase_receiver: String,
+    pub block_creator: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -173,5 +178,8 @@ mod mainnet_block_parsing_tests {
             &mainnet_block.get_coinbase_receiver(),
             "B62qjA7LFMvKuzFbGZK9yb3wAkBThba1pe5ap8UZx8jEvfAEcnDgDBE"
         );
+
+        // Test block creator
+        assert_eq!(&mainnet_block.get_block_creator(), "B62qjJ2eGwj1mmB6XThCV2m9JxUqJGXLqwyirxTbzBanzs2ThazD1Gy");
     }
 }
