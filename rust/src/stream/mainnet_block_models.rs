@@ -15,7 +15,11 @@ impl MainnetBlock {
     }
 
     pub fn get_last_vrf_output(&self) -> String {
-        self.protocol_state.body.consensus_state.last_vrf_output.clone()
+        self.protocol_state.body.consensus_state.last_vrf_output.to_string()
+    }
+
+    pub fn get_coinbase_receiver(&self) -> String {
+        self.protocol_state.body.consensus_state.coinbase_receiver.to_string()
     }
 
     pub fn get_coinbase_reward_nanomina(&self) -> u64 {
@@ -75,6 +79,10 @@ impl MainnetBlock {
             })
             .unwrap_or(0)
     }
+
+    pub fn get_timestamp(&self) -> u64 {
+        self.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -86,6 +94,12 @@ pub struct ProtocolState {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Body {
     pub consensus_state: ConsensusState,
+    pub blockchain_state: BlockchainState,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlockchainState {
+    timestamp: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -93,6 +107,7 @@ pub struct ConsensusState {
     pub last_vrf_output: String,
     pub global_slot_since_genesis: String,
     pub supercharge_coinbase: bool,
+    pub coinbase_receiver: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -149,5 +164,14 @@ mod mainnet_block_parsing_tests {
 
         // Test snark work count
         assert_eq!(mainnet_block.get_snark_work_count(), 64);
+
+        // Test parsing timestamp
+        assert_eq!(mainnet_block.get_timestamp(), 1615986540000);
+
+        // Test parsing coinbase receiver
+        assert_eq!(
+            &mainnet_block.get_coinbase_receiver(),
+            "B62qjA7LFMvKuzFbGZK9yb3wAkBThba1pe5ap8UZx8jEvfAEcnDgDBE"
+        );
     }
 }
