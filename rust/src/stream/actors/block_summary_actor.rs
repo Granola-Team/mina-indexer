@@ -46,6 +46,7 @@ impl Actor for BlockSummaryActor {
                     coinbase_receiver: block_payload.coinbase_receiver,
                     coinbase_reward_nanomina: block_payload.coinbase_reward_nanomina,
                     global_slot_since_genesis: block_payload.global_slot_since_genesis,
+                    last_vrf_output: block_payload.last_vrf_output,
                     is_berkeley_block: false,
                 };
                 self.publish(Event {
