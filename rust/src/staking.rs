@@ -5,10 +5,27 @@ use crate::{
 use anyhow::Result;
 use tracing::{error, info};
 
-pub fn run(dir: &str) -> Result<()> {
-    info!("Processing files in: {}", dir);
-    let paths = get_file_paths(dir)?;
+pub fn run(staking_dir: &str) -> Result<()> {
+    info!("Processing files in: {}", staking_dir);
+    let paths = get_file_paths(staking_dir)?;
     let db = get_db_connection()?;
+
+    // Create temporary table
+    db.execute_batch(
+        "CREATE TEMPORARY TABLE ledgers (
+            pk VARCHAR NOT NULL CHECK (pk SIMILAR TO 'B62[0-9A-Za-z]{52}'),
+            balance DECIMAL NOT NULL,
+            delegate VARCHAR NULL,
+            token VARCHAR NULL,
+            nonce BIGINT NULL,
+            receipt_chain_hash VARCHAR NOT NULL,
+            voting_for VARCHAR NOT NULL,
+            timing JSON NULL,
+            token_symbol VARCHAR NULL,
+            ledger_hash VARCHAR NOT NULL,
+            epoch BIGINT NOT NULL
+        );",
+    )?;
 
     for path in &paths {
         let file_path = path.to_str().unwrap();
@@ -29,7 +46,7 @@ pub fn run(dir: &str) -> Result<()> {
                     )
                     SELECT
                         json_extract_string(json, '$.pk'),
-                        CAST(json_extract_string(json, '$.balance') AS DECIMAL(20,10)),
+                        CAST(json_extract_string(json, '$.balance') AS DECIMAL),
                         json_extract_string(json, '$.delegate'),
                         json_extract_string(json, '$.token'),
                         CAST(json_extract_string(json, '$.nonce') AS BIGINT),
@@ -143,7 +160,7 @@ pub fn run(dir: &str) -> Result<()> {
         )?;
 
         // Clear ledgers table for next file
-        db.execute_batch("DELETE FROM ledgers;")?;
+        db.execute_batch("TRUNCATE TABLE ledgers;")?;
     }
 
     Ok(())

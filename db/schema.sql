@@ -4,6 +4,7 @@ CREATE SEQUENCE user_commands_id_seq;
 CREATE SEQUENCE internal_commands_id_seq;
 CREATE SEQUENCE snark_jobs_id_seq;
 CREATE SEQUENCE staking_ledgers_id_seq;
+CREATE SEQUENCE staking_epochs_id_seq;
 
 -- Create tables
 CREATE TABLE IF NOT EXISTS accounts (
@@ -37,7 +38,7 @@ CREATE TABLE IF NOT EXISTS blockchain_states (
 );
 
 CREATE TABLE IF NOT EXISTS staged_ledger_hashes (
-    blockchain_state_hash VARCHAR PRIMARY KEY REFERENCES blockchain_states(block_hash),
+    block_hash VARCHAR PRIMARY KEY REFERENCES blockchain_states(block_hash),
     non_snark_ledger_hash VARCHAR,
     non_snark_aux_hash VARCHAR,
     non_snark_pending_coinbase_aux VARCHAR,
@@ -97,23 +98,22 @@ CREATE TABLE IF NOT EXISTS snark_jobs (
 );
 
 CREATE TABLE IF NOT EXISTS staking_epochs (
-    hash VARCHAR CHECK (hash SIMILAR TO 'j[0-9A-Za-z]{50}'),
-    epoch BIGINT,
-    PRIMARY KEY (hash, epoch)
+    id BIGINT DEFAULT(nextval('staking_epochs_id_seq')) PRIMARY KEY,
+    hash VARCHAR NOT NULL CHECK (hash SIMILAR TO 'j[0-9A-Za-z]{50}'),
+    epoch BIGINT NOT NULL,
+    UNIQUE(hash, epoch)
 );
 
 CREATE TABLE IF NOT EXISTS staking_ledgers (
     id BIGINT DEFAULT(nextval('staking_ledgers_id_seq')) PRIMARY KEY,
-    epoch_hash VARCHAR,
-    epoch_number BIGINT,
+    staking_epoch_id BIGINT NOT NULL REFERENCES staking_epochs(id),
     source VARCHAR REFERENCES accounts(public_key),
     balance DECIMAL,
     target VARCHAR REFERENCES accounts(public_key),
-    token BIGINT,
+    token VARCHAR,
     nonce BIGINT,
     receipt_chain_hash VARCHAR CHECK (receipt_chain_hash SIMILAR TO '2[0-9A-Za-z]{51}'),
-    voting_for VARCHAR CHECK (voting_for SIMILAR TO '3N[A-Za-z][0-9A-Za-z]{49}'),
-    FOREIGN KEY (epoch_hash, epoch_number) REFERENCES staking_epochs(hash, epoch)
+    voting_for VARCHAR CHECK (voting_for SIMILAR TO '3N[A-Za-z][0-9A-Za-z]{49}')
 );
 
 CREATE TABLE IF NOT EXISTS staking_timing (
