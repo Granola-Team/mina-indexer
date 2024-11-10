@@ -137,6 +137,7 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
         previous_state_hash: "4MPXcYhJY8URpwZxBEmv9C7kXf5h41PLXeX9GoTwFg3TuL2Q9zMn".to_string(),
         last_vrf_output: "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA=".to_string(),
         user_command_count: 4,
+        snark_work_count: 0,
     };
 
     // Create an Event with serialized MainnetBlockPayload

@@ -16,12 +16,30 @@ impl MainnetBlock {
         self.protocol_state.body.consensus_state.last_vrf_output.clone()
     }
 
+    pub fn get_snark_work_count(&self) -> usize {
+        let completed_works_pre_diff_count = self
+            .staged_ledger_diff
+            .as_ref()
+            .and_then(|ledger_diff| ledger_diff.diff.first()) // Access `diff[0]`
+            .and_then(|opt_diff| opt_diff.as_ref()) // Check if `diff[0]` is `Some`
+            .map(|diff| diff.completed_works.len()) // Get the length of commands array
+            .unwrap_or(0);
+        let completed_works_post_diff_count = self
+            .staged_ledger_diff
+            .as_ref()
+            .and_then(|ledger_diff| ledger_diff.diff.get(1)) // Access `diff[1]`
+            .and_then(|opt_diff| opt_diff.as_ref()) // Check if `diff[1]` is `Some`
+            .map(|diff| diff.completed_works.len()) // Get the length of commands array
+            .unwrap_or(0);
+        completed_works_pre_diff_count + completed_works_post_diff_count
+    }
+
     // Calculates the count of commands in `diff[0].commands` and `diff[1].commands`
     pub fn get_user_commands_count(&self) -> usize {
         let diff_0_count = self
             .staged_ledger_diff
             .as_ref()
-            .and_then(|ledger_diff| ledger_diff.diff.get(0)) // Access `diff[0]`
+            .and_then(|ledger_diff| ledger_diff.diff.first()) // Access `diff[0]`
             .and_then(|opt_diff| opt_diff.as_ref()) // Check if `diff[0]` is `Some`
             .map(|diff| diff.commands.len()) // Get the length of commands array
             .unwrap_or(0); // Default to 0 if `diff[0]` is None
@@ -62,6 +80,13 @@ pub struct StagedLedgerDiff {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Diff {
     pub commands: Vec<Command>, // Each `Diff` contains a vector of `Command`s
+    pub completed_works: Vec<CompletedWorks>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CompletedWorks {
+    pub fee: String,
+    pub prover: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

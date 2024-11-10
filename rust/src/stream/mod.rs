@@ -63,7 +63,7 @@ pub async fn process_blocks_dir(
         let (b_num, b_hash) = extract_height_and_hash(b);
 
         match a_num.cmp(&b_num) {
-            Ordering::Equal => a_hash.cmp(&b_hash), // Fallback to hash comparison
+            Ordering::Equal => a_hash.cmp(b_hash), // Fallback to hash comparison
             other => other,
         }
     });

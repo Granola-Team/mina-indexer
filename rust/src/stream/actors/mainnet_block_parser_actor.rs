@@ -49,6 +49,7 @@ impl Actor for MainnetBlockParserActor {
                 previous_state_hash: block.get_previous_state_hash(),
                 last_vrf_output: block.get_last_vrf_output(),
                 user_command_count: block.get_user_commands_count(),
+                snark_work_count: block.get_snark_work_count(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,
@@ -103,6 +104,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.previous_state_hash, "3NLdywCHZmuqxS4hUnW7Uuu6sr97iifh5Ldc6m9EbzVZyLqbxqCh");
         assert_eq!(payload.last_vrf_output, "HXzRY01h73mWXp4cjNwdDTYLDtdFU5mYhTbWWi-1wwE=");
         assert_eq!(payload.user_command_count, 1);
+        assert_eq!(payload.snark_work_count, 0);
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor for block 100.");
@@ -128,6 +130,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.previous_state_hash, "3NLAuBJPgT4Tk4LpufAEDQq4Jv9QVUefq3n3eB9x9VgGqe6LKzWp");
         assert_eq!(payload.last_vrf_output, "ws1xspEgjEyLiSS0V2-Egf9UzJG3FACpruvvDEsqDAA=");
         assert_eq!(payload.user_command_count, 3);
+        assert_eq!(payload.snark_work_count, 0);
         assert_eq!(actor.events_processed().load(Ordering::SeqCst), 2);
     } else {
         panic!("Did not receive expected event from actor for block 99.");
