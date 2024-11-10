@@ -1,17 +1,18 @@
 use std::collections::BTreeMap;
 
-#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Height(pub u64);
 
-#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Hash(pub String);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Node {
     pub height: Height,
     pub state_hash: Hash,
     pub previous_state_hash: Hash,
     pub last_vrf_output: String,
+    pub metadata_str: Option<String>,
 }
 
 #[derive(Debug)]
@@ -26,6 +27,13 @@ impl BlockchainTree {
             tree: BTreeMap::new(),
             max_ancestors_from_best_tip,
         }
+    }
+
+    pub fn get_node(&self, height: Height, state_hash: Hash) -> Option<Node> {
+        self.tree
+            .get(&height)
+            .and_then(|entries| entries.into_iter().find(|entry| entry.state_hash == state_hash))
+            .cloned()
     }
 
     pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {
@@ -162,6 +170,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -170,6 +179,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_2".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "vrf_output".to_string(),
+            ..Default::default()
         };
 
         let result = tree.add_node(node.clone());
@@ -187,6 +197,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -195,6 +206,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3".to_string()),
             previous_state_hash: Hash("nonexistent_parent".to_string()),
             last_vrf_output: "vrf_output".to_string(),
+            ..Default::default()
         };
 
         let result = tree.add_node(node);
@@ -211,6 +223,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -219,6 +232,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_2".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "vrf_output".to_string(),
+            ..Default::default()
         };
 
         tree.add_node(node.clone()).unwrap();
@@ -236,6 +250,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -244,6 +259,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_2".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "vrf_output".to_string(),
+            ..Default::default()
         };
 
         tree.add_node(node.clone()).unwrap();
@@ -264,6 +280,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -273,6 +290,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_2".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "parent_vrf".to_string(),
+            ..Default::default()
         };
         tree.add_node(parent_node.clone()).unwrap();
 
@@ -282,6 +300,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3a".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "c_vrf_output".to_string(),
+            ..Default::default()
         };
 
         let node2 = Node {
@@ -289,6 +308,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3b".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "d_vrf_output".to_string(),
+            ..Default::default()
         };
 
         let node3 = Node {
@@ -296,6 +316,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3c".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "b_vrf_output".to_string(),
+            ..Default::default()
         };
 
         let node4 = Node {
@@ -303,6 +324,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3d".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "a_vrf_output".to_string(),
+            ..Default::default()
         };
 
         // Add nodes to the tree
@@ -337,6 +359,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -345,6 +368,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_2".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "parent_vrf".to_string(),
+            ..Default::default()
         };
         tree.add_node(parent_node.clone()).unwrap();
 
@@ -353,6 +377,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3a".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "vrf_output_1".to_string(),
+            ..Default::default()
         };
 
         let node2 = Node {
@@ -360,6 +385,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("block_3b".to_string()),
             previous_state_hash: Hash("block_2".to_string()),
             last_vrf_output: "vrf_output_2".to_string(),
+            ..Default::default()
         };
 
         tree.add_node(node1.clone()).unwrap();
@@ -383,6 +409,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(genesis_payload.state_hash),
             previous_state_hash: Hash(genesis_payload.previous_state_hash),
             last_vrf_output: genesis_payload.last_vrf_output,
+            ..Default::default()
         };
         tree.set_root(node).unwrap();
 
@@ -392,6 +419,7 @@ mod blockchain_tree_tests {
             state_hash: Hash("common_ancestor".to_string()),
             previous_state_hash: Hash(GENESIS_STATE_HASH.to_string()),
             last_vrf_output: "common_vrf".to_string(),
+            ..Default::default()
         };
         tree.add_node(common_ancestor.clone()).unwrap();
 
@@ -401,18 +429,21 @@ mod blockchain_tree_tests {
             state_hash: Hash("branch1_block3".to_string()),
             previous_state_hash: Hash("common_ancestor".to_string()),
             last_vrf_output: "vrf_b1_3".to_string(),
+            ..Default::default()
         };
         let branch1_node2 = Node {
             height: Height(4),
             state_hash: Hash("branch1_block4".to_string()),
             previous_state_hash: Hash("branch1_block3".to_string()),
             last_vrf_output: "vrf_b1_4".to_string(),
+            ..Default::default()
         };
         let node_a = Node {
             height: Height(5),
             state_hash: Hash("node_a".to_string()),
             previous_state_hash: Hash("branch1_block4".to_string()),
             last_vrf_output: "vrf_a".to_string(),
+            ..Default::default()
         };
 
         tree.add_node(branch1_node1.clone()).unwrap();
@@ -425,18 +456,21 @@ mod blockchain_tree_tests {
             state_hash: Hash("branch2_block3".to_string()),
             previous_state_hash: Hash("common_ancestor".to_string()),
             last_vrf_output: "vrf_b2_3".to_string(),
+            ..Default::default()
         };
         let branch2_node2 = Node {
             height: Height(4),
             state_hash: Hash("branch2_block4".to_string()),
             previous_state_hash: Hash("branch2_block3".to_string()),
             last_vrf_output: "vrf_b2_4".to_string(),
+            ..Default::default()
         };
         let node_b = Node {
             height: Height(5),
             state_hash: Hash("branch2_block5".to_string()),
             previous_state_hash: Hash("branch2_block4".to_string()),
             last_vrf_output: "vrf_b2_5".to_string(),
+            ..Default::default()
         };
 
         tree.add_node(branch2_node1.clone()).unwrap();
@@ -471,6 +505,7 @@ mod blockchain_tree_tests {
             state_hash: Hash(root_payload.state_hash),
             previous_state_hash: Hash(root_payload.previous_state_hash),
             last_vrf_output: root_payload.last_vrf_output,
+            ..Default::default()
         };
 
         // Call set_root to add the new root node
@@ -501,6 +536,7 @@ mod blockchain_tree_prune_tests {
                     Hash("genesis".to_string())
                 },
                 last_vrf_output: format!("vrf_{}", height),
+                ..Default::default()
             };
             tree.set_root(node.clone()).unwrap();
         }
@@ -563,6 +599,7 @@ mod blockchain_tree_prune_tests {
             state_hash: Hash("genesis".to_string()),
             previous_state_hash: Hash("".to_string()),
             last_vrf_output: "".to_string(),
+            ..Default::default()
         };
         tree.set_root(genesis_node.clone()).unwrap();
 
@@ -586,5 +623,25 @@ mod blockchain_tree_prune_tests {
         for height in 1..=15 {
             assert!(tree.tree.contains_key(&Height(height)));
         }
+    }
+
+    #[test]
+    fn test_metadata_str_field() {
+        let mut tree = BlockchainTree::new(10);
+
+        // Add a node with metadata
+        let node_with_metadata = Node {
+            height: Height(1),
+            state_hash: Hash("block_4".to_string()),
+            previous_state_hash: Hash("block_3".to_string()),
+            last_vrf_output: "vrf_output_4".to_string(),
+            metadata_str: Some("Important metadata".to_string()),
+        };
+        tree.set_root(node_with_metadata.clone()).unwrap();
+
+        // Retrieve the node and check the metadata
+        let retrieved_node = tree.get_node(Height(1), Hash("block_4".to_string()));
+        assert!(retrieved_node.is_some());
+        assert_eq!(retrieved_node.unwrap().metadata_str, Some("Important metadata".to_string()));
     }
 }
