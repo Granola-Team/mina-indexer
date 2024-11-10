@@ -15,7 +15,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub struct BlockchainTreeBuilderActor {
     id: String,
     shared_publisher: Arc<SharedPublisher>,
-    events_processed: AtomicUsize,
+    events_published: AtomicUsize,
     blockchain_tree: Arc<Mutex<BlockchainTree>>,
 }
 
@@ -25,7 +25,7 @@ impl BlockchainTreeBuilderActor {
         Self {
             id: "BlockchainTreeActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
             blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
         }
     }
@@ -37,8 +37,8 @@ impl Actor for BlockchainTreeBuilderActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
 
     async fn handle_event(&self, event: Event) {
@@ -64,7 +64,6 @@ impl Actor for BlockchainTreeBuilderActor {
                         event_type: EventType::NewBlock,
                         payload: sonic_rs::to_string(&added_payload).unwrap(),
                     });
-                    self.incr_event_processed();
                 } else {
                     // try again later
                     self.publish(Event {
@@ -94,13 +93,13 @@ impl Actor for BlockchainTreeBuilderActor {
                     event_type: EventType::NewBlock,
                     payload: sonic_rs::to_string(&added_payload).unwrap(),
                 });
-                self.incr_event_processed();
             }
             _ => {}
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -306,7 +305,7 @@ async fn test_blockchain_tree_actor_adds_genesis_block() {
 
     // Verify that the genesis block has been processed
     assert_eq!(
-        actor.events_processed().load(std::sync::atomic::Ordering::SeqCst),
+        actor.events_published().load(std::sync::atomic::Ordering::SeqCst),
         1,
         "Expected the genesis block to be processed once"
     );

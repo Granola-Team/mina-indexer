@@ -17,7 +17,7 @@ use std::{
 pub struct BerkeleyBlockParserActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
 }
 
 impl BerkeleyBlockParserActor {
@@ -25,7 +25,7 @@ impl BerkeleyBlockParserActor {
         Self {
             id: "BerkeleyBlockParserActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
         }
     }
 }
@@ -36,8 +36,8 @@ impl Actor for BerkeleyBlockParserActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
 
     async fn handle_event(&self, event: Event) {
@@ -55,11 +55,11 @@ impl Actor for BerkeleyBlockParserActor {
                 event_type: EventType::BerkeleyBlock,
                 payload: sonic_rs::to_string(&berkeley_block_payload).unwrap(),
             });
-            self.incr_event_processed();
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -74,7 +74,7 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
     let actor = BerkeleyBlockParserActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
-        events_processed: AtomicUsize::new(0),
+        events_published: AtomicUsize::new(0),
     };
 
     let block_file = "./src/stream/test_data/berkeley_blocks/berkeley-10-3NL53c8uTVnoFjzh17VAeCR9r3zjmDowNpeFRRVEUqnvX5WdHtWE.json";
@@ -101,7 +101,7 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.state_hash, "3NL53c8uTVnoFjzh17VAeCR9r3zjmDowNpeFRRVEUqnvX5WdHtWE");
         assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
         assert_eq!(payload.last_vrf_output, "hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=");
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }

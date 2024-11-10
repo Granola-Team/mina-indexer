@@ -17,7 +17,7 @@ use std::{
 pub struct MainnetBlockParserActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
 }
 
 impl MainnetBlockParserActor {
@@ -25,7 +25,7 @@ impl MainnetBlockParserActor {
         Self {
             id: "MainnetBlockParserActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
         }
     }
 }
@@ -35,8 +35,8 @@ impl Actor for MainnetBlockParserActor {
     fn id(&self) -> String {
         self.id.clone()
     }
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
     async fn handle_event(&self, event: Event) {
         if let EventType::MainnetBlockPath = event.event_type {
@@ -59,11 +59,11 @@ impl Actor for MainnetBlockParserActor {
                 event_type: EventType::MainnetBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
             });
-            self.incr_event_processed();
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -78,7 +78,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
     let actor = MainnetBlockParserActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
-        events_processed: AtomicUsize::new(0),
+        events_published: AtomicUsize::new(0),
     };
 
     // Define paths for two block files
@@ -109,7 +109,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.last_vrf_output, "HXzRY01h73mWXp4cjNwdDTYLDtdFU5mYhTbWWi-1wwE=");
         assert_eq!(payload.user_command_count, 1);
         assert_eq!(payload.snark_work_count, 0);
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor for block 100.");
     }
@@ -135,7 +135,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.last_vrf_output, "ws1xspEgjEyLiSS0V2-Egf9UzJG3FACpruvvDEsqDAA=");
         assert_eq!(payload.user_command_count, 3);
         assert_eq!(payload.snark_work_count, 0);
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 2);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 2);
     } else {
         panic!("Did not receive expected event from actor for block 99.");
     }

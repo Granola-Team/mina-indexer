@@ -15,7 +15,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub struct BlockCanonicityActor {
     id: String,
     shared_publisher: Arc<SharedPublisher>,
-    events_processed: AtomicUsize,
+    events_published: AtomicUsize,
     blockchain_tree: Arc<Mutex<BlockchainTree>>,
 }
 impl BlockCanonicityActor {
@@ -23,7 +23,7 @@ impl BlockCanonicityActor {
         Self {
             id: "BlockCanonicityActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
             blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
         }
     }
@@ -75,7 +75,7 @@ impl BlockCanonicityActor {
             event_type: EventType::BlockCanonicityUpdate,
             payload: sonic_rs::to_string(&update).unwrap(),
         });
-        self.incr_event_processed();
+        self.incr_event_published();
     }
 }
 
@@ -85,8 +85,8 @@ impl Actor for BlockCanonicityActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
 
     async fn handle_event(&self, event: Event) {
@@ -215,7 +215,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     }
 
     // Verify both events have been processed
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 3);
+    assert_eq!(actor.events_published().load(Ordering::SeqCst), 3);
 
     Ok(())
 }
@@ -305,7 +305,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     // Assert both canonical and non-canonical updates were received as expected
     assert!(received_new_canonical_update, "New block should be marked as canonical.");
     assert!(received_non_canonical_update, "Initial block should be marked as non-canonical.");
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), 4);
+    assert_eq!(actor.events_published().load(Ordering::SeqCst), 4);
 
     Ok(())
 }
@@ -463,7 +463,7 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     }
 
     let genesis_event = 1;
-    assert_eq!(actor.events_processed().load(Ordering::SeqCst), num_expected_events + genesis_event);
+    assert_eq!(actor.events_published().load(Ordering::SeqCst), num_expected_events + genesis_event);
 
     Ok(())
 }

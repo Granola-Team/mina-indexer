@@ -10,7 +10,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub struct BlockSummaryActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
 }
 
 impl BlockSummaryActor {
@@ -18,7 +18,7 @@ impl BlockSummaryActor {
         Self {
             id: "BlockSummaryActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
         }
     }
 }
@@ -29,8 +29,8 @@ impl Actor for BlockSummaryActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
     async fn handle_event(&self, event: Event) {
         match event.event_type {
@@ -52,7 +52,6 @@ impl Actor for BlockSummaryActor {
                     event_type: EventType::BlockSummary,
                     payload: sonic_rs::to_string(&payload).unwrap(),
                 });
-                self.incr_event_processed();
             }
             EventType::BerkeleyBlock => {
                 todo!("impl for berkeley block");
@@ -62,6 +61,7 @@ impl Actor for BlockSummaryActor {
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -124,7 +124,7 @@ async fn test_block_summary_actor_handle_event() {
         assert!(!summary_payload.is_berkeley_block);
 
         // Verify that the event was marked as processed
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BlockSummary event from BlockSummaryActor.");
     }

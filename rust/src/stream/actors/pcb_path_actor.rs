@@ -10,7 +10,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub struct PCBBlockPathActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
 }
 
 impl PCBBlockPathActor {
@@ -18,7 +18,7 @@ impl PCBBlockPathActor {
         Self {
             id: "PCBBlockPathActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
         }
     }
 }
@@ -29,8 +29,8 @@ impl Actor for PCBBlockPathActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
     async fn handle_event(&self, event: Event) {
         if let EventType::PrecomputedBlockPath = event.event_type {
@@ -46,11 +46,11 @@ impl Actor for PCBBlockPathActor {
                     payload: event.payload,
                 });
             }
-            self.incr_event_processed();
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -66,7 +66,7 @@ async fn test_precomputed_block_path_identity_actor() {
     let actor = PCBBlockPathActor {
         id: "PCBBlockPathActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
-        events_processed: AtomicUsize::new(0),
+        events_published: AtomicUsize::new(0),
     };
 
     // Subscribe to the shared publisher to listen for actor responses
@@ -85,7 +85,7 @@ async fn test_precomputed_block_path_identity_actor() {
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::BerkeleyBlockPath);
         assert_eq!(received_event.payload, temp_file_berkeley.path().to_str().unwrap().to_string());
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BerkeleyBlockPath event from actor.");
     }

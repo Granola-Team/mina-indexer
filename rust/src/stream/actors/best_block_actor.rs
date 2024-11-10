@@ -16,7 +16,7 @@ pub struct BestBlock {
 pub struct BestBlockActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
     pub best_block: Arc<Mutex<BestBlock>>,
 }
 
@@ -25,7 +25,7 @@ impl BestBlockActor {
         Self {
             id: "BestBlockActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
             best_block: Arc::new(Mutex::new(BestBlock {
                 height: 1,
                 state_hash: GENESIS_STATE_HASH.to_string(),
@@ -40,8 +40,8 @@ impl Actor for BestBlockActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
     async fn handle_event(&self, event: Event) {
         if let EventType::BlockCanonicityUpdate = event.event_type {
@@ -55,12 +55,12 @@ impl Actor for BestBlockActor {
                     event_type: EventType::BestBlock,
                     payload: event.payload,
                 });
-                self.incr_event_processed();
             }
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -112,8 +112,8 @@ async fn test_best_block_actor_updates_on_canonical_block() -> anyhow::Result<()
         panic!("Expected a BestBlock event but did not receive one.");
     }
 
-    // Verify that events_processed was incremented
-    assert_eq!(actor.events_processed.load(Ordering::SeqCst), 1);
+    // Verify that events_published was incremented
+    assert_eq!(actor.events_published.load(Ordering::SeqCst), 1);
 
     Ok(())
 }

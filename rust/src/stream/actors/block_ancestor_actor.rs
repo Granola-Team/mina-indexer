@@ -10,7 +10,7 @@ use std::sync::{atomic::AtomicUsize, Arc};
 pub struct BlockAncestorActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_processed: AtomicUsize,
+    pub events_published: AtomicUsize,
 }
 
 impl BlockAncestorActor {
@@ -18,7 +18,7 @@ impl BlockAncestorActor {
         Self {
             id: "BlockAncestorActor".to_string(),
             shared_publisher,
-            events_processed: AtomicUsize::new(0),
+            events_published: AtomicUsize::new(0),
         }
     }
 }
@@ -29,8 +29,8 @@ impl Actor for BlockAncestorActor {
         self.id.clone()
     }
 
-    fn events_processed(&self) -> &AtomicUsize {
-        &self.events_processed
+    fn events_published(&self) -> &AtomicUsize {
+        &self.events_published
     }
     async fn handle_event(&self, event: Event) {
         match event.event_type {
@@ -46,7 +46,6 @@ impl Actor for BlockAncestorActor {
                     event_type: EventType::BlockAncestor,
                     payload: sonic_rs::to_string(&block_ancestor_payload).unwrap(),
                 });
-                self.incr_event_processed();
             }
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
@@ -60,13 +59,13 @@ impl Actor for BlockAncestorActor {
                     event_type: EventType::BlockAncestor,
                     payload: sonic_rs::to_string(&block_ancestor_payload).unwrap(),
                 });
-                self.incr_event_processed();
             }
             _ => {}
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -79,7 +78,7 @@ async fn test_block_ancestor_actor_with_berkeley_block() -> anyhow::Result<()> {
     let actor = BlockAncestorActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
-        events_processed: AtomicUsize::new(0),
+        events_published: AtomicUsize::new(0),
     };
 
     // Define BerkeleyBlockPayload for the test
@@ -111,7 +110,7 @@ async fn test_block_ancestor_actor_with_berkeley_block() -> anyhow::Result<()> {
         assert_eq!(payload.height, 89);
         assert_eq!(payload.state_hash, "3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON");
         assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }
@@ -127,7 +126,7 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
     let actor = BlockAncestorActor {
         id: "TestActor".to_string(),
         shared_publisher: Arc::clone(&shared_publisher),
-        events_processed: AtomicUsize::new(0),
+        events_published: AtomicUsize::new(0),
     };
 
     // Define MainnetBlockPayload for the test
@@ -165,7 +164,7 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
         assert_eq!(payload.height, 101);
         assert_eq!(payload.state_hash, "4MTNpwef32H67dHk9Mx25ZLpHfVz27QXECm8C4o5eyRa5LgJ1qLScCwpJM");
         assert_eq!(payload.previous_state_hash, "4MPXcYhJY8URpwZxBEmv9C7kXf5h41PLXeX9GoTwFg3TuL2Q9zMn");
-        assert_eq!(actor.events_processed().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }

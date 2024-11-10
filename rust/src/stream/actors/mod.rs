@@ -14,11 +14,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 #[async_trait]
 pub trait Actor: Send + Sync {
     fn id(&self) -> String;
-    fn events_processed(&self) -> &AtomicUsize;
+    fn events_published(&self) -> &AtomicUsize;
 
     // Default implementation of `shutdown` to log the count
     fn shutdown(&self) {
-        let count = self.events_processed().load(Ordering::SeqCst);
+        let count = self.events_published().load(Ordering::SeqCst);
         println!("Actor {} processed {} events before shutdown.", self.id(), count);
     }
 
@@ -26,8 +26,8 @@ pub trait Actor: Send + Sync {
         self.handle_event(event).await;
     }
 
-    fn incr_event_processed(&self) {
-        self.events_processed().fetch_add(1, Ordering::SeqCst);
+    fn incr_event_published(&self) {
+        self.events_published().fetch_add(1, Ordering::SeqCst);
     }
 
     // Define handle_event for specific event processing per actor
