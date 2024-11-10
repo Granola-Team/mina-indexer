@@ -24,6 +24,10 @@ pub struct MainnetBlockPayload {
     pub last_vrf_output: String,
     pub user_command_count: usize,
     pub snark_work_count: usize,
+    pub timestamp: u64,
+    pub coinbase_receiver: String,
+    pub coinbase_reward_nanomina: u64,
+    pub global_slot_since_genesis: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

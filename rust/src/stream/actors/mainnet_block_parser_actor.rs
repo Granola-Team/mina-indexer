@@ -50,6 +50,10 @@ impl Actor for MainnetBlockParserActor {
                 last_vrf_output: block.get_last_vrf_output(),
                 user_command_count: block.get_user_commands_count(),
                 snark_work_count: block.get_snark_work_count(),
+                timestamp: block.get_timestamp(),
+                coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
+                coinbase_receiver: block.get_coinbase_receiver(),
+                global_slot_since_genesis: block.get_global_slot_since_genesis(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,
