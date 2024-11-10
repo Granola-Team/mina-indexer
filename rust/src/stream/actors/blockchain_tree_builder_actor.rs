@@ -51,6 +51,7 @@ impl Actor for BlockchainTreeBuilderActor {
                     state_hash: Hash(block_payload.state_hash.clone()),
                     previous_state_hash: Hash(block_payload.previous_state_hash.clone()),
                     last_vrf_output: block_payload.last_vrf_output.clone(),
+                    ..Default::default()
                 };
                 if blockchain_tree.has_parent(&next_node) {
                     blockchain_tree.add_node(next_node).unwrap();
@@ -81,6 +82,7 @@ impl Actor for BlockchainTreeBuilderActor {
                     state_hash: Hash(genesis_payload.state_hash.clone()),
                     previous_state_hash: Hash(genesis_payload.previous_state_hash.clone()),
                     last_vrf_output: genesis_payload.last_vrf_output.clone(),
+                    ..Default::default()
                 };
                 blockchain_tree.set_root(root_node).unwrap();
                 let added_payload = NewBlockPayload {

@@ -98,6 +98,7 @@ impl Actor for BlockCanonicityActor {
                 state_hash: Hash(block_payload.state_hash.clone()),
                 previous_state_hash: Hash(block_payload.previous_state_hash),
                 last_vrf_output: block_payload.last_vrf_output,
+                ..Default::default()
             };
             if next_node.height.0 == 1 {
                 blockchain_tree.set_root(next_node.clone()).unwrap();
