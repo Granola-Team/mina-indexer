@@ -2,7 +2,8 @@ use crate::{stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilder
 use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
-    mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, Actor,
+    block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
+    Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -37,6 +38,7 @@ pub async fn process_blocks_dir(
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher))),
     ];
 
     // Spawn tasks for each actor and collect their handles

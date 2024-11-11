@@ -37,10 +37,18 @@ task :ingest => [:build] do
   chdir root_dir
 end
 
+desc 'Clean database'
+task :clean_db do
+  chdir 'rust'
+  sh "rm mina.db"
+  chdir root_dir
+end
+
 desc 'Clean up build artifacts'
 task :clean do
   chdir 'rust'
   sh "cargo clean"
+  sh "rm mina.db"
   chdir root_dir
 end
 
