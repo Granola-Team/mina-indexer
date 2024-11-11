@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{BlockSummaryPayload, MainnetBlockPayload};
+use crate::stream::payloads::{BlockSummaryPayload, GenesisBlockPayload, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -34,6 +34,26 @@ impl Actor for BlockSummaryActor {
     }
     async fn handle_event(&self, event: Event) {
         match event.event_type {
+            EventType::GenesisBlock => {
+                let block_payload: GenesisBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let payload = BlockSummaryPayload {
+                    height: block_payload.height,
+                    state_hash: block_payload.state_hash,
+                    previous_state_hash: block_payload.previous_state_hash,
+                    user_command_count: 0,
+                    snark_work_count: 0,
+                    timestamp: block_payload.unix_timestamp,
+                    coinbase_receiver: String::new(),
+                    coinbase_reward_nanomina: 0,
+                    global_slot_since_genesis: 1,
+                    last_vrf_output: block_payload.last_vrf_output,
+                    is_berkeley_block: false,
+                };
+                self.publish(Event {
+                    event_type: EventType::BlockSummary,
+                    payload: sonic_rs::to_string(&payload).unwrap(),
+                });
+            }
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let payload = BlockSummaryPayload {

@@ -123,11 +123,7 @@ impl Actor for BlockCanonicityActor {
                 }
                 blockchain_tree.prune_tree().unwrap();
             } else {
-                // try again later
-                self.publish(Event {
-                    event_type: EventType::NewBlock,
-                    payload: event.payload,
-                });
+                panic!("Block received out of order");
             }
         }
     }

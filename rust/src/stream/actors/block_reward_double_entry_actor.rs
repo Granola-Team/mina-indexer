@@ -27,7 +27,7 @@ pub struct BlockRewardDoubleEntryActor {
 impl BlockRewardDoubleEntryActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "BestBlockActor".to_string(),
+            id: "BlockRewardDoubleEntryActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
             block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
