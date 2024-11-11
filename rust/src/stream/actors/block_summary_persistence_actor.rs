@@ -61,7 +61,7 @@ impl BlockSummaryPersistenceActor {
                 DELETE FROM block_summary
                 WHERE height = ? AND state_hash = ?
             "#;
-        txn.execute(delete_query, &[&summary.height.to_string(), &summary.state_hash.to_string()])
+        txn.execute(delete_query, [&summary.height.to_string(), &summary.state_hash.to_string()])
             .unwrap();
         let insert_query = r#"
                 INSERT INTO block_summary (
@@ -72,7 +72,7 @@ impl BlockSummaryPersistenceActor {
             "#;
         txn.execute(
             insert_query,
-            &[
+            [
                 &summary.height.to_string(),                    // height
                 &summary.state_hash.to_string(),                // state_hash
                 &summary.previous_state_hash.to_string(),       // previous_state_hash
