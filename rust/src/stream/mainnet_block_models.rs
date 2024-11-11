@@ -27,7 +27,7 @@ impl MainnetBlock {
     }
 
     fn get_staged_ledger_pre_diff(&self) -> Option<Diff> {
-        self.staged_ledger_diff.diff.get(0).and_then(|opt| opt.clone())
+        self.staged_ledger_diff.diff.first().and_then(|opt| opt.clone())
     }
 
     fn get_staged_ledger_post_diff(&self) -> Option<Diff> {
