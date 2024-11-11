@@ -6,7 +6,7 @@ use sonic_rs::Value; // To handle arbitrary JSON objects
 pub struct MainnetBlock {
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
-    pub staged_ledger_diff: Option<StagedLedgerDiff>,
+    pub staged_ledger_diff: StagedLedgerDiff,
 }
 
 impl MainnetBlock {
@@ -26,62 +26,49 @@ impl MainnetBlock {
         self.protocol_state.body.consensus_state.coinbase_receiver.to_string()
     }
 
+    fn get_staged_ledger_pre_diff(&self) -> Option<Diff> {
+        self.staged_ledger_diff.diff.get(0).and_then(|opt| opt.clone())
+    }
+
+    fn get_staged_ledger_post_diff(&self) -> Option<Diff> {
+        self.staged_ledger_diff.diff.get(1).and_then(|opt| opt.clone())
+    }
+
     pub fn get_coinbase_reward_nanomina(&self) -> u64 {
-        self.staged_ledger_diff
-            .as_ref()
-            .map(|ledger_diff| {
-                ledger_diff
-                    .diff
-                    .iter()
-                    .take(2)
-                    .filter_map(|opt_diff| {
-                        opt_diff.as_ref().and_then(|diff| {
-                            if diff.coinbase[0] != "Zero" {
-                                if self.protocol_state.body.consensus_state.supercharge_coinbase {
-                                    Some(2 * MAINNET_COINBASE_REWARD)
-                                } else {
-                                    Some(MAINNET_COINBASE_REWARD)
-                                }
-                            } else {
-                                None
-                            }
-                        })
-                    })
-                    .sum()
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| {
+                opt_diff.as_ref().and_then(|diff| {
+                    if diff.coinbase[0] != "Zero" {
+                        if self.protocol_state.body.consensus_state.supercharge_coinbase {
+                            Some(2 * MAINNET_COINBASE_REWARD)
+                        } else {
+                            Some(MAINNET_COINBASE_REWARD)
+                        }
+                    } else {
+                        None
+                    }
+                })
             })
-            .unwrap_or(0)
+            .sum()
+    }
+
+    pub fn get_snark_work_count(&self) -> usize {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.len()))
+            .sum()
+    }
+
+    pub fn get_user_commands_count(&self) -> usize {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.len()))
+            .sum()
     }
 
     pub fn get_global_slot_since_genesis(&self) -> u64 {
         self.protocol_state.body.consensus_state.global_slot_since_genesis.parse::<u64>().unwrap()
-    }
-
-    pub fn get_snark_work_count(&self) -> usize {
-        self.staged_ledger_diff
-            .as_ref()
-            .map(|ledger_diff| {
-                ledger_diff
-                    .diff
-                    .iter()
-                    .take(2)
-                    .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.len()))
-                    .sum()
-            })
-            .unwrap_or(0)
-    }
-
-    pub fn get_user_commands_count(&self) -> usize {
-        self.staged_ledger_diff
-            .as_ref()
-            .map(|ledger_diff| {
-                ledger_diff
-                    .diff
-                    .iter()
-                    .take(2)
-                    .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.len()))
-                    .sum()
-            })
-            .unwrap_or(0)
     }
 
     pub fn get_timestamp(&self) -> u64 {
@@ -120,7 +107,7 @@ pub struct StagedLedgerDiff {
     pub diff: Vec<Option<Diff>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diff {
     pub commands: Vec<Command>,
     pub completed_works: Vec<CompletedWorks>,
@@ -133,13 +120,13 @@ pub struct CoinbaseData {
     pub fee: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompletedWorks {
     pub fee: String,
     pub prover: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Command {
     pub data: Vec<Value>, // Placeholder type to avoid parsing nested structures now
 }
