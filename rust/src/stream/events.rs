@@ -11,6 +11,7 @@ pub enum EventType {
     BlockCanonicityUpdate,
     BestBlock,
     BlockSummary,
+    DoubleEntryTxn,
 }
 
 #[derive(Debug, Clone, PartialEq)]

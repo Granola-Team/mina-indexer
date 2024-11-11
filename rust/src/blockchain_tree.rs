@@ -32,7 +32,7 @@ impl BlockchainTree {
     pub fn get_node(&self, height: Height, state_hash: Hash) -> Option<Node> {
         self.tree
             .get(&height)
-            .and_then(|entries| entries.into_iter().find(|entry| entry.state_hash == state_hash))
+            .and_then(|entries| entries.iter().find(|entry| entry.state_hash == state_hash))
             .cloned()
     }
 
