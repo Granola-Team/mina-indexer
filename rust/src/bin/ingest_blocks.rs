@@ -1,5 +1,5 @@
-use mina_indexer::stream::process_blocks_dir;
-use std::{path::PathBuf, str::FromStr};
+use mina_indexer::stream::{process_blocks_dir, shared_publisher::SharedPublisher};
+use std::{path::PathBuf, str::FromStr, sync::Arc};
 use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
@@ -14,7 +14,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Spawn the process_blocks_dir task with the shutdown receiver
     let process_handle = tokio::spawn(async move {
-        let _ = process_blocks_dir(blocks_dir, shutdown_receiver).await;
+        let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
+        let _ = process_blocks_dir(blocks_dir, &shared_publisher, shutdown_receiver).await;
     });
 
     // Wait indefinitely for Ctrl+C to trigger shutdown

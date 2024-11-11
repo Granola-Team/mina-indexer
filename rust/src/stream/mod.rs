@@ -21,23 +21,22 @@ pub mod shared_publisher;
 
 pub async fn process_blocks_dir(
     blocks_dir: PathBuf,
+    shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
 ) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
-    let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
-
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
-        Arc::new(PCBBlockPathActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BerkeleyBlockParserActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(MainnetBlockParserActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockAncestorActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockCanonicityActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BestBlockActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockSummaryActor::new(Arc::clone(&shared_publisher))),
-        Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(&shared_publisher))),
+        Arc::new(PCBBlockPathActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BerkeleyBlockParserActor::new(Arc::clone(shared_publisher))),
+        Arc::new(MainnetBlockParserActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockAncestorActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockCanonicityActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
     ];
 
     // Spawn tasks for each actor and collect their handles
@@ -111,33 +110,68 @@ where
         }
     }
 }
-
 #[tokio::test]
 async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
-    use std::{path::PathBuf, str::FromStr};
+    use crate::stream::{events::EventType, payloads::*};
+    use std::{collections::HashMap, path::PathBuf, str::FromStr};
     use tokio::{sync::broadcast, time::Duration};
 
     // Create a shutdown channel for the test
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
     // Path to the directory with 100 mainnet block files
-    let blocks_dir = PathBuf::from_str("../test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
+    let blocks_dir = PathBuf::from_str("./src/stream/test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
 
-    // Spawn the process_blocks_dir task with the shutdown receiver
-    let process_handle = tokio::spawn(async move {
-        let _ = process_blocks_dir(blocks_dir, shutdown_receiver).await;
+    let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
+    let mut receiver = shared_publisher.subscribe();
+
+    // Spawn the task to process blocks
+    let process_handle = tokio::spawn({
+        let shared_publisher = Arc::clone(&shared_publisher);
+        async move {
+            process_blocks_dir(blocks_dir, &shared_publisher, shutdown_receiver).await.unwrap();
+        }
     });
 
-    // Allow some time for processing
+    // Wait a short duration for some events to be processed, then trigger shutdown
     tokio::time::sleep(Duration::from_secs(1)).await;
-
-    // Send the shutdown signal
     let _ = shutdown_sender.send(());
 
-    // Wait for the task to handle shutdown and finish
+    // Wait for the task to finish processing
     let _ = process_handle.await;
 
-    // TODO: Need to find a way to check log output
+    // Count each event type received
+    let mut event_counts: HashMap<EventType, usize> = HashMap::new();
+    let mut last_best_block: Option<BlockCanonicityUpdatePayload> = None;
+    while let Ok(event) = receiver.try_recv() {
+        if event.event_type == EventType::BestBlock {
+            last_best_block = Some(sonic_rs::from_str(&event.payload).unwrap());
+        }
+        *event_counts.entry(event.event_type).or_insert(0) += 1;
+    }
+
+    let paths_count = 165;
+    let paths_plus_genesis_count = paths_count + 1;
+    let length_of_chain = 100;
+
+    assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
+    assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
+    // assert_eq!(
+    //     event_counts.get(&EventType::BerkeleyBlockPath).cloned().unwrap(),
+    //     todo!("No berkeley blocks yet")
+    // );
+    // assert_eq!(
+    //     event_counts.get(&EventType::BlockCanonicityUpdate).cloned().unwrap(),
+    //     todo!("Not yet calculated")
+    // );
+    assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
+    assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
+    assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
+    assert_eq!(event_counts.get(&EventType::BestBlock).cloned().unwrap(), length_of_chain);
+
+    // Best Block & Last canonical update:
+    assert_eq!(last_best_block.clone().unwrap().height, length_of_chain as u64);
+    assert_eq!(&last_best_block.unwrap().state_hash, "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4");
 
     Ok(())
 }
