@@ -54,10 +54,15 @@ impl MainnetBlock {
     }
 
     pub fn get_snark_work_count(&self) -> usize {
+        self.get_snark_work().len()
+    }
+
+    pub fn get_snark_work(&self) -> Vec<CompletedWorks> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
-            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.len()))
-            .sum()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
+            .flat_map(|works| works.into_iter())
+            .collect()
     }
 
     pub fn get_user_commands_count(&self) -> usize {
