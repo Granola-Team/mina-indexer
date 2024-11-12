@@ -1,6 +1,6 @@
 use core::time;
 use mina_indexer::stream::{process_blocks_dir, shared_publisher::SharedPublisher};
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{env, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
@@ -11,7 +11,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
     // Path to the blocks directory
-    let blocks_dir = PathBuf::from_str("src/stream/test_data/100_mainnet_blocks").expect("blocks dir to be present");
+    let blocks_dir =
+        PathBuf::from_str(&env::var("BLOCKS_DIR").expect("expected BLOCKS_DIR environment variable to be present")).expect("expected blocks dir to exist");
 
     let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
 
