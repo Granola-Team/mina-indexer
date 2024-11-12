@@ -28,7 +28,7 @@ pub struct BlockSummaryPersistenceActor {
 impl BlockSummaryPersistenceActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         let db = get_db_connection().unwrap();
-        db.execute_batch(
+        if let Err(e) = db.execute_batch(
             "CREATE TABLE IF NOT EXISTS block_summary (
                 height BIGINT,
                 state_hash TEXT,
@@ -43,8 +43,9 @@ impl BlockSummaryPersistenceActor {
                 is_berkeley_block BOOLEAN,
                 is_canonical BOOLEAN
             );",
-        )
-        .unwrap();
+        ) {
+            println!("Unable to create block_summary table {:?}", e);
+        }
         Self {
             id: "BlockSummaryPersistenceActor".to_string(),
             shared_publisher,
@@ -55,41 +56,46 @@ impl BlockSummaryPersistenceActor {
     }
 
     async fn db_upsert(&self, summary: &BlockSummaryPayload, canonical: bool) -> Result<()> {
-        let mut db = get_db_connection().unwrap();
-        let txn = db.transaction().unwrap();
-        let delete_query = r#"
-                DELETE FROM block_summary
-                WHERE height = ? AND state_hash = ?
-            "#;
-        txn.execute(delete_query, [&summary.height.to_string(), &summary.state_hash.to_string()])
-            .unwrap();
-        let insert_query = r#"
-                INSERT INTO block_summary (
-                    height, state_hash, previous_state_hash, user_command_count, snark_work_count,
-                    timestamp, coinbase_receiver, coinbase_reward_nanomina, global_slot_since_genesis,
-                    last_vrf_output, is_berkeley_block, is_canonical
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            "#;
-        txn.execute(
-            insert_query,
-            [
-                &summary.height.to_string(),                    // height
-                &summary.state_hash.to_string(),                // state_hash
-                &summary.previous_state_hash.to_string(),       // previous_state_hash
-                &summary.user_command_count.to_string(),        // user_command_count
-                &summary.snark_work_count.to_string(),          // snark_work_count
-                &summary.timestamp.to_string(),                 // timestamp
-                &summary.coinbase_receiver.to_string(),         // coinbase_receiver
-                &summary.coinbase_reward_nanomina.to_string(),  // coinbase_reward_nanomina
-                &summary.global_slot_since_genesis.to_string(), // global_slot_since_genesis
-                &summary.last_vrf_output.to_string(),           // last_vrf_output
-                &summary.is_berkeley_block.to_string(),         // is_berkeley_block
-                &canonical.to_string(),
-            ],
-        )
-        .unwrap();
-
-        txn.commit().unwrap();
+        match get_db_connection() {
+            Ok(db) => {
+                let delete_query = r#"
+                        DELETE FROM block_summary
+                        WHERE height = ? AND state_hash = ?
+                    "#;
+                if let Err(e) = db.execute(delete_query, [&summary.height.to_string(), &summary.state_hash.to_string()]) {
+                    println!("Unable to delete block summary entry: {:?}", e);
+                }
+                let insert_query = r#"
+                        INSERT INTO block_summary (
+                            height, state_hash, previous_state_hash, user_command_count, snark_work_count,
+                            timestamp, coinbase_receiver, coinbase_reward_nanomina, global_slot_since_genesis,
+                            last_vrf_output, is_berkeley_block, is_canonical
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    "#;
+                if let Err(e) = db.execute(
+                    insert_query,
+                    [
+                        &summary.height.to_string(),                    // height
+                        &summary.state_hash.to_string(),                // state_hash
+                        &summary.previous_state_hash.to_string(),       // previous_state_hash
+                        &summary.user_command_count.to_string(),        // user_command_count
+                        &summary.snark_work_count.to_string(),          // snark_work_count
+                        &summary.timestamp.to_string(),                 // timestamp
+                        &summary.coinbase_receiver.to_string(),         // coinbase_receiver
+                        &summary.coinbase_reward_nanomina.to_string(),  // coinbase_reward_nanomina
+                        &summary.global_slot_since_genesis.to_string(), // global_slot_since_genesis
+                        &summary.last_vrf_output.to_string(),           // last_vrf_output
+                        &summary.is_berkeley_block.to_string(),         // is_berkeley_block
+                        &canonical.to_string(),
+                    ],
+                ) {
+                    println!("Unable to insert block summary entry: {:?}", e);
+                }
+            }
+            Err(e) => {
+                println!("Unable to get database connection: {:?}", e);
+            }
+        }
 
         Ok(())
     }
