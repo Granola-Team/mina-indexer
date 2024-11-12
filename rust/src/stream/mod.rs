@@ -7,7 +7,7 @@ use actors::{
 };
 use events::Event;
 use futures::future::try_join_all;
-use payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload};
+use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
 use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
@@ -175,7 +175,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
-    use crate::stream::events::EventType;
+    use crate::stream::{events::EventType, payloads::BlockCanonicityUpdatePayload};
     use std::{collections::HashMap, path::PathBuf, str::FromStr};
     use tokio::{sync::broadcast, time::Duration};
 
@@ -216,7 +216,7 @@ async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::BlockCanonicityUpdate).cloned().unwrap(), 25);
 
     // Best Block & Last canonical update:
-    assert_eq!(last_best_block.clone().unwrap().height, 10 as u64);
+    assert_eq!(last_best_block.clone().unwrap().height, 10_u64);
     assert_eq!(&last_best_block.unwrap().state_hash, "3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL");
 
     Ok(())
