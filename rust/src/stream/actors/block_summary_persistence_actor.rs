@@ -5,8 +5,7 @@ use super::super::{
 };
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    constants::TRANSITION_FRONTIER_DISTANCE,
-    get_db_connection,
+    constants::{POSTGRES_CONNECTION_STRING, TRANSITION_FRONTIER_DISTANCE},
     stream::payloads::*,
 };
 use anyhow::Result;
@@ -16,6 +15,7 @@ use std::{
     collections::VecDeque,
     sync::{atomic::AtomicUsize, Arc},
 };
+use tokio_postgres::{Client, NoTls};
 
 pub struct BlockSummaryPersistenceActor {
     pub id: String,
@@ -23,81 +23,98 @@ pub struct BlockSummaryPersistenceActor {
     pub events_published: AtomicUsize,
     pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
     pub blockchain_tree: Arc<Mutex<BlockchainTree>>,
+    pub client: Client,
 }
 
 impl BlockSummaryPersistenceActor {
-    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
-        let db = get_db_connection().unwrap();
-        if let Err(e) = db.execute_batch(
-            "CREATE TABLE IF NOT EXISTS block_summary (
-                height BIGINT,
-                state_hash TEXT,
-                previous_state_hash TEXT,
-                user_command_count INTEGER,
-                snark_work_count INTEGER,
-                timestamp BIGINT,
-                coinbase_receiver TEXT,
-                coinbase_reward_nanomina BIGINT,
-                global_slot_since_genesis BIGINT,
-                last_vrf_output TEXT,
-                is_berkeley_block BOOLEAN,
-                is_canonical BOOLEAN
-            );",
-        ) {
-            println!("Unable to create block_summary table {:?}", e);
-        }
-        Self {
-            id: "BlockSummaryPersistenceActor".to_string(),
-            shared_publisher,
-            events_published: AtomicUsize::new(0),
-            block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
-            blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
+    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("connection error: {}", e);
+                }
+            });
+            if let Err(e) = client
+                .execute(
+                    "CREATE TABLE IF NOT EXISTS block_summary (
+                        height BIGINT,
+                        state_hash TEXT,
+                        previous_state_hash TEXT,
+                        user_command_count INTEGER,
+                        snark_work_count INTEGER,
+                        timestamp BIGINT,
+                        coinbase_receiver TEXT,
+                        coinbase_reward_nanomina BIGINT,
+                        global_slot_since_genesis BIGINT,
+                        last_vrf_output TEXT,
+                        is_berkeley_block BOOLEAN,
+                        is_canonical BOOLEAN,
+                        UNIQUE (height, state_hash)
+                    );",
+                    &[],
+                )
+                .await
+            {
+                println!("Unable to create block_summary table {:?}", e);
+            }
+            Self {
+                id: "BlockSummaryPersistenceActor".to_string(),
+                shared_publisher,
+                client,
+                events_published: AtomicUsize::new(0),
+                block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
+                blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
+            }
+        } else {
+            panic!("Unable to establish connection to database")
         }
     }
 
-    async fn db_upsert(&self, summary: &BlockSummaryPayload, canonical: bool) -> Result<()> {
-        match get_db_connection() {
-            Ok(db) => {
-                let delete_query = r#"
-                        DELETE FROM block_summary
-                        WHERE height = ? AND state_hash = ?
-                    "#;
-                if let Err(e) = db.execute(delete_query, [&summary.height.to_string(), &summary.state_hash.to_string()]) {
-                    println!("Unable to delete block summary entry: {:?}", e);
-                }
-                let insert_query = r#"
-                        INSERT INTO block_summary (
-                            height, state_hash, previous_state_hash, user_command_count, snark_work_count,
-                            timestamp, coinbase_receiver, coinbase_reward_nanomina, global_slot_since_genesis,
-                            last_vrf_output, is_berkeley_block, is_canonical
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    "#;
-                if let Err(e) = db.execute(
-                    insert_query,
-                    [
-                        &summary.height.to_string(),                    // height
-                        &summary.state_hash.to_string(),                // state_hash
-                        &summary.previous_state_hash.to_string(),       // previous_state_hash
-                        &summary.user_command_count.to_string(),        // user_command_count
-                        &summary.snark_work_count.to_string(),          // snark_work_count
-                        &summary.timestamp.to_string(),                 // timestamp
-                        &summary.coinbase_receiver.to_string(),         // coinbase_receiver
-                        &summary.coinbase_reward_nanomina.to_string(),  // coinbase_reward_nanomina
-                        &summary.global_slot_since_genesis.to_string(), // global_slot_since_genesis
-                        &summary.last_vrf_output.to_string(),           // last_vrf_output
-                        &summary.is_berkeley_block.to_string(),         // is_berkeley_block
-                        &canonical.to_string(),
-                    ],
-                ) {
-                    println!("Unable to insert block summary entry: {:?}", e);
-                }
-            }
-            Err(e) => {
-                println!("Unable to get database connection: {:?}", e);
-            }
-        }
+    async fn db_upsert(&self, summary: &BlockSummaryPayload, canonical: bool) -> Result<u64, &'static str> {
+        let upsert_query = r#"
+            INSERT INTO block_summary (
+                height, state_hash, previous_state_hash, user_command_count, snark_work_count,
+                timestamp, coinbase_receiver, coinbase_reward_nanomina, global_slot_since_genesis,
+                last_vrf_output, is_berkeley_block, is_canonical
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (height, state_hash)
+            DO UPDATE SET
+                previous_state_hash = EXCLUDED.previous_state_hash,
+                user_command_count = EXCLUDED.user_command_count,
+                snark_work_count = EXCLUDED.snark_work_count,
+                timestamp = EXCLUDED.timestamp,
+                coinbase_receiver = EXCLUDED.coinbase_receiver,
+                coinbase_reward_nanomina = EXCLUDED.coinbase_reward_nanomina,
+                global_slot_since_genesis = EXCLUDED.global_slot_since_genesis,
+                last_vrf_output = EXCLUDED.last_vrf_output,
+                is_berkeley_block = EXCLUDED.is_berkeley_block,
+                is_canonical = EXCLUDED.is_canonical
+        "#;
 
-        Ok(())
+        match self
+            .client
+            .execute(
+                upsert_query,
+                &[
+                    &(summary.height as i64),
+                    &summary.state_hash,
+                    &summary.previous_state_hash,
+                    &(summary.user_command_count as i32),
+                    &(summary.snark_work_count as i32),
+                    &(summary.timestamp as i64),
+                    &summary.coinbase_receiver,
+                    &(summary.coinbase_reward_nanomina as i64),
+                    &(summary.global_slot_since_genesis as i64),
+                    &summary.last_vrf_output,
+                    &summary.is_berkeley_block,
+                    &canonical,
+                ],
+            )
+            .await
+        {
+            Err(_) => Err("Unable to upsert into block_summary table"),
+            Ok(affected_rows) => Ok(affected_rows),
+        }
     }
 
     async fn upsert_block_summary(&self) -> Result<(), &'static str> {
@@ -111,7 +128,9 @@ impl BlockSummaryPersistenceActor {
                 // Deserialize the metadata string to extract block summary
                 let block_summary: BlockSummaryPayload = sonic_rs::from_str(&node.metadata_str.unwrap()).unwrap();
 
-                self.db_upsert(&block_summary, update.canonical).await.unwrap();
+                if let Ok(affected_rows) = self.db_upsert(&block_summary, update.canonical).await {
+                    assert_eq!(affected_rows, 1)
+                };
 
                 // Prune the tree as needed
                 tree.prune_tree().unwrap();

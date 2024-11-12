@@ -9,7 +9,7 @@ use events::Event;
 use futures::future::try_join_all;
 use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
-use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -27,6 +27,8 @@ pub async fn process_blocks_dir(
 ) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
+    let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
         Arc::new(PCBBlockPathActor::new(Arc::clone(shared_publisher))),
@@ -38,7 +40,7 @@ pub async fn process_blocks_dir(
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
-        Arc::new(BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher))),
+        Arc::new(block_persistence_actor),
     ];
 
     // Spawn tasks for each actor and collect their handles
@@ -76,7 +78,7 @@ pub async fn process_blocks_dir(
     for entry in entries {
         let path = entry.as_path();
 
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        // tokio::time::sleep(Duration::from_millis(1)).await;
         shared_publisher.publish(Event {
             event_type: events::EventType::PrecomputedBlockPath,
             payload: path.to_str().map(ToString::to_string).unwrap_or_default(),

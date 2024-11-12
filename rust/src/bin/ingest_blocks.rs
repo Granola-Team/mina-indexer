@@ -1,3 +1,4 @@
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
