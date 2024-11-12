@@ -1,4 +1,4 @@
-TRUNCATE staking_timing;
+truncate staking_timing;
 truncate staking_ledgers;
 truncate staking_epochs;
 truncate snark_jobs;

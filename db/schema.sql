@@ -1,10 +1,9 @@
--- Create sequences first
-CREATE SEQUENCE epoch_data_id_seq;
-CREATE SEQUENCE user_commands_id_seq;
-CREATE SEQUENCE internal_commands_id_seq;
-CREATE SEQUENCE snark_jobs_id_seq;
-CREATE SEQUENCE staking_ledgers_id_seq;
-CREATE SEQUENCE staking_epochs_id_seq;
+CREATE SEQUENCE IF NOT EXISTS epoch_data_id_seq;
+CREATE SEQUENCE IF NOT EXISTS user_commands_id_seq;
+CREATE SEQUENCE IF NOT EXISTS internal_commands_id_seq;
+CREATE SEQUENCE IF NOT EXISTS snark_jobs_id_seq;
+CREATE SEQUENCE IF NOT EXISTS staking_ledgers_id_seq;
+CREATE SEQUENCE IF NOT EXISTS staking_epochs_id_seq;
 
 -- Create tables
 CREATE TABLE IF NOT EXISTS accounts (
