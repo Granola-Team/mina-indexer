@@ -17,7 +17,7 @@ pub fn get_db_connection() -> Result<Connection, duckdb::Error> {
     db.execute_batch(
         "
             SET maximum_object_size='512MB';
-            SET memory_limit='4GB';
+            SET memory_limit='16GB';
         ",
     )?;
 

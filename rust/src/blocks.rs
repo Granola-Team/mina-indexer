@@ -7,7 +7,7 @@ use tracing::{error, info};
 
 pub fn run(blocks_dir: &str) -> Result<()> {
     let paths = get_file_paths(blocks_dir)?;
-    const BATCH_SIZE: usize = 10_000;
+    const BATCH_SIZE: usize = 5_000;
 
     for chunk in paths.chunks(BATCH_SIZE) {
         let db = get_db_connection()?;
@@ -130,7 +130,6 @@ pub fn run(blocks_dir: &str) -> Result<()> {
         // Insert data into permanent tables
         db.execute_batch(
             r#"
-            -- Insert accounts
             -- Insert accounts
             INSERT INTO accounts (public_key)
             SELECT DISTINCT val FROM (
