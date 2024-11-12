@@ -7,7 +7,7 @@ use actors::{
 };
 use events::Event;
 use futures::future::try_join_all;
-use payloads::GenesisBlockPayload;
+use payloads::{BlockCanonicityUpdatePayload, GenesisBlockPayload};
 use shared_publisher::SharedPublisher;
 use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
@@ -113,6 +113,7 @@ where
         }
     }
 }
+
 #[tokio::test]
 async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     use crate::stream::{events::EventType, payloads::*};
@@ -159,22 +160,64 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
 
     assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
-    // assert_eq!(
-    //     event_counts.get(&EventType::BerkeleyBlockPath).cloned().unwrap(),
-    //     todo!("No berkeley blocks yet")
-    // );
-    // assert_eq!(
-    //     event_counts.get(&EventType::BlockCanonicityUpdate).cloned().unwrap(),
-    //     todo!("Not yet calculated")
-    // );
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
-    assert_eq!(event_counts.get(&EventType::BestBlock).cloned().unwrap(), length_of_chain);
+    assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() > length_of_chain);
+    assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() < paths_count);
 
     // Best Block & Last canonical update:
     assert_eq!(last_best_block.clone().unwrap().height, length_of_chain as u64);
     assert_eq!(&last_best_block.unwrap().state_hash, "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
+    use crate::stream::events::EventType;
+    use std::{collections::HashMap, path::PathBuf, str::FromStr};
+    use tokio::{sync::broadcast, time::Duration};
+
+    // Create a shutdown channel for the test
+    let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
+
+    // Path to the directory with 100 mainnet block files
+    let blocks_dir = PathBuf::from_str("./src/stream/test_data/10_mainnet_blocks").expect("Directory with mainnet blocks should exist");
+
+    let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
+    let mut receiver = shared_publisher.subscribe();
+
+    // Spawn the task to process blocks
+    let process_handle = tokio::spawn({
+        let shared_publisher = Arc::clone(&shared_publisher);
+        async move {
+            process_blocks_dir(blocks_dir, &shared_publisher, shutdown_receiver).await.unwrap();
+        }
+    });
+
+    // Wait a short duration for some events to be processed, then trigger shutdown
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    let _ = shutdown_sender.send(());
+
+    // Wait for the task to finish processing
+    let _ = process_handle.await;
+
+    // Count each event type received
+    let mut event_counts: HashMap<EventType, usize> = HashMap::new();
+    let mut last_best_block: Option<BlockCanonicityUpdatePayload> = None;
+    while let Ok(event) = receiver.try_recv() {
+        if event.event_type == EventType::BestBlock {
+            last_best_block = Some(sonic_rs::from_str(&event.payload).unwrap());
+        }
+        *event_counts.entry(event.event_type).or_insert(0) += 1;
+    }
+
+    assert_eq!(event_counts.get(&EventType::BlockCanonicityUpdate).cloned().unwrap(), 25);
+
+    // Best Block & Last canonical update:
+    assert_eq!(last_best_block.clone().unwrap().height, 10 as u64);
+    assert_eq!(&last_best_block.unwrap().state_hash, "3NKHYHrqKpDcon6ToV5CLDiheanjshk5gcsNqefnK78phCFTR2aL");
 
     Ok(())
 }

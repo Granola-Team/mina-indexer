@@ -59,7 +59,7 @@ impl Actor for BestBlockActor {
                     });
                 }
                 // Update best block if the new block is canonical and has a higher height
-                Some(best_block) if block_payload.canonical && block_payload.height > best_block.height => {
+                Some(best_block) if block_payload.canonical && block_payload.height >= best_block.height => {
                     best_block.height = block_payload.height;
                     best_block.state_hash = block_payload.state_hash;
                     self.publish(Event {
