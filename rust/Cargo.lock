@@ -955,6 +955,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bigdecimal",
+ "chrono",
  "duckdb",
  "futures",
  "lazy_static",

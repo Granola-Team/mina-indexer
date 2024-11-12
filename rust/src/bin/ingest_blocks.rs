@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
     stream::{process_blocks_dir, shared_publisher::SharedPublisher},
@@ -32,7 +33,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
         tokio::spawn(async move {
             loop {
-                println!("Current buffer size: {}", shared_publisher.buffer_size());
+                let now: DateTime<Utc> = Utc::now();
+                println!("{} Current buffer size: {}", now.to_rfc3339(), shared_publisher.buffer_size());
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
         })
