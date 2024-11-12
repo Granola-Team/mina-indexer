@@ -13,10 +13,6 @@ libiconv.systems = ["aarch64-darwin", "x86_64-darwin"]
 # to match versions
 rust-analyzer.pkg-path = "rust-analyzer"
 rust-analyzer.pkg-group = "rust-analyzer"
-
-# Linker
-mold.pkg-path = "mold"
-mold.systems = ["aarch64-linux", "x86_64-linux"]
 zld.pkg-path = "zld"
 zld.systems = ["aarch64-darwin", "x86_64-darwin"]
 glibc.pkg-path = "glibc"

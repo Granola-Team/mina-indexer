@@ -33,13 +33,6 @@
           "x86_64-darwin"
         ]
       },
-      "mold": {
-        "pkg-path": "mold",
-        "systems": [
-          "aarch64-linux",
-          "x86_64-linux"
-        ]
-      },
       "nightly-rust": {
         "flake": "github:nix-community/fenix/monthly#default.toolchain"
       },
@@ -854,64 +847,6 @@
         "out": "/nix/store/gkxkraki0lmpz4dkzfn6h87jb6ry5hwf-libiconv-107"
       },
       "system": "x86_64-darwin",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "mold",
-      "broken": false,
-      "derivation": "/nix/store/8b6qvj0aqmwghxvjwwla6wdgjcg1dqky-mold-2.34.1.drv",
-      "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
-      "install_id": "mold",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "name": "mold-2.34.1",
-      "pname": "mold",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "2.34.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/49qfbwkii3nvfm2c6qfmq2kb0l6v6gqy-mold-2.34.1"
-      },
-      "system": "aarch64-linux",
-      "group": "toplevel",
-      "priority": 5
-    },
-    {
-      "attr_path": "mold",
-      "broken": false,
-      "derivation": "/nix/store/xmb2ahyzy8q4bbn0phx2znic2zgrf6w4-mold-2.34.1.drv",
-      "description": "Faster drop-in replacement for existing Unix linkers (unwrapped)",
-      "install_id": "mold",
-      "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "name": "mold-2.34.1",
-      "pname": "mold",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
-      "stabilities": [
-        "unstable"
-      ],
-      "unfree": false,
-      "version": "2.34.1",
-      "outputs_to_install": [
-        "out"
-      ],
-      "outputs": {
-        "out": "/nix/store/625h5ych6nvd0qm29liq43600k8ilf6x-mold-2.34.1"
-      },
-      "system": "x86_64-linux",
       "group": "toplevel",
       "priority": 5
     },
