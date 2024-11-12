@@ -61,3 +61,6 @@ rust-project.json
 Database
 *.db
 *.wal
+postgres/
+postgres_data/
+logfile
