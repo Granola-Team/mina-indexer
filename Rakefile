@@ -74,3 +74,6 @@ task :check do
   sh 'cargo-fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings'
   chdir root_dir
 end
+
+desc "Checks readiness of code"
+task :ready => [:lint, :format, :check, :test]
