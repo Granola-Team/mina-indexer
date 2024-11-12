@@ -61,15 +61,15 @@ CREATE TABLE IF NOT EXISTS user_commands (
     block_hash VARCHAR REFERENCES blocks(hash),
     status VARCHAR,
     source VARCHAR REFERENCES accounts(public_key),
-    source_balance DECIMAL,
+    source_balance DECIMAL(38, 9),
     target VARCHAR REFERENCES accounts(public_key),
-    target_balance DECIMAL,
-    fee DECIMAL,
+    target_balance DECIMAL(38, 9),
+    fee DECIMAL(38, 9),
     fee_payer VARCHAR REFERENCES accounts(public_key),
-    fee_payer_balance DECIMAL,
+    fee_payer_balance DECIMAL(38, 9),
     fee_token VARCHAR,
-    fee_payer_account_creation_fee_paid DECIMAL,
-    target_account_creation_fee_paid DECIMAL,
+    fee_payer_account_creation_fee_paid DECIMAL(38, 9),
+    target_account_creation_fee_paid DECIMAL(38, 9),
     nonce BIGINT,
     valid_until BIGINT,
     memo VARCHAR,
@@ -78,22 +78,22 @@ CREATE TABLE IF NOT EXISTS user_commands (
     created_token VARCHAR,
     type VARCHAR CHECK (type IN ('payment', 'staking_delegation')),
     token_id BIGINT,
-    amount DECIMAL
+    amount DECIMAL(38, 9)
 );
 
 CREATE TABLE IF NOT EXISTS internal_commands (
     id BIGINT DEFAULT(nextval('internal_commands_id_seq')) PRIMARY KEY,
     block_hash VARCHAR REFERENCES blocks(hash),
     type VARCHAR CHECK (type IN ('coinbase', 'fee_transfer')),
-    target1_balance DECIMAL,
-    target2_balance DECIMAL
+    target1_balance DECIMAL(38, 9),
+    target2_balance DECIMAL(38, 9)
 );
 
 CREATE TABLE IF NOT EXISTS snark_jobs (
     id BIGINT DEFAULT(nextval('snark_jobs_id_seq')) PRIMARY KEY,
     block_hash VARCHAR REFERENCES blocks(hash),
     prover VARCHAR REFERENCES accounts(public_key),
-    fee DECIMAL
+    fee DECIMAL(38, 9)
 );
 
 CREATE TABLE IF NOT EXISTS staking_epochs (
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS staking_ledgers (
     id BIGINT DEFAULT(nextval('staking_ledgers_id_seq')) PRIMARY KEY,
     staking_epoch_id BIGINT NOT NULL REFERENCES staking_epochs(id),
     source VARCHAR REFERENCES accounts(public_key),
-    balance DECIMAL,
+    balance DECIMAL(38, 9),
     target VARCHAR REFERENCES accounts(public_key),
     token VARCHAR,
     nonce BIGINT,
@@ -117,9 +117,9 @@ CREATE TABLE IF NOT EXISTS staking_ledgers (
 
 CREATE TABLE IF NOT EXISTS staking_timing (
     ledger_id BIGINT PRIMARY KEY REFERENCES staking_ledgers(id),
-    initial_minimum_balance DECIMAL,
+    initial_minimum_balance DECIMAL(38, 9),
     cliff_time BIGINT,
-    cliff_amount DECIMAL,
+    cliff_amount DECIMAL(38, 9),
     vesting_period BIGINT,
-    vesting_increment DECIMAL
+    vesting_increment DECIMAL(38, 9)
 );

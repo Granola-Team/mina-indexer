@@ -239,7 +239,7 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 nextval('snark_jobs_id_seq'),
                 hash,
                 json_extract_string(data, '$.prover'),
-                CAST(json_extract(data, '$.fee') AS DECIMAL)
+                CAST(json_extract(data, '$.fee') AS DECIMAL(38, 9))
             FROM temp_completed_works
             WHERE data IS NOT NULL;
 
@@ -256,18 +256,18 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                     WHEN 'Stake_delegation' THEN delegator
                     WHEN 'Payment' THEN source_pk
                 END,
-                CAST(NULLIF(source_balance, 'null') AS DECIMAL),
+                CAST(NULLIF(source_balance, 'null') AS DECIMAL(38, 9)),
                 CASE command_type
                     WHEN 'Stake_delegation' THEN new_delegate
                     WHEN 'Payment' THEN receiver_pk
                 END,
-                CAST(NULLIF(receiver_balance, 'null') AS DECIMAL),
-                CAST(fee AS DECIMAL),
+                CAST(NULLIF(receiver_balance, 'null') AS DECIMAL(38, 9)),
+                CAST(fee AS DECIMAL(38, 9)),
                 fee_payer_pk,
-                CAST(NULLIF(fee_payer_balance, 'null') AS DECIMAL),
+                CAST(NULLIF(fee_payer_balance, 'null') AS DECIMAL(38, 9)),
                 fee_token,
-                CAST(NULLIF(fee_payer_account_creation_fee_paid, 'null') AS DECIMAL),
-                CAST(NULLIF(receiver_account_creation_fee_paid, 'null') AS DECIMAL),
+                CAST(NULLIF(fee_payer_account_creation_fee_paid, 'null') AS DECIMAL(38, 9)),
+                CAST(NULLIF(receiver_account_creation_fee_paid, 'null') AS DECIMAL(38, 9)),
                 CAST(nonce AS BIGINT),
                 CAST(valid_until AS BIGINT),
                 memo,
@@ -279,7 +279,7 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                     WHEN 'Payment' THEN 'payment'
                 END,
                 CAST(NULLIF(token_id, 'null') AS BIGINT),
-                CAST(NULLIF(amount, 'null') AS DECIMAL)
+                CAST(NULLIF(amount, 'null') AS DECIMAL(38, 9))
             FROM temp_user_commands
             WHERE command_type IN ('Stake_delegation', 'Payment');
 
@@ -300,13 +300,13 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 END,
                 -- First target balance based on command type
                 CASE type
-                    WHEN 'Coinbase' THEN CAST(json_extract_string(data, '$[1].coinbase_receiver_balance') AS DECIMAL)
-                    WHEN 'Fee_transfer' THEN CAST(json_extract_string(data, '$[1].receiver1_balance') AS DECIMAL)
+                    WHEN 'Coinbase' THEN CAST(json_extract_string(data, '$[1].coinbase_receiver_balance') AS DECIMAL(38, 9))
+                    WHEN 'Fee_transfer' THEN CAST(json_extract_string(data, '$[1].receiver1_balance') AS DECIMAL(38, 9))
                 END as target1_balance,
                 -- Second target balance based on command type
                 CASE type
-                    WHEN 'Coinbase' THEN CAST(NULLIF(json_extract_string(data, '$[1].fee_transfer_receiver_balance'), 'null') AS DECIMAL)
-                    WHEN 'Fee_transfer' THEN CAST(NULLIF(json_extract_string(data, '$[1].receiver2_balance'), 'null') AS DECIMAL)
+                    WHEN 'Coinbase' THEN CAST(NULLIF(json_extract_string(data, '$[1].fee_transfer_receiver_balance'), 'null') AS DECIMAL(38, 9))
+                    WHEN 'Fee_transfer' THEN CAST(NULLIF(json_extract_string(data, '$[1].receiver2_balance'), 'null') AS DECIMAL(38, 9))
                 END as target2_balance
             FROM temp_internal_commands
             WHERE data IS NOT NULL;

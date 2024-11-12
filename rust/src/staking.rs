@@ -14,7 +14,7 @@ pub fn run(staking_dir: &str) -> Result<()> {
     db.execute_batch(
         "CREATE TEMPORARY TABLE ledgers (
             pk VARCHAR NOT NULL CHECK (pk SIMILAR TO 'B62[0-9A-Za-z]{52}'),
-            balance DECIMAL NOT NULL,
+            balance DECIMAL(38, 9) NOT NULL,
             delegate VARCHAR NULL,
             token VARCHAR NULL,
             nonce BIGINT NULL,
@@ -46,7 +46,7 @@ pub fn run(staking_dir: &str) -> Result<()> {
                     )
                     SELECT
                         json_extract_string(json, '$.pk'),
-                        CAST(json_extract_string(json, '$.balance') AS DECIMAL),
+                        CAST(json_extract_string(json, '$.balance') AS DECIMAL(38, 9)),
                         json_extract_string(json, '$.delegate'),
                         json_extract_string(json, '$.token'),
                         CAST(json_extract_string(json, '$.nonce') AS BIGINT),
@@ -141,11 +141,11 @@ pub fn run(staking_dir: &str) -> Result<()> {
                     )
                     SELECT
                         sl.id,
-                        CAST(l.timing->>'initial_minimum_balance' AS DECIMAL),
+                        CAST(l.timing->>'initial_minimum_balance' AS DECIMAL(38, 9)),
                         CAST(l.timing->>'cliff_time' AS BIGINT),
-                        CAST(l.timing->>'cliff_amount' AS DECIMAL),
+                        CAST(l.timing->>'cliff_amount' AS DECIMAL(38, 9)),
                         CAST(l.timing->>'vesting_period' AS BIGINT),
-                        CAST(l.timing->>'vesting_increment' AS DECIMAL)
+                        CAST(l.timing->>'vesting_increment' AS DECIMAL(38, 9))
                     FROM staking_ledgers sl
                     JOIN staking_epochs se ON sl.staking_epoch_id = se.id
                     JOIN ledgers l ON sl.source = l.pk
