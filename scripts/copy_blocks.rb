@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 
-require 'fileutils'
-require 'optparse'
+require "fileutils"
+require "optparse"
 
 # Define default parameters
 options = {
-  source_dir: '/path/to/source',       # Default source directory (change as needed)
-  destination_dir: '/path/to/destination', # Default destination directory (change as needed)
+  source_dir: "/path/to/source",       # Default source directory (change as needed)
+  destination_dir: "/path/to/destination", # Default destination directory (change as needed)
   range_min: 1,    # Default minimum range value
   range_max: 25    # Default maximum range value
 }
@@ -35,7 +35,7 @@ FileUtils.mkdir_p(options[:destination_dir])
 
 # Copy files within the specified range
 Dir.glob("#{options[:source_dir]}/*-*.json").each do |file|
-  if file.match(/-\d+-/)  # Check for a number in the filename
+  if /-\d+-/.match?(file)  # Check for a number in the filename
     number = file[/-(\d+)-/, 1].to_i
 
     # Check if the number is within the specified range

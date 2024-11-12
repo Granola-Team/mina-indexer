@@ -59,6 +59,16 @@
       },
       "sqlfluff": {
         "pkg-path": "sqlfluff"
+      },
+      "standard": {
+        "pkg-path": "rubyPackages.standard"
+      },
+      "zld": {
+        "pkg-path": "zld",
+        "systems": [
+          "aarch64-darwin",
+          "x86_64-darwin"
+        ]
       }
     },
     "hook": {
@@ -1310,6 +1320,172 @@
         "out": "/nix/store/vj14s5yv0a4py7l52rvp2fz2fks200vx-sqlfluff-3.2.5"
       },
       "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rubyPackages.standard",
+      "broken": false,
+      "derivation": "/nix/store/jda9xgbyjywva9hwv9yxma8ah64z0dhy-ruby3.3-standard-1.40.0.drv",
+      "install_id": "standard",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "ruby3.3-standard-1.40.0",
+      "pname": "standard",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "ruby3.3-standard-1.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7nrmnn6r7lpg1zrycydnh58bsgsnxkhg-ruby3.3-standard-1.40.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rubyPackages.standard",
+      "broken": false,
+      "derivation": "/nix/store/7b3ciprr4nw0baapkdz50pg50f4j4rhz-ruby3.3-standard-1.40.0.drv",
+      "install_id": "standard",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "ruby3.3-standard-1.40.0",
+      "pname": "standard",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "ruby3.3-standard-1.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/kx5p5f830gk552bxvscj62zfg3fl7xpy-ruby3.3-standard-1.40.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rubyPackages.standard",
+      "broken": false,
+      "derivation": "/nix/store/5x59r7am79npcnfvmm6lyq6lyvxh71g7-ruby3.3-standard-1.40.0.drv",
+      "install_id": "standard",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "ruby3.3-standard-1.40.0",
+      "pname": "standard",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "ruby3.3-standard-1.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/3fpy5wnpf48028ghvf5j7j698pzx40j7-ruby3.3-standard-1.40.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "rubyPackages.standard",
+      "broken": false,
+      "derivation": "/nix/store/y2kz7lv1zl0yy1s2gzqv1yl3wzfqapjn-ruby3.3-standard-1.40.0.drv",
+      "install_id": "standard",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "ruby3.3-standard-1.40.0",
+      "pname": "standard",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "ruby3.3-standard-1.40.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/k5k0xkxkxkb5q6azx3j621zvz9yy83h0-ruby3.3-standard-1.40.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zld",
+      "broken": false,
+      "derivation": "/nix/store/280nbn95v0xnj9284mdrikgxazqgqb75-zld-1.3.4.drv",
+      "description": "Faster version of Apple's linker",
+      "install_id": "zld",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "zld-1.3.4",
+      "pname": "zld",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.3.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wh35kcnc6ngpn0af1vgdg9r5xv2hxsf4-zld-1.3.4"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "zld",
+      "broken": false,
+      "derivation": "/nix/store/lgpbyv8s5hvdnxd7395iy2wzj927z9vc-zld-1.3.4.drv",
+      "description": "Faster version of Apple's linker",
+      "install_id": "zld",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "zld-1.3.4",
+      "pname": "zld",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.3.4",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/40xamqpmjl24avyplbynbvzxmvblavpp-zld-1.3.4"
+      },
+      "system": "x86_64-darwin",
       "group": "toplevel",
       "priority": 5
     },

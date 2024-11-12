@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 
-require 'json'
-require 'optparse'
+require "json"
+require "optparse"
 
 # Define default options
 options = {
-  source_dir: '/path/to/source',
-  tip_file: 'mainnet-25-<tip_hash>.json'
+  source_dir: "/path/to/source",
+  tip_file: "mainnet-25-<tip_hash>.json"
 }
 
 # Parse command-line options

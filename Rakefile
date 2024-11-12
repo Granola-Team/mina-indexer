@@ -65,6 +65,7 @@ task :lint do
   sh 'cargo machete --fix'
   sh 'cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings'
   chdir root_dir
+  sh 'standardrb --fix scripts'
 end
 
 desc "Check code formatting and run Clippy"
@@ -73,6 +74,7 @@ task :check do
   sh 'cargo machete'
   sh 'cargo-fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings'
   chdir root_dir
+  sh 'standardrb --no-fix scripts'
 end
 
 desc "Start database service"
