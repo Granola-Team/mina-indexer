@@ -43,6 +43,9 @@
           "x86_64-linux"
         ]
       },
+      "postgresql": {
+        "pkg-path": "postgresql_17"
+      },
       "ruby": {
         "pkg-path": "ruby"
       },
@@ -62,7 +65,9 @@
         ]
       }
     },
-    "hook": {},
+    "hook": {
+      "on-activate": "    export PGPORT=\"${PGPORT:-9002}\"\n\n    export PGUSER=mina_indexer\n    export PGPASS=mina_indexer\n    export PGDATABASE=mina_indexer\n    export SESSION_SECRET=\"$USER-session-secret\"\n\n    # Postgres environment variables\n    export PGDATA=$PWD/postgres_data\n    export PGHOST=$PWD/postgres\n    export LOG_PATH=$PGHOST/LOG\n    export DATABASE_URL=\"postgresql:///$PGDATABASE?host=$PGHOST&port=$PGPORT\"\n    mkdir -p $PGHOST\n    if [ ! -d $PGDATA ]; then\n      echo 'Initializing postgresql database...'\n      initdb $PGDATA --username $PGUSER -A md5 --pwfile=<(echo $PGPASS) --auth=trust\n      echo \"listen_addresses='*'\" >> $PGDATA/postgresql.conf\n      echo \"unix_socket_directories='$PGHOST'\" >> $PGDATA/postgresql.conf\n      echo \"unix_socket_permissions=0700\" >> $PGDATA/postgresql.conf\n    fi\n"
+    },
     "profile": {},
     "options": {
       "systems": [
@@ -75,6 +80,20 @@
         "licenses": []
       },
       "semver": {}
+    },
+    "services": {
+      "database": {
+        "command": "postgres start",
+        "vars": {
+          "PGDATABASE": "mina_indexer",
+          "PGPASSWORD": "mina_indexer",
+          "PGPORT": "9002",
+          "PGUSER": "mina_indexer"
+        },
+        "is-daemon": null,
+        "shutdown": null,
+        "systems": null
+      }
     }
   },
   "packages": [
@@ -541,13 +560,13 @@
       "description": "Embeddable SQL OLAP Database Management System",
       "install_id": "duckdb",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "duckdb-1.1.2",
       "pname": "duckdb",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -572,13 +591,13 @@
       "description": "Embeddable SQL OLAP Database Management System",
       "install_id": "duckdb",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "duckdb-1.1.2",
       "pname": "duckdb",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -797,13 +816,13 @@
       "description": "Iconv(3) implementation",
       "install_id": "libiconv",
       "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "libiconv-107",
       "pname": "libiconv",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -827,13 +846,13 @@
       "description": "Iconv(3) implementation",
       "install_id": "libiconv",
       "license": "[ BSD-2-Clause, BSD-3-Clause, APSL-1.0 ]",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "libiconv-107",
       "pname": "libiconv",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -921,19 +940,157 @@
       "priority": 5
     },
     {
+      "attr_path": "postgresql_17",
+      "broken": false,
+      "derivation": "/nix/store/fqhg90yg3lb0vanjzhxryqxax3np29aj-postgresql-17.0.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "postgresql-17.0",
+      "pname": "postgresql_17",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "postgresql-17.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "dev": "/nix/store/33jgy0lz77y5cqhwnl3sqlrk3d3hrw3s-postgresql-17.0-dev",
+        "doc": "/nix/store/mm1ziwdk2cn0dg9mrdd2q6fcjg35braj-postgresql-17.0-doc",
+        "lib": "/nix/store/3mvf7k0crdpk6dz5ns7zkibsyaryij1x-postgresql-17.0-lib",
+        "man": "/nix/store/7ww2fy5sv1fhlb32nknk47hc61bbc214-postgresql-17.0-man",
+        "out": "/nix/store/3wmd815gb9fkjav7ah4p6n7jvqi4hr00-postgresql-17.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_17",
+      "broken": false,
+      "derivation": "/nix/store/n0w0ly75m0qap2i8jg1fxkab5xyycqld-postgresql-17.0.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "postgresql-17.0",
+      "pname": "postgresql_17",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "postgresql-17.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "dev": "/nix/store/pjjqbv26y5inpn2s27mpdafa5b7vn4vz-postgresql-17.0-dev",
+        "doc": "/nix/store/19lqgqr1997c7mxpmnm79nl7qsc0z1mx-postgresql-17.0-doc",
+        "lib": "/nix/store/yav72nd3l6xnzps83b23xf01pi2vlz4d-postgresql-17.0-lib",
+        "man": "/nix/store/qzl3a0x9axkcw9vvic4hfx3gxaq9hq7h-postgresql-17.0-man",
+        "out": "/nix/store/rh37y2iz53c1a1xmic02dhq824cqm00f-postgresql-17.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_17",
+      "broken": false,
+      "derivation": "/nix/store/fsb5cp5n2m9jv6iy5682qdplqvpv2h4i-postgresql-17.0.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "postgresql-17.0",
+      "pname": "postgresql_17",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "postgresql-17.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "debug": "/nix/store/kvp4cra882q3zrbn98ifkvsw9ifsqn9p-postgresql-17.0-debug",
+        "dev": "/nix/store/aqpxyinwmhh60pzink5qaar8fdbwb2kx-postgresql-17.0-dev",
+        "doc": "/nix/store/raiv59cb4aa5idj4rah58ql3kj4x2lhq-postgresql-17.0-doc",
+        "lib": "/nix/store/rdy3wxrb3bs95qc7pj68k2pcbz0kcman-postgresql-17.0-lib",
+        "man": "/nix/store/dg7813s8l9p7s6q6kpz2zy5jn2xxf0da-postgresql-17.0-man",
+        "out": "/nix/store/i4f6q5yq6xsyy8nyd5zbp8wzkdgn58xq-postgresql-17.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "postgresql_17",
+      "broken": false,
+      "derivation": "/nix/store/d7j78wplhgib3l7vrcmn92xhrniq2zc3-postgresql-17.0.drv",
+      "description": "Powerful, open source object-relational database system",
+      "install_id": "postgresql",
+      "license": "PostgreSQL",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "postgresql-17.0",
+      "pname": "postgresql_17",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "postgresql-17.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "debug": "/nix/store/i313jcfhg9y8qxcsly78fc9xin3q57w9-postgresql-17.0-debug",
+        "dev": "/nix/store/57v8m3886b3kvf49q5rcc535llfahjq6-postgresql-17.0-dev",
+        "doc": "/nix/store/jwjy9lhgkkv8k6bia8n5786h3vwksqb8-postgresql-17.0-doc",
+        "lib": "/nix/store/ka6y8fclayrdhdr7j02fxbqnk5d1ljzn-postgresql-17.0-lib",
+        "man": "/nix/store/b1idvh7pxnqrxbkgsz52y42j7pqdmbsr-postgresql-17.0-man",
+        "out": "/nix/store/p5n515lv5a3wyq53ws14w1a6z9fi28y6-postgresql-17.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "ruby",
       "broken": false,
       "derivation": "/nix/store/0qr7zkxfy4jn533fclik3dg1gdcf7dlw-ruby-3.3.5.drv",
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -957,13 +1114,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -987,13 +1144,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -1017,13 +1174,13 @@
       "description": "Object-oriented language for quick and easy programming",
       "install_id": "ruby",
       "license": "Ruby",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "ruby-3.3.5",
       "pname": "ruby",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -1047,13 +1204,13 @@
       "description": "Faster version of Apple's linker",
       "install_id": "zld",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "zld-1.3.4",
       "pname": "zld",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -1076,13 +1233,13 @@
       "description": "Faster version of Apple's linker",
       "install_id": "zld",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "zld-1.3.4",
       "pname": "zld",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
