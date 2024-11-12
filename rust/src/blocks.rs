@@ -10,10 +10,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
     const BATCH_SIZE: usize = 5_000;
 
     for chunk in paths.chunks(BATCH_SIZE) {
-        let db = get_db_connection()?;
+        let mut db = get_db_connection()?;
+        let tx = db.transaction()?;
 
         // Create temporary table for raw JSON data
-        db.execute_batch(
+        tx.execute_batch(
             "CREATE TEMPORARY TABLE raw_blocks (
                 hash VARCHAR,
                 height BIGINT,
@@ -36,14 +37,14 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 block_hash, height, file_path
             );
 
-            match db.execute_batch(&sql) {
+            match tx.execute_batch(&sql) {
                 Ok(_) => info!("Successfully loaded block {}", block_hash),
                 Err(e) => error!("Error loading block {}: {}", block_hash, e),
             }
         }
 
         // Create base views for common JSON paths
-        db.execute_batch(
+        tx.execute_batch(
             r#"
             CREATE TEMPORARY VIEW json_paths AS
             SELECT
@@ -128,7 +129,7 @@ pub fn run(blocks_dir: &str) -> Result<()> {
         )?;
 
         // Insert data into permanent tables
-        db.execute_batch(
+        tx.execute_batch(
             r#"
             -- Insert accounts
             INSERT INTO accounts (public_key)
@@ -164,6 +165,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
             WHERE val IS NOT NULL
             AND val SIMILAR TO 'B62[0-9A-Za-z]{52}'
             ON CONFLICT (public_key) DO NOTHING;
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
 
             -- Insert blocks
             INSERT INTO blocks (
@@ -200,6 +206,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 CAST(json_extract(consensus, '$.min_window_density') AS BIGINT),
                 CAST(json_extract(consensus, '$.has_ancestor_in_same_checkpoint_window') AS BOOLEAN)
             FROM extracted_state;
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
 
             -- Insert blockchain states
             INSERT INTO blockchain_states (
@@ -217,6 +228,12 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 CAST(json_extract(blockchain, '$.timestamp') AS BIGINT)
             FROM extracted_state;
 
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
+
             -- Insert staged ledger hashes
             INSERT INTO staged_ledger_hashes (
                 block_hash,
@@ -233,6 +250,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
                 json_extract_string(blockchain, '$.staged_ledger_hash.pending_coinbase_hash')
             FROM extracted_state;
 
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
             -- Insert snark jobs
             INSERT INTO snark_jobs (id, block_hash, prover, fee)
             SELECT
@@ -243,6 +265,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
             FROM temp_completed_works
             WHERE data IS NOT NULL;
 
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
             -- Insert user commands
             INSERT INTO user_commands
             SELECT
@@ -283,6 +310,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
             FROM temp_user_commands
             WHERE command_type IN ('Stake_delegation', 'Payment');
 
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
             -- Insert internal commands
             INSERT INTO internal_commands (
                 id,
@@ -311,6 +343,11 @@ pub fn run(blocks_dir: &str) -> Result<()> {
             FROM temp_internal_commands
             WHERE data IS NOT NULL;
 
+            "#,
+        )?;
+
+        tx.execute_batch(
+            r#"
             -- Insert epoch data
             WITH epoch_types(path, label) AS (
                 VALUES
