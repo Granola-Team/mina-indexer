@@ -1,5 +1,8 @@
 use core::time;
-use mina_indexer::stream::{process_blocks_dir, shared_publisher::SharedPublisher};
+use mina_indexer::{
+    constants::CHANNEL_MESSAGE_CAPACITY,
+    stream::{process_blocks_dir, shared_publisher::SharedPublisher},
+};
 use std::{env, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::{signal, sync::broadcast};
 
@@ -14,7 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let blocks_dir =
         PathBuf::from_str(&env::var("BLOCKS_DIR").expect("expected BLOCKS_DIR environment variable to be present")).expect("expected blocks dir to exist");
 
-    let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
+    let shared_publisher = Arc::new(SharedPublisher::new(CHANNEL_MESSAGE_CAPACITY)); // Initialize publisher
 
     // Spawn the process_blocks_dir task with the shutdown receiver
     let process_handle = {
