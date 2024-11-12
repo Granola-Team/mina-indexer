@@ -1,9 +1,8 @@
-use core::time;
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
     stream::{process_blocks_dir, shared_publisher::SharedPublisher},
 };
-use std::{env, path::PathBuf, str::FromStr, sync::Arc};
+use std::{env, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
@@ -32,10 +31,9 @@ async fn main() -> Result<(), anyhow::Error> {
         let shared_publisher = Arc::clone(&shared_publisher);
 
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(time::Duration::from_secs(1));
             loop {
-                interval.tick().await;
                 println!("Current buffer size: {}", shared_publisher.buffer_size());
+                tokio::time::sleep(Duration::from_secs(60)).await;
             }
         })
     };
