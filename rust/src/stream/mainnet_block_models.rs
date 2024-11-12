@@ -1,6 +1,5 @@
 use crate::constants::MAINNET_COINBASE_REWARD;
-use serde::{Deserialize, Serialize};
-use sonic_rs::Value; // To handle arbitrary JSON objects
+use sonic_rs::{Deserialize, Serialize, Value}; // To handle arbitrary JSON objects
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainnetBlock {

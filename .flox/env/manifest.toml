@@ -19,12 +19,24 @@ mold.pkg-path = "mold"
 mold.systems = ["aarch64-linux", "x86_64-linux"]
 zld.pkg-path = "zld"
 zld.systems = ["aarch64-darwin", "x86_64-darwin"]
+glibc.pkg-path = "glibc"
+glibc.systems = ["aarch64-linux", "x86_64-linux"]
+gcc.pkg-path = "gcc"
+gcc.systems = ["aarch64-linux", "x86_64-linux"]
+openssl.pkg-path = "openssl"
+openssl.systems = ["aarch64-linux", "x86_64-linux"]
 
 # Ruby
 ruby.pkg-path = "ruby"
 
 # Database
 duckdb.pkg-path = "duckdb"
+
+# Cargo
+cargo-machete.pkg-path = "cargo-machete"
+cargo-edit.pkg-path = "cargo-edit"
+
+# Misc
 
 [vars]
 

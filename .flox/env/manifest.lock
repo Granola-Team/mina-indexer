@@ -3,8 +3,28 @@
   "manifest": {
     "version": 1,
     "install": {
+      "cargo-edit": {
+        "pkg-path": "cargo-edit"
+      },
+      "cargo-machete": {
+        "pkg-path": "cargo-machete"
+      },
       "duckdb": {
         "pkg-path": "duckdb"
+      },
+      "gcc": {
+        "pkg-path": "gcc",
+        "systems": [
+          "aarch64-linux",
+          "x86_64-linux"
+        ]
+      },
+      "glibc": {
+        "pkg-path": "glibc",
+        "systems": [
+          "aarch64-linux",
+          "x86_64-linux"
+        ]
       },
       "libiconv": {
         "pkg-path": "libiconv",
@@ -22,6 +42,13 @@
       },
       "nightly-rust": {
         "flake": "github:nix-community/fenix/monthly#default.toolchain"
+      },
+      "openssl": {
+        "pkg-path": "openssl",
+        "systems": [
+          "aarch64-linux",
+          "x86_64-linux"
+        ]
       },
       "ruby": {
         "pkg-path": "ruby"
@@ -283,6 +310,238 @@
       "priority": 5
     },
     {
+      "attr_path": "cargo-edit",
+      "broken": false,
+      "derivation": "/nix/store/45qbzv5qnr8i3mrm0b17k8ci1f7g2gn6-cargo-edit-0.13.0.drv",
+      "description": "Utility for managing cargo dependencies from the command line",
+      "install_id": "cargo-edit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-edit-0.13.0",
+      "pname": "cargo-edit",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dkgiz5i127k2dgz1y60lca3c9cwijlax-cargo-edit-0.13.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-edit",
+      "broken": false,
+      "derivation": "/nix/store/vham5xll9rf3m3raa9wpjjxqizz6yffl-cargo-edit-0.13.0.drv",
+      "description": "Utility for managing cargo dependencies from the command line",
+      "install_id": "cargo-edit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-edit-0.13.0",
+      "pname": "cargo-edit",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zrivjkiz14w3ir9pd80p2pzndz18hzzv-cargo-edit-0.13.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-edit",
+      "broken": false,
+      "derivation": "/nix/store/lvx0vqxvknfbyvi9d508nxcgjckjiiy1-cargo-edit-0.13.0.drv",
+      "description": "Utility for managing cargo dependencies from the command line",
+      "install_id": "cargo-edit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-edit-0.13.0",
+      "pname": "cargo-edit",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/dcm78mxdnpq3c06af4rclb0fh9l9lb4q-cargo-edit-0.13.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-edit",
+      "broken": false,
+      "derivation": "/nix/store/qyl0pafmpzi7hfqwgalm3ndk0apap9y0-cargo-edit-0.13.0.drv",
+      "description": "Utility for managing cargo dependencies from the command line",
+      "install_id": "cargo-edit",
+      "license": "[ Apache-2.0, MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-edit-0.13.0",
+      "pname": "cargo-edit",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.13.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/bsjzwp4i4g2blbx2k230gldq7mmhrznm-cargo-edit-0.13.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-machete",
+      "broken": false,
+      "derivation": "/nix/store/4n6hzxmpvvc6qfb9fhcz6hkx86zd14mx-cargo-machete-0.7.0.drv",
+      "description": "Cargo tool that detects unused dependencies in Rust projects",
+      "install_id": "cargo-machete",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-machete-0.7.0",
+      "pname": "cargo-machete",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/v6yhqprzdlkq7lfpqwv42wpx5z3sjb4b-cargo-machete-0.7.0"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-machete",
+      "broken": false,
+      "derivation": "/nix/store/gj4xq4cn4f0iv6rnpz2pf7l76qzngmmq-cargo-machete-0.7.0.drv",
+      "description": "Cargo tool that detects unused dependencies in Rust projects",
+      "install_id": "cargo-machete",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-machete-0.7.0",
+      "pname": "cargo-machete",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qgngjz26yvwncccq6ricq5r4gb5dlwrp-cargo-machete-0.7.0"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-machete",
+      "broken": false,
+      "derivation": "/nix/store/3hnb7jvfa2hihxk5hdqzpy4z675293fi-cargo-machete-0.7.0.drv",
+      "description": "Cargo tool that detects unused dependencies in Rust projects",
+      "install_id": "cargo-machete",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-machete-0.7.0",
+      "pname": "cargo-machete",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/afm4a8qdwnk7ci3prbdvj42sr93nmsiz-cargo-machete-0.7.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "cargo-machete",
+      "broken": false,
+      "derivation": "/nix/store/rlicyfnjm7k8l33bs3jrwq1fz92pl3cz-cargo-machete-0.7.0.drv",
+      "description": "Cargo tool that detects unused dependencies in Rust projects",
+      "install_id": "cargo-machete",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "cargo-machete-0.7.0",
+      "pname": "cargo-machete",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.0",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/7w1xb7vlrbdn2hif03lf0mblf0kzfajd-cargo-machete-0.7.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
       "attr_path": "duckdb",
       "broken": false,
       "derivation": "/nix/store/dl2jh4k0zvr8cimcrg19c8yxybvhz94n-duckdb-1.1.2.drv",
@@ -351,13 +610,13 @@
       "description": "Embeddable SQL OLAP Database Management System",
       "install_id": "duckdb",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "duckdb-1.1.2",
       "pname": "duckdb",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -382,13 +641,13 @@
       "description": "Embeddable SQL OLAP Database Management System",
       "install_id": "duckdb",
       "license": "MIT",
-      "locked_url": "https://github.com/flox/nixpkgs?rev=4aa36568d413aca0ea84a1684d2d46f55dbabad7",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "name": "duckdb-1.1.2",
       "pname": "duckdb",
-      "rev": "4aa36568d413aca0ea84a1684d2d46f55dbabad7",
-      "rev_count": 703931,
-      "rev_date": "2024-11-05T05:43:48Z",
-      "scrape_date": "2024-11-07T03:55:45Z",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
       "stabilities": [
         "unstable"
       ],
@@ -401,6 +660,138 @@
         "dev": "/nix/store/jjvl3pjgipx3sch6qilvxp6jhfqmd7ym-duckdb-1.1.2-dev",
         "lib": "/nix/store/billgkvg0azhryxg7v0syr64jk9pyjmz-duckdb-1.1.2-lib",
         "out": "/nix/store/p9fjs5a606a0zrkb7q62slwy99xkakgg-duckdb-1.1.2"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gcc",
+      "broken": false,
+      "derivation": "/nix/store/lbjwdmk0a2vkib0kl6fb6290hxbcg7n3-gcc-wrapper-13.3.0.drv",
+      "description": "GNU Compiler Collection, version 13.3.0 (wrapper script)",
+      "install_id": "gcc",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "gcc-wrapper-13.3.0",
+      "pname": "gcc",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "wrapper-13.3.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "info": "/nix/store/z4s1jh6s6bybsvbhgdgzpg4mi2dy1p9j-gcc-wrapper-13.3.0-info",
+        "man": "/nix/store/z1gi1i3jyvh8v2blm59qpm9mm3xv1k7p-gcc-wrapper-13.3.0-man",
+        "out": "/nix/store/g45nm13bwh1jxypl33wxi016yjzbidkp-gcc-wrapper-13.3.0"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "gcc",
+      "broken": false,
+      "derivation": "/nix/store/r3890165w1rv337m56xqvazwgbw25rj8-gcc-wrapper-13.3.0.drv",
+      "description": "GNU Compiler Collection, version 13.3.0 (wrapper script)",
+      "install_id": "gcc",
+      "license": "GPL-3.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "gcc-wrapper-13.3.0",
+      "pname": "gcc",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "wrapper-13.3.0",
+      "outputs_to_install": [
+        "out",
+        "man"
+      ],
+      "outputs": {
+        "info": "/nix/store/3z941y4gyqs2m0bs8v3qnil42irx1dmp-gcc-wrapper-13.3.0-info",
+        "man": "/nix/store/bhd4nlz0993jcsmp7b4fpgjyc9knh1yx-gcc-wrapper-13.3.0-man",
+        "out": "/nix/store/hgw57m0jh2w10jsv8x86ng267pm5sla8-gcc-wrapper-13.3.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glibc",
+      "broken": false,
+      "derivation": "/nix/store/0v2m9id0vhckxrib6h4177py31nlcd4z-glibc-2.40-36.drv",
+      "description": "GNU C Library",
+      "install_id": "glibc",
+      "license": "LGPL-2.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "glibc-2.40-36",
+      "pname": "glibc",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.40-36",
+      "outputs_to_install": [
+        "bin"
+      ],
+      "outputs": {
+        "bin": "/nix/store/pp0sc4ry232c2f3cfljhp4ncfmbc2dpw-glibc-2.40-36-bin",
+        "debug": "/nix/store/jvinvfjml28l2b56c4wdgb4kgnk0llia-glibc-2.40-36-debug",
+        "dev": "/nix/store/ah9kr35lsmsa8gxngkksj02xir5li1yh-glibc-2.40-36-dev",
+        "getent": "/nix/store/1z4vn6rphd7w1ixgvisxxm6dk6ffmm2g-glibc-2.40-36-getent",
+        "out": "/nix/store/mkg8ismz3szq25r4gzq77xblkkp518r0-glibc-2.40-36",
+        "static": "/nix/store/k91gp7k55284ymy2blxy82msipr3m3mf-glibc-2.40-36-static"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "glibc",
+      "broken": false,
+      "derivation": "/nix/store/cxd5si2wb4qr1p20m79xdp1gdxfjyg7l-glibc-2.40-36.drv",
+      "description": "GNU C Library",
+      "install_id": "glibc",
+      "license": "LGPL-2.0-or-later",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "glibc-2.40-36",
+      "pname": "glibc",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "2.40-36",
+      "outputs_to_install": [
+        "bin"
+      ],
+      "outputs": {
+        "bin": "/nix/store/5571d6dklkwfcp1812dj4lxb0gl3w1yw-glibc-2.40-36-bin",
+        "debug": "/nix/store/4hyvva1qccsqw6w2vy8p9rb659hjm8lh-glibc-2.40-36-debug",
+        "dev": "/nix/store/932dj5qwfzck90mnvqpd1f9hjqznaqdj-glibc-2.40-36-dev",
+        "getent": "/nix/store/az5vszpdy3i53lksl8rbjai7bc88r5zs-glibc-2.40-36-getent",
+        "out": "/nix/store/3bvxjkkmwlymr0fssczhgi39c3aj1l7i-glibc-2.40-36",
+        "static": "/nix/store/dn3xrgx3gcg6y4ijnjrxm8px2d7rh6zk-glibc-2.40-36-static"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
@@ -519,6 +910,76 @@
       ],
       "outputs": {
         "out": "/nix/store/625h5ych6nvd0qm29liq43600k8ilf6x-mold-2.34.1"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openssl",
+      "broken": false,
+      "derivation": "/nix/store/r9crmaak3absa2xyw4bjrj7x5bh2sdq0-openssl-3.3.2.drv",
+      "description": "Cryptographic library that implements the SSL and TLS protocols",
+      "install_id": "openssl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "openssl-3.3.2",
+      "pname": "openssl",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.2",
+      "outputs_to_install": [
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/h6g6r847dwiyqwhw5zg3wbacmdvz6w7i-openssl-3.3.2-bin",
+        "debug": "/nix/store/zf7j39gqr81035fnl8rgk1a4zrnjc8hd-openssl-3.3.2-debug",
+        "dev": "/nix/store/j2rfx6xx6g29dzqy7b9l49np0s9psnbk-openssl-3.3.2-dev",
+        "doc": "/nix/store/0n59hl88lkhckfy0v6a4jzbpzx1salcr-openssl-3.3.2-doc",
+        "man": "/nix/store/38532clg4qirfgy6bwl8s1677rh8xpnx-openssl-3.3.2-man",
+        "out": "/nix/store/2bm8dphxbxhk9x85k5lb3x6x38cl79b4-openssl-3.3.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openssl",
+      "broken": false,
+      "derivation": "/nix/store/lm77xbxlhnf0dybmmjynsb279ajrk31m-openssl-3.3.2.drv",
+      "description": "Cryptographic library that implements the SSL and TLS protocols",
+      "install_id": "openssl",
+      "license": "Apache-2.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "openssl-3.3.2",
+      "pname": "openssl",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.3.2",
+      "outputs_to_install": [
+        "bin",
+        "man"
+      ],
+      "outputs": {
+        "bin": "/nix/store/9x40a20if2q28m96hlw3q5z5q5ajgpgp-openssl-3.3.2-bin",
+        "debug": "/nix/store/06s3mk1hdxr3yhj14kfxj0jxr8j9d9xi-openssl-3.3.2-debug",
+        "dev": "/nix/store/xm6d1ig9ff7zkid1gvzsbig45m2pnlaz-openssl-3.3.2-dev",
+        "doc": "/nix/store/bdvckip8agmykajljwf1jwxivk39svi3-openssl-3.3.2-doc",
+        "man": "/nix/store/sniicxqqxyq4z98ras44illvj7k996g7-openssl-3.3.2-man",
+        "out": "/nix/store/m8gwqmn8k3jm0gbcia358mz4y00lgmbc-openssl-3.3.2"
       },
       "system": "x86_64-linux",
       "group": "toplevel",

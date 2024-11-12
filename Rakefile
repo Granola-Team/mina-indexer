@@ -62,15 +62,15 @@ end
 desc "Lint code"
 task :lint do
   chdir 'rust'
+  sh 'cargo machete --fix'
   sh 'cargo clippy --all-targets --all-features --fix --allow-dirty --allow-staged -- -D warnings'
   chdir root_dir
 end
 
-
-
 desc "Check code formatting and run Clippy"
 task :check do
   chdir 'rust'
+  sh 'cargo machete'
   sh 'cargo-fmt --all --check && cargo clippy --all-targets --all-features -- -D warnings'
   chdir root_dir
 end
