@@ -64,3 +64,4 @@ Database
 postgres/
 postgres_data/
 logfile
+*.tmp
