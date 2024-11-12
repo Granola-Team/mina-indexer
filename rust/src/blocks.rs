@@ -7,10 +7,10 @@ use rayon::prelude::*;
 use std::{thread, time::Duration};
 use tracing::{error, info, warn};
 
-const MAX_RETRIES: u32 = 3;
+const MAX_RETRIES: u32 = 6;
 const RETRY_DELAY_MS: u64 = 5000;
-const BATCH_SIZE: usize = 5_000;
-const SUB_BATCH_SIZE: usize = 1_000;
+const BATCH_SIZE: usize = 3_000;
+const SUB_BATCH_SIZE: usize = 600;
 
 struct SqlStatements {
     statements: Vec<&'static str>,
