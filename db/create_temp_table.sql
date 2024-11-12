@@ -2,5 +2,5 @@
 CREATE TEMPORARY TABLE raw_blocks (
     hash VARCHAR,
     height BIGINT,
-    data JSON
+    json JSON
 );

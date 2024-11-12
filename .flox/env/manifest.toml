@@ -31,6 +31,7 @@ duckdb.pkg-path = "duckdb"
 # Cargo
 cargo-machete.pkg-path = "cargo-machete"
 cargo-edit.pkg-path = "cargo-edit"
+sqlfluff.pkg-path = "sqlfluff"
 postgresql.pkg-path = "postgresql_17"
 
 # Misc

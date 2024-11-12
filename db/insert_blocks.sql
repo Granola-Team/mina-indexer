@@ -20,15 +20,19 @@ SELECT
     previous_hash,
     json_extract_string(body, '$.genesis_state_hash'),
     height,
-    CAST(json_extract(consensus, '$.epoch_count') AS BIGINT),
-    CAST(json_extract(consensus, '$.global_slot_since_genesis') AS BIGINT),
+    cast(json_extract(consensus, '$.epoch_count') AS BIGINT),
+    cast(json_extract(consensus, '$.global_slot_since_genesis') AS BIGINT),
     scheduled_time,
-    CAST(json_extract(consensus, '$.total_currency') AS BIGINT),
+    cast(json_extract(consensus, '$.total_currency') AS BIGINT),
     json_extract_string(consensus, '$.block_stake_winner'),
     json_extract_string(consensus, '$.block_creator'),
     json_extract_string(consensus, '$.coinbase_receiver'),
-    CAST(json_extract(consensus, '$.supercharge_coinbase') AS BOOLEAN),
+    cast(json_extract(consensus, '$.supercharge_coinbase') AS BOOLEAN),
     json_extract_string(consensus, '$.last_vrf_output'),
-    CAST(json_extract(consensus, '$.min_window_density') AS BIGINT),
-    CAST(json_extract(consensus, '$.has_ancestor_in_same_checkpoint_window') AS BOOLEAN)
+    cast(json_extract(consensus, '$.min_window_density') AS BIGINT),
+    cast(
+        json_extract(
+            consensus, '$.has_ancestor_in_same_checkpoint_window'
+        ) AS BOOLEAN
+    )
 FROM extracted_state;

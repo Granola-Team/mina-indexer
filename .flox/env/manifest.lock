@@ -57,12 +57,8 @@
         "pkg-path": "rustPlatform.rustLibSrc",
         "pkg-group": "rust-toolchain"
       },
-      "zld": {
-        "pkg-path": "zld",
-        "systems": [
-          "aarch64-darwin",
-          "x86_64-darwin"
-        ]
+      "sqlfluff": {
+        "pkg-path": "sqlfluff"
       }
     },
     "hook": {
@@ -1198,15 +1194,15 @@
       "priority": 5
     },
     {
-      "attr_path": "zld",
+      "attr_path": "sqlfluff",
       "broken": false,
-      "derivation": "/nix/store/280nbn95v0xnj9284mdrikgxazqgqb75-zld-1.3.4.drv",
-      "description": "Faster version of Apple's linker",
-      "install_id": "zld",
-      "license": "MIT",
+      "derivation": "/nix/store/04190yiabkmbgl4xhna25zqpqsdx2mh1-sqlfluff-3.2.5.drv",
+      "description": "SQL linter and auto-formatter",
+      "install_id": "sqlfluff",
+      "license": "[ MIT ]",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "zld-1.3.4",
-      "pname": "zld",
+      "name": "sqlfluff-3.2.5",
+      "pname": "sqlfluff",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -1215,27 +1211,28 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "1.3.4",
+      "version": "3.2.5",
       "outputs_to_install": [
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/wh35kcnc6ngpn0af1vgdg9r5xv2hxsf4-zld-1.3.4"
+        "dist": "/nix/store/58h7l5q9r3pc6nzq0bf6abslds4hb9s7-sqlfluff-3.2.5-dist",
+        "out": "/nix/store/bzzgvli0gg08i90ws5m05k3s6aip5xyb-sqlfluff-3.2.5"
       },
       "system": "aarch64-darwin",
       "group": "toplevel",
       "priority": 5
     },
     {
-      "attr_path": "zld",
+      "attr_path": "sqlfluff",
       "broken": false,
-      "derivation": "/nix/store/lgpbyv8s5hvdnxd7395iy2wzj927z9vc-zld-1.3.4.drv",
-      "description": "Faster version of Apple's linker",
-      "install_id": "zld",
-      "license": "MIT",
+      "derivation": "/nix/store/ixsv82amf362vk6jr6rd53nn4ma4i983-sqlfluff-3.2.5.drv",
+      "description": "SQL linter and auto-formatter",
+      "install_id": "sqlfluff",
+      "license": "[ MIT ]",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "zld-1.3.4",
-      "pname": "zld",
+      "name": "sqlfluff-3.2.5",
+      "pname": "sqlfluff",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -1244,14 +1241,75 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "1.3.4",
+      "version": "3.2.5",
       "outputs_to_install": [
         "out"
       ],
       "outputs": {
-        "out": "/nix/store/40xamqpmjl24avyplbynbvzxmvblavpp-zld-1.3.4"
+        "dist": "/nix/store/ig0jqcrs2fr40yppdn6cl758b18l6bx0-sqlfluff-3.2.5-dist",
+        "out": "/nix/store/zbkbfgh6yv798znaxlc7swgmz291i7k8-sqlfluff-3.2.5"
       },
       "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlfluff",
+      "broken": false,
+      "derivation": "/nix/store/1d40h99f0c1biz6nd8jv40h0wj4f500d-sqlfluff-3.2.5.drv",
+      "description": "SQL linter and auto-formatter",
+      "install_id": "sqlfluff",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "sqlfluff-3.2.5",
+      "pname": "sqlfluff",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.2.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/zyabdy60z46hzwvhvrn6z669wlikzp2c-sqlfluff-3.2.5-dist",
+        "out": "/nix/store/kfalfnzxwp7k5rc809874nhdsygzy6gl-sqlfluff-3.2.5"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "sqlfluff",
+      "broken": false,
+      "derivation": "/nix/store/zkka6jyljbz204ar58b66pgy7vjb3llm-sqlfluff-3.2.5.drv",
+      "description": "SQL linter and auto-formatter",
+      "install_id": "sqlfluff",
+      "license": "[ MIT ]",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "sqlfluff-3.2.5",
+      "pname": "sqlfluff",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "3.2.5",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "dist": "/nix/store/q09v3x7x947x6ksmn3q6v7wkqwj53pll-sqlfluff-3.2.5-dist",
+        "out": "/nix/store/vj14s5yv0a4py7l52rvp2fz2fks200vx-sqlfluff-3.2.5"
+      },
+      "system": "x86_64-linux",
       "group": "toplevel",
       "priority": 5
     },

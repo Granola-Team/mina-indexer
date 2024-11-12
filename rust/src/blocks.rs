@@ -73,21 +73,24 @@ impl ChunkProcessor {
                 .collect();
 
             // Create temporary tables and insert raw data
-            let mut stmt = tx.prepare("INSERT INTO raw_blocks SELECT ? as hash, ? as height, data FROM read_json(?) as data")?;
+            let mut stmt = tx.prepare("INSERT INTO raw_blocks SELECT ? AS hash, ? AS height, json FROM read_json(?) AS json")?;
 
             for (block_hash, height, file_path) in prepared_data {
                 match stmt.execute([block_hash, &height.to_string(), &file_path]) {
                     Ok(_) => info!("Loaded block {} at height {}", block_hash, height),
                     Err(e) => {
-                        error!("Error loading block {}: {}", block_hash, e);
-                        return Err(e.into());
+                        error!("Error loading block {} at height {}: {}. Skipping this block.", block_hash, height, e);
+                        continue; // Skip problematic blocks instead of failing the entire chunk
                     }
                 }
             }
 
-            // Execute all SQL statements in order
+            // Execute remaining SQL statements
             for statement in &self.sql_statements.statements {
-                tx.execute_batch(statement)?;
+                if let Err(e) = tx.execute_batch(statement) {
+                    error!("Error executing SQL statement {}: {}", statement, e);
+                    return Err(e.into());
+                }
             }
 
             tx.commit()?;
