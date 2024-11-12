@@ -21,8 +21,8 @@ impl SharedPublisher {
             Ok(_) => {
                 self.buffer_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
-            Err(e) => {
-                println!("{:?}", e);
+            Err(_) => {
+                // println!("{:?}", e);
             }
         }
     }
