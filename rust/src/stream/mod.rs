@@ -9,7 +9,7 @@ use events::Event;
 use futures::future::try_join_all;
 use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
-use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc};
+use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -76,6 +76,7 @@ pub async fn process_blocks_dir(
     for entry in entries {
         let path = entry.as_path();
 
+        tokio::time::sleep(Duration::from_millis(1)).await;
         shared_publisher.publish(Event {
             event_type: events::EventType::PrecomputedBlockPath,
             payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
@@ -136,7 +137,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     });
 
     // Wait a short duration for some events to be processed, then trigger shutdown
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(6)).await;
     let _ = shutdown_sender.send(());
 
     // Wait for the task to finish processing
