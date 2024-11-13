@@ -48,13 +48,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Send the shutdown signal to terminate the process_blocks_dir task
     let _ = shutdown_sender.send(());
 
-    // Wait for process_blocks_dir to shut down gracefully
-    if let Err(e) = process_handle.await {
-        eprintln!("Error while awaiting process_blocks_dir: {:?}", e);
-    } else {
-        println!("process_blocks_dir has shut down gracefully.");
-    }
-
+    process_handle.abort();
     monitor_handle.abort();
 
     Ok(())
