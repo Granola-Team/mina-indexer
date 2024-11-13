@@ -31,7 +31,9 @@ impl SnarkSummaryPersistenceActor {
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
                         prover TEXT NOT NULL,
-                        fee DOUBLE PRECISION NOT NULL
+                        fee DOUBLE PRECISION NOT NULL,
+                        is_canonical BOOLEAN NOT NULL,
+                        CONSTRAINT unique_snark_work_summary UNIQUE (height, state_hash, timestamp, prover, fee)
                     );",
                     &[],
                 )
@@ -60,15 +62,15 @@ impl SnarkSummaryPersistenceActor {
                 fee,
                 is_canonical
             ) VALUES
-                ($1, $2, $3, $4, $5)
-            ON CONFLICT (height, state_hash) DO UPDATE
-            SET
+                ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT ON CONSTRAINT unique_snark_work_summary -- Use the unique constraint name here
+            DO UPDATE SET
+                state_hash = EXCLUDED.state_hash,
                 timestamp = EXCLUDED.timestamp,
                 prover = EXCLUDED.prover,
                 fee = EXCLUDED.fee,
                 is_canonical = EXCLUDED.is_canonical;
-
-        "#;
+            "#;
 
         match self
             .client
@@ -85,7 +87,11 @@ impl SnarkSummaryPersistenceActor {
             )
             .await
         {
-            Err(_) => Err("Unable to upsert into snark_work_summary table"),
+            Err(e) => {
+                let msg = e.to_string();
+                println!("{}", msg);
+                Err("unable to upsert into snark_work_summary table")
+            }
             Ok(affected_rows) => Ok(affected_rows),
         }
     }

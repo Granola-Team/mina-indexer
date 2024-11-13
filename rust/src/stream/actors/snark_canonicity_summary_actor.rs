@@ -33,9 +33,9 @@ impl SnarkCanonicitySummaryActor {
 
     async fn process_snark_summary(&self) -> Result<(), &'static str> {
         let mut queue = self.block_canonicity_queue.lock().await;
-        let snarks = self.snark_map.lock().await;
 
         while let Some(update) = queue.pop_front() {
+            let snarks = self.snark_map.lock().await;
             if let Some(entries) = snarks.get(&Height(update.height)) {
                 for entry in entries {
                     let payload = SnarkCanonicitySummaryPayload {
@@ -51,8 +51,9 @@ impl SnarkCanonicitySummaryActor {
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
+                queue.retain(|key| key.height > update.height); // other
             } else {
-                queue.push_front(update);
+                queue.push_back(update);
                 drop(queue);
                 break;
             }
@@ -90,6 +91,7 @@ impl Actor for SnarkCanonicitySummaryActor {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
                 let mut snarks = self.snark_map.lock().await;
                 snarks.retain(|key, _| key.0 > height);
+                drop(snarks);
             }
             _ => return,
         }
