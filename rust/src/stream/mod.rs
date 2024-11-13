@@ -175,7 +175,6 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     let paths_plus_genesis_count = paths_count + 1;
     let length_of_chain = 100;
     let number_of_user_commands = 247; // hand-calulated
-    let canonical_updates = event_counts.get(&EventType::BlockCanonicityUpdate).cloned().unwrap();
 
     assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
