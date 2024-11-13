@@ -75,11 +75,12 @@ impl MainnetBlock {
             .sum()
     }
 
-    pub fn get_user_commands(&self) -> Vec<Command> {
+    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.clone()))
             .flat_map(|user_commands| user_commands.into_iter())
+            .map(|uc| uc.to_command_summary())
             .collect()
     }
 
@@ -150,49 +151,83 @@ pub struct Command {
 }
 
 impl Command {
-    pub fn get_status(&self) -> String {
+    fn get_status(&self) -> String {
         self.status.first().unwrap().to_string().trim_matches('"').to_string()
     }
 
-    pub fn get_nonce(&self) -> usize {
+    fn get_nonce(&self) -> usize {
         self.signed_command
             .as_ref()
             .map(|sc| sc.payload.common.nonce.parse::<usize>().unwrap())
             .unwrap()
     }
 
-    pub fn get_sender(&self) -> String {
+    fn get_sender(&self) -> String {
         match self.signed_command.as_ref().unwrap().payload.body.clone() {
             Body::Payment(p) => p.source_pk.to_string(),
             Body::StakeDelegation(StakeDelegationType::SetDelegate(sd)) => sd.delegator.to_string(),
         }
     }
 
-    pub fn get_receiver(&self) -> String {
+    fn get_type(&self) -> String {
+        match self.signed_command.as_ref().unwrap().payload.body.clone() {
+            Body::Payment(_) => "Payment".to_string(),
+            Body::StakeDelegation(StakeDelegationType::SetDelegate(_)) => "Stake Delegation".to_string(),
+        }
+    }
+
+    fn get_receiver(&self) -> String {
         match self.signed_command.as_ref().unwrap().payload.body.clone() {
             Body::Payment(p) => p.receiver_pk.to_string(),
             Body::StakeDelegation(StakeDelegationType::SetDelegate(sd)) => sd.new_delegate.to_string(),
         }
     }
 
-    pub fn get_fee(&self) -> f64 {
+    fn get_fee(&self) -> f64 {
         self.signed_command.as_ref().unwrap().payload.common.fee.parse::<f64>().unwrap()
     }
 
-    pub fn get_amount_nanomina(&self) -> u64 {
+    fn get_amount_nanomina(&self) -> u64 {
         match self.signed_command.as_ref().unwrap().payload.body.clone() {
             Body::Payment(p) => p.amount.parse::<u64>().unwrap(),
             Body::StakeDelegation(StakeDelegationType::SetDelegate(_)) => 0,
         }
     }
 
-    pub fn get_memo(&self) -> String {
+    fn get_memo(&self) -> String {
         self.signed_command.as_ref().unwrap().payload.common.memo.to_string()
     }
 
-    pub fn get_fee_payer(&self) -> String {
+    fn get_fee_payer(&self) -> String {
         self.signed_command.as_ref().unwrap().payload.common.fee_payer_pk.to_string()
     }
+
+    pub fn to_command_summary(&self) -> CommandSummary {
+        CommandSummary {
+            memo: self.get_memo(),
+            fee_payer: self.get_fee_payer(),
+            sender: self.get_sender(),
+            receiver: self.get_receiver(),
+            status: self.get_status(),
+            txn_type: self.get_type(),
+            nonce: self.get_nonce(),
+            fee_nanomina: (self.get_fee() * 1_000_000_000f64) as u64,
+            amount_nanomina: self.get_amount_nanomina(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CommandSummary {
+    pub memo: String,
+    pub fee_payer: String,
+    pub sender: String,
+    pub receiver: String,
+    pub status: String,
+    pub txn_type: String,
+    pub nonce: usize,
+    pub fee_nanomina: u64,
+    pub amount_nanomina: u64,
 }
 
 fn deserialize_signed_command<'de, D>(deserializer: D) -> Result<Option<SignedCommand>, D::Error>
@@ -361,25 +396,25 @@ mod mainnet_block_parsing_tests {
         let first_user_command = user_commands.first().unwrap();
 
         // Test Fee
-        assert_eq!(first_user_command.get_fee(), 0.01f64);
+        assert_eq!(first_user_command.fee_nanomina, 10_000_000);
 
         // Test memo
-        assert_eq!(&first_user_command.get_memo(), "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+        assert_eq!(&first_user_command.memo, "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
 
         // Test memo
-        assert_eq!(first_user_command.get_nonce(), 265);
+        assert_eq!(first_user_command.nonce, 265);
 
         // Test sender
-        assert_eq!(&first_user_command.get_sender(), "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
+        assert_eq!(&first_user_command.sender, "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
 
         // Test receiver
-        assert_eq!(&first_user_command.get_receiver(), "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM");
+        assert_eq!(&first_user_command.receiver, "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM");
 
         // test status
-        assert_eq!(&first_user_command.get_status(), "Applied");
+        assert_eq!(&first_user_command.status, "Applied");
 
         // test
-        assert_eq!(first_user_command.get_amount_nanomina(), 1000);
+        assert_eq!(first_user_command.amount_nanomina, 1000);
     }
 
     #[test]
@@ -397,24 +432,24 @@ mod mainnet_block_parsing_tests {
         let fifth_user_command = user_commands.get(4).unwrap();
 
         // Test Fee
-        assert_eq!(fifth_user_command.get_fee(), 0.0101);
+        assert_eq!(fifth_user_command.fee_nanomina, 10_100_000);
 
         // Test memo
-        assert_eq!(&fifth_user_command.get_memo(), "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+        assert_eq!(&fifth_user_command.memo, "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
 
         // Test memo
-        assert_eq!(fifth_user_command.get_nonce(), 0);
+        assert_eq!(fifth_user_command.nonce, 0);
 
         // Test sender
-        assert_eq!(&fifth_user_command.get_sender(), "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
+        assert_eq!(&fifth_user_command.sender, "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
 
         // Test receiver
-        assert_eq!(&fifth_user_command.get_receiver(), "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
+        assert_eq!(&fifth_user_command.receiver, "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
 
         // test status
-        assert_eq!(&fifth_user_command.get_status(), "Applied");
+        assert_eq!(&fifth_user_command.status, "Applied");
 
         // test
-        assert_eq!(fifth_user_command.get_amount_nanomina(), 0);
+        assert_eq!(fifth_user_command.amount_nanomina, 0);
     }
 }

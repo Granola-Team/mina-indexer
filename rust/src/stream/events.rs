@@ -15,6 +15,7 @@ pub enum EventType {
     SnarkWorkSummary,
     SnarkCanonicitySummary,
     TransitionFrontier,
+    UserCommandSummary,
 }
 
 #[derive(Debug, Clone, PartialEq)]

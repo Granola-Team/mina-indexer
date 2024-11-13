@@ -3,20 +3,20 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{BlockSummaryPayload, GenesisBlockPayload, MainnetBlockPayload};
+use crate::stream::payloads::{MainnetBlockPayload, UserCommandSummaryPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
-pub struct BlockSummaryActor {
+pub struct UserCommandActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
 }
 
-impl BlockSummaryActor {
+impl UserCommandActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "BlockSummaryActor".to_string(),
+            id: "UserCommandActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
         }
@@ -24,7 +24,7 @@ impl BlockSummaryActor {
 }
 
 #[async_trait]
-impl Actor for BlockSummaryActor {
+impl Actor for UserCommandActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -34,45 +34,26 @@ impl Actor for BlockSummaryActor {
     }
     async fn handle_event(&self, event: Event) {
         match event.event_type {
-            EventType::GenesisBlock => {
-                let block_payload: GenesisBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let payload = BlockSummaryPayload {
-                    height: block_payload.height,
-                    state_hash: block_payload.state_hash,
-                    previous_state_hash: block_payload.previous_state_hash,
-                    user_command_count: 0,
-                    snark_work_count: 0,
-                    timestamp: block_payload.unix_timestamp,
-                    coinbase_receiver: String::new(),
-                    coinbase_reward_nanomina: 0,
-                    global_slot_since_genesis: 1,
-                    last_vrf_output: block_payload.last_vrf_output,
-                    is_berkeley_block: false,
-                };
-                self.publish(Event {
-                    event_type: EventType::BlockSummary,
-                    payload: sonic_rs::to_string(&payload).unwrap(),
-                });
-            }
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let payload = BlockSummaryPayload {
-                    height: block_payload.height,
-                    state_hash: block_payload.state_hash,
-                    previous_state_hash: block_payload.previous_state_hash,
-                    user_command_count: block_payload.user_command_count,
-                    snark_work_count: block_payload.snark_work_count,
-                    timestamp: block_payload.timestamp,
-                    coinbase_receiver: block_payload.coinbase_receiver,
-                    coinbase_reward_nanomina: block_payload.coinbase_reward_nanomina,
-                    global_slot_since_genesis: block_payload.global_slot_since_genesis,
-                    last_vrf_output: block_payload.last_vrf_output,
-                    is_berkeley_block: false,
-                };
-                self.publish(Event {
-                    event_type: EventType::BlockSummary,
-                    payload: sonic_rs::to_string(&payload).unwrap(),
-                });
+                for user_command in block_payload.user_commands.iter() {
+                    let payload = UserCommandSummaryPayload {
+                        height: block_payload.height,
+                        state_hash: block_payload.state_hash.to_string(),
+                        timestamp: block_payload.timestamp,
+                        txn_type: user_command.txn_type.to_string(),
+                        status: user_command.status.to_string(),
+                        sender: user_command.sender.to_string(),
+                        receiver: user_command.receiver.to_string(),
+                        nonce: user_command.nonce,
+                        fee_nanomina: user_command.fee_nanomina,
+                        amount_nanomina: user_command.amount_nanomina,
+                    };
+                    self.publish(Event {
+                        event_type: EventType::UserCommandSummary,
+                        payload: sonic_rs::to_string(&payload).unwrap(),
+                    });
+                }
             }
             EventType::BerkeleyBlock => {
                 todo!("impl for berkeley block");
@@ -88,29 +69,59 @@ impl Actor for BlockSummaryActor {
 }
 
 #[tokio::test]
-async fn test_block_summary_actor_handle_event() {
+async fn test_user_command_actor_handle_event() {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        payloads::{BlockSummaryPayload, MainnetBlockPayload},
+        mainnet_block_models::*,
+        payloads::{MainnetBlockPayload, UserCommandSummaryPayload},
     };
-    // Create a shared publisher to test if events are published
-    let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockSummaryActor::new(Arc::clone(&shared_publisher));
+    use std::sync::Arc;
 
-    // Create a mock MainnetBlockPayload
+    // Create a shared publisher to capture published events
+    let shared_publisher = Arc::new(SharedPublisher::new(100));
+    let actor = UserCommandActor::new(Arc::clone(&shared_publisher));
+
+    // Mock a MainnetBlockPayload with user commands
+    let user_commands = vec![
+        CommandSummary {
+            memo: "memo_1".to_string(),
+            fee_payer: "payer_1".to_string(),
+            sender: "sender_1".to_string(),
+            receiver: "receiver_1".to_string(),
+            status: "Applied".to_string(),
+            txn_type: "Payment".to_string(),
+            nonce: 1,
+            fee_nanomina: 10_000_000,
+            amount_nanomina: 500_000_000,
+        },
+        CommandSummary {
+            memo: "memo_2".to_string(),
+            fee_payer: "payer_2".to_string(),
+            sender: "sender_2".to_string(),
+            receiver: "receiver_2".to_string(),
+            status: "Failed".to_string(),
+            txn_type: "Stake Delegation".to_string(),
+            nonce: 2,
+            fee_nanomina: 5_000_000,
+            amount_nanomina: 0,
+        },
+    ];
+
+    // MainnetBlockPayload with sample user commands
     let block_payload = MainnetBlockPayload {
-        height: 100,
-        last_vrf_output: "some_vrf_output".to_string(),
-        state_hash: "some_state_hash".to_string(),
+        height: 10,
+        state_hash: "state_hash".to_string(),
         previous_state_hash: "previous_state_hash".to_string(),
-        user_command_count: 5,
-        snark_work_count: 3,
+        last_vrf_output: "last_vrf_output".to_string(),
+        user_command_count: 2,
+        user_commands,
+        snark_work_count: 0,
         snark_work: vec![],
-        timestamp: 1623423000,
-        coinbase_receiver: "receiver_public_key".to_string(),
+        timestamp: 123414312431234,
+        coinbase_receiver: "coinbase_receiver".to_string(),
         coinbase_reward_nanomina: 720_000_000_000,
-        global_slot_since_genesis: 12345,
+        global_slot_since_genesis: 16,
     };
 
     // Serialize the MainnetBlockPayload to JSON for the event payload
@@ -126,28 +137,31 @@ async fn test_block_summary_actor_handle_event() {
     // Call handle_event to process the MainnetBlock event
     actor.handle_event(event).await;
 
-    // Check if the BlockSummary event was published
-    if let Ok(received_event) = receiver.recv().await {
-        assert_eq!(received_event.event_type, EventType::BlockSummary);
+    // Capture and verify the published UserCommandSummary events
+    for user_command in block_payload.user_commands.iter() {
+        // Check if the UserCommandSummary event was published
+        if let Ok(received_event) = receiver.recv().await {
+            assert_eq!(received_event.event_type, EventType::UserCommandSummary);
 
-        // Deserialize the payload of the BlockSummary event
-        let summary_payload: BlockSummaryPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            // Deserialize the payload of the UserCommandSummary event
+            let summary_payload: UserCommandSummaryPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
-        // Verify that the BlockSummaryPayload matches expected values
-        assert_eq!(summary_payload.height, 100);
-        assert_eq!(summary_payload.state_hash, "some_state_hash");
-        assert_eq!(summary_payload.previous_state_hash, "previous_state_hash");
-        assert_eq!(summary_payload.user_command_count, 5);
-        assert_eq!(summary_payload.snark_work_count, 3);
-        assert_eq!(summary_payload.timestamp, 1623423000);
-        assert_eq!(summary_payload.coinbase_receiver, "receiver_public_key");
-        assert_eq!(summary_payload.coinbase_reward_nanomina, 720_000_000_000);
-        assert_eq!(summary_payload.global_slot_since_genesis, 12345);
-        assert!(!summary_payload.is_berkeley_block);
-
-        // Verify that the event was marked as processed
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
-    } else {
-        panic!("Did not receive expected BlockSummary event from BlockSummaryActor.");
+            // Verify that the UserCommandSummaryPayload matches the expected values
+            assert_eq!(summary_payload.height, block_payload.height);
+            assert_eq!(summary_payload.state_hash, block_payload.state_hash);
+            assert_eq!(summary_payload.timestamp, block_payload.timestamp);
+            assert_eq!(summary_payload.txn_type, user_command.txn_type);
+            assert_eq!(summary_payload.status, user_command.status);
+            assert_eq!(summary_payload.sender, user_command.sender);
+            assert_eq!(summary_payload.receiver, user_command.receiver);
+            assert_eq!(summary_payload.nonce, user_command.nonce);
+            assert_eq!(summary_payload.fee_nanomina, user_command.fee_nanomina);
+            assert_eq!(summary_payload.amount_nanomina, user_command.amount_nanomina);
+        } else {
+            panic!("Did not receive expected UserCommandSummary event from UserCommandActor.");
+        }
     }
+
+    // Verify that the event count matches the number of user commands processed
+    assert_eq!(actor.events_published().load(Ordering::SeqCst), block_payload.user_commands.len());
 }

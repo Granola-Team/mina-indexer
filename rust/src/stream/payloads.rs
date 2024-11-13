@@ -1,4 +1,4 @@
-use super::mainnet_block_models::CompletedWorks;
+use super::mainnet_block_models::{CommandSummary, CompletedWorks};
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -17,13 +17,14 @@ pub struct BerkeleyBlockPayload {
     pub last_vrf_output: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct MainnetBlockPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,
     pub last_vrf_output: String,
     pub user_command_count: usize,
+    pub user_commands: Vec<CommandSummary>,
     pub snark_work_count: usize,
     pub snark_work: Vec<CompletedWorks>,
     pub timestamp: u64,
@@ -106,6 +107,21 @@ pub struct BlockSummaryPayload {
     pub global_slot_since_genesis: u64,
     pub last_vrf_output: String,
     pub is_berkeley_block: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct UserCommandSummaryPayload {
+    pub height: u64,
+    pub state_hash: String,
+    // pub txn_hash: String,    //
+    pub timestamp: u64,
+    pub txn_type: String,
+    pub status: String,
+    pub sender: String,
+    pub receiver: String,
+    pub nonce: usize,
+    pub fee_nanomina: u64,
+    pub amount_nanomina: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]

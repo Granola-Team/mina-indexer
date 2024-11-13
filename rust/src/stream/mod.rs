@@ -4,7 +4,7 @@ use actors::{
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
     snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
-    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, Actor,
+    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -45,6 +45,7 @@ pub async fn process_blocks_dir(
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(UserCommandActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
     ];
@@ -93,11 +94,11 @@ pub async fn process_blocks_dir(
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
                 });
             }
+
+            println!("Finished publishing files. Waiting for shutdown signal...");
         }
     });
     actor_handles.push(init_actor);
-
-    println!("Finished publishing files. Waiting for shutdown signal...");
 
     // Wait for the shutdown signal to terminate
     let _ = shutdown_receiver.recv().await;

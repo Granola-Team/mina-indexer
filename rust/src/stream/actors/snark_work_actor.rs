@@ -106,6 +106,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
         coinbase_receiver: block.get_coinbase_receiver(),
         coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
         global_slot_since_genesis: block.get_global_slot_since_genesis(),
+        user_commands: block.get_user_commands(),
     };
 
     // Create shared publisher and SnarkWorkSummaryActor

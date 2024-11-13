@@ -137,11 +137,11 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
         last_vrf_output: "WXPOLoGn9vE7HwqkE-K5bH4d3LmSPPJQcfoLsrTDkQA=".to_string(),
         user_command_count: 4,
         snark_work_count: 0,
-        snark_work: vec![],
         timestamp: 1615986540000,
         coinbase_receiver: "B62qjA7LFMvKuzFbGZK9yb3wAkBThba1pe5ap8UZx8jEvfAEcnDgDBE".to_string(),
         coinbase_reward_nanomina: 720_000_000_000,
         global_slot_since_genesis: 148,
+        ..Default::default()
     };
 
     // Create an Event with serialized MainnetBlockPayload
