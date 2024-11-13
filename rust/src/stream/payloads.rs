@@ -124,6 +124,22 @@ pub struct UserCommandSummaryPayload {
     pub amount_nanomina: u64,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct UserCommandCanonicityPayload {
+    pub height: u64,
+    pub state_hash: String,
+    // pub txn_hash: String,    //
+    pub timestamp: u64,
+    pub txn_type: String,
+    pub status: String,
+    pub sender: String,
+    pub receiver: String,
+    pub nonce: usize,
+    pub fee_nanomina: u64,
+    pub amount_nanomina: u64,
+    pub canonical: bool,
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum DoubleEntryType {
     BlockReward,

@@ -13,6 +13,7 @@ pub(crate) mod snark_summary_persistence_actor;
 pub(crate) mod snark_work_actor;
 pub(crate) mod transition_frontier_actor;
 pub(crate) mod user_command_actor;
+pub(crate) mod user_command_canonicity_actor;
 
 use super::events::Event;
 use async_trait::async_trait;

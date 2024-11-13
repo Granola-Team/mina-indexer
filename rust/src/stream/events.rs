@@ -16,6 +16,7 @@ pub enum EventType {
     SnarkCanonicitySummary,
     TransitionFrontier,
     UserCommandSummary,
+    UserCommandCanonicityUpdate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
