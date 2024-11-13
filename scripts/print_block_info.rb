@@ -1,4 +1,4 @@
-require 'json'
+require "json"
 
 def extract_info(directory)
   Dir.glob("#{directory}/*.json").each do |file_path|
