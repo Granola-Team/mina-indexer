@@ -13,6 +13,7 @@ pub enum EventType {
     BlockSummary,
     DoubleEntryTxn,
     SnarkWorkSummary,
+    TransitionFrontier,
 }
 
 #[derive(Debug, Clone, PartialEq)]

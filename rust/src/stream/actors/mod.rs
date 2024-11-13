@@ -9,6 +9,7 @@ pub(crate) mod blockchain_tree_builder_actor;
 pub(crate) mod mainnet_block_parser_actor;
 pub(crate) mod pcb_path_actor;
 pub(crate) mod snark_work_actor;
+pub(crate) mod transition_frontier_actor;
 
 use super::events::Event;
 use async_trait::async_trait;

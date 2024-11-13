@@ -3,7 +3,7 @@ use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
-    snark_work_actor::SnarkWorkSummaryActor, Actor,
+    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -38,6 +38,7 @@ pub async fn process_blocks_dir(
         Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
+        Arc::new(TransitionFrontierActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
@@ -168,6 +169,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() > length_of_chain);
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() < paths_count);
+    assert!(!event_counts.contains_key(&EventType::TransitionFrontier));
 
     // Best Block & Last canonical update:
     assert_eq!(last_best_block.clone().unwrap().height, length_of_chain as u64);
