@@ -3,7 +3,7 @@ use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
-    Actor,
+    snark_work_actor::SnarkWorkSummaryActor, Actor,
 };
 use std::time::Duration;
 use events::Event;
@@ -41,6 +41,7 @@ pub async fn process_blocks_dir(
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
     ];
 

@@ -1,3 +1,4 @@
+use super::mainnet_block_models::CompletedWorks;
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -24,6 +25,7 @@ pub struct MainnetBlockPayload {
     pub last_vrf_output: String,
     pub user_command_count: usize,
     pub snark_work_count: usize,
+    pub snark_work: Vec<CompletedWorks>,
     pub timestamp: u64,
     pub coinbase_receiver: String,
     pub coinbase_reward_nanomina: u64,
@@ -70,6 +72,15 @@ impl GenesisBlockPayload {
             unix_timestamp: 1615939200000,
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SnarkWorkSummaryPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub prover: String,
+    pub fee: f64,
 }
 
 #[derive(Serialize, Deserialize)]

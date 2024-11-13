@@ -106,6 +106,7 @@ async fn test_block_summary_actor_handle_event() {
         previous_state_hash: "previous_state_hash".to_string(),
         user_command_count: 5,
         snark_work_count: 3,
+        snark_work: vec![],
         timestamp: 1623423000,
         coinbase_receiver: "receiver_public_key".to_string(),
         coinbase_reward_nanomina: 720_000_000_000,

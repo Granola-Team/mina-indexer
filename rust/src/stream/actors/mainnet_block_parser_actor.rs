@@ -50,6 +50,7 @@ impl Actor for MainnetBlockParserActor {
                 last_vrf_output: block.get_last_vrf_output(),
                 user_command_count: block.get_user_commands_count(),
                 snark_work_count: block.get_snark_work_count(),
+                snark_work: block.get_snark_work(),
                 timestamp: block.get_timestamp(),
                 coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
                 coinbase_receiver: block.get_coinbase_receiver(),

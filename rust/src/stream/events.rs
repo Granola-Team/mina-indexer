@@ -12,6 +12,7 @@ pub enum EventType {
     BestBlock,
     BlockSummary,
     DoubleEntryTxn,
+    SnarkWorkSummary,
 }
 
 #[derive(Debug, Clone, PartialEq)]
