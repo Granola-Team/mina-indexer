@@ -135,8 +135,8 @@ impl BlockSummaryPersistenceActor {
                 // Prune the tree as needed
                 tree.prune_tree().unwrap();
             } else {
-                // If the node is not found, push the update back to the end of the queue
-                queue.push_back(update);
+                // If the node is not found, push the update to the front of the queue
+                queue.push_front(update);
                 drop(queue);
                 // Exit to avoid a busy loop if we keep finding no nodes
                 break;
