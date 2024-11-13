@@ -36,22 +36,25 @@ impl Actor for TransitionFrontierActor {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
+        fn get_transition_frontier(payload: &BlockCanonicityUpdatePayload) -> u64 {
+            payload.height - TRANSITION_FRONTIER_DISTANCE as u64
+        }
         if event.event_type == EventType::BestBlock {
             let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.payload).unwrap();
             let mut transition_frontier = self.transition_frontier.lock().await;
-            let new_transition_frontier = payload.height - TRANSITION_FRONTIER_DISTANCE as u64;
+
             match &mut *transition_frontier {
                 Some(tf) if payload.height > tf.0 + TRANSITION_FRONTIER_DISTANCE as u64 => {
-                    tf.0 = new_transition_frontier;
+                    tf.0 = get_transition_frontier(&payload);
                 }
                 None if payload.height > TRANSITION_FRONTIER_DISTANCE as u64 => {
-                    *transition_frontier = Some(Height(new_transition_frontier));
+                    *transition_frontier = Some(Height(get_transition_frontier(&payload)));
                 }
                 _ => return, // Early return if no action is needed
             }
             self.publish(Event {
                 event_type: EventType::TransitionFrontier,
-                payload: new_transition_frontier.to_string(),
+                payload: get_transition_frontier(&payload).to_string(),
             });
         }
     }

@@ -3,8 +3,8 @@ use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
-    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor,
-    Actor,
+    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
+    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -44,6 +44,7 @@ pub async fn process_blocks_dir(
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockRewardDoubleEntryActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
     ];

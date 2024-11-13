@@ -74,13 +74,23 @@ impl GenesisBlockPayload {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SnarkWorkSummaryPayload {
     pub height: u64,
     pub state_hash: String,
     pub timestamp: u64,
     pub prover: String,
     pub fee: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SnarkCanonicitySummaryPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub prover: String,
+    pub fee: f64,
+    pub canonical: bool,
 }
 
 #[derive(Serialize, Deserialize)]
