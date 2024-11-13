@@ -4,7 +4,7 @@ use serde::{
     de::{SeqAccess, Visitor},
     Deserializer,
 };
-use sonic_rs::{Deserialize, Serialize, Value}; // To handle arbitrary JSON objects
+use sonic_rs::{Deserialize, Serialize, Value};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainnetBlock {
@@ -147,6 +147,52 @@ pub struct Command {
     #[serde(rename = "data", deserialize_with = "deserialize_signed_command")]
     pub signed_command: Option<SignedCommand>, // Directly parse as SignedCommand, or None if absent
     pub status: Vec<Value>,
+}
+
+impl Command {
+    pub fn get_status(&self) -> String {
+        self.status.first().unwrap().to_string().trim_matches('"').to_string()
+    }
+
+    pub fn get_nonce(&self) -> usize {
+        self.signed_command
+            .as_ref()
+            .map(|sc| sc.payload.common.nonce.parse::<usize>().unwrap())
+            .unwrap()
+    }
+
+    pub fn get_sender(&self) -> String {
+        match self.signed_command.as_ref().unwrap().payload.body.clone() {
+            Body::Payment(p) => p.source_pk.to_string(),
+            Body::StakeDelegation(StakeDelegationType::SetDelegate(sd)) => sd.delegator.to_string(),
+        }
+    }
+
+    pub fn get_receiver(&self) -> String {
+        match self.signed_command.as_ref().unwrap().payload.body.clone() {
+            Body::Payment(p) => p.receiver_pk.to_string(),
+            Body::StakeDelegation(StakeDelegationType::SetDelegate(sd)) => sd.new_delegate.to_string(),
+        }
+    }
+
+    pub fn get_fee(&self) -> f64 {
+        self.signed_command.as_ref().unwrap().payload.common.fee.parse::<f64>().unwrap()
+    }
+
+    pub fn get_amount_nanomina(&self) -> u64 {
+        match self.signed_command.as_ref().unwrap().payload.body.clone() {
+            Body::Payment(p) => p.amount.parse::<u64>().unwrap(),
+            Body::StakeDelegation(StakeDelegationType::SetDelegate(_)) => 0,
+        }
+    }
+
+    pub fn get_memo(&self) -> String {
+        self.signed_command.as_ref().unwrap().payload.common.memo.to_string()
+    }
+
+    pub fn get_fee_payer(&self) -> String {
+        self.signed_command.as_ref().unwrap().payload.common.fee_payer_pk.to_string()
+    }
 }
 
 fn deserialize_signed_command<'de, D>(deserializer: D) -> Result<Option<SignedCommand>, D::Error>
@@ -310,6 +356,30 @@ mod mainnet_block_parsing_tests {
 
         // Test block creator
         assert_eq!(&mainnet_block.get_block_creator(), "B62qjJ2eGwj1mmB6XThCV2m9JxUqJGXLqwyirxTbzBanzs2ThazD1Gy");
+
+        let user_commands = mainnet_block.get_user_commands();
+        let first_user_command = user_commands.first().unwrap();
+
+        // Test Fee
+        assert_eq!(first_user_command.get_fee(), 0.01f64);
+
+        // Test memo
+        assert_eq!(&first_user_command.get_memo(), "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+
+        // Test memo
+        assert_eq!(first_user_command.get_nonce(), 265);
+
+        // Test sender
+        assert_eq!(&first_user_command.get_sender(), "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
+
+        // Test receiver
+        assert_eq!(&first_user_command.get_receiver(), "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM");
+
+        // test status
+        assert_eq!(&first_user_command.get_status(), "Applied");
+
+        // test
+        assert_eq!(first_user_command.get_amount_nanomina(), 1000);
     }
 
     #[test]
@@ -322,5 +392,29 @@ mod mainnet_block_parsing_tests {
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
         assert_eq!(mainnet_block.get_user_commands_count(), 23);
+
+        let user_commands = mainnet_block.get_user_commands();
+        let fifth_user_command = user_commands.get(4).unwrap();
+
+        // Test Fee
+        assert_eq!(fifth_user_command.get_fee(), 0.0101);
+
+        // Test memo
+        assert_eq!(&fifth_user_command.get_memo(), "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+
+        // Test memo
+        assert_eq!(fifth_user_command.get_nonce(), 0);
+
+        // Test sender
+        assert_eq!(&fifth_user_command.get_sender(), "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
+
+        // Test receiver
+        assert_eq!(&fifth_user_command.get_receiver(), "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
+
+        // test status
+        assert_eq!(&fifth_user_command.get_status(), "Applied");
+
+        // test
+        assert_eq!(fifth_user_command.get_amount_nanomina(), 0);
     }
 }
