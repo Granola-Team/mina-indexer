@@ -1,4 +1,9 @@
 use crate::constants::MAINNET_COINBASE_REWARD;
+use core::fmt;
+use serde::{
+    de::{SeqAccess, Visitor},
+    Deserializer,
+};
 use sonic_rs::{Deserialize, Serialize, Value}; // To handle arbitrary JSON objects
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -37,15 +42,14 @@ impl MainnetBlock {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
-                opt_diff.as_ref().and_then(|diff| {
-                    if diff.coinbase[0] != "Zero" {
-                        if self.protocol_state.body.consensus_state.supercharge_coinbase {
-                            Some(2 * MAINNET_COINBASE_REWARD)
-                        } else {
-                            Some(MAINNET_COINBASE_REWARD)
-                        }
-                    } else {
-                        None
+                opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
+                    Some(v) if *v == "Zero" => None,
+                    _ => {
+                        let multiplier = match self.protocol_state.body.consensus_state.supercharge_coinbase {
+                            true => 2,
+                            false => 1,
+                        };
+                        Some(multiplier * MAINNET_COINBASE_REWARD)
                     }
                 })
             })
@@ -71,6 +75,14 @@ impl MainnetBlock {
             .sum()
     }
 
+    pub fn get_user_commands(&self) -> Vec<Command> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.clone()))
+            .flat_map(|user_commands| user_commands.into_iter())
+            .collect()
+    }
+
     pub fn get_global_slot_since_genesis(&self) -> u64 {
         self.protocol_state.body.consensus_state.global_slot_since_genesis.parse::<u64>().unwrap()
     }
@@ -83,11 +95,11 @@ impl MainnetBlock {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProtocolState {
     pub previous_state_hash: String,
-    pub body: Body,
+    pub body: ProtocolStateBody,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Body {
+pub struct ProtocolStateBody {
     pub consensus_state: ConsensusState,
     pub blockchain_state: BlockchainState,
 }
@@ -132,7 +144,133 @@ pub struct CompletedWorks {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Command {
-    pub data: Vec<Value>, // Placeholder type to avoid parsing nested structures now
+    #[serde(rename = "data", deserialize_with = "deserialize_signed_command")]
+    pub signed_command: Option<SignedCommand>, // Directly parse as SignedCommand, or None if absent
+    pub status: Vec<Value>,
+}
+
+fn deserialize_signed_command<'de, D>(deserializer: D) -> Result<Option<SignedCommand>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct CommandDataVisitor;
+
+    impl<'de> Visitor<'de> for CommandDataVisitor {
+        type Value = Option<SignedCommand>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a list where the second item is a SignedCommand")
+        }
+
+        fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+        where
+            V: SeqAccess<'de>,
+        {
+            // Skip the first element
+            let _ = seq.next_element::<Value>()?;
+            // Attempt to parse the second element as SignedCommand
+            let second: Option<SignedCommand> = seq.next_element()?;
+            Ok(second)
+        }
+    }
+
+    deserializer.deserialize_seq(CommandDataVisitor)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SignedCommand {
+    pub payload: Payload,
+    pub signer: String,
+    pub signature: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payload {
+    pub common: Common,
+    #[serde(deserialize_with = "deserialize_body")]
+    pub body: Body,
+}
+
+fn deserialize_body<'de, D>(deserializer: D) -> Result<Body, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BodyVisitor;
+
+    impl<'de> Visitor<'de> for BodyVisitor {
+        type Value = Body;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an array with a command type string and a map of values or nested arrays")
+        }
+
+        fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+        where
+            V: SeqAccess<'de>,
+        {
+            // Parse the command type as a string
+            let command_type: String = seq.next_element()?.ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+
+            // Handle different command types based on structure
+            match command_type.as_str() {
+                "Payment" => {
+                    let payment: Payment = seq.next_element()?.ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                    Ok(Body::Payment(payment))
+                }
+                "Stake_delegation" => {
+                    // Parse additional nested array for Stake_delegation
+                    let nested: Vec<Value> = seq.next_element()?.ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+
+                    // Check if nested is an array and matches ["Set_delegate", { ... }]
+                    // Assume structure ["Set_delegate", { "delegator": ..., "new_delegate": ... }]
+                    let set_delegate = nested[1].clone();
+                    let set_delegate: SetDelegate = sonic_rs::from_value(&set_delegate).map_err(serde::de::Error::custom)?;
+                    Ok(Body::StakeDelegation(StakeDelegationType::SetDelegate(set_delegate)))
+                }
+                _ => Err(serde::de::Error::unknown_variant(&command_type, &["Payment", "Stake_delegation"])),
+            }
+        }
+    }
+
+    deserializer.deserialize_seq(BodyVisitor)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+pub enum Body {
+    Payment(Payment),
+    StakeDelegation(StakeDelegationType),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payment {
+    pub source_pk: String,
+    pub receiver_pk: String,
+    pub token_id: String,
+    pub amount: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+pub enum StakeDelegationType {
+    #[serde(rename = "Set_delegate")]
+    SetDelegate(SetDelegate),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SetDelegate {
+    pub delegator: String,
+    pub new_delegate: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Common {
+    pub fee: String,
+    pub fee_token: String,
+    pub fee_payer_pk: String,
+    pub nonce: String,
+    pub valid_until: String,
+    pub memo: String,
 }
 
 #[cfg(test)]
@@ -172,5 +310,17 @@ mod mainnet_block_parsing_tests {
 
         // Test block creator
         assert_eq!(&mainnet_block.get_block_creator(), "B62qjJ2eGwj1mmB6XThCV2m9JxUqJGXLqwyirxTbzBanzs2ThazD1Gy");
+    }
+
+    #[test]
+    fn test_mainnet_block_with_stake_delegation() {
+        // Path to your test JSON file
+        let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-199999-3NKDFcMG4gbdeSwEYzoAURSHv4uRabTFbTY7W6JpECN2rHmwYE8j.json");
+        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+
+        // Deserialize JSON into MainnetBlock struct
+        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        assert_eq!(mainnet_block.get_user_commands_count(), 23);
     }
 }
