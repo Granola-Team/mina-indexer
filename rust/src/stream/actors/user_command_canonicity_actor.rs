@@ -57,7 +57,7 @@ impl UserCommandCanonicityActor {
                     });
                 }
             } else {
-                queue.push_front(update);
+                queue.push_back(update);
                 drop(queue);
                 break;
             }
