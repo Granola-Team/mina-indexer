@@ -24,42 +24,76 @@ openssl.systems = ["aarch64-linux", "x86_64-linux"]
 
 # Ruby
 ruby.pkg-path = "ruby"
+standard.pkg-path = "rubyPackages.standard"
 
 # Database
 duckdb.pkg-path = "duckdb"
+postgresql_16.pkg-path = "postgresql_16"
+timescaledb.pkg-path = "timescaledb"
+sqlfluff.pkg-path = "sqlfluff"
 
 # Cargo
 cargo-machete.pkg-path = "cargo-machete"
 cargo-edit.pkg-path = "cargo-edit"
-sqlfluff.pkg-path = "sqlfluff"
-postgresql.pkg-path = "postgresql_17"
-standard.pkg-path = "rubyPackages.standard"
 
 # Misc
 
 [vars]
+PGPORT = "9002"
+PGUSER = "mina_indexer"
+PGPASS = "mina_indexer"
+PGDATABASE = "mina_indexer"
 
 [hook]
 on-activate = """
-    export PGPORT="${PGPORT:-9002}"
-
-    export PGUSER=mina_indexer
-    export PGPASS=mina_indexer
-    export PGDATABASE=mina_indexer
-    export SESSION_SECRET="$USER-session-secret"
-
-    # Postgres environment variables
+    export SESSION_SECRET=$(head -c 55 /dev/urandom | base64)
     export PGDATA=$PWD/postgres_data
     export PGHOST=$PWD/postgres
     export LOG_PATH=$PGHOST/LOG
-    export DATABASE_URL="postgresql:///$PGDATABASE?host=$PGHOST&port=$PGPORT"
+    export DATABASE_URL=postgresql:///$PGDATABASE?host=$PGHOST&port=$PGPORT
+
     mkdir -p $PGHOST
-    if [ ! -d $PGDATA ]; then
-      echo 'Initializing postgresql database...'
-      initdb $PGDATA --username $PGUSER -A md5 --pwfile=<(echo $PGPASS) --auth=trust
-      echo "listen_addresses='*'" >> $PGDATA/postgresql.conf
-      echo "unix_socket_directories='$PGHOST'" >> $PGDATA/postgresql.conf
-      echo "unix_socket_permissions=0700" >> $PGDATA/postgresql.conf
+    chmod 0700 $PGHOST
+
+    if [ ! -d \"$PGDATA\" ]; then
+        echo 'Initializing postgresql database...'
+        initdb $PGDATA --username $PGUSER -A md5 --pwfile=<(echo $PGPASS) --auth=trust
+
+        # Configure postgresql.conf
+        cat > \"$PGDATA/postgresql.conf\" << EOF
+shared_preload_libraries = 'timescaledb'
+max_connections = 100
+shared_buffers = '1GB'
+effective_cache_size = '3GB'
+maintenance_work_mem = '256MB'
+timescaledb.telemetry_level = off
+unix_socket_permissions = 0700
+unix_socket_directories = '${PGHOST}'
+listen_addresses = '*'
+port = ${PGPORT}
+EOF
+    fi
+
+    if ! pg_ctl status > /dev/null; then
+
+        # Clean up any stale files
+        sleep 1
+        rm -f $PGHOST/.s.PGSQL.* || true
+
+        echo "Starting PostgreSQL"
+        pg_ctl -D $PGDATA -o "-k $PGHOST" -l $LOG_PATH start
+
+        until pg_isready -h $PGHOST -p $PGPORT -U $PGUSER; do
+            echo "Waiting for PostgreSQL to start"
+            sleep 1
+        done
+
+        if ! psql -U $PGUSER -h $PGHOST -p $PGPORT -d postgres -lqt | cut -d \\| -f 1 | grep -qw $PGDATABASE; then
+            echo "Creating database since it doesn't exist"
+            createdb -U $PGUSER -h $PGHOST -p $PGPORT $PGDATABASE
+        fi
+
+        psql -d $PGDATABASE -c \"CREATE EXTENSION IF NOT EXISTS timescaledb\"
     fi
 """
 
@@ -67,10 +101,3 @@ on-activate = """
 
 [options]
 systems = ["aarch64-darwin", "x86_64-darwin", "aarch64-linux", "x86_64-linux"]
-
-[services.database]
-command = "postgres start"
-vars.PGUSER = "mina_indexer"
-vars.PGPASSWORD = "mina_indexer"
-vars.PGDATABASE = "mina_indexer"
-vars.PGPORT = "9002"

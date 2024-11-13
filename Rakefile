@@ -77,22 +77,5 @@ task :check do
   sh 'standardrb --no-fix scripts'
 end
 
-desc "Start database service"
-task :start_db_service do
-  sh "pg_ctl -D ./postgres_data -l logfile start"
-end
-
-desc "Create database"
-task :create_db do
-  sh "createdb -U mina_indexer mina_indexer"
-end
-
-desc "Remove database"
-task :remove_db do
-  sh "lsof -t -i :9002 | xargs kill -9 || true "
-  sh "rm -rf postgres"
-  sh "rm -rf postgres_data"
-end
-
 desc "Checks readiness of code"
 task :ready => [:lint, :format, :check, :test]

@@ -43,8 +43,8 @@
           "x86_64-linux"
         ]
       },
-      "postgresql": {
-        "pkg-path": "postgresql_17"
+      "postgresql_16": {
+        "pkg-path": "postgresql_16"
       },
       "ruby": {
         "pkg-path": "ruby"
@@ -63,6 +63,9 @@
       "standard": {
         "pkg-path": "rubyPackages.standard"
       },
+      "timescaledb": {
+        "pkg-path": "timescaledb"
+      },
       "zld": {
         "pkg-path": "zld",
         "systems": [
@@ -71,8 +74,14 @@
         ]
       }
     },
+    "vars": {
+      "PGDATABASE": "mina_indexer",
+      "PGPASS": "mina_indexer",
+      "PGPORT": "9002",
+      "PGUSER": "mina_indexer"
+    },
     "hook": {
-      "on-activate": "    export PGPORT=\"${PGPORT:-9002}\"\n\n    export PGUSER=mina_indexer\n    export PGPASS=mina_indexer\n    export PGDATABASE=mina_indexer\n    export SESSION_SECRET=\"$USER-session-secret\"\n\n    # Postgres environment variables\n    export PGDATA=$PWD/postgres_data\n    export PGHOST=$PWD/postgres\n    export LOG_PATH=$PGHOST/LOG\n    export DATABASE_URL=\"postgresql:///$PGDATABASE?host=$PGHOST&port=$PGPORT\"\n    mkdir -p $PGHOST\n    if [ ! -d $PGDATA ]; then\n      echo 'Initializing postgresql database...'\n      initdb $PGDATA --username $PGUSER -A md5 --pwfile=<(echo $PGPASS) --auth=trust\n      echo \"listen_addresses='*'\" >> $PGDATA/postgresql.conf\n      echo \"unix_socket_directories='$PGHOST'\" >> $PGDATA/postgresql.conf\n      echo \"unix_socket_permissions=0700\" >> $PGDATA/postgresql.conf\n    fi\n"
+      "on-activate": "    export SESSION_SECRET=$(head -c 55 /dev/urandom | base64)\n    export PGDATA=$PWD/postgres_data\n    export PGHOST=$PWD/postgres\n    export LOG_PATH=$PGHOST/LOG\n    export DATABASE_URL=postgresql:///$PGDATABASE?host=$PGHOST&port=$PGPORT\n\n    mkdir -p $PGHOST\n    chmod 0700 $PGHOST\n\n    if [ ! -d \"$PGDATA\" ]; then\n        echo 'Initializing postgresql database...'\n        initdb $PGDATA --username $PGUSER -A md5 --pwfile=<(echo $PGPASS) --auth=trust\n\n        # Configure postgresql.conf\n        cat > \"$PGDATA/postgresql.conf\" << EOF\nshared_preload_libraries = 'timescaledb'\nmax_connections = 100\nshared_buffers = '1GB'\neffective_cache_size = '3GB'\nmaintenance_work_mem = '256MB'\ntimescaledb.telemetry_level = off\nunix_socket_permissions = 0700\nunix_socket_directories = '${PGHOST}'\nlisten_addresses = '*'\nport = ${PGPORT}\nEOF\n    fi\n\n    if ! pg_ctl status > /dev/null; then\n\n        # Clean up any stale files\n        sleep 1\n        rm -f $PGHOST/.s.PGSQL.* || true\n\n        echo \"Starting PostgreSQL\"\n        pg_ctl -D $PGDATA -o \"-k $PGHOST\" -l $LOG_PATH start\n\n        until pg_isready -h $PGHOST -p $PGPORT -U $PGUSER; do\n            echo \"Waiting for PostgreSQL to start\"\n            sleep 1\n        done\n\n        if ! psql -U $PGUSER -h $PGHOST -p $PGPORT -d postgres -lqt | cut -d \\| -f 1 | grep -qw $PGDATABASE; then\n            echo \"Creating database since it doesn't exist\"\n            createdb -U $PGUSER -h $PGHOST -p $PGPORT $PGDATABASE\n        fi\n\n        psql -d $PGDATABASE -c \"CREATE EXTENSION IF NOT EXISTS timescaledb\"\n    fi\n"
     },
     "profile": {},
     "options": {
@@ -86,20 +95,6 @@
         "licenses": []
       },
       "semver": {}
-    },
-    "services": {
-      "database": {
-        "command": "postgres start",
-        "vars": {
-          "PGDATABASE": "mina_indexer",
-          "PGPASSWORD": "mina_indexer",
-          "PGPORT": "9002",
-          "PGUSER": "mina_indexer"
-        },
-        "is-daemon": null,
-        "shutdown": null,
-        "systems": null
-      }
     }
   },
   "packages": [
@@ -946,15 +941,15 @@
       "priority": 5
     },
     {
-      "attr_path": "postgresql_17",
+      "attr_path": "postgresql_16",
       "broken": false,
-      "derivation": "/nix/store/fqhg90yg3lb0vanjzhxryqxax3np29aj-postgresql-17.0.drv",
+      "derivation": "/nix/store/svbnkhb26032jvmpjp0imv64lxpjh18m-postgresql-16.4.drv",
       "description": "Powerful, open source object-relational database system",
-      "install_id": "postgresql",
+      "install_id": "postgresql_16",
       "license": "PostgreSQL",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "postgresql-17.0",
-      "pname": "postgresql_17",
+      "name": "postgresql-16.4",
+      "pname": "postgresql_16",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -963,32 +958,32 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "postgresql-17.0",
+      "version": "postgresql-16.4",
       "outputs_to_install": [
         "out",
         "man"
       ],
       "outputs": {
-        "dev": "/nix/store/33jgy0lz77y5cqhwnl3sqlrk3d3hrw3s-postgresql-17.0-dev",
-        "doc": "/nix/store/mm1ziwdk2cn0dg9mrdd2q6fcjg35braj-postgresql-17.0-doc",
-        "lib": "/nix/store/3mvf7k0crdpk6dz5ns7zkibsyaryij1x-postgresql-17.0-lib",
-        "man": "/nix/store/7ww2fy5sv1fhlb32nknk47hc61bbc214-postgresql-17.0-man",
-        "out": "/nix/store/3wmd815gb9fkjav7ah4p6n7jvqi4hr00-postgresql-17.0"
+        "dev": "/nix/store/7dlym60qc7jmhm8d44f7dsnaghb7xdvk-postgresql-16.4-dev",
+        "doc": "/nix/store/pqrjg70wwgam8rq48cm1yibk87iy81cg-postgresql-16.4-doc",
+        "lib": "/nix/store/1n8ppphidl1nprqdnc70jqd9bnnqbhz0-postgresql-16.4-lib",
+        "man": "/nix/store/vm90nyq3v42gka36vfxgyvbsqgavf30h-postgresql-16.4-man",
+        "out": "/nix/store/njzzxcv9qbvpc3as73zynk8i30qlfkyk-postgresql-16.4"
       },
       "system": "aarch64-darwin",
       "group": "toplevel",
       "priority": 5
     },
     {
-      "attr_path": "postgresql_17",
+      "attr_path": "postgresql_16",
       "broken": false,
-      "derivation": "/nix/store/n0w0ly75m0qap2i8jg1fxkab5xyycqld-postgresql-17.0.drv",
+      "derivation": "/nix/store/5pwc2r60xzlk51jr7g4953dql0askyja-postgresql-16.4.drv",
       "description": "Powerful, open source object-relational database system",
-      "install_id": "postgresql",
+      "install_id": "postgresql_16",
       "license": "PostgreSQL",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "postgresql-17.0",
-      "pname": "postgresql_17",
+      "name": "postgresql-16.4",
+      "pname": "postgresql_16",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -997,32 +992,32 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "postgresql-17.0",
+      "version": "postgresql-16.4",
       "outputs_to_install": [
         "out",
         "man"
       ],
       "outputs": {
-        "dev": "/nix/store/pjjqbv26y5inpn2s27mpdafa5b7vn4vz-postgresql-17.0-dev",
-        "doc": "/nix/store/19lqgqr1997c7mxpmnm79nl7qsc0z1mx-postgresql-17.0-doc",
-        "lib": "/nix/store/yav72nd3l6xnzps83b23xf01pi2vlz4d-postgresql-17.0-lib",
-        "man": "/nix/store/qzl3a0x9axkcw9vvic4hfx3gxaq9hq7h-postgresql-17.0-man",
-        "out": "/nix/store/rh37y2iz53c1a1xmic02dhq824cqm00f-postgresql-17.0"
+        "dev": "/nix/store/mb1x8id6pjm1j2wvbrpmxbnpaj91hvp8-postgresql-16.4-dev",
+        "doc": "/nix/store/7n6zyhmk7yki0kzfmbxvjjyrb9qskfv8-postgresql-16.4-doc",
+        "lib": "/nix/store/vdfbff4iad2nv03dzmgpp8axx5n50xmb-postgresql-16.4-lib",
+        "man": "/nix/store/vrbawdhrrvvliqjr0g53804rqrcxnpfq-postgresql-16.4-man",
+        "out": "/nix/store/8r8zgm795png9iwbc9sv296d4rvc494a-postgresql-16.4"
       },
       "system": "x86_64-darwin",
       "group": "toplevel",
       "priority": 5
     },
     {
-      "attr_path": "postgresql_17",
+      "attr_path": "postgresql_16",
       "broken": false,
-      "derivation": "/nix/store/fsb5cp5n2m9jv6iy5682qdplqvpv2h4i-postgresql-17.0.drv",
+      "derivation": "/nix/store/9zzv0dw2ams49w2i4jsf1s3jc5a1vgx6-postgresql-16.4.drv",
       "description": "Powerful, open source object-relational database system",
-      "install_id": "postgresql",
+      "install_id": "postgresql_16",
       "license": "PostgreSQL",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "postgresql-17.0",
-      "pname": "postgresql_17",
+      "name": "postgresql-16.4",
+      "pname": "postgresql_16",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -1031,33 +1026,33 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "postgresql-17.0",
+      "version": "postgresql-16.4",
       "outputs_to_install": [
         "out",
         "man"
       ],
       "outputs": {
-        "debug": "/nix/store/kvp4cra882q3zrbn98ifkvsw9ifsqn9p-postgresql-17.0-debug",
-        "dev": "/nix/store/aqpxyinwmhh60pzink5qaar8fdbwb2kx-postgresql-17.0-dev",
-        "doc": "/nix/store/raiv59cb4aa5idj4rah58ql3kj4x2lhq-postgresql-17.0-doc",
-        "lib": "/nix/store/rdy3wxrb3bs95qc7pj68k2pcbz0kcman-postgresql-17.0-lib",
-        "man": "/nix/store/dg7813s8l9p7s6q6kpz2zy5jn2xxf0da-postgresql-17.0-man",
-        "out": "/nix/store/i4f6q5yq6xsyy8nyd5zbp8wzkdgn58xq-postgresql-17.0"
+        "debug": "/nix/store/4b6pzkw3sw3d1xz31ba0h82sk4m9q7ch-postgresql-16.4-debug",
+        "dev": "/nix/store/nw8xyfklwnp9afjywa89q9v549mdmx9s-postgresql-16.4-dev",
+        "doc": "/nix/store/w7af6r825fwlgdfr5q8gn906mg5522fb-postgresql-16.4-doc",
+        "lib": "/nix/store/7kg75r4716xf0pf15igpdcdlczhp981x-postgresql-16.4-lib",
+        "man": "/nix/store/fmkxhxwjfd8v428vbhzhz7myh2d4jx26-postgresql-16.4-man",
+        "out": "/nix/store/h0kz668dqw9c3d4vx4c28ikn4b8hgds4-postgresql-16.4"
       },
       "system": "aarch64-linux",
       "group": "toplevel",
       "priority": 5
     },
     {
-      "attr_path": "postgresql_17",
+      "attr_path": "postgresql_16",
       "broken": false,
-      "derivation": "/nix/store/d7j78wplhgib3l7vrcmn92xhrniq2zc3-postgresql-17.0.drv",
+      "derivation": "/nix/store/aif5b3rdlfmirmcisq78p0wc0gc8gc8k-postgresql-16.4.drv",
       "description": "Powerful, open source object-relational database system",
-      "install_id": "postgresql",
+      "install_id": "postgresql_16",
       "license": "PostgreSQL",
       "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
-      "name": "postgresql-17.0",
-      "pname": "postgresql_17",
+      "name": "postgresql-16.4",
+      "pname": "postgresql_16",
       "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
       "rev_count": 705705,
       "rev_date": "2024-11-09T08:06:34Z",
@@ -1066,18 +1061,18 @@
         "unstable"
       ],
       "unfree": false,
-      "version": "postgresql-17.0",
+      "version": "postgresql-16.4",
       "outputs_to_install": [
         "out",
         "man"
       ],
       "outputs": {
-        "debug": "/nix/store/i313jcfhg9y8qxcsly78fc9xin3q57w9-postgresql-17.0-debug",
-        "dev": "/nix/store/57v8m3886b3kvf49q5rcc535llfahjq6-postgresql-17.0-dev",
-        "doc": "/nix/store/jwjy9lhgkkv8k6bia8n5786h3vwksqb8-postgresql-17.0-doc",
-        "lib": "/nix/store/ka6y8fclayrdhdr7j02fxbqnk5d1ljzn-postgresql-17.0-lib",
-        "man": "/nix/store/b1idvh7pxnqrxbkgsz52y42j7pqdmbsr-postgresql-17.0-man",
-        "out": "/nix/store/p5n515lv5a3wyq53ws14w1a6z9fi28y6-postgresql-17.0"
+        "debug": "/nix/store/krb6fp58dkx0v1w6ljgsc1q4fa9px38b-postgresql-16.4-debug",
+        "dev": "/nix/store/a1y4jday73043sr9jdkl45x86fc4bz6b-postgresql-16.4-dev",
+        "doc": "/nix/store/aimqn571cc15g9dylir4sg9hddsx9vk4-postgresql-16.4-doc",
+        "lib": "/nix/store/y44iixsj2fd1pcy8ny66809z8r6zlxag-postgresql-16.4-lib",
+        "man": "/nix/store/h2kawzk00cnmqvbp860hispl7rr8dyij-postgresql-16.4-man",
+        "out": "/nix/store/wc1a06ip2fajrjkfbw7cvxzw1c949a6g-postgresql-16.4"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
@@ -1426,6 +1421,122 @@
       ],
       "outputs": {
         "out": "/nix/store/k5k0xkxkxkb5q6azx3j621zvz9yy83h0-ruby3.3-standard-1.40.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "timescaledb",
+      "broken": false,
+      "derivation": "/nix/store/m1w9sfrnkc7lx69wqgy0qqp98sx2sra0-timescaledb-2.14.2.drv",
+      "description": "Scales PostgreSQL for time-series data via automatic partitioning across time and space",
+      "install_id": "timescaledb",
+      "license": "Timescale License Agreegment",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "timescaledb-2.14.2",
+      "pname": "timescaledb",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.14.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/jp2aq4ns5klw7mk82v1qnd4f9k3z0cqa-timescaledb-2.14.2"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "timescaledb",
+      "broken": false,
+      "derivation": "/nix/store/mvsxd1k6gzrlsdvyzkvv6fai5qnwhkay-timescaledb-2.14.2.drv",
+      "description": "Scales PostgreSQL for time-series data via automatic partitioning across time and space",
+      "install_id": "timescaledb",
+      "license": "Timescale License Agreegment",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "timescaledb-2.14.2",
+      "pname": "timescaledb",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.14.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/2khcb3vr00sy4fs9ksrs8c5nly5ssn3x-timescaledb-2.14.2"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "timescaledb",
+      "broken": false,
+      "derivation": "/nix/store/2vxb3cszilm2wyrqznl8nilq9m1gy1qz-timescaledb-2.14.2.drv",
+      "description": "Scales PostgreSQL for time-series data via automatic partitioning across time and space",
+      "install_id": "timescaledb",
+      "license": "Timescale License Agreegment",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "timescaledb-2.14.2",
+      "pname": "timescaledb",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.14.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/fs0fxs8bd79wwilcqw03dxi8ycwjbvlb-timescaledb-2.14.2"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "timescaledb",
+      "broken": false,
+      "derivation": "/nix/store/81f0ijga90wvhr8vhdcnaxa7bf565ljm-timescaledb-2.14.2.drv",
+      "description": "Scales PostgreSQL for time-series data via automatic partitioning across time and space",
+      "install_id": "timescaledb",
+      "license": "Timescale License Agreegment",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "name": "timescaledb-2.14.2",
+      "pname": "timescaledb",
+      "rev": "76612b17c0ce71689921ca12d9ffdc9c23ce40b2",
+      "rev_count": 705705,
+      "rev_date": "2024-11-09T08:06:34Z",
+      "scrape_date": "2024-11-11T03:57:18Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": true,
+      "version": "2.14.2",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/z3gw02jyav9qbx8c75l60c2b5g6vg0q2-timescaledb-2.14.2"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
