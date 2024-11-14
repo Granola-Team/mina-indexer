@@ -4,7 +4,8 @@ use actors::{
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor,
     fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor, internal_command_canonicity_actor::InternalCommandCanonicityActor,
-    mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    internal_command_persistence_actor::InternalCommandPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor,
+    pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
     snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor,
     user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
     user_command_persistence_actor::UserCommandPersistenceActor, Actor,
@@ -34,6 +35,7 @@ pub async fn process_blocks_dir(
     let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -58,6 +60,7 @@ pub async fn process_blocks_dir(
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor),
+        Arc::new(internal_command_persistence_actor),
     ];
 
     // Spawn tasks for each actor and collect their handles

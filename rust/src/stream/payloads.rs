@@ -133,6 +133,19 @@ pub enum InternalCommandType {
     FeeTransfer,
 }
 
+use std::fmt;
+
+impl fmt::Display for InternalCommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            InternalCommandType::Coinbase => "Coinbase",
+            InternalCommandType::FeeTransferViaCoinbase => "FeeTransferViaCoinbase",
+            InternalCommandType::FeeTransfer => "FeeTransfer",
+        };
+        write!(f, "{}", display_text)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct InternalCommandPayload {
     pub internal_command_type: InternalCommandType,
