@@ -176,7 +176,11 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
             last_best_block = Some(sonic_rs::from_str(&event.payload).unwrap());
         }
         match event.event_type {
-            EventType::InternalCommand => if let Some(InternalCommandPayload { internal_command_type, .. }) = sonic_rs::from_str(&event.payload).ok() { *internal_command_counts.entry(internal_command_type).or_insert(0) += 1 },
+            EventType::InternalCommand => {
+                if let Ok(InternalCommandPayload { internal_command_type, .. }) = sonic_rs::from_str(&event.payload) {
+                    *internal_command_counts.entry(internal_command_type).or_insert(0) += 1
+                }
+            }
             _ => {
                 *event_counts.entry(event.event_type).or_insert(0) += 1;
             }
@@ -191,13 +195,17 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
-    assert_eq!(internal_command_counts.get(&InternalCommandType::Coinbase).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::UserCommandSummary).cloned().unwrap(), number_of_user_commands);
+
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() > length_of_chain);
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() < paths_count);
     assert!(!event_counts.contains_key(&EventType::TransitionFrontier));
+
+    assert_eq!(internal_command_counts.get(&InternalCommandType::Coinbase).cloned().unwrap(), paths_count);
+    assert!(!internal_command_counts.contains_key(&InternalCommandType::FeeTransfer));
+    assert!(!internal_command_counts.contains_key(&InternalCommandType::FeeTransferViaCoinbase));
 
     // Best Block & Last canonical update:
     assert_eq!(last_best_block.clone().unwrap().height, length_of_chain as u64);

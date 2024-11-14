@@ -126,7 +126,7 @@ pub struct UserCommandSummaryPayload {
     pub amount_nanomina: u64,
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
 pub enum InternalCommandType {
     Coinbase,
     FeeTransferViaCoinbase,
