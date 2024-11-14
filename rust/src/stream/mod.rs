@@ -183,6 +183,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
+    assert_eq!(event_counts.get(&EventType::CoinbaseTransfer).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::UserCommandSummary).cloned().unwrap(), number_of_user_commands);
