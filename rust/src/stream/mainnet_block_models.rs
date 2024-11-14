@@ -18,8 +18,8 @@ impl MainnetBlock {
         self.protocol_state.body.consensus_state.block_creator.to_string()
     }
 
-    pub fn get_fee_transfer_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+    pub fn get_fee_transfer_via_coinbase(&self) -> Option<FeeTransferViaCoinbase> {
+        let fee_transfer_via_coinbase: Option<Vec<FeeTransferViaCoinbase>> = [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
                 opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
@@ -41,8 +41,15 @@ impl MainnetBlock {
                     _ => None,
                 })
             })
-            .collect::<Vec<_>>()
-            .into()
+            .collect::<Vec<FeeTransferViaCoinbase>>()
+            .into();
+
+        if let Some(fts) = fee_transfer_via_coinbase.filter(|v| !v.is_empty()) {
+            assert_eq!(fts.len(), 1);
+            Some(fts.first().unwrap().clone())
+        } else {
+            None
+        }
     }
 
     pub fn get_previous_state_hash(&self) -> String {
@@ -120,7 +127,7 @@ impl MainnetBlock {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FeeTransferViaCoinbase {
     pub receiver: String,
     pub fee: f64,
@@ -495,9 +502,7 @@ mod mainnet_block_parsing_tests {
         // Deserialize JSON into MainnetBlock struct
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
-        let fee_transfers_via_coinbase = mainnet_block.get_fee_transfer_via_coinbase().unwrap();
-        assert_eq!(fee_transfers_via_coinbase.len(), 1);
-        let fee_transfer_via_coinbase = fee_transfers_via_coinbase.first().unwrap();
+        let fee_transfer_via_coinbase = mainnet_block.get_fee_transfer_via_coinbase().unwrap();
         assert_eq!(fee_transfer_via_coinbase.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
         assert_eq!(fee_transfer_via_coinbase.fee, 0.00005f64);
     }

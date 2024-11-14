@@ -18,6 +18,7 @@ pub enum EventType {
     UserCommandSummary,
     UserCommandCanonicityUpdate,
     CoinbaseTransfer,
+    FeeTransferViaCoinbase,
 }
 
 #[derive(Debug, Clone, PartialEq)]

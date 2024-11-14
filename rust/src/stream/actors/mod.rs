@@ -7,6 +7,7 @@ pub(crate) mod block_summary_actor;
 pub(crate) mod block_summary_persistence_actor;
 pub(crate) mod blockchain_tree_builder_actor;
 pub(crate) mod coinbase_transfer_actor;
+pub(crate) mod fee_transfer_via_coinbase_actor;
 pub(crate) mod mainnet_block_parser_actor;
 pub(crate) mod pcb_path_actor;
 pub(crate) mod snark_canonicity_summary_actor;

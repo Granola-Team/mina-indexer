@@ -122,6 +122,7 @@ async fn test_user_command_actor_handle_event() {
         coinbase_receiver: "coinbase_receiver".to_string(),
         coinbase_reward_nanomina: 720_000_000_000,
         global_slot_since_genesis: 16,
+        ..Default::default()
     };
 
     // Serialize the MainnetBlockPayload to JSON for the event payload
