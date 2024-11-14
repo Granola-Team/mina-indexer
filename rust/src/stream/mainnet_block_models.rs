@@ -25,7 +25,6 @@ impl MainnetBlock {
                 opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
                     Some(v1) if v1 == "One" => match diff.coinbase.last() {
                         Some(v2) => {
-                            println!("{:?}", v1.is_null());
                             if v2.is_null() {
                                 return None;
                             }
