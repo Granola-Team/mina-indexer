@@ -2,7 +2,7 @@ use crate::{stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilder
 use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
-    block_summary_persistence_actor::BlockSummaryPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
+    block_summary_persistence_actor::BlockSummaryPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor,
     fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
     snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
     snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor,
@@ -52,6 +52,7 @@ pub async fn process_blocks_dir(
         Arc::new(UserCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferViaCoinbaseActor::new(Arc::clone(shared_publisher))),
+        Arc::new(FeeTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor),
@@ -168,12 +169,18 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
 
     // Count each event type received
     let mut event_counts: HashMap<EventType, usize> = HashMap::new();
+    let mut internal_command_counts: HashMap<InternalCommandType, usize> = HashMap::new();
     let mut last_best_block: Option<BlockCanonicityUpdatePayload> = None;
     while let Ok(event) = receiver.try_recv() {
         if event.event_type == EventType::BestBlock {
             last_best_block = Some(sonic_rs::from_str(&event.payload).unwrap());
         }
-        *event_counts.entry(event.event_type).or_insert(0) += 1;
+        match event.event_type {
+            EventType::InternalCommand => if let Some(InternalCommandPayload { internal_command_type, .. }) = sonic_rs::from_str(&event.payload).ok() { *internal_command_counts.entry(internal_command_type).or_insert(0) += 1 },
+            _ => {
+                *event_counts.entry(event.event_type).or_insert(0) += 1;
+            }
+        }
     }
 
     let paths_count = 165;
@@ -184,7 +191,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::PrecomputedBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
-    assert_eq!(event_counts.get(&EventType::CoinbaseTransfer).cloned().unwrap(), paths_count);
+    assert_eq!(internal_command_counts.get(&InternalCommandType::Coinbase).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::UserCommandSummary).cloned().unwrap(), number_of_user_commands);

@@ -57,6 +57,7 @@ impl Actor for MainnetBlockParserActor {
                 global_slot_since_genesis: block.get_global_slot_since_genesis(),
                 user_commands: block.get_user_commands(),
                 fee_transfer_via_coinbase: block.get_fee_transfer_via_coinbase(),
+                fee_transfers: block.get_fee_transfers(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,

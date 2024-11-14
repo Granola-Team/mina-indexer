@@ -108,6 +108,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
         global_slot_since_genesis: block.get_global_slot_since_genesis(),
         user_commands: block.get_user_commands(),
         fee_transfer_via_coinbase: block.get_fee_transfer_via_coinbase(),
+        fee_transfers: block.get_fee_transfers(),
     };
 
     // Create shared publisher and SnarkWorkSummaryActor

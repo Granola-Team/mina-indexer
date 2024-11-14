@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{FeeTransferViaCoinbasePayload, MainnetBlockPayload};
+use crate::stream::payloads::{InternalCommandPayload, InternalCommandType, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -37,7 +37,8 @@ impl Actor for FeeTransferViaCoinbaseActor {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 if let Some(fee_transfer_via_coinbase) = block_payload.fee_transfer_via_coinbase {
-                    let payload = FeeTransferViaCoinbasePayload {
+                    let payload = InternalCommandPayload {
+                        internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
                         height: block_payload.height,
                         state_hash: block_payload.state_hash.to_string(),
                         timestamp: block_payload.timestamp,
@@ -45,7 +46,7 @@ impl Actor for FeeTransferViaCoinbaseActor {
                         amount_nanomina: (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64,
                     };
                     self.publish(Event {
-                        event_type: EventType::FeeTransferViaCoinbase,
+                        event_type: EventType::InternalCommand,
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
@@ -69,7 +70,7 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
     use crate::stream::{
         events::{Event, EventType},
         mainnet_block_models::FeeTransferViaCoinbase,
-        payloads::{FeeTransferViaCoinbasePayload, MainnetBlockPayload},
+        payloads::MainnetBlockPayload,
     };
     use std::sync::Arc;
 
@@ -104,10 +105,10 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
 
     // Capture and verify the published FeeTransferViaCoinbase event
     if let Ok(received_event) = receiver.recv().await {
-        assert_eq!(received_event.event_type, EventType::FeeTransferViaCoinbase);
+        assert_eq!(received_event.event_type, EventType::InternalCommand);
 
         // Deserialize the payload of the FeeTransferViaCoinbase event
-        let fee_transfer_payload: FeeTransferViaCoinbasePayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        let fee_transfer_payload: InternalCommandPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
         // Verify that the FeeTransferViaCoinbasePayload matches the expected values
         assert_eq!(fee_transfer_payload.height, block_payload.height);

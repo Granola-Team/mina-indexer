@@ -1,4 +1,4 @@
-use super::mainnet_block_models::{CommandSummary, CompletedWorks, FeeTransferViaCoinbase};
+use super::mainnet_block_models::{CommandSummary, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase};
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -32,6 +32,7 @@ pub struct MainnetBlockPayload {
     pub coinbase_reward_nanomina: u64,
     pub global_slot_since_genesis: u64,
     pub fee_transfer_via_coinbase: Option<FeeTransferViaCoinbase>,
+    pub fee_transfers: Vec<FeeTransfer>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -125,17 +126,16 @@ pub struct UserCommandSummaryPayload {
     pub amount_nanomina: u64,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct CoinbaseTransferPayload {
-    pub height: u64,
-    pub state_hash: String,
-    pub timestamp: u64,
-    pub amount_nanomina: u64,
-    pub recipient: String,
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub enum InternalCommandType {
+    Coinbase,
+    FeeTransferViaCoinbase,
+    FeeTransfer,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct FeeTransferViaCoinbasePayload {
+pub struct InternalCommandPayload {
+    pub internal_command_type: InternalCommandType,
     pub height: u64,
     pub state_hash: String,
     pub timestamp: u64,
