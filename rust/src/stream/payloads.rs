@@ -126,14 +126,14 @@ pub struct UserCommandSummaryPayload {
     pub amount_nanomina: u64,
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
 pub enum InternalCommandType {
     Coinbase,
     FeeTransferViaCoinbase,
     FeeTransfer,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct InternalCommandPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
@@ -141,6 +141,17 @@ pub struct InternalCommandPayload {
     pub timestamp: u64,
     pub amount_nanomina: u64,
     pub recipient: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct InternalCommandCanonicityPayload {
+    pub internal_command_type: InternalCommandType,
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub amount_nanomina: u64,
+    pub recipient: String,
+    pub canonical: bool,
 }
 
 #[derive(Serialize, Deserialize)]

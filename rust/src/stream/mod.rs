@@ -3,10 +3,11 @@ use actors::{
     berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
     block_canonicity_actor::BlockCanonicityActor, block_reward_double_entry_actor::BlockRewardDoubleEntryActor, block_summary_actor::BlockSummaryActor,
     block_summary_persistence_actor::BlockSummaryPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor,
-    fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
-    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
-    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor,
-    user_command_canonicity_actor::UserCommandCanonicityActor, user_command_persistence_actor::UserCommandPersistenceActor, Actor,
+    fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor, internal_command_canonicity_actor::InternalCommandCanonicityActor,
+    mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor,
+    user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
+    user_command_persistence_actor::UserCommandPersistenceActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -53,6 +54,7 @@ pub async fn process_blocks_dir(
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferViaCoinbaseActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferActor::new(Arc::clone(shared_publisher))),
+        Arc::new(InternalCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor),

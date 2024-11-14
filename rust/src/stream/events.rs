@@ -18,6 +18,7 @@ pub enum EventType {
     UserCommandSummary,
     UserCommandCanonicityUpdate,
     InternalCommand,
+    InternalCommandCanonicityUpdate,
 }
 
 #[derive(Debug, Clone, PartialEq)]
