@@ -5,6 +5,7 @@ use serde::{
     Deserializer,
 };
 use sonic_rs::{Deserialize, JsonValueTrait, Serialize, Value};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainnetBlock {
@@ -16,6 +17,26 @@ pub struct MainnetBlock {
 impl MainnetBlock {
     pub fn get_block_creator(&self) -> String {
         self.protocol_state.body.consensus_state.block_creator.to_string()
+    }
+
+    pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
+        let mut fee_transfers: HashMap<String, u64> = HashMap::new();
+        for completed_work in self.get_snark_work() {
+            let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
+            *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
+        }
+        if let Some(fee_transfer_via_coinbase) = self.get_fee_transfer_via_coinbase() {
+            fee_transfers.remove(&fee_transfer_via_coinbase.receiver);
+        }
+        fee_transfers.remove(&self.get_coinbase_receiver());
+        fee_transfers.retain(|_, v| *v > 0u64);
+        fee_transfers
+            .into_iter()
+            .map(|(prover, fee_nanomina)| FeeTransfer {
+                recipient: prover,
+                fee_nanomina,
+            })
+            .collect()
     }
 
     pub fn get_fee_transfer_via_coinbase(&self) -> Option<FeeTransferViaCoinbase> {
@@ -130,6 +151,12 @@ impl MainnetBlock {
 pub struct FeeTransferViaCoinbase {
     pub receiver: String,
     pub fee: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeeTransfer {
+    pub recipient: String,
+    pub fee_nanomina: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -457,7 +484,7 @@ mod mainnet_block_parsing_tests {
     }
 
     #[test]
-    fn test_mainnet_block_with_stake_delegation() {
+    fn test_mainnet_block_with_stake_delegation_and_fee_transfers() {
         // Path to your test JSON file
         let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-199999-3NKDFcMG4gbdeSwEYzoAURSHv4uRabTFbTY7W6JpECN2rHmwYE8j.json");
         let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
@@ -470,26 +497,45 @@ mod mainnet_block_parsing_tests {
         let user_commands = mainnet_block.get_user_commands();
         let fifth_user_command = user_commands.get(4).unwrap();
 
-        // Test Fee
+        // Test fields of the fifth user command
         assert_eq!(fifth_user_command.fee_nanomina, 10_100_000);
-
-        // Test memo
         assert_eq!(&fifth_user_command.memo, "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
-
-        // Test memo
         assert_eq!(fifth_user_command.nonce, 0);
-
-        // Test sender
         assert_eq!(&fifth_user_command.sender, "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
-
-        // Test receiver
         assert_eq!(&fifth_user_command.receiver, "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
-
-        // test status
         assert_eq!(&fifth_user_command.status, "Applied");
-
-        // test
         assert_eq!(fifth_user_command.amount_nanomina, 0);
+
+        // Test fee transfers
+        let fee_transfers = mainnet_block.get_fee_transfers();
+        let expected_fee_transfers = vec![
+            ("B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h", 312),
+            ("B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP", 350000),
+            ("B62qoHXLV7QT6ezrPai2fLiS2k7eA4dDecW6hkDjXeuKdgjsTDATdNi", 200),
+            ("B62qn2Ne2JGRdbHXdfD8wkA6PTWuBjaxUDQ6QuPAmggrcYjTP3HwWkF", 1000000),
+            ("B62qpcENWiR5VKkrHscV9cWfPwNs56ExFeb94FDiVz9GeV2mBNpMCkY", 60000),
+            ("B62qnucUMHz7Dw2ReNgWhmR5XCvPeQjJWPReuQ8GwPyY4qj1otGBiKr", 960000),
+            ("B62qqWzWHjUmJSSB9db6BDpGjFJkRNjjtZorwJdpeASzSPHpRe4CoJS", 1100000),
+            ("B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp", 3000000),
+            ("B62qp5dXkkj3TkkfPos35rNYxVTKTbm5CqigfgKppA5E7GQHK7H3nNd", 1777776),
+            ("B62qkBqSkXgkirtU3n8HJ9YgwHh3vUD6kGJ5ZRkQYGNPeL5xYL2tL1L", 3000000),
+        ];
+
+        println!("{:#?}", fee_transfers);
+
+        // Assert that the number of fee transfers matches
+        assert_eq!(fee_transfers.len(), expected_fee_transfers.len());
+
+        // Check each expected fee transfer against the result
+        for (expected_recipient, expected_fee) in expected_fee_transfers.iter() {
+            assert_eq!(
+                fee_transfers
+                    .iter()
+                    .filter(|ft| &ft.recipient == expected_recipient && &ft.fee_nanomina == expected_fee)
+                    .count(),
+                1
+            )
+        }
     }
 
     #[test]
