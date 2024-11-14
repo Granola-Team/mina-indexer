@@ -5,7 +5,7 @@ use actors::{
     block_summary_persistence_actor::BlockSummaryPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor, pcb_path_actor::PCBBlockPathActor,
     snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
     snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor,
-    user_command_canonicity_actor::UserCommandCanonicityActor, Actor,
+    user_command_canonicity_actor::UserCommandCanonicityActor, user_command_persistence_actor::UserCommandPersistenceActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -31,6 +31,7 @@ pub async fn process_blocks_dir(
 
     let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -50,6 +51,7 @@ pub async fn process_blocks_dir(
         Arc::new(UserCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
+        Arc::new(user_command_persistence_actor),
     ];
 
     // Spawn tasks for each actor and collect their handles
