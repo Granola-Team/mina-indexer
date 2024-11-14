@@ -4,7 +4,7 @@ use serde::{
     de::{SeqAccess, Visitor},
     Deserializer,
 };
-use sonic_rs::{Deserialize, Serialize, Value};
+use sonic_rs::{Deserialize, JsonValueTrait, Serialize, Value};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainnetBlock {
@@ -16,6 +16,33 @@ pub struct MainnetBlock {
 impl MainnetBlock {
     pub fn get_block_creator(&self) -> String {
         self.protocol_state.body.consensus_state.block_creator.to_string()
+    }
+
+    pub fn get_fee_transfer_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| {
+                opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
+                    Some(v1) if v1 == "One" => match diff.coinbase.last() {
+                        Some(v2) => {
+                            println!("{:?}", v1.is_null());
+                            if v2.is_null() {
+                                return None;
+                            }
+
+                            // Try to extract "receiver_pk" and "fee" from the JSON structure
+                            let receiver = v2["receiver_pk"].as_str().unwrap().to_string();
+                            let fee = v2["fee"].as_str().unwrap().parse::<f64>().unwrap();
+
+                            Some(FeeTransferViaCoinbase { receiver, fee })
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                })
+            })
+            .collect::<Vec<_>>()
+            .into()
     }
 
     pub fn get_previous_state_hash(&self) -> String {
@@ -43,7 +70,7 @@ impl MainnetBlock {
             .iter()
             .filter_map(|opt_diff| {
                 opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
-                    Some(v) if *v == "Zero" => None,
+                    Some(v) if v == "Zero" => None,
                     _ => {
                         let multiplier = match self.protocol_state.body.consensus_state.supercharge_coinbase {
                             true => 2,
@@ -91,6 +118,12 @@ impl MainnetBlock {
     pub fn get_timestamp(&self) -> u64 {
         self.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
     }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FeeTransferViaCoinbase {
+    pub receiver: String,
+    pub fee: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -451,5 +484,21 @@ mod mainnet_block_parsing_tests {
 
         // test
         assert_eq!(fifth_user_command.amount_nanomina, 0);
+    }
+
+    #[test]
+    fn test_mainnet_block_with_fee_transfer_via_coinbase() {
+        // Path to your test JSON file
+        let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-300000-3NLuJ7pWnSw2iYhjsJFTX1CGTavB3FHcwvP1E6r5Ewxss2qf8udQ.json");
+        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+
+        // Deserialize JSON into MainnetBlock struct
+        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        let fee_transfers_via_coinbase = mainnet_block.get_fee_transfer_via_coinbase().unwrap();
+        assert_eq!(fee_transfers_via_coinbase.len(), 1);
+        let fee_transfer_via_coinbase = fee_transfers_via_coinbase.first().unwrap();
+        assert_eq!(fee_transfer_via_coinbase.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
+        assert_eq!(fee_transfer_via_coinbase.fee, 0.00005f64);
     }
 }
