@@ -92,7 +92,7 @@ pub async fn process_blocks_dir(
             for entry in entries {
                 let path = entry.as_path();
 
-                tokio::time::sleep(Duration::from_millis(1)).await;
+                tokio::time::sleep(Duration::from_millis(5)).await;
                 shared_publisher.publish(Event {
                     event_type: events::EventType::PrecomputedBlockPath,
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
