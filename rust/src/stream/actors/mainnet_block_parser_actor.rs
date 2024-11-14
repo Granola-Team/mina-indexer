@@ -35,7 +35,7 @@ impl Actor for MainnetBlockParserActor {
     fn id(&self) -> String {
         self.id.clone()
     }
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
@@ -111,7 +111,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.last_vrf_output, "HXzRY01h73mWXp4cjNwdDTYLDtdFU5mYhTbWWi-1wwE=");
         assert_eq!(payload.user_command_count, 1);
         assert_eq!(payload.snark_work_count, 0);
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor for block 100.");
     }
@@ -137,7 +137,7 @@ async fn test_mainnet_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.last_vrf_output, "ws1xspEgjEyLiSS0V2-Egf9UzJG3FACpruvvDEsqDAA=");
         assert_eq!(payload.user_command_count, 3);
         assert_eq!(payload.snark_work_count, 0);
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 2);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 2);
     } else {
         panic!("Did not receive expected event from actor for block 99.");
     }

@@ -29,7 +29,7 @@ impl Actor for BlockSummaryActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
@@ -147,7 +147,7 @@ async fn test_block_summary_actor_handle_event() {
         assert!(!summary_payload.is_berkeley_block);
 
         // Verify that the event was marked as processed
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BlockSummary event from BlockSummaryActor.");
     }

@@ -20,7 +20,7 @@ use tokio_postgres::{Client, NoTls};
 pub struct BlockSummaryPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_published: AtomicUsize,
+    pub database_inserts: AtomicUsize,
     pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
     pub blockchain_tree: Arc<Mutex<BlockchainTree>>,
     pub client: Client,
@@ -61,7 +61,7 @@ impl BlockSummaryPersistenceActor {
                 id: "BlockSummaryPersistenceActor".to_string(),
                 shared_publisher,
                 client,
-                events_published: AtomicUsize::new(0),
+                database_inserts: AtomicUsize::new(0),
                 block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
                 blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
             }
@@ -128,8 +128,15 @@ impl BlockSummaryPersistenceActor {
                 // Deserialize the metadata string to extract block summary
                 let block_summary: BlockSummaryPayload = sonic_rs::from_str(&node.metadata_str.unwrap()).unwrap();
 
-                if let Ok(affected_rows) = self.db_upsert(&block_summary, update.canonical).await {
-                    assert_eq!(affected_rows, 1)
+                match self.db_upsert(&block_summary, update.canonical).await {
+                    Ok(affected_rows) => {
+                        assert_eq!(affected_rows, 1);
+                        self.shared_publisher.incr_database_insert();
+                        self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    Err(e) => {
+                        panic!("{}", e);
+                    }
                 };
 
                 // Prune the tree as needed
@@ -153,8 +160,8 @@ impl Actor for BlockSummaryPersistenceActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
-        &self.events_published
+    fn actor_outputs(&self) -> &AtomicUsize {
+        &self.database_inserts
     }
     async fn handle_event(&self, event: Event) {
         match event.event_type {

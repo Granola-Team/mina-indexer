@@ -29,7 +29,7 @@ impl Actor for PCBBlockPathActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
@@ -85,7 +85,7 @@ async fn test_precomputed_block_path_identity_actor() {
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::BerkeleyBlockPath);
         assert_eq!(received_event.payload, temp_file_berkeley.path().to_str().unwrap().to_string());
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected BerkeleyBlockPath event from actor.");
     }

@@ -12,7 +12,7 @@ use tokio_postgres::{Client, NoTls};
 pub struct SnarkSummaryPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub events_published: AtomicUsize,
+    pub database_inserts: AtomicUsize,
     pub client: Client,
 }
 
@@ -45,7 +45,7 @@ impl SnarkSummaryPersistenceActor {
                 id: "SnarkSummaryPersistenceActor".to_string(),
                 shared_publisher,
                 client,
-                events_published: AtomicUsize::new(0),
+                database_inserts: AtomicUsize::new(0),
             }
         } else {
             panic!("Unable to establish connection to database")
@@ -103,14 +103,21 @@ impl Actor for SnarkSummaryPersistenceActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
-        &self.events_published
+    fn actor_outputs(&self) -> &AtomicUsize {
+        &self.database_inserts
     }
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::SnarkCanonicitySummary {
             let event_payload: SnarkCanonicitySummaryPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if let Err(e) = self.db_upsert(&event_payload).await {
-                panic!("{:?}", e);
+            match self.db_upsert(&event_payload).await {
+                Ok(affected_rows) => {
+                    assert_eq!(affected_rows, 1);
+                    self.shared_publisher.incr_database_insert();
+                    self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+                Err(e) => {
+                    panic!("{}", e);
+                }
             }
         }
     }

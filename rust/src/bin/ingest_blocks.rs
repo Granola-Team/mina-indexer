@@ -35,7 +35,12 @@ async fn main() -> Result<(), anyhow::Error> {
         tokio::spawn(async move {
             loop {
                 let now: DateTime<Utc> = Utc::now();
-                println!("{} Current buffer size: {}", now.to_rfc3339(), shared_publisher.buffer_size());
+                println!(
+                    "{} Current buffer size: {}. Database inserts: {}",
+                    now.to_rfc3339(),
+                    shared_publisher.buffer_size(),
+                    shared_publisher.database_inserts()
+                );
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
         })

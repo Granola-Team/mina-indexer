@@ -73,7 +73,7 @@ impl Actor for UserCommandCanonicityActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {

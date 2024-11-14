@@ -29,7 +29,7 @@ impl Actor for UserCommandActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
@@ -163,5 +163,5 @@ async fn test_user_command_actor_handle_event() {
     }
 
     // Verify that the event count matches the number of user commands processed
-    assert_eq!(actor.events_published().load(Ordering::SeqCst), block_payload.user_commands.len());
+    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), block_payload.user_commands.len());
 }

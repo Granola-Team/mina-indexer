@@ -85,7 +85,7 @@ impl Actor for BlockCanonicityActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
 
@@ -212,7 +212,7 @@ async fn test_non_canonical_block_with_vrf_info() -> anyhow::Result<()> {
     }
 
     // Verify both events have been processed
-    assert_eq!(actor.events_published().load(Ordering::SeqCst), 3);
+    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 3);
 
     Ok(())
 }
@@ -302,7 +302,7 @@ async fn test_new_block_becomes_canonical_over_existing_block() -> anyhow::Resul
     // Assert both canonical and non-canonical updates were received as expected
     assert!(received_new_canonical_update, "New block should be marked as canonical.");
     assert!(received_non_canonical_update, "Initial block should be marked as non-canonical.");
-    assert_eq!(actor.events_published().load(Ordering::SeqCst), 4);
+    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 4);
 
     Ok(())
 }
@@ -460,7 +460,7 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
     }
 
     let genesis_event = 1;
-    assert_eq!(actor.events_published().load(Ordering::SeqCst), num_expected_events + genesis_event);
+    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), num_expected_events + genesis_event);
 
     Ok(())
 }

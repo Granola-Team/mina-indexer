@@ -37,7 +37,7 @@ impl Actor for BlockchainTreeBuilderActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
 
@@ -307,7 +307,7 @@ async fn test_blockchain_tree_actor_adds_genesis_block() {
 
     // Verify that the genesis block has been processed
     assert_eq!(
-        actor.events_published().load(std::sync::atomic::Ordering::SeqCst),
+        actor.actor_outputs().load(std::sync::atomic::Ordering::SeqCst),
         1,
         "Expected the genesis block to be processed once"
     );

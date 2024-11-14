@@ -36,7 +36,7 @@ impl Actor for BerkeleyBlockParserActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
 
@@ -101,7 +101,7 @@ async fn test_berkeley_block_parser_actor() -> anyhow::Result<()> {
         assert_eq!(payload.state_hash, "3NL53c8uTVnoFjzh17VAeCR9r3zjmDowNpeFRRVEUqnvX5WdHtWE");
         assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
         assert_eq!(payload.last_vrf_output, "hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=");
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }

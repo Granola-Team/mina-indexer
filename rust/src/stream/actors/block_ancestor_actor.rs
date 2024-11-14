@@ -29,7 +29,7 @@ impl Actor for BlockAncestorActor {
         self.id.clone()
     }
 
-    fn events_published(&self) -> &AtomicUsize {
+    fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
@@ -110,7 +110,7 @@ async fn test_block_ancestor_actor_with_berkeley_block() -> anyhow::Result<()> {
         assert_eq!(payload.height, 89);
         assert_eq!(payload.state_hash, "3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON");
         assert_eq!(payload.previous_state_hash, "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu");
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }
@@ -165,7 +165,7 @@ async fn test_block_ancestor_actor_with_mainnet_block() -> anyhow::Result<()> {
         assert_eq!(payload.height, 101);
         assert_eq!(payload.state_hash, "4MTNpwef32H67dHk9Mx25ZLpHfVz27QXECm8C4o5eyRa5LgJ1qLScCwpJM");
         assert_eq!(payload.previous_state_hash, "4MPXcYhJY8URpwZxBEmv9C7kXf5h41PLXeX9GoTwFg3TuL2Q9zMn");
-        assert_eq!(actor.events_published().load(Ordering::SeqCst), 1);
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
     } else {
         panic!("Did not receive expected event from actor.");
     }
