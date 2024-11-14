@@ -125,6 +125,15 @@ pub struct UserCommandSummaryPayload {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct CoinbaseTransferPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub amount_nanomina: u64,
+    pub recipient: String,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct UserCommandCanonicityPayload {
     pub height: u64,
     pub state_hash: String,
