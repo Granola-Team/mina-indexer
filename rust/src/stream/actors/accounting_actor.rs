@@ -43,46 +43,34 @@ impl AccountingActor {
     }
 
     async fn process_internal_command(&self, payload: &InternalCommandCanonicityPayload) {
-        let canonical = payload.canonical;
-        let (lhs, rhs) = match payload.internal_command_type {
-            InternalCommandType::Coinbase => (
-                vec![AccountingEntry {
-                    entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
-                    account: VIRTUAL_MINA_PROTOCOL_ADDRESS.to_string(),
-                    account_type: AccountingEntryAccountType::VirtualAddess,
-                    amount_nanomina: payload.amount_nanomina,
-                    timestamp: payload.timestamp,
-                }],
-                vec![AccountingEntry {
-                    entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
-                    account: payload.recipient.clone(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: payload.amount_nanomina,
-                    timestamp: payload.timestamp,
-                }],
-            ),
-            InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => (
-                vec![AccountingEntry {
-                    entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
-                    account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
-                    account_type: AccountingEntryAccountType::VirtualAddess,
-                    amount_nanomina: payload.amount_nanomina,
-                    timestamp: payload.timestamp,
-                }],
-                vec![AccountingEntry {
-                    entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
-                    account: payload.recipient.clone(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: payload.amount_nanomina,
-                    timestamp: payload.timestamp,
-                }],
-            ),
+        let mut source_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Debit,
+            account: match payload.internal_command_type {
+                InternalCommandType::Coinbase => VIRTUAL_MINA_PROTOCOL_ADDRESS.to_string(),
+                InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+            },
+            account_type: AccountingEntryAccountType::VirtualAddess,
+            amount_nanomina: payload.amount_nanomina,
+            timestamp: payload.timestamp,
         };
+        let mut recipient_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Credit,
+            account: payload.recipient.clone(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: payload.amount_nanomina,
+            timestamp: payload.timestamp,
+        };
+
+        if !payload.canonical {
+            // Swap debits and credits for non-canonical entries
+            source_entry.entry_type = AccountingEntryType::Credit;
+            recipient_entry.entry_type = AccountingEntryType::Debit;
+        }
 
         let double_entry_record = DoubleEntryRecordPayload {
             height: payload.height,
-            lhs,
-            rhs,
+            lhs: vec![source_entry],
+            rhs: vec![recipient_entry],
         };
 
         self.publish_transaction(&double_entry_record).await;
