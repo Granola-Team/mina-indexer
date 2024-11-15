@@ -41,7 +41,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     shared_publisher.buffer_size(),
                     shared_publisher.database_inserts(),
                     if shared_publisher.database_inserts() > 0 {
-                        format!("{:2}", shared_publisher.buffer_size() as f64 / shared_publisher.database_inserts() as f64)
+                        format!("{:.2}", shared_publisher.buffer_size() as f64 / shared_publisher.database_inserts() as f64)
                     } else {
                         "n/a".to_string()
                     }
