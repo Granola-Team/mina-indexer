@@ -19,6 +19,7 @@ use tokio::{sync::broadcast, task};
 mod actors;
 pub mod berkeley_block_models;
 pub mod events;
+pub mod genesis_ledger_models;
 pub mod mainnet_block_models;
 pub mod models;
 pub mod payloads;
