@@ -94,7 +94,7 @@ impl UserCommandPersistenceActor {
                     &(payload.height as i64),
                     &payload.state_hash,
                     &(payload.timestamp as i64),
-                    &payload.txn_type,
+                    &payload.txn_type.to_string(),
                     &payload.status.to_string(),
                     &payload.sender,
                     &payload.receiver,

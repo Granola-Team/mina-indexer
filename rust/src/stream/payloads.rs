@@ -1,4 +1,4 @@
-use super::mainnet_block_models::{CommandStatus, CommandSummary, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase};
+use super::mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase};
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -117,7 +117,7 @@ pub struct UserCommandSummaryPayload {
     pub state_hash: String,
     // pub txn_hash: String,    //
     pub timestamp: u64,
-    pub txn_type: String,
+    pub txn_type: CommandType,
     pub status: CommandStatus,
     pub sender: String,
     pub receiver: String,
@@ -174,7 +174,7 @@ pub struct UserCommandCanonicityPayload {
     pub state_hash: String,
     // pub txn_hash: String,    //
     pub timestamp: u64,
-    pub txn_type: String,
+    pub txn_type: CommandType,
     pub status: CommandStatus,
     pub sender: String,
     pub receiver: String,

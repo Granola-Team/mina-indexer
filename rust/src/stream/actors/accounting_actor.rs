@@ -94,6 +94,7 @@ impl AccountingActor {
             CommandStatus::Applied => payload.amount_nanomina,
             CommandStatus::Failed => 0,
         };
+
         let lhs = vec![
             AccountingEntry {
                 entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
@@ -190,7 +191,7 @@ mod accounting_actor_tests {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: "Payment".to_string(),
+            txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
             status: CommandStatus::Failed,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
@@ -234,7 +235,7 @@ mod accounting_actor_tests {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: "Payment".to_string(),
+            txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
             status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
@@ -272,7 +273,7 @@ mod accounting_actor_tests {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: "Payment".to_string(),
+            txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
             status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),

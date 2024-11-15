@@ -233,6 +233,23 @@ impl fmt::Display for CommandStatus {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+pub enum CommandType {
+    #[default]
+    Payment,
+    StakeDelegation,
+}
+
+impl fmt::Display for CommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            CommandType::Payment => "Payment",
+            CommandType::StakeDelegation => "StakeDelegation",
+        };
+        write!(f, "{}", display_text)
+    }
+}
+
 impl Command {
     fn get_status(&self) -> String {
         self.status.first().unwrap().as_str().unwrap().to_string()
@@ -252,10 +269,10 @@ impl Command {
         }
     }
 
-    fn get_type(&self) -> String {
+    fn get_type(&self) -> CommandType {
         match self.signed_command.as_ref().unwrap().payload.body.clone() {
-            Body::Payment(_) => "Payment".to_string(),
-            Body::StakeDelegation(StakeDelegationType::SetDelegate(_)) => "Stake Delegation".to_string(),
+            Body::Payment(_) => CommandType::Payment,
+            Body::StakeDelegation(StakeDelegationType::SetDelegate(_)) => CommandType::StakeDelegation,
         }
     }
 
@@ -303,14 +320,14 @@ impl Command {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommandSummary {
     pub memo: String,
     pub fee_payer: String,
     pub sender: String,
     pub receiver: String,
     pub status: CommandStatus,
-    pub txn_type: String,
+    pub txn_type: CommandType,
     pub nonce: usize,
     pub fee_nanomina: u64,
     pub amount_nanomina: u64,
