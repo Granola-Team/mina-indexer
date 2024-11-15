@@ -41,9 +41,9 @@ async fn main() -> Result<(), anyhow::Error> {
                     shared_publisher.buffer_size(),
                     shared_publisher.database_inserts(),
                     if shared_publisher.database_inserts() > 0 {
-                        shared_publisher.buffer_size() / shared_publisher.database_inserts()
+                        format!("{:2}", shared_publisher.buffer_size() as f64 / shared_publisher.database_inserts() as f64)
                     } else {
-                        0
+                        "n/a".to_string()
                     }
                 );
                 tokio::time::sleep(Duration::from_secs(60)).await;
