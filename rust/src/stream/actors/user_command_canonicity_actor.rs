@@ -48,6 +48,7 @@ impl UserCommandCanonicityActor {
                         receiver: entry.receiver.to_string(),
                         nonce: entry.nonce,
                         fee_nanomina: entry.fee_nanomina,
+                        fee_payer: entry.fee_payer.to_string(),
                         amount_nanomina: entry.amount_nanomina,
                         canonical: update.canonical,
                     };
@@ -134,6 +135,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
         nonce: 1,
         fee_nanomina: 10_000_000,
         amount_nanomina: 500_000_000,
+        ..Default::default()
     };
 
     // Send a UserCommandSummary event to populate the user_commands map
@@ -207,6 +209,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
                 nonce: 1,
                 fee_nanomina: 5000,
                 amount_nanomina: 10000,
+                ..Default::default()
             }],
         );
         user_commands.insert(
@@ -222,6 +225,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
                 nonce: 2,
                 fee_nanomina: 1000,
                 amount_nanomina: 20000,
+                ..Default::default()
             }],
         );
     }

@@ -1,0 +1,421 @@
+use super::super::{
+    events::{Event, EventType},
+    shared_publisher::SharedPublisher,
+    Actor,
+};
+use crate::{
+    constants::{VIRTUAL_BLOCK_REWARD_POOL_ADDRESS, VIRTUAL_MINA_PROTOCOL_ADDRESS},
+    stream::payloads::{
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
+        UserCommandCanonicityPayload,
+    },
+};
+use async_trait::async_trait;
+use std::sync::{atomic::AtomicUsize, Arc};
+
+pub struct AccountingActor {
+    pub id: String,
+    pub shared_publisher: Arc<SharedPublisher>,
+    pub entries_processed: AtomicUsize,
+}
+
+impl AccountingActor {
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "AccountingActor".to_string(),
+            shared_publisher,
+            entries_processed: AtomicUsize::new(0),
+        }
+    }
+
+    async fn publish_transaction(&self, record: &DoubleEntryRecordPayload) {
+        record.verify();
+        let event = Event {
+            event_type: EventType::DoubleEntryTransaction,
+            payload: sonic_rs::to_string(record).unwrap(),
+        };
+
+        self.shared_publisher.publish(event);
+        self.entries_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    async fn process_internal_command(&self, payload: &InternalCommandCanonicityPayload) {
+        let canonical = payload.canonical;
+        let (lhs, rhs) = match payload.internal_command_type {
+            InternalCommandType::Coinbase => (
+                vec![AccountingEntry {
+                    entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
+                    account: VIRTUAL_MINA_PROTOCOL_ADDRESS.to_string(),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                }],
+                vec![AccountingEntry {
+                    entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
+                    account: payload.recipient.clone(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                }],
+            ),
+            InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => (
+                vec![AccountingEntry {
+                    entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
+                    account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                }],
+                vec![AccountingEntry {
+                    entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
+                    account: payload.recipient.clone(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                }],
+            ),
+        };
+
+        let double_entry_record = DoubleEntryRecordPayload {
+            height: payload.height,
+            lhs,
+            rhs,
+        };
+
+        self.publish_transaction(&double_entry_record).await;
+    }
+
+    async fn process_user_command(&self, payload: &UserCommandCanonicityPayload) {
+        let canonical = payload.canonical;
+        let lhs = vec![
+            AccountingEntry {
+                entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
+                account: payload.sender.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: payload.amount_nanomina,
+                timestamp: payload.timestamp,
+            },
+            AccountingEntry {
+                entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
+                account: payload.fee_payer.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: payload.fee_nanomina,
+                timestamp: payload.timestamp,
+            },
+        ];
+        let rhs = vec![
+            AccountingEntry {
+                entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
+                account: payload.receiver.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: payload.amount_nanomina,
+                timestamp: payload.timestamp,
+            },
+            AccountingEntry {
+                entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
+                account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: payload.fee_nanomina,
+                timestamp: payload.timestamp,
+            },
+        ];
+
+        let double_entry_record = DoubleEntryRecordPayload {
+            height: payload.height,
+            lhs,
+            rhs,
+        };
+
+        self.publish_transaction(&double_entry_record).await;
+    }
+}
+
+#[async_trait]
+impl Actor for AccountingActor {
+    fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    fn actor_outputs(&self) -> &AtomicUsize {
+        &self.entries_processed
+    }
+
+    async fn handle_event(&self, event: Event) {
+        match event.event_type {
+            EventType::InternalCommandCanonicityUpdate => {
+                let payload: InternalCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+                self.process_internal_command(&payload).await;
+            }
+            EventType::UserCommandCanonicityUpdate => {
+                let payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+                self.process_user_command(&payload).await;
+            }
+            _ => {}
+        }
+    }
+
+    fn publish(&self, event: Event) {
+        self.incr_event_published();
+        self.shared_publisher.publish(event);
+    }
+}
+
+#[cfg(test)]
+mod accounting_actor_tests {
+    use super::*;
+    use crate::stream::payloads::{DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType, UserCommandCanonicityPayload};
+    use std::sync::{atomic::Ordering, Arc};
+    use tokio::time::timeout;
+
+    // Helper function to set up actor and subscriber
+    fn setup_actor() -> (Arc<AccountingActor>, tokio::sync::broadcast::Receiver<Event>) {
+        let shared_publisher = Arc::new(SharedPublisher::new(200));
+        let actor = Arc::new(AccountingActor::new(Arc::clone(&shared_publisher)));
+        let receiver = shared_publisher.subscribe();
+        (actor, receiver)
+    }
+
+    #[tokio::test]
+    async fn test_process_user_command_canonical_true() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = UserCommandCanonicityPayload {
+            height: 200,
+            state_hash: "state_hash_3".to_string(),
+            timestamp: 1620000200,
+            txn_type: "Payment".to_string(),
+            status: "Applied".to_string(),
+            sender: "B62qsender1".to_string(),
+            receiver: "B62qreceiver1".to_string(),
+            fee_payer: "B62qsender1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1_000_000,
+            amount_nanomina: 100_000_000,
+            canonical: true,
+        };
+
+        actor.process_user_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs.len(), 2);
+            assert_eq!(published_payload.rhs.len(), 2);
+
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, payload.sender);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, payload.receiver);
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_process_user_command_canonical_false() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = UserCommandCanonicityPayload {
+            height: 200,
+            state_hash: "state_hash_3".to_string(),
+            timestamp: 1620000200,
+            txn_type: "Payment".to_string(),
+            status: "Applied".to_string(),
+            sender: "B62qsender1".to_string(),
+            receiver: "B62qreceiver1".to_string(),
+            fee_payer: "B62qsender1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1_000_000,
+            amount_nanomina: 100_000_000,
+            canonical: false,
+        };
+
+        actor.process_user_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs.len(), 2);
+            assert_eq!(published_payload.rhs.len(), 2);
+
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, payload.sender);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, payload.receiver);
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_coinbase_canonical_true() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::Coinbase,
+            height: 300,
+            state_hash: "state_hash_4".to_string(),
+            timestamp: 1620000300,
+            amount_nanomina: 200_000_000,
+            recipient: "B62qrecipient1".to_string(),
+            canonical: true,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_MINA_PROTOCOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_coinbase_canonical_false() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::Coinbase,
+            height: 300,
+            state_hash: "state_hash_4".to_string(),
+            timestamp: 1620000300,
+            amount_nanomina: 200_000_000,
+            recipient: "B62qrecipient1".to_string(),
+            canonical: false,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_MINA_PROTOCOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_fee_transfer_canonical_true() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::FeeTransfer,
+            height: 300,
+            state_hash: "state_hash_5".to_string(),
+            timestamp: 1620000400,
+            amount_nanomina: 50_000_000,
+            recipient: "B62qrecipient2".to_string(),
+            canonical: true,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_fee_transfer_canonical_false() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::FeeTransfer,
+            height: 300,
+            state_hash: "state_hash_5".to_string(),
+            timestamp: 1620000400,
+            amount_nanomina: 50_000_000,
+            recipient: "B62qrecipient2".to_string(),
+            canonical: false,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_fee_transfer_via_coinbase_canonical_true() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
+            height: 300,
+            state_hash: "state_hash_6".to_string(),
+            timestamp: 1620000500,
+            amount_nanomina: 75_000_000,
+            recipient: "B62qrecipient3".to_string(),
+            canonical: true,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_internal_command_fee_transfer_via_coinbase_canonical_false() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = InternalCommandCanonicityPayload {
+            internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
+            height: 300,
+            state_hash: "state_hash_6".to_string(),
+            timestamp: 1620000500,
+            amount_nanomina: 75_000_000,
+            recipient: "B62qrecipient3".to_string(),
+            canonical: false,
+        };
+
+        actor.process_internal_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        }
+    }
+}

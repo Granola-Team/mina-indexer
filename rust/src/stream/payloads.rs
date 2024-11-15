@@ -111,7 +111,7 @@ pub struct BlockSummaryPayload {
     pub is_berkeley_block: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct UserCommandSummaryPayload {
     pub height: u64,
     pub state_hash: String,
@@ -123,6 +123,7 @@ pub struct UserCommandSummaryPayload {
     pub receiver: String,
     pub nonce: usize,
     pub fee_nanomina: u64,
+    pub fee_payer: String,
     pub amount_nanomina: u64,
 }
 
@@ -179,137 +180,55 @@ pub struct UserCommandCanonicityPayload {
     pub receiver: String,
     pub nonce: usize,
     pub fee_nanomina: u64,
+    pub fee_payer: String,
     pub amount_nanomina: u64,
     pub canonical: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum DoubleEntryType {
-    BlockReward,
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DoubleEntryRecordPayload {
+    pub height: u64,
+    // pub txn_hash: u64,
+    pub lhs: Vec<AccountingEntry>, // Multiple debit entries
+    pub rhs: Vec<AccountingEntry>, // Multiple credit entries
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub enum TxnType {
+impl DoubleEntryRecordPayload {
+    pub fn verify(&self) {
+        assert_eq!(
+            self.lhs.iter().map(|e| e.amount_nanomina).sum::<u64>(),
+            self.rhs.iter().map(|e| e.amount_nanomina).sum::<u64>()
+        )
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AccountingEntryType {
     Debit,
     Credit,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct LedgerEntry {
-    pub value: u64,
-    pub txn_type: TxnType,
-    pub account: String, // New field for account information
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DoubleEntryPayload {
-    pub entry_type: DoubleEntryType,
-    pub lhs_entry: LedgerEntry,
-    pub rhs_entry: Vec<LedgerEntry>,
-}
-
-// Builder for DoubleEntryPayload
-#[derive(Debug)]
-pub struct DoubleEntryPayloadBuilder {
-    entry_type: Option<DoubleEntryType>,
-    lhs_entry: Option<LedgerEntry>,
-    rhs_entry: Vec<LedgerEntry>,
-}
-
-impl Default for DoubleEntryPayloadBuilder {
-    fn default() -> Self {
-        Self::new()
+impl fmt::Display for AccountingEntryType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            AccountingEntryType::Debit => "Debit",
+            AccountingEntryType::Credit => "Credit",
+        };
+        write!(f, "{}", display_text)
     }
 }
 
-impl DoubleEntryPayloadBuilder {
-    pub fn new() -> Self {
-        Self {
-            entry_type: None,
-            lhs_entry: None,
-            rhs_entry: Vec::new(),
-        }
-    }
-
-    pub fn entry_type(mut self, entry_type: DoubleEntryType) -> Self {
-        self.entry_type = Some(entry_type);
-        self
-    }
-
-    pub fn lhs_entry(mut self, value: u64, txn_type: TxnType, account: String) -> Self {
-        self.lhs_entry = Some(LedgerEntry { value, txn_type, account });
-        self
-    }
-
-    pub fn add_rhs_entry(mut self, value: u64, txn_type: TxnType, account: String) -> Self {
-        self.rhs_entry.push(LedgerEntry { value, txn_type, account });
-        self
-    }
-
-    pub fn build(self) -> Result<DoubleEntryPayload, &'static str> {
-        Ok(DoubleEntryPayload {
-            entry_type: self.entry_type.ok_or("entry_type is required")?,
-            lhs_entry: self.lhs_entry.ok_or("lhs_entry is required")?,
-            rhs_entry: self.rhs_entry,
-        })
-    }
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AccountingEntryAccountType {
+    VirtualAddess,
+    BlockchainAddress,
 }
 
-impl DoubleEntryPayload {
-    pub fn builder() -> DoubleEntryPayloadBuilder {
-        DoubleEntryPayloadBuilder::new()
-    }
-}
-
-#[cfg(test)]
-mod double_entry_payload_builder_tests {
-    use super::*;
-
-    #[test]
-    fn test_double_entry_payload_builder() {
-        let payload = DoubleEntryPayload::builder()
-            .entry_type(DoubleEntryType::BlockReward)
-            .lhs_entry(1000, TxnType::Debit, "Account_A".to_string())
-            .add_rhs_entry(500, TxnType::Credit, "Account_B".to_string())
-            .add_rhs_entry(500, TxnType::Credit, "Account_C".to_string())
-            .build()
-            .expect("Failed to build DoubleEntryPayload");
-
-        // Verify that the payload is built as expected
-        assert_eq!(payload.entry_type, DoubleEntryType::BlockReward);
-        assert_eq!(payload.lhs_entry.value, 1000);
-        assert_eq!(payload.lhs_entry.txn_type, TxnType::Debit);
-        assert_eq!(payload.lhs_entry.account, "Account_A");
-
-        assert_eq!(payload.rhs_entry.len(), 2);
-        assert_eq!(payload.rhs_entry[0].value, 500);
-        assert_eq!(payload.rhs_entry[0].txn_type, TxnType::Credit);
-        assert_eq!(payload.rhs_entry[0].account, "Account_B");
-
-        assert_eq!(payload.rhs_entry[1].value, 500);
-        assert_eq!(payload.rhs_entry[1].txn_type, TxnType::Credit);
-        assert_eq!(payload.rhs_entry[1].account, "Account_C");
-    }
-
-    #[test]
-    fn test_builder_missing_entry_type() {
-        let result = DoubleEntryPayload::builder()
-            .lhs_entry(1000, TxnType::Debit, "Account_A".to_string())
-            .add_rhs_entry(500, TxnType::Credit, "Account_B".to_string())
-            .build();
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "entry_type is required");
-    }
-
-    #[test]
-    fn test_builder_missing_lhs_entry() {
-        let result = DoubleEntryPayload::builder()
-            .entry_type(DoubleEntryType::BlockReward)
-            .add_rhs_entry(500, TxnType::Credit, "Account_B".to_string())
-            .build();
-
-        assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "lhs_entry is required");
-    }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AccountingEntry {
+    pub entry_type: AccountingEntryType, // "debit" or "credit"
+    pub account: String,
+    pub account_type: AccountingEntryAccountType,
+    pub amount_nanomina: u64,
+    pub timestamp: u64,
 }

@@ -47,6 +47,7 @@ impl Actor for UserCommandActor {
                         receiver: user_command.receiver.to_string(),
                         nonce: user_command.nonce,
                         fee_nanomina: user_command.fee_nanomina,
+                        fee_payer: user_command.fee_payer.to_string(),
                         amount_nanomina: user_command.amount_nanomina,
                     };
                     self.publish(Event {
