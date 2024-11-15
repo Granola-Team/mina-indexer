@@ -26,7 +26,7 @@ impl UserCommandPersistenceActor {
             });
             if let Err(e) = client
                 .execute(
-                    "CREATE TABLE IF NOT EXISTS user_command (
+                    "CREATE TABLE IF NOT EXISTS user_commands (
                         height BIGINT NOT NULL,
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
