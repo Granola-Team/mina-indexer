@@ -14,7 +14,7 @@ use events::Event;
 use futures::future::try_join_all;
 use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
-use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -100,12 +100,11 @@ pub async fn process_blocks_dir(
             // Iterate over files in the directory and publish events
             for entry in entries {
                 let path = entry.as_path();
-
-                tokio::time::sleep(Duration::from_millis(5)).await;
                 shared_publisher.publish(Event {
                     event_type: events::EventType::PrecomputedBlockPath,
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
                 });
+                tokio::task::yield_now().await;
             }
 
             println!("Finished publishing files. Waiting for shutdown signal...");
