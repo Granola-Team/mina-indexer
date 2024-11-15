@@ -1,3 +1,5 @@
+use super::mainnet_block_models::{CommandStatus, CommandSummary, CommandType};
+use crate::constants::VIRTUAL_MINA_FOUNDATION_ADDRESS;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,6 +34,26 @@ pub struct Ledger {
 pub struct GenesisLedger {
     pub genesis: Genesis,
     pub ledger: Ledger,
+}
+
+impl GenesisLedger {
+    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
+        self.ledger
+            .accounts
+            .iter()
+            .map(|account| CommandSummary {
+                memo: "".to_string(),
+                fee_payer: "".to_string(),
+                sender: VIRTUAL_MINA_FOUNDATION_ADDRESS.to_string(),
+                amount_nanomina: (account.balance.parse::<f64>().ok().unwrap() * 1_000_000_000f64) as u64,
+                fee_nanomina: 0,
+                nonce: 0,
+                receiver: account.pk.clone(),
+                status: CommandStatus::Applied,
+                txn_type: CommandType::Payment,
+            })
+            .collect::<Vec<CommandSummary>>()
+    }
 }
 
 #[cfg(test)]
