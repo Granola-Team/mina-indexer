@@ -59,7 +59,7 @@ impl UserCommandPersistenceActor {
 
     async fn db_upsert(&self, payload: &UserCommandCanonicityPayload) -> Result<u64, &'static str> {
         let upsert_query = r#"
-            INSERT INTO user_command (
+            INSERT INTO user_commands (
                 height,
                 state_hash,
                 timestamp,
