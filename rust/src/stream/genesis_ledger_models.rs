@@ -55,7 +55,7 @@ mod gensis_ledger_tests {
         assert_eq!(parsed_data.ledger.name, "mainnet");
 
         let accounts = &parsed_data.ledger.accounts;
-        assert_eq!(accounts.len(), 2);
+        assert_eq!(accounts.len(), 1675);
 
         let first_account = &accounts[0];
         assert_eq!(first_account.pk, "B62qmqMrgPshhHKLJ7DqWn1KeizEgga5MuGmWb2bXajUnyivfeMW6JE");
@@ -67,9 +67,9 @@ mod gensis_ledger_tests {
         assert!(first_account.timing.is_some());
 
         let second_account = &accounts[1];
-        assert_eq!(second_account.pk, "B62qpkOnlyNoTiming");
-        assert_eq!(second_account.balance, "500000");
-        assert!(second_account.delegate.is_none());
-        assert!(second_account.timing.is_none());
+        assert_eq!(second_account.pk, "B62qmVHmj3mNhouDf1hyQFCSt3ATuttrxozMunxYMLctMvnk5y7nas1");
+        assert_eq!(second_account.balance, "230400");
+        assert!(second_account.delegate.is_some());
+        assert!(second_account.timing.is_some());
     }
 }

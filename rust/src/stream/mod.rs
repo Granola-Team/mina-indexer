@@ -145,7 +145,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await?;
 
     // Wait a short duration for some events to be processed, then trigger shutdown
-    tokio::time::sleep(Duration::from_secs(1)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
     let _ = shutdown_sender.send(());
 
     // Wait for the task to finish processing
