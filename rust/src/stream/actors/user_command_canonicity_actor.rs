@@ -43,7 +43,7 @@ impl UserCommandCanonicityActor {
                         state_hash: entry.state_hash.to_string(),
                         timestamp: entry.timestamp,
                         txn_type: entry.txn_type.to_string(),
-                        status: entry.status.to_string(),
+                        status: entry.status.clone(),
                         sender: entry.sender.to_string(),
                         receiver: entry.receiver.to_string(),
                         nonce: entry.nonce,
@@ -112,7 +112,10 @@ impl Actor for UserCommandCanonicityActor {
 
 #[tokio::test]
 async fn test_user_command_canonicity_actor_processes_user_command_updates() -> anyhow::Result<()> {
-    use crate::stream::payloads::{BlockCanonicityUpdatePayload, UserCommandCanonicityPayload, UserCommandSummaryPayload};
+    use crate::stream::{
+        mainnet_block_models::CommandStatus,
+        payloads::{BlockCanonicityUpdatePayload, UserCommandCanonicityPayload, UserCommandSummaryPayload},
+    };
     use std::sync::atomic::Ordering;
     use tokio::time::timeout;
 
@@ -129,7 +132,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
         state_hash: "sample_hash".to_string(),
         timestamp: 123456,
         txn_type: "Payment".to_string(),
-        status: "Applied".to_string(),
+        status: CommandStatus::Applied,
         sender: "sender_public_key".to_string(),
         receiver: "receiver_public_key".to_string(),
         nonce: 1,
@@ -187,7 +190,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
 
 #[tokio::test]
 async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_frontier() -> anyhow::Result<()> {
-    use crate::stream::payloads::UserCommandSummaryPayload;
+    use crate::stream::{mainnet_block_models::CommandStatus, payloads::UserCommandSummaryPayload};
 
     // Set up the actor
     let shared_publisher = Arc::new(SharedPublisher::new(200));
@@ -203,7 +206,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
                 state_hash: "hash_5".to_string(),
                 timestamp: 1000,
                 txn_type: "Payment".to_string(),
-                status: "Applied".to_string(),
+                status: CommandStatus::Applied,
                 sender: "sender_5".to_string(),
                 receiver: "receiver_5".to_string(),
                 nonce: 1,
@@ -219,7 +222,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
                 state_hash: "hash_10".to_string(),
                 timestamp: 2000,
                 txn_type: "Stake Delegation".to_string(),
-                status: "Applied".to_string(),
+                status: CommandStatus::Applied,
                 sender: "sender_10".to_string(),
                 receiver: "receiver_10".to_string(),
                 nonce: 2,

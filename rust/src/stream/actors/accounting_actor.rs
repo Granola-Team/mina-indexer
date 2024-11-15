@@ -5,9 +5,12 @@ use super::super::{
 };
 use crate::{
     constants::{VIRTUAL_BLOCK_REWARD_POOL_ADDRESS, VIRTUAL_MINA_PROTOCOL_ADDRESS},
-    stream::payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
-        UserCommandCanonicityPayload,
+    stream::{
+        mainnet_block_models::CommandStatus,
+        payloads::{
+            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
+            UserCommandCanonicityPayload,
+        },
     },
 };
 use async_trait::async_trait;
@@ -87,12 +90,16 @@ impl AccountingActor {
 
     async fn process_user_command(&self, payload: &UserCommandCanonicityPayload) {
         let canonical = payload.canonical;
+        let amount_nanomina = match payload.status {
+            CommandStatus::Applied => payload.amount_nanomina,
+            CommandStatus::Failed => 0,
+        };
         let lhs = vec![
             AccountingEntry {
                 entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
                 account: payload.sender.to_string(),
                 account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: payload.amount_nanomina,
+                amount_nanomina,
                 timestamp: payload.timestamp,
             },
             AccountingEntry {
@@ -108,7 +115,7 @@ impl AccountingActor {
                 entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
                 account: payload.receiver.to_string(),
                 account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: payload.amount_nanomina,
+                amount_nanomina,
                 timestamp: payload.timestamp,
             },
             AccountingEntry {
@@ -176,6 +183,50 @@ mod accounting_actor_tests {
     }
 
     #[tokio::test]
+    async fn test_process_user_command_canonical_true_but_failed_with_fee_paid() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = UserCommandCanonicityPayload {
+            height: 200,
+            state_hash: "state_hash_3".to_string(),
+            timestamp: 1620000200,
+            txn_type: "Payment".to_string(),
+            status: CommandStatus::Failed,
+            sender: "B62qsender1".to_string(),
+            receiver: "B62qreceiver1".to_string(),
+            fee_payer: "B62qsender1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1_000_000,
+            amount_nanomina: 100_000_000,
+            canonical: true,
+        };
+
+        actor.process_user_command(&payload).await;
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs.len(), 2);
+            assert_eq!(published_payload.rhs.len(), 2);
+
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, payload.sender);
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, payload.receiver);
+
+            // no money sent but fee still paid
+            assert_eq!(published_payload.rhs[0].amount_nanomina, 0);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, 0);
+            assert_eq!(published_payload.rhs[1].amount_nanomina, 1_000_000);
+            assert_eq!(published_payload.lhs[1].amount_nanomina, 1_000_000);
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
     async fn test_process_user_command_canonical_true() {
         let (actor, mut receiver) = setup_actor();
 
@@ -184,7 +235,7 @@ mod accounting_actor_tests {
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
             txn_type: "Payment".to_string(),
-            status: "Applied".to_string(),
+            status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
             fee_payer: "B62qsender1".to_string(),
@@ -222,7 +273,7 @@ mod accounting_actor_tests {
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
             txn_type: "Payment".to_string(),
-            status: "Applied".to_string(),
+            status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
             fee_payer: "B62qsender1".to_string(),

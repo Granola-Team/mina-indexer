@@ -216,9 +216,26 @@ pub struct Command {
     pub status: Vec<Value>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+pub enum CommandStatus {
+    Applied,
+    #[default]
+    Failed,
+}
+
+impl fmt::Display for CommandStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            CommandStatus::Applied => "Applied",
+            CommandStatus::Failed => "Failed",
+        };
+        write!(f, "{}", display_text)
+    }
+}
+
 impl Command {
     fn get_status(&self) -> String {
-        self.status.first().unwrap().to_string().trim_matches('"').to_string()
+        self.status.first().unwrap().as_str().unwrap().to_string()
     }
 
     fn get_nonce(&self) -> usize {
@@ -274,7 +291,10 @@ impl Command {
             fee_payer: self.get_fee_payer(),
             sender: self.get_sender(),
             receiver: self.get_receiver(),
-            status: self.get_status(),
+            status: match self.get_status().as_str() {
+                "Applied" => CommandStatus::Applied,
+                _ => CommandStatus::Failed,
+            },
             txn_type: self.get_type(),
             nonce: self.get_nonce(),
             fee_nanomina: (self.get_fee() * 1_000_000_000f64) as u64,
@@ -289,7 +309,7 @@ pub struct CommandSummary {
     pub fee_payer: String,
     pub sender: String,
     pub receiver: String,
-    pub status: String,
+    pub status: CommandStatus,
     pub txn_type: String,
     pub nonce: usize,
     pub fee_nanomina: u64,
@@ -477,7 +497,7 @@ mod mainnet_block_parsing_tests {
         assert_eq!(&first_user_command.receiver, "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM");
 
         // test status
-        assert_eq!(&first_user_command.status, "Applied");
+        assert_eq!(first_user_command.status, CommandStatus::Applied);
 
         // test
         assert_eq!(first_user_command.amount_nanomina, 1000);
@@ -503,7 +523,7 @@ mod mainnet_block_parsing_tests {
         assert_eq!(fifth_user_command.nonce, 0);
         assert_eq!(&fifth_user_command.sender, "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
         assert_eq!(&fifth_user_command.receiver, "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
-        assert_eq!(&fifth_user_command.status, "Applied");
+        assert_eq!(fifth_user_command.status, CommandStatus::Applied);
         assert_eq!(fifth_user_command.amount_nanomina, 0);
 
         // Test fee transfers

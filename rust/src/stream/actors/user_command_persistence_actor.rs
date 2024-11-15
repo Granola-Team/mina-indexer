@@ -95,7 +95,7 @@ impl UserCommandPersistenceActor {
                     &payload.state_hash,
                     &(payload.timestamp as i64),
                     &payload.txn_type,
-                    &payload.status,
+                    &payload.status.to_string(),
                     &payload.sender,
                     &payload.receiver,
                     &(payload.nonce as i32),
