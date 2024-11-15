@@ -34,7 +34,11 @@ pub async fn process_blocks_dir(
 
     let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let user_command_persistence_actor_m_0 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 0).await;
+    let user_command_persistence_actor_m_1 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 1).await;
+    let user_command_persistence_actor_m_2 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 2).await;
+    let user_command_persistence_actor_m_3 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 3).await;
+    let user_command_persistence_actor_m_4 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 4).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
 
     // Define actors
@@ -59,7 +63,11 @@ pub async fn process_blocks_dir(
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         Arc::new(snark_persistence_actor),
-        Arc::new(user_command_persistence_actor),
+        Arc::new(user_command_persistence_actor_m_0),
+        Arc::new(user_command_persistence_actor_m_1),
+        Arc::new(user_command_persistence_actor_m_2),
+        Arc::new(user_command_persistence_actor_m_3),
+        Arc::new(user_command_persistence_actor_m_4),
         Arc::new(internal_command_persistence_actor),
     ];
 
