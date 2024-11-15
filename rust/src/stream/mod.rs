@@ -1,4 +1,4 @@
-use crate::{stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor, utility::extract_height_and_hash};
+use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
 use actors::{
     accounting_actor::AccountingActor, berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor,
     block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor, block_summary_actor::BlockSummaryActor,
@@ -12,9 +12,8 @@ use actors::{
 };
 use events::Event;
 use futures::future::try_join_all;
-use payloads::GenesisBlockPayload;
 use shared_publisher::SharedPublisher;
-use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc};
+use std::sync::Arc;
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -24,9 +23,9 @@ pub mod mainnet_block_models;
 pub mod models;
 pub mod payloads;
 pub mod shared_publisher;
+pub mod sourcing;
 
-pub async fn process_blocks_dir(
-    blocks_dir: PathBuf,
+pub async fn subscribe_actors(
     shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
 ) -> anyhow::Result<()> {
@@ -80,46 +79,6 @@ pub async fn process_blocks_dir(
         actor_handles.push(handle);
     }
 
-    shared_publisher.publish(Event {
-        event_type: events::EventType::GenesisBlock,
-        payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
-    });
-
-    let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir)?
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-        .map(|e| e.path())
-        .collect();
-
-    // Sort entries by the extracted number and hash
-    entries.sort_by(|a, b| {
-        let (a_num, a_hash) = extract_height_and_hash(a);
-        let (b_num, b_hash) = extract_height_and_hash(b);
-
-        match a_num.cmp(&b_num) {
-            Ordering::Equal => a_hash.cmp(b_hash), // Fallback to hash comparison
-            other => other,
-        }
-    });
-
-    let init_actor = tokio::spawn({
-        let shared_publisher = Arc::clone(shared_publisher);
-        async move {
-            // Iterate over files in the directory and publish events
-            for entry in entries {
-                let path = entry.as_path();
-                shared_publisher.publish(Event {
-                    event_type: events::EventType::PrecomputedBlockPath,
-                    payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
-                });
-                tokio::task::yield_now().await;
-            }
-
-            println!("Finished publishing files. Waiting for shutdown signal...");
-        }
-    });
-    actor_handles.push(init_actor);
-
     // Wait for the shutdown signal to terminate
     let _ = shutdown_receiver.recv().await;
 
@@ -160,15 +119,12 @@ where
 
 #[tokio::test]
 async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
-    use crate::stream::{events::EventType, payloads::*};
+    use crate::stream::{events::EventType, payloads::*, sourcing::*};
     use std::{collections::HashMap, path::PathBuf, str::FromStr};
     use tokio::{sync::broadcast, time::Duration};
 
     // Create a shutdown channel for the test
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
-
-    // Path to the directory with 100 mainnet block files
-    let blocks_dir = PathBuf::from_str("./src/stream/test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
 
     let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
     let mut receiver = shared_publisher.subscribe();
@@ -176,13 +132,19 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     // Spawn the task to process blocks
     let process_handle = tokio::spawn({
         let shared_publisher = Arc::clone(&shared_publisher);
+        let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            process_blocks_dir(blocks_dir, &shared_publisher, shutdown_receiver).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver).await.unwrap();
         }
     });
 
+    let blocks_dir = PathBuf::from_str("./src/stream/test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    publish_genesis_block(&shared_publisher).unwrap();
+    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await?;
+
     // Wait a short duration for some events to be processed, then trigger shutdown
-    tokio::time::sleep(Duration::from_secs(6)).await;
+    tokio::time::sleep(Duration::from_secs(1)).await;
     let _ = shutdown_sender.send(());
 
     // Wait for the task to finish processing
@@ -237,15 +199,12 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
-    use crate::stream::{events::EventType, payloads::BlockCanonicityUpdatePayload};
+    use crate::stream::{events::EventType, payloads::BlockCanonicityUpdatePayload, sourcing::*};
     use std::{path::PathBuf, str::FromStr};
     use tokio::{sync::broadcast, time::Duration};
 
     // Create a shutdown channel for the test
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
-
-    // Path to the directory with 10 mainnet block files
-    let blocks_dir = PathBuf::from_str("./src/stream/test_data/10_mainnet_blocks").expect("Directory with mainnet blocks should exist");
 
     let shared_publisher = Arc::new(SharedPublisher::new(100_000)); // Initialize publisher
     let mut receiver = shared_publisher.subscribe();
@@ -253,10 +212,16 @@ async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
     // Spawn the task to process blocks
     let process_handle = tokio::spawn({
         let shared_publisher = Arc::clone(&shared_publisher);
+        let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            process_blocks_dir(blocks_dir, &shared_publisher, shutdown_receiver).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver).await.unwrap();
         }
     });
+
+    let blocks_dir = PathBuf::from_str("./src/stream/test_data/10_mainnet_blocks").expect("Directory with mainnet blocks should exist");
+    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    publish_genesis_block(&shared_publisher).unwrap();
+    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await?;
 
     // Wait a short duration for some events to be processed, then trigger shutdown
     tokio::time::sleep(Duration::from_secs(5)).await;
