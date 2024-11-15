@@ -6,7 +6,7 @@ use super::super::{
 use crate::{
     constants::{VIRTUAL_BLOCK_REWARD_POOL_ADDRESS, VIRTUAL_MINA_PROTOCOL_ADDRESS},
     stream::{
-        mainnet_block_models::CommandStatus,
+        mainnet_block_models::{CommandStatus, CommandType},
         payloads::{
             AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
             UserCommandCanonicityPayload,
@@ -89,49 +89,57 @@ impl AccountingActor {
     }
 
     async fn process_user_command(&self, payload: &UserCommandCanonicityPayload) {
-        let canonical = payload.canonical;
-        let amount_nanomina = match payload.status {
-            CommandStatus::Applied => payload.amount_nanomina,
-            CommandStatus::Failed => 0,
+        let mut sender_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Debit,
+            account: payload.sender.to_string(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: payload.amount_nanomina,
+            timestamp: payload.timestamp,
+        };
+        let mut fee_payer_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Debit,
+            account: payload.fee_payer.to_string(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: payload.fee_nanomina,
+            timestamp: payload.timestamp,
+        };
+        let mut receiver_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Credit,
+            account: payload.receiver.to_string(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: payload.amount_nanomina,
+            timestamp: payload.timestamp,
+        };
+        let mut block_reward_pool_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Credit,
+            account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+            account_type: AccountingEntryAccountType::VirtualAddess,
+            amount_nanomina: payload.fee_nanomina,
+            timestamp: payload.timestamp,
         };
 
-        let lhs = vec![
-            AccountingEntry {
-                entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
-                account: payload.sender.to_string(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina,
-                timestamp: payload.timestamp,
-            },
-            AccountingEntry {
-                entry_type: if canonical { AccountingEntryType::Debit } else { AccountingEntryType::Credit },
-                account: payload.fee_payer.to_string(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: payload.fee_nanomina,
-                timestamp: payload.timestamp,
-            },
-        ];
-        let rhs = vec![
-            AccountingEntry {
-                entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
-                account: payload.receiver.to_string(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina,
-                timestamp: payload.timestamp,
-            },
-            AccountingEntry {
-                entry_type: if canonical { AccountingEntryType::Credit } else { AccountingEntryType::Debit },
-                account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: payload.fee_nanomina,
-                timestamp: payload.timestamp,
-            },
-        ];
+        if !payload.canonical {
+            // swap debits and credits
+            sender_entry.entry_type = AccountingEntryType::Credit;
+            fee_payer_entry.entry_type = AccountingEntryType::Credit;
+            receiver_entry.entry_type = AccountingEntryType::Debit;
+            block_reward_pool_entry.entry_type = AccountingEntryType::Debit;
+        }
+        if payload.status == CommandStatus::Failed {
+            // no balance is transferred but fees are paid
+            sender_entry.amount_nanomina = 0;
+            receiver_entry.amount_nanomina = 0;
+        }
+        if payload.txn_type == CommandType::StakeDelegation {
+            // balance is staked not transferred
+            sender_entry.amount_nanomina = 0;
+            receiver_entry.amount_nanomina = 0;
+        }
 
         let double_entry_record = DoubleEntryRecordPayload {
             height: payload.height,
-            lhs,
-            rhs,
+            lhs: vec![sender_entry, fee_payer_entry],
+            rhs: vec![receiver_entry, block_reward_pool_entry],
         };
 
         self.publish_transaction(&double_entry_record).await;
