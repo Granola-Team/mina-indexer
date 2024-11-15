@@ -36,10 +36,15 @@ async fn main() -> Result<(), anyhow::Error> {
             loop {
                 let now: DateTime<Utc> = Utc::now();
                 println!(
-                    "{} Messages published: {}. Database inserts: {}",
+                    "{} Messages published: {}. Database inserts: {}. Ratio: {}",
                     now.to_rfc3339(),
                     shared_publisher.buffer_size(),
-                    shared_publisher.database_inserts()
+                    shared_publisher.database_inserts(),
+                    if shared_publisher.database_inserts() > 0 {
+                        shared_publisher.buffer_size() / shared_publisher.database_inserts()
+                    } else {
+                        0
+                    }
                 );
                 tokio::time::sleep(Duration::from_secs(60)).await;
             }
