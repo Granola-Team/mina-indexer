@@ -36,7 +36,7 @@ async fn main() -> Result<(), anyhow::Error> {
             loop {
                 let now: DateTime<Utc> = Utc::now();
                 println!(
-                    "{} Current buffer size: {}. Database inserts: {}",
+                    "{} Messages published: {}. Database inserts: {}",
                     now.to_rfc3339(),
                     shared_publisher.buffer_size(),
                     shared_publisher.database_inserts()

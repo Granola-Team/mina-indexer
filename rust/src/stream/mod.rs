@@ -130,9 +130,18 @@ where
     loop {
         tokio::select! {
             event = receiver.recv() => {
-                if let Ok(event) = event {
-                    actor.on_event(event).await;
+                match event {
+                    Ok(event) => {
+                        actor.on_event(event).await;
+                    }
+                    Err(broadcast::error::RecvError::Lagged(count)) => {
+                        println!("Actor {} lagged behind, missed {} messages",actor.id(), count);
+                    }
+                    Err(e) => {
+                        println!("{:?}",e)
+                    }
                 }
+
             },
             _ = shutdown_rx.recv() => {
                 actor.shutdown(); // Generalized shutdown call
