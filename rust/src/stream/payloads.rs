@@ -167,6 +167,7 @@ pub struct InternalCommandCanonicityPayload {
     pub amount_nanomina: u64,
     pub recipient: String,
     pub canonical: bool,
+    pub was_canonical: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -184,6 +185,7 @@ pub struct UserCommandCanonicityPayload {
     pub fee_payer: String,
     pub amount_nanomina: u64,
     pub canonical: bool,
+    pub was_canonical: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

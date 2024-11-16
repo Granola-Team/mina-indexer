@@ -51,6 +51,7 @@ impl UserCommandCanonicityActor {
                         fee_payer: entry.fee_payer.to_string(),
                         amount_nanomina: entry.amount_nanomina,
                         canonical: update.canonical,
+                        was_canonical: update.was_canonical,
                     };
                     self.publish(Event {
                         event_type: EventType::UserCommandCanonicityUpdate,

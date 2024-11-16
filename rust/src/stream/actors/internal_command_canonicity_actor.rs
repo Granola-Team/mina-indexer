@@ -46,6 +46,7 @@ impl InternalCommandCanonicityActor {
                         amount_nanomina: entry.amount_nanomina,
                         recipient: entry.recipient.to_string(),
                         canonical: update.canonical,
+                        was_canonical: update.was_canonical,
                     };
                     self.publish(Event {
                         event_type: EventType::InternalCommandCanonicityUpdate,

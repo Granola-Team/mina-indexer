@@ -118,16 +118,16 @@ impl AccountingActor {
             sender_entry.amount_nanomina = 0;
             receiver_entry.amount_nanomina = 0;
         }
-        if payload.txn_type == CommandType::StakeDelegation {
-            // balance is staked not transferred
-            sender_entry.amount_nanomina = 0;
-            receiver_entry.amount_nanomina = 0;
-        }
+        let (lhs, rhs) = match payload.txn_type {
+            // stake delegation does not affect balance of sender or receiver from accounting perspective
+            CommandType::StakeDelegation => (vec![fee_payer_entry], vec![block_reward_pool_entry]),
+            CommandType::Payment => (vec![sender_entry, fee_payer_entry], vec![receiver_entry, block_reward_pool_entry]),
+        };
 
         let double_entry_record = DoubleEntryRecordPayload {
             height: payload.height,
-            lhs: vec![sender_entry, fee_payer_entry],
-            rhs: vec![receiver_entry, block_reward_pool_entry],
+            lhs,
+            rhs,
         };
 
         self.publish_transaction(&double_entry_record).await;
@@ -148,10 +148,18 @@ impl Actor for AccountingActor {
         match event.event_type {
             EventType::InternalCommandCanonicityUpdate => {
                 let payload: InternalCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+                // not canonical, and never wasn't before. No need to deduct
+                if !payload.canonical && !payload.was_canonical {
+                    return;
+                }
                 self.process_internal_command(&payload).await;
             }
             EventType::UserCommandCanonicityUpdate => {
                 let payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+                // not canonical, and never wasn't before. No need to deduct
+                if !payload.canonical && !payload.was_canonical {
+                    return;
+                }
                 self.process_user_command(&payload).await;
             }
             _ => {}
@@ -196,6 +204,7 @@ mod accounting_actor_tests {
             fee_nanomina: 1_000_000,
             amount_nanomina: 100_000_000,
             canonical: true,
+            was_canonical: false,
         };
 
         actor.process_user_command(&payload).await;
@@ -240,6 +249,7 @@ mod accounting_actor_tests {
             fee_nanomina: 1_000_000,
             amount_nanomina: 100_000_000,
             canonical: true,
+            was_canonical: false,
         };
 
         actor.process_user_command(&payload).await;
@@ -278,25 +288,19 @@ mod accounting_actor_tests {
             fee_nanomina: 1_000_000,
             amount_nanomina: 100_000_000,
             canonical: false,
+            was_canonical: false,
         };
 
-        actor.process_user_command(&payload).await;
+        actor
+            .handle_event(Event {
+                event_type: EventType::UserCommandCanonicityUpdate,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await;
         let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+        assert!(published_event.is_err(), "Did not expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
-            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-            assert_eq!(published_payload.height, payload.height);
-            assert_eq!(published_payload.lhs.len(), 2);
-            assert_eq!(published_payload.rhs.len(), 2);
-
-            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.lhs[0].account, payload.sender);
-            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.rhs[0].account, payload.receiver);
-        }
-
-        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -311,6 +315,7 @@ mod accounting_actor_tests {
             amount_nanomina: 200_000_000,
             recipient: "B62qrecipient1".to_string(),
             canonical: true,
+            was_canonical: false,
         };
 
         actor.process_internal_command(&payload).await;
@@ -339,6 +344,7 @@ mod accounting_actor_tests {
             amount_nanomina: 200_000_000,
             recipient: "B62qrecipient1".to_string(),
             canonical: false,
+            was_canonical: true,
         };
 
         actor.process_internal_command(&payload).await;
@@ -367,6 +373,7 @@ mod accounting_actor_tests {
             amount_nanomina: 50_000_000,
             recipient: "B62qrecipient2".to_string(),
             canonical: true,
+            was_canonical: false,
         };
 
         actor.process_internal_command(&payload).await;
@@ -395,20 +402,19 @@ mod accounting_actor_tests {
             amount_nanomina: 50_000_000,
             recipient: "B62qrecipient2".to_string(),
             canonical: false,
+            was_canonical: false,
         };
 
-        actor.process_internal_command(&payload).await;
+        actor
+            .handle_event(Event {
+                event_type: EventType::InternalCommandCanonicityUpdate,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await;
         let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+        assert!(published_event.is_err(), "Did not expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
-            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-            assert_eq!(published_payload.height, payload.height);
-            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
-            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.rhs[0].account, payload.recipient);
-        }
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
@@ -423,6 +429,7 @@ mod accounting_actor_tests {
             amount_nanomina: 75_000_000,
             recipient: "B62qrecipient3".to_string(),
             canonical: true,
+            was_canonical: false,
         };
 
         actor.process_internal_command(&payload).await;
@@ -451,6 +458,7 @@ mod accounting_actor_tests {
             amount_nanomina: 75_000_000,
             recipient: "B62qrecipient3".to_string(),
             canonical: false,
+            was_canonical: true,
         };
 
         actor.process_internal_command(&payload).await;
