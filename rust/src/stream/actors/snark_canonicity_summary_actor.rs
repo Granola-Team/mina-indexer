@@ -73,6 +73,15 @@ impl Actor for SnarkCanonicitySummaryActor {
     fn actor_outputs(&self) -> &AtomicUsize {
         &self.events_published
     }
+
+    async fn report(&self) {
+        let snarks = self.snark_map.lock().await;
+        self.print_report("Internal Commands HashMap", snarks.len());
+        drop(snarks);
+        let canonicity = self.block_canonicity_queue.lock().await;
+        self.print_report("Block Canonicity Queue", canonicity.len());
+    }
+
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BlockCanonicityUpdate => {
