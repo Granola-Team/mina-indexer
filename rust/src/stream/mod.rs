@@ -12,7 +12,7 @@ use actors::{
 use events::Event;
 use futures::future::try_join_all;
 use shared_publisher::SharedPublisher;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
 mod actors;
@@ -78,6 +78,9 @@ pub async fn subscribe_actors(
         Arc::new(new_account_actor),
     ];
 
+    let monitor_actors = actors.clone();
+    let monitor_shutdown_rx = shutdown_receiver.resubscribe();
+
     // Spawn tasks for each actor and collect their handles
     let mut actor_handles = Vec::new();
     for actor in actors {
@@ -86,13 +89,31 @@ pub async fn subscribe_actors(
         let handle = task::spawn(setup_actor(receiver, actor_shutdown_rx, actor));
         actor_handles.push(handle);
     }
+    let monitor_handle = tokio::spawn(async move {
+        let mut monitor_shutdown_rx = monitor_shutdown_rx;
+        loop {
+            tokio::select! {
+                _ = monitor_shutdown_rx.recv() => {
+                    println!("Shutdown signal received, terminating monitor task.");
+                    break;
+                }
+                _ = tokio::time::sleep(Duration::from_secs(60)) => {
+                    println!("Actor statuses:");
+                    for actor in monitor_actors.clone() {
+                        actor.report().await;
+                    }
+                }
+            }
+        }
+    });
 
-    // Wait for the shutdown signal to terminate
+    // Wait for the shutdown signal to terminat
     let _ = shutdown_receiver.recv().await;
 
     // Await all actor handles to ensure they shut down gracefully
     println!("Waiting for all actors to shut down...");
     try_join_all(actor_handles).await?;
+    monitor_handle.await?;
     println!("All actors have been shut down.");
     Ok(())
 }

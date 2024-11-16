@@ -41,6 +41,11 @@ impl Actor for BlockchainTreeBuilderActor {
         &self.events_published
     }
 
+    async fn report(&self) {
+        let tree = self.blockchain_tree.lock().await;
+        self.print_report("Blockchain Tree", tree.size());
+    }
+
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BlockAncestor => {

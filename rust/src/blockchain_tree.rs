@@ -36,6 +36,10 @@ impl BlockchainTree {
             .cloned()
     }
 
+    pub fn size(&self) -> usize {
+        self.tree.len()
+    }
+
     pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {
         self.tree.entry(node.height.clone()).or_default().push(node);
         Ok(())

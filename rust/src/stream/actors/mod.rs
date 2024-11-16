@@ -38,6 +38,12 @@ pub trait Actor: Send + Sync {
         println!("Actor {} output {} events/inserts before shutdown.", self.id(), count);
     }
 
+    fn print_report(&self, description: &'static str, size: usize) {
+        println!("{}: {} has size {}", self.id(), description, size);
+    }
+
+    async fn report(&self) {}
+
     async fn on_event(&self, event: Event) {
         self.handle_event(event).await;
     }
