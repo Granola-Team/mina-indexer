@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{DoubleEntryRecordPayload, NewAccountPayload},
+    stream::payloads::{AccountingEntryAccountType, DoubleEntryRecordPayload, NewAccountPayload},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -89,28 +89,29 @@ impl Actor for NewAccountActor {
 
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
                 let account = &accounting_entry.account;
-
-                match self.insert_account(account).await {
-                    Ok(affected_rows) => {
-                        if affected_rows == 1 {
-                            // Publish NewAccount event
-                            let new_account_event = Event {
-                                event_type: EventType::NewAccount,
-                                payload: sonic_rs::to_string(&NewAccountPayload {
-                                    height: event_payload.height,
-                                    account: account.to_string(),
-                                })
-                                .unwrap(),
-                            };
-                            self.publish(new_account_event);
-                            self.shared_publisher.incr_database_insert();
+                if accounting_entry.account_type == AccountingEntryAccountType::BlockchainAddress {
+                    match self.insert_account(account).await {
+                        Ok(affected_rows) => {
+                            if affected_rows == 1 {
+                                // Publish NewAccount event
+                                let new_account_event = Event {
+                                    event_type: EventType::NewAccount,
+                                    payload: sonic_rs::to_string(&NewAccountPayload {
+                                        height: event_payload.height,
+                                        account: account.to_string(),
+                                    })
+                                    .unwrap(),
+                                };
+                                self.publish(new_account_event);
+                                self.shared_publisher.incr_database_insert();
+                            }
                         }
-                    }
-                    Err(e) => {
-                        if e != "duplicate key violation" {
-                            panic!("Error inserting account: {:?}", e);
+                        Err(e) => {
+                            if e != "duplicate key violation" {
+                                panic!("Error inserting account: {:?}", e);
+                            }
+                            // Duplicate key, do nothing
                         }
-                        // Duplicate key, do nothing
                     }
                 }
             }
