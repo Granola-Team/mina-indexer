@@ -1,4 +1,4 @@
-use super::mainnet_block_models::{CommandStatus, CommandSummary, CommandType};
+use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload};
 use crate::constants::VIRTUAL_MINA_FOUNDATION_ADDRESS;
 use serde::{Deserialize, Serialize};
 
@@ -37,22 +37,28 @@ pub struct GenesisLedger {
 }
 
 impl GenesisLedger {
-    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
+    pub fn get_accounting_double_entries(&self) -> Vec<DoubleEntryRecordPayload> {
         self.ledger
             .accounts
             .iter()
-            .map(|account| CommandSummary {
-                memo: "".to_string(),
-                fee_payer: "".to_string(),
-                sender: VIRTUAL_MINA_FOUNDATION_ADDRESS.to_string(),
-                amount_nanomina: (account.balance.parse::<f64>().ok().unwrap() * 1_000_000_000f64) as u64,
-                fee_nanomina: 0,
-                nonce: 0,
-                receiver: account.pk.clone(),
-                status: CommandStatus::Applied,
-                txn_type: CommandType::Payment,
+            .map(|account| DoubleEntryRecordPayload {
+                height: 0,
+                lhs: vec![AccountingEntry {
+                    entry_type: AccountingEntryType::Debit,
+                    account: VIRTUAL_MINA_FOUNDATION_ADDRESS.to_string(),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
+                    timestamp: 1615939200,
+                }],
+                rhs: vec![AccountingEntry {
+                    entry_type: AccountingEntryType::Credit,
+                    account: account.pk.to_string(),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
+                    timestamp: 1615939200,
+                }],
             })
-            .collect::<Vec<CommandSummary>>()
+            .collect::<Vec<DoubleEntryRecordPayload>>()
     }
 }
 

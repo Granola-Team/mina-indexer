@@ -11,7 +11,6 @@ pub enum EventType {
     BlockCanonicityUpdate,
     BestBlock,
     BlockSummary,
-    DoubleEntryTxn,
     SnarkWorkSummary,
     SnarkCanonicitySummary,
     TransitionFrontier,

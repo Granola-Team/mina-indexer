@@ -1,4 +1,4 @@
-use super::{payloads::GenesisBlockPayload, shared_publisher::SharedPublisher};
+use super::{genesis_ledger_models::GenesisLedger, payloads::GenesisBlockPayload, shared_publisher::SharedPublisher};
 use crate::{
     stream::events::{Event, EventType},
     utility::extract_height_and_hash,
@@ -12,6 +12,24 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
         event_type: EventType::GenesisBlock,
         payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
     });
+
+    Ok(())
+}
+
+pub fn publish_genesis_ledger_double_entries(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
+    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
+
+    // Ensure the file exists before testing
+    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
+
+    let genesis_ledger: GenesisLedger = sonic_rs::from_str(&file_content)?;
+
+    for de in genesis_ledger.get_accounting_double_entries() {
+        shared_publisher.publish(Event {
+            event_type: EventType::DoubleEntryTransaction,
+            payload: sonic_rs::to_string(&de).unwrap(),
+        });
+    }
 
     Ok(())
 }
