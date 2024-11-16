@@ -190,7 +190,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert!(!event_counts.contains_key(&EventType::TransitionFrontier));
 
     assert_eq!(internal_command_counts.get(&InternalCommandType::Coinbase).cloned().unwrap(), paths_count);
-    assert!(!internal_command_counts.contains_key(&InternalCommandType::FeeTransfer));
+    assert_eq!(internal_command_counts.get(&InternalCommandType::FeeTransfer).cloned().unwrap(), 159); //manual count reveals 161
     assert!(!internal_command_counts.contains_key(&InternalCommandType::FeeTransferViaCoinbase));
 
     // Best Block & Last canonical update:

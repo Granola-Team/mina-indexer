@@ -3,14 +3,11 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{
-    constants::{VIRTUAL_BLOCK_REWARD_POOL_ADDRESS, VIRTUAL_MINA_PROTOCOL_ADDRESS},
-    stream::{
-        mainnet_block_models::{CommandStatus, CommandType},
-        payloads::{
-            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
-            UserCommandCanonicityPayload,
-        },
+use crate::stream::{
+    mainnet_block_models::{CommandStatus, CommandType},
+    payloads::{
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
+        UserCommandCanonicityPayload,
     },
 };
 use async_trait::async_trait;
@@ -46,8 +43,8 @@ impl AccountingActor {
         let mut source_entry = AccountingEntry {
             entry_type: AccountingEntryType::Debit,
             account: match payload.internal_command_type {
-                InternalCommandType::Coinbase => VIRTUAL_MINA_PROTOCOL_ADDRESS.to_string(),
-                InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+                InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
+                InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => format!("BlockRewardPool#{}", payload.state_hash),
             },
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: payload.amount_nanomina,
@@ -100,7 +97,7 @@ impl AccountingActor {
         };
         let mut block_reward_pool_entry = AccountingEntry {
             entry_type: AccountingEntryType::Credit,
-            account: VIRTUAL_BLOCK_REWARD_POOL_ADDRESS.to_string(),
+            account: format!("BlockRewardPool#{}", payload.state_hash),
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: payload.fee_nanomina,
             timestamp: payload.timestamp,
@@ -326,7 +323,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_MINA_PROTOCOL_ADDRESS);
+            assert_eq!(published_payload.lhs[0].account, format!("MinaCoinbasePayment#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
@@ -355,7 +352,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_MINA_PROTOCOL_ADDRESS);
+            assert_eq!(published_payload.lhs[0].account, format!("MinaCoinbasePayment#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
@@ -384,7 +381,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
@@ -440,7 +437,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
@@ -469,7 +466,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.lhs[0].account, VIRTUAL_BLOCK_REWARD_POOL_ADDRESS);
+            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }

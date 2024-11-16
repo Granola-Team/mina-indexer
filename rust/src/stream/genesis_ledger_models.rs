@@ -1,5 +1,4 @@
 use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload};
-use crate::constants::VIRTUAL_MINA_FOUNDATION_ADDRESS;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,7 +44,7 @@ impl GenesisLedger {
                 height: 0,
                 lhs: vec![AccountingEntry {
                     entry_type: AccountingEntryType::Debit,
-                    account: VIRTUAL_MINA_FOUNDATION_ADDRESS.to_string(),
+                    account: "MinaGenesisLedger".to_string(),
                     account_type: AccountingEntryAccountType::VirtualAddess,
                     amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
                     timestamp: 1615939200,
