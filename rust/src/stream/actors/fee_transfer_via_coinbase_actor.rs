@@ -3,10 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{
-    AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandPayload, InternalCommandType,
-    MainnetBlockPayload,
-};
+use crate::stream::payloads::{InternalCommandPayload, InternalCommandType, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -24,45 +21,6 @@ impl FeeTransferViaCoinbaseActor {
             events_published: AtomicUsize::new(0),
         }
     }
-
-    fn publish_coinbase_accounting_entry(&self, block_payload: &MainnetBlockPayload, fee: u64) {
-        let payload = DoubleEntryRecordPayload {
-            height: block_payload.height,
-            lhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Debit,
-                account: block_payload.coinbase_receiver.clone(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: fee,
-                timestamp: block_payload.timestamp,
-            }],
-            rhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Credit,
-                account: format!("BlockRewardPool#{}", block_payload.state_hash),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: fee,
-                timestamp: block_payload.timestamp,
-            }],
-        };
-        self.publish(Event {
-            event_type: EventType::DoubleEntryTransaction,
-            payload: sonic_rs::to_string(&payload).unwrap(),
-        });
-    }
-
-    fn publish_fee_transfer_via_coinbase(&self, block_payload: &MainnetBlockPayload, fee: u64, receiver: String) {
-        let payload = InternalCommandPayload {
-            internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
-            height: block_payload.height,
-            state_hash: block_payload.state_hash.to_string(),
-            timestamp: block_payload.timestamp,
-            recipient: receiver,
-            amount_nanomina: fee,
-        };
-        self.publish(Event {
-            event_type: EventType::InternalCommand,
-            payload: sonic_rs::to_string(&payload).unwrap(),
-        });
-    }
 }
 
 #[async_trait]
@@ -78,11 +36,20 @@ impl Actor for FeeTransferViaCoinbaseActor {
         match event.event_type {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                if let Some(fee_transfers_via_coinbase) = &block_payload.fee_transfer_via_coinbase {
+                if let Some(fee_transfers_via_coinbase) = block_payload.fee_transfer_via_coinbase {
                     for fee_transfer_via_coinbase in fee_transfers_via_coinbase.iter() {
-                        let fee_transfer_amount = (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64;
-                        self.publish_coinbase_accounting_entry(&block_payload, fee_transfer_amount);
-                        self.publish_fee_transfer_via_coinbase(&block_payload, fee_transfer_amount, fee_transfer_via_coinbase.receiver.to_string());
+                        let payload = InternalCommandPayload {
+                            internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
+                            height: block_payload.height,
+                            state_hash: block_payload.state_hash.to_string(),
+                            timestamp: block_payload.timestamp,
+                            recipient: fee_transfer_via_coinbase.receiver.to_string(),
+                            amount_nanomina: (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64,
+                        };
+                        self.publish(Event {
+                            event_type: EventType::InternalCommand,
+                            payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
                     }
                 }
             }
@@ -109,9 +76,11 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
     };
     use std::sync::Arc;
 
+    // Setup a shared publisher to capture published events
     let shared_publisher = Arc::new(SharedPublisher::new(100));
     let actor = FeeTransferViaCoinbaseActor::new(Arc::clone(&shared_publisher));
 
+    // Create a MainnetBlockPayload with a FeeTransferViaCoinbase
     let block_payload = MainnetBlockPayload {
         height: 10,
         state_hash: "state_hash_example".to_string(),
@@ -123,49 +92,38 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
         ..Default::default()
     };
 
+    // Serialize the MainnetBlockPayload to JSON for the event payload
     let payload_json = sonic_rs::to_string(&block_payload).unwrap();
     let event = Event {
         event_type: EventType::MainnetBlock,
         payload: payload_json,
     };
 
+    // Subscribe to the shared publisher to capture published events
     let mut receiver = shared_publisher.subscribe();
 
+    // Call handle_event to process the MainnetBlock event
     actor.handle_event(event).await;
 
-    // Verify coinbase accounting entry
-    if let Ok(received_event) = receiver.recv().await {
-        assert_eq!(received_event.event_type, EventType::DoubleEntryTransaction);
-
-        let accounting_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-
-        // Check `lhs`
-        assert_eq!(accounting_payload.height, block_payload.height);
-        assert_eq!(accounting_payload.lhs.len(), 1);
-        assert_eq!(accounting_payload.lhs[0].account, block_payload.coinbase_receiver);
-        assert_eq!(accounting_payload.lhs[0].amount_nanomina, 50_000);
-        assert_eq!(accounting_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-
-        // Check `rhs`
-        assert_eq!(accounting_payload.rhs.len(), 1);
-        assert_eq!(accounting_payload.rhs[0].account, format!("BlockRewardPool#{}", block_payload.state_hash));
-        assert_eq!(accounting_payload.rhs[0].amount_nanomina, 50_000);
-        assert_eq!(accounting_payload.rhs[0].entry_type, AccountingEntryType::Credit);
-    }
-
-    // Verify fee transfer via coinbase
+    // Capture and verify the published FeeTransferViaCoinbase event
     if let Ok(received_event) = receiver.recv().await {
         assert_eq!(received_event.event_type, EventType::InternalCommand);
 
+        // Deserialize the payload of the FeeTransferViaCoinbase event
         let fee_transfer_payload: InternalCommandPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+
+        // Verify that the FeeTransferViaCoinbasePayload matches the expected values
         assert_eq!(fee_transfer_payload.height, block_payload.height);
         assert_eq!(fee_transfer_payload.state_hash, block_payload.state_hash);
         assert_eq!(fee_transfer_payload.timestamp, block_payload.timestamp);
         assert_eq!(fee_transfer_payload.recipient, "receiver_example");
-        assert_eq!(fee_transfer_payload.amount_nanomina, 50_000);
+        assert_eq!(fee_transfer_payload.amount_nanomina, 50_000); // 0.00005 * 1_000_000_000
+    } else {
+        panic!("Did not receive expected FeeTransferViaCoinbase event from FeeTransferViaCoinbaseActor.");
     }
 
-    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 2);
+    // Verify that the event count matches the number of events published
+    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
