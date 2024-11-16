@@ -1,3 +1,4 @@
+pub(crate) mod account_summary_persistence_actor;
 pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_parser_actor;
 pub(crate) mod best_block_actor;

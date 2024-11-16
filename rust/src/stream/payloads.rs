@@ -227,6 +227,16 @@ pub enum AccountingEntryAccountType {
     BlockchainAddress,
 }
 
+impl fmt::Display for AccountingEntryAccountType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            AccountingEntryAccountType::VirtualAddess => "VirtualAddess",
+            AccountingEntryAccountType::BlockchainAddress => "BlockchainAddress",
+        };
+        write!(f, "{}", display_text)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AccountingEntry {
     pub entry_type: AccountingEntryType, // "debit" or "credit"
