@@ -4,6 +4,7 @@ use sonic_rs::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct NewAccountPayload {
     pub height: u64,
+    pub state_hash: String,
     pub timestamp: u64,
     pub account: String,
 }
@@ -200,6 +201,7 @@ pub struct UserCommandCanonicityPayload {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DoubleEntryRecordPayload {
     pub height: u64,
+    pub state_hash: String,
     // pub txn_hash: u64,
     pub lhs: Vec<AccountingEntry>, // Multiple debit entries
     pub rhs: Vec<AccountingEntry>, // Multiple credit entries

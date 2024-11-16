@@ -42,6 +42,7 @@ impl GenesisLedger {
             .iter()
             .map(|account| DoubleEntryRecordPayload {
                 height: 0,
+                state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
                 lhs: vec![AccountingEntry {
                     entry_type: AccountingEntryType::Debit,
                     account: "MinaGenesisLedger".to_string(),

@@ -67,6 +67,7 @@ impl AccountingActor {
 
         let double_entry_record = DoubleEntryRecordPayload {
             height: payload.height,
+            state_hash: payload.state_hash.to_string(),
             lhs: vec![source_entry],
             rhs: vec![recipient_entry],
         };
@@ -124,6 +125,7 @@ impl AccountingActor {
 
         let double_entry_record = DoubleEntryRecordPayload {
             height: payload.height,
+            state_hash: payload.state_hash.to_string(),
             lhs,
             rhs,
         };
@@ -152,6 +154,7 @@ impl Actor for AccountingActor {
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
                     height: payload.height,
+                    state_hash: payload.state_hash.to_string(),
                     lhs: vec![AccountingEntry {
                         entry_type: AccountingEntryType::Debit,
                         account: payload.account,
@@ -512,6 +515,7 @@ mod accounting_actor_tests {
         // Mock NewAccountPayload
         let payload = NewAccountPayload {
             height: 100,
+            state_hash: "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4".to_string(),
             timestamp: 0,
             account: "B62qnewaccount1".to_string(),
         };
@@ -566,6 +570,7 @@ mod accounting_actor_tests {
         // Mock NewAccountPayload
         let payload = NewAccountPayload {
             height: 0,
+            state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
             timestamp: 0,
             account: "B62qnewaccount1".to_string(),
         };

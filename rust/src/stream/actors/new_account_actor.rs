@@ -99,6 +99,7 @@ impl Actor for NewAccountActor {
                                     event_type: EventType::NewAccount,
                                     payload: sonic_rs::to_string(&NewAccountPayload {
                                         height: event_payload.height,
+                                        state_hash: event_payload.state_hash.to_string(),
                                         timestamp: accounting_entry.timestamp,
                                         account: account.to_string(),
                                     })
@@ -149,6 +150,7 @@ mod new_account_actor_tests {
 
         let payload = DoubleEntryRecordPayload {
             height: 1,
+            state_hash: "state_hash".to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "B62qnewaccount1".to_string(),
@@ -185,6 +187,7 @@ mod new_account_actor_tests {
 
         let payload = DoubleEntryRecordPayload {
             height: 1,
+            state_hash: "state_hash".to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "B62qduplicateaccount".to_string(),
