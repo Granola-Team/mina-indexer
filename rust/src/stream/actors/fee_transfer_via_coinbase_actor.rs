@@ -78,10 +78,12 @@ impl Actor for FeeTransferViaCoinbaseActor {
         match event.event_type {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                if let Some(fee_transfer_via_coinbase) = &block_payload.fee_transfer_via_coinbase {
-                    let fee_transfer_amount = (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64;
-                    self.publish_coinbase_accounting_entry(&block_payload, fee_transfer_amount);
-                    self.publish_fee_transfer_via_coinbase(&block_payload, fee_transfer_amount, fee_transfer_via_coinbase.receiver.to_string())
+                if let Some(fee_transfers_via_coinbase) = &block_payload.fee_transfer_via_coinbase {
+                    for fee_transfer_via_coinbase in fee_transfers_via_coinbase.iter() {
+                        let fee_transfer_amount = (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64;
+                        self.publish_coinbase_accounting_entry(&block_payload, fee_transfer_amount);
+                        self.publish_fee_transfer_via_coinbase(&block_payload, fee_transfer_amount, fee_transfer_via_coinbase.receiver.to_string());
+                    }
                 }
             }
             EventType::BerkeleyBlock => {
@@ -114,10 +116,10 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
         height: 10,
         state_hash: "state_hash_example".to_string(),
         timestamp: 123456789,
-        fee_transfer_via_coinbase: Some(FeeTransferViaCoinbase {
+        fee_transfer_via_coinbase: Some(vec![FeeTransferViaCoinbase {
             receiver: "receiver_example".to_string(),
             fee: 0.00005,
-        }),
+        }]),
         ..Default::default()
     };
 

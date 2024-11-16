@@ -25,8 +25,10 @@ impl MainnetBlock {
             let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
             *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
         }
-        if let Some(fee_transfer_via_coinbase) = self.get_fee_transfer_via_coinbase() {
-            fee_transfers.remove(&fee_transfer_via_coinbase.receiver);
+        if let Some(fee_transfers_via_coinbase) = self.get_fee_transfer_via_coinbase() {
+            for ftvc in fee_transfers_via_coinbase.iter() {
+                fee_transfers.remove(&ftvc.receiver);
+            }
         }
         fee_transfers.remove(&self.get_coinbase_receiver());
         fee_transfers.retain(|_, v| *v > 0u64);
@@ -39,37 +41,33 @@ impl MainnetBlock {
             .collect()
     }
 
-    pub fn get_fee_transfer_via_coinbase(&self) -> Option<FeeTransferViaCoinbase> {
-        let fee_transfer_via_coinbase: Option<Vec<FeeTransferViaCoinbase>> = [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+    pub fn get_fee_transfer_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
                 opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
-                    Some(v1) if v1 == "One" => match diff.coinbase.last() {
-                        Some(v2) => {
-                            if v2.is_null() {
-                                return None;
-                            }
+                    Some(v1) if v1 == "One" => Some(
+                        diff.coinbase
+                            .iter()
+                            .filter_map(|v2| {
+                                if v2.is_null() {
+                                    return None;
+                                }
 
-                            // Try to extract "receiver_pk" and "fee" from the JSON structure
-                            let receiver = v2["receiver_pk"].as_str().unwrap().to_string();
-                            let fee = v2["fee"].as_str().unwrap().parse::<f64>().unwrap();
+                                // Try to extract "receiver_pk" and "fee" from the JSON structure
+                                let receiver = v2["receiver_pk"].as_str().unwrap().to_string();
+                                let fee = v2["fee"].as_str().unwrap().parse::<f64>().unwrap();
 
-                            Some(FeeTransferViaCoinbase { receiver, fee })
-                        }
-                        _ => None,
-                    },
+                                Some(FeeTransferViaCoinbase { receiver, fee })
+                            })
+                            .collect::<Vec<FeeTransferViaCoinbase>>(),
+                    ),
                     _ => None,
                 })
             })
+            .flatten()
             .collect::<Vec<FeeTransferViaCoinbase>>()
-            .into();
-
-        if let Some(fts) = fee_transfer_via_coinbase.filter(|v| !v.is_empty()) {
-            assert_eq!(fts.len(), 1);
-            Some(fts.first().unwrap().clone())
-        } else {
-            None
-        }
+            .into()
     }
 
     pub fn get_previous_state_hash(&self) -> String {
@@ -585,7 +583,8 @@ mod mainnet_block_parsing_tests {
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
         let fee_transfer_via_coinbase = mainnet_block.get_fee_transfer_via_coinbase().unwrap();
-        assert_eq!(fee_transfer_via_coinbase.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
-        assert_eq!(fee_transfer_via_coinbase.fee, 0.00005f64);
+        let first_ftva = fee_transfer_via_coinbase.first().unwrap();
+        assert_eq!(first_ftva.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
+        assert_eq!(first_ftva.fee, 0.00005f64);
     }
 }

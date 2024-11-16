@@ -31,7 +31,7 @@ pub struct MainnetBlockPayload {
     pub coinbase_receiver: String,
     pub coinbase_reward_nanomina: u64,
     pub global_slot_since_genesis: u64,
-    pub fee_transfer_via_coinbase: Option<FeeTransferViaCoinbase>,
+    pub fee_transfer_via_coinbase: Option<Vec<FeeTransferViaCoinbase>>,
     pub fee_transfers: Vec<FeeTransfer>,
 }
 
