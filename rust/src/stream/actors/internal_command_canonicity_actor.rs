@@ -45,6 +45,7 @@ impl InternalCommandCanonicityActor {
                         timestamp: entry.timestamp,
                         amount_nanomina: entry.amount_nanomina,
                         recipient: entry.recipient.to_string(),
+                        source: entry.source.clone(),
                         canonical: update.canonical,
                         was_canonical: update.was_canonical,
                     };
@@ -133,6 +134,7 @@ mod internal_command_canonicity_actor_tests {
             timestamp: 123456,
             amount_nanomina: 100_000_000,
             recipient: "recipient_public_key".to_string(),
+            source: None,
         };
 
         actor
@@ -191,6 +193,7 @@ mod internal_command_canonicity_actor_tests {
                     timestamp: 1000,
                     amount_nanomina: 5000,
                     recipient: "recipient_5".to_string(),
+                    source: None,
                 }],
             );
             internal_commands.insert(
@@ -202,6 +205,7 @@ mod internal_command_canonicity_actor_tests {
                     timestamp: 2000,
                     amount_nanomina: 10000,
                     recipient: "recipient_10".to_string(),
+                    source: None,
                 }],
             );
         }
@@ -267,6 +271,7 @@ mod internal_command_canonicity_actor_tests {
             timestamp: 123456,
             amount_nanomina: 100_000_000,
             recipient: "recipient_public_key".to_string(),
+            source: None,
         };
 
         actor

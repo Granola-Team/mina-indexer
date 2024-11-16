@@ -45,6 +45,7 @@ impl Actor for FeeTransferViaCoinbaseActor {
                             timestamp: block_payload.timestamp,
                             recipient: fee_transfer_via_coinbase.receiver.to_string(),
                             amount_nanomina: (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64,
+                            source: Some(block_payload.coinbase_receiver.to_string()),
                         };
                         self.publish(Event {
                             event_type: EventType::InternalCommand,

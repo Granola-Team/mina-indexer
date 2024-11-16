@@ -156,6 +156,7 @@ pub struct InternalCommandPayload {
     pub timestamp: u64,
     pub amount_nanomina: u64,
     pub recipient: String,
+    pub source: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -166,6 +167,7 @@ pub struct InternalCommandCanonicityPayload {
     pub timestamp: u64,
     pub amount_nanomina: u64,
     pub recipient: String,
+    pub source: Option<String>,
     pub canonical: bool,
     pub was_canonical: bool,
 }

@@ -43,6 +43,7 @@ impl Actor for CoinbaseTransferActor {
                     timestamp: block_payload.timestamp,
                     recipient: block_payload.coinbase_receiver,
                     amount_nanomina: block_payload.coinbase_reward_nanomina,
+                    source: None,
                 };
                 self.publish(Event {
                     event_type: EventType::InternalCommand,

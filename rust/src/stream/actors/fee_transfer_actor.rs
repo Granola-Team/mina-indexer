@@ -47,6 +47,7 @@ impl Actor for FeeTransferActor {
                         timestamp: block_payload.timestamp,
                         recipient: block_payload.coinbase_receiver,
                         amount_nanomina: total_fees_paid - total_snark_fees,
+                        source: None,
                     };
                     self.publish(Event {
                         event_type: EventType::InternalCommand,
@@ -61,6 +62,7 @@ impl Actor for FeeTransferActor {
                         timestamp: block_payload.timestamp,
                         recipient: fee_transfer.recipient.to_string(),
                         amount_nanomina: fee_transfer.fee_nanomina,
+                        source: None,
                     };
                     self.publish(Event {
                         event_type: EventType::InternalCommand,

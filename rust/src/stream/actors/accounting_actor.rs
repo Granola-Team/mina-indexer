@@ -44,7 +44,8 @@ impl AccountingActor {
             entry_type: AccountingEntryType::Debit,
             account: match payload.internal_command_type {
                 InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
-                InternalCommandType::FeeTransfer | InternalCommandType::FeeTransferViaCoinbase => format!("BlockRewardPool#{}", payload.state_hash),
+                InternalCommandType::FeeTransfer => format!("BlockRewardPool#{}", payload.state_hash),
+                InternalCommandType::FeeTransferViaCoinbase => payload.source.as_ref().cloned().unwrap(),
             },
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: payload.amount_nanomina,
@@ -313,6 +314,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient1".to_string(),
             canonical: true,
             was_canonical: false,
+            source: None,
         };
 
         actor.process_internal_command(&payload).await;
@@ -342,6 +344,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient1".to_string(),
             canonical: false,
             was_canonical: true,
+            source: None,
         };
 
         actor.process_internal_command(&payload).await;
@@ -371,6 +374,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient2".to_string(),
             canonical: true,
             was_canonical: false,
+            source: None,
         };
 
         actor.process_internal_command(&payload).await;
@@ -400,6 +404,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient2".to_string(),
             canonical: false,
             was_canonical: false,
+            source: None,
         };
 
         actor
@@ -427,6 +432,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient3".to_string(),
             canonical: true,
             was_canonical: false,
+            source: Some("coinbase_receiver".to_string()),
         };
 
         actor.process_internal_command(&payload).await;
@@ -437,7 +443,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.lhs[0].account, "coinbase_receiver".to_string());
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
@@ -456,6 +462,7 @@ mod accounting_actor_tests {
             recipient: "B62qrecipient3".to_string(),
             canonical: false,
             was_canonical: true,
+            source: Some("coinbase_receiver".to_string()),
         };
 
         actor.process_internal_command(&payload).await;
@@ -466,7 +473,7 @@ mod accounting_actor_tests {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.lhs[0].account, "coinbase_receiver".to_string());
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }

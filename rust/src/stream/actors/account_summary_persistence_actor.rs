@@ -44,7 +44,7 @@ impl AccountSummaryPersistenceActor {
                 println!("Unable to create accounts table {:?}", e);
             }
             Self {
-                id: "AccountSummaryActor".to_string(),
+                id: "AccountSummaryPersistenceActor".to_string(),
                 shared_publisher,
                 client,
                 database_inserts: AtomicUsize::new(0),
