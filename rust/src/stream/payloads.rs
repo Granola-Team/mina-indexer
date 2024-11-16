@@ -232,7 +232,7 @@ pub enum AccountingEntryAccountType {
 impl fmt::Display for AccountingEntryAccountType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_text = match self {
-            AccountingEntryAccountType::VirtualAddess => "VirtualAddess",
+            AccountingEntryAccountType::VirtualAddess => "VirtualAddress",
             AccountingEntryAccountType::BlockchainAddress => "BlockchainAddress",
         };
         write!(f, "{}", display_text)
