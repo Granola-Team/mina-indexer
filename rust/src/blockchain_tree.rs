@@ -40,6 +40,10 @@ impl BlockchainTree {
         self.tree.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.tree.is_empty()
+    }
+
     pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {
         self.tree.entry(node.height.clone()).or_default().push(node);
         Ok(())

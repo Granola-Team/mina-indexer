@@ -58,6 +58,11 @@ impl Actor for BlockchainTreeBuilderActor {
                     last_vrf_output: block_payload.last_vrf_output.clone(),
                     ..Default::default()
                 };
+                if blockchain_tree.is_empty() {
+                    // we assume the first block we receive is carefully selected
+                    // to be the best canonical tip,
+                    blockchain_tree.set_root(next_node.clone()).unwrap();
+                }
                 if blockchain_tree.has_parent(&next_node) {
                     blockchain_tree.add_node(next_node).unwrap();
                     let added_payload = NewBlockPayload {
