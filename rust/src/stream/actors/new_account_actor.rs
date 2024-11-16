@@ -33,7 +33,8 @@ impl NewAccountActor {
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS account_tracking (
-                        account TEXT PRIMARY KEY
+                        account TEXT PRIMARY KEY,
+                        height BIGINT NOT NULL
                     );",
                     &[],
                 )
@@ -52,13 +53,13 @@ impl NewAccountActor {
         }
     }
 
-    async fn insert_account(&self, account: &str) -> Result<u64, &'static str> {
+    async fn insert_account(&self, account: &str, height: i64) -> Result<u64, &'static str> {
         let insert_query = r#"
-            INSERT INTO account_tracking (account)
-            VALUES ($1)
+            INSERT INTO account_tracking (account, height)
+            VALUES ($1, $2)
         "#;
 
-        match self.client.execute(insert_query, &[&account]).await {
+        match self.client.execute(insert_query, &[&account, &height]).await {
             Ok(affected_rows) => Ok(affected_rows),
             Err(e) => {
                 if let Some(db_error) = e.as_db_error() {
@@ -90,7 +91,7 @@ impl Actor for NewAccountActor {
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
                 let account = &accounting_entry.account;
                 if accounting_entry.account_type == AccountingEntryAccountType::BlockchainAddress {
-                    match self.insert_account(account).await {
+                    match self.insert_account(account, event_payload.height as i64).await {
                         Ok(affected_rows) => {
                             if affected_rows == 1 {
                                 // Publish NewAccount event
