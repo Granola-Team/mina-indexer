@@ -19,6 +19,7 @@ pub enum EventType {
     InternalCommand,
     InternalCommandCanonicityUpdate,
     DoubleEntryTransaction,
+    NewAccount,
 }
 
 #[derive(Debug, Clone, PartialEq)]

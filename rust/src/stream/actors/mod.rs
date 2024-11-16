@@ -13,6 +13,7 @@ pub(crate) mod fee_transfer_via_coinbase_actor;
 pub(crate) mod internal_command_canonicity_actor;
 pub(crate) mod internal_command_persistence_actor;
 pub(crate) mod mainnet_block_parser_actor;
+pub(crate) mod new_account_actor;
 pub(crate) mod pcb_path_actor;
 pub(crate) mod snark_canonicity_summary_actor;
 pub(crate) mod snark_summary_persistence_actor;

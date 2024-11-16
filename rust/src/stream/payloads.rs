@@ -1,6 +1,12 @@
 use super::mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase};
 use sonic_rs::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
+pub struct NewAccountPayload {
+    pub height: u64,
+    pub account: String,
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct BlockAncestorPayload {
     pub height: u64,
