@@ -20,6 +20,7 @@ pub struct SnarkCanonicitySummaryActor {
     pub snark_map: Arc<Mutex<HashMap<Height, Vec<SnarkWorkSummaryPayload>>>>,
 }
 
+#[allow(dead_code)]
 impl SnarkCanonicitySummaryActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {

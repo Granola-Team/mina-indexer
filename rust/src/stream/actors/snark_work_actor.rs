@@ -13,6 +13,7 @@ pub struct SnarkWorkSummaryActor {
     pub events_published: AtomicUsize,
 }
 
+#[allow(dead_code)]
 impl SnarkWorkSummaryActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {

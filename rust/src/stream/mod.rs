@@ -6,9 +6,8 @@ use actors::{
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
-    snark_work_actor::SnarkWorkSummaryActor, transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor,
-    user_command_canonicity_actor::UserCommandCanonicityActor, user_command_persistence_actor::UserCommandPersistenceActor, Actor,
+    transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
+    user_command_persistence_actor::UserCommandPersistenceActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -33,7 +32,7 @@ pub async fn subscribe_actors(
     println!("Starting process_blocks_dir...");
 
     let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let user_command_persistence_actor_m_0 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 0).await;
     let user_command_persistence_actor_m_1 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 1).await;
     let user_command_persistence_actor_m_2 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 2).await;
@@ -54,8 +53,8 @@ pub async fn subscribe_actors(
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
         Arc::new(TransitionFrontierActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockSummaryActor::new(Arc::clone(shared_publisher))),
-        Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
-        Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
+        // Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
+        // Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(UserCommandActor::new(Arc::clone(shared_publisher))),
         Arc::new(UserCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
@@ -64,7 +63,7 @@ pub async fn subscribe_actors(
         Arc::new(InternalCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
-        Arc::new(snark_persistence_actor),
+        // Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor_m_0),
         Arc::new(user_command_persistence_actor_m_1),
         Arc::new(user_command_persistence_actor_m_2),

@@ -16,6 +16,7 @@ pub struct SnarkSummaryPersistenceActor {
     pub client: Client,
 }
 
+#[allow(dead_code)]
 impl SnarkSummaryPersistenceActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
