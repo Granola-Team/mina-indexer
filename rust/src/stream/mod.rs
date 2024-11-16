@@ -39,7 +39,9 @@ pub async fn subscribe_actors(
     let user_command_persistence_actor_m_3 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 3).await;
     let user_command_persistence_actor_m_4 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 4).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let account_summary_persistence_actor = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let account_summary_persistence_actor_m_0 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 0).await;
+    let account_summary_persistence_actor_m_1 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 1).await;
+    let account_summary_persistence_actor_m_2 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 2).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher)).await;
 
     // Define actors
@@ -70,7 +72,9 @@ pub async fn subscribe_actors(
         Arc::new(user_command_persistence_actor_m_3),
         Arc::new(user_command_persistence_actor_m_4),
         Arc::new(internal_command_persistence_actor),
-        Arc::new(account_summary_persistence_actor),
+        Arc::new(account_summary_persistence_actor_m_0),
+        Arc::new(account_summary_persistence_actor_m_1),
+        Arc::new(account_summary_persistence_actor_m_2),
         Arc::new(new_account_actor),
     ];
 

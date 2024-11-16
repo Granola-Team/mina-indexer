@@ -34,6 +34,9 @@ impl BlockSummaryPersistenceActor {
                     eprintln!("connection error: {}", e);
                 }
             });
+            if let Err(e) = client.execute("DROP TABLE IF EXISTS block_summary;", &[]).await {
+                println!("Unable to drop block_summary table {:?}", e);
+            }
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS block_summary (

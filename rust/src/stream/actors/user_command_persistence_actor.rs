@@ -25,6 +25,9 @@ impl UserCommandPersistenceActor {
                     eprintln!("connection error: {}", e);
                 }
             });
+            if let Err(e) = client.execute("DROP TABLE IF EXISTS user_commands;", &[]).await {
+                println!("Unable to drop user_commands table {:?}", e);
+            }
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS user_commands (

@@ -24,6 +24,9 @@ impl InternalCommandPersistenceActor {
                     eprintln!("connection error: {}", e);
                 }
             });
+            if let Err(e) = client.execute("DROP TABLE IF EXISTS internal_commands;", &[]).await {
+                println!("Unable to drop internal_commands table {:?}", e);
+            }
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS internal_commands (

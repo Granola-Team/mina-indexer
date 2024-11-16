@@ -16,11 +16,12 @@ pub struct AccountSummaryPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
+    pub modulo_3: u64,
     pub client: Client,
 }
 
 impl AccountSummaryPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, modulo_3: u64) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
@@ -47,6 +48,7 @@ impl AccountSummaryPersistenceActor {
                 id: "AccountSummaryPersistenceActor".to_string(),
                 shared_publisher,
                 client,
+                modulo_3,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -95,15 +97,17 @@ impl Actor for AccountSummaryPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::DoubleEntryTransaction {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-            for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
-                match self.db_update(accounting_entry).await {
-                    Ok(affected_rows) => {
-                        assert_eq!(affected_rows, 1);
-                        self.shared_publisher.incr_database_insert();
-                        self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    }
-                    Err(e) => {
-                        panic!("{:?}", e);
+            if event_payload.height % 3 == self.modulo_3 {
+                for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
+                    match self.db_update(accounting_entry).await {
+                        Ok(affected_rows) => {
+                            assert_eq!(affected_rows, 1);
+                            self.shared_publisher.incr_database_insert();
+                            self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        }
+                        Err(e) => {
+                            panic!("{:?}", e);
+                        }
                     }
                 }
             }
