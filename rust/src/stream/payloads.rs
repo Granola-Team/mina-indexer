@@ -4,6 +4,7 @@ use sonic_rs::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct NewAccountPayload {
     pub height: u64,
+    pub timestamp: u64,
     pub account: String,
 }
 

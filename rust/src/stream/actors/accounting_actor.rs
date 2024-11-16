@@ -7,7 +7,7 @@ use crate::stream::{
     mainnet_block_models::{CommandStatus, CommandType},
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
-        UserCommandCanonicityPayload,
+        NewAccountPayload, UserCommandCanonicityPayload,
     },
 };
 use async_trait::async_trait;
@@ -144,6 +144,32 @@ impl Actor for AccountingActor {
 
     async fn handle_event(&self, event: Event) {
         match event.event_type {
+            EventType::NewAccount => {
+                let payload: NewAccountPayload = sonic_rs::from_str(&event.payload).unwrap();
+                if payload.height == 0 {
+                    // genesis ledger accounts pay no account creation fees
+                    return;
+                }
+                let double_entry_record = DoubleEntryRecordPayload {
+                    height: payload.height,
+                    lhs: vec![AccountingEntry {
+                        entry_type: AccountingEntryType::Debit,
+                        account: payload.account,
+                        account_type: AccountingEntryAccountType::BlockchainAddress,
+                        amount_nanomina: 1_000_000_000,
+                        timestamp: 0,
+                    }],
+                    rhs: vec![AccountingEntry {
+                        entry_type: AccountingEntryType::Credit,
+                        account: format!("AccountCreationFee#{}", payload.height),
+                        account_type: AccountingEntryAccountType::VirtualAddess,
+                        amount_nanomina: 1_000_000_000,
+                        timestamp: 0,
+                    }],
+                };
+
+                self.publish_transaction(&double_entry_record).await;
+            }
             EventType::InternalCommandCanonicityUpdate => {
                 let payload: InternalCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
                 // not canonical, and never wasn't before. No need to deduct
@@ -477,5 +503,86 @@ mod accounting_actor_tests {
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
         }
+    }
+
+    #[tokio::test]
+    async fn test_process_new_account_event() {
+        let (actor, mut receiver) = setup_actor();
+
+        // Mock NewAccountPayload
+        let payload = NewAccountPayload {
+            height: 100,
+            timestamp: 0,
+            account: "B62qnewaccount1".to_string(),
+        };
+
+        // Create the event
+        let event = Event {
+            event_type: EventType::NewAccount,
+            payload: sonic_rs::to_string(&payload).unwrap(),
+        };
+
+        // Handle the NewAccount event
+        actor.handle_event(event).await;
+
+        // Verify the published DoubleEntryTransaction event
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event {
+            assert_eq!(event.event_type, EventType::DoubleEntryTransaction);
+
+            // Deserialize and verify the DoubleEntryRecordPayload
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            // Verify the LHS (debit) entry
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, payload.account);
+            assert_eq!(published_payload.lhs[0].account_type, AccountingEntryAccountType::BlockchainAddress);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, 1_000_000_000);
+            assert_eq!(published_payload.lhs[0].timestamp, 0);
+
+            // Verify the RHS (credit) entry
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("AccountCreationFee#{}", payload.height));
+            assert_eq!(published_payload.rhs[0].account_type, AccountingEntryAccountType::VirtualAddess);
+            assert_eq!(published_payload.rhs[0].amount_nanomina, 1_000_000_000);
+            assert_eq!(published_payload.rhs[0].timestamp, 0);
+        } else {
+            panic!("Expected a DoubleEntryTransaction event to be published.");
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_process_new_account_event_at_height_0() {
+        let (actor, mut receiver) = setup_actor();
+
+        // Mock NewAccountPayload
+        let payload = NewAccountPayload {
+            height: 0,
+            timestamp: 0,
+            account: "B62qnewaccount1".to_string(),
+        };
+
+        // Create the event
+        let event = Event {
+            event_type: EventType::NewAccount,
+            payload: sonic_rs::to_string(&payload).unwrap(),
+        };
+
+        // Handle the NewAccount event
+        actor.handle_event(event).await;
+
+        // Verify no published DoubleEntryTransaction event
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_err(), "Did not expected a DoubleEntryTransaction event to be published.");
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 0);
     }
 }

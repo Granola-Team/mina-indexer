@@ -98,6 +98,7 @@ impl Actor for NewAccountActor {
                                     event_type: EventType::NewAccount,
                                     payload: sonic_rs::to_string(&NewAccountPayload {
                                         height: event_payload.height,
+                                        timestamp: accounting_entry.timestamp,
                                         account: account.to_string(),
                                     })
                                     .unwrap(),
