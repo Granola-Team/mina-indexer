@@ -85,6 +85,7 @@ async fn test_transition_frontier_actor_updates() -> anyhow::Result<()> {
         height: TRANSITION_FRONTIER_DISTANCE as u64 + 1,
         state_hash: "some_hash".to_string(),
         canonical: true,
+        was_canonical: false,
     };
 
     // Send the BestBlock event
@@ -132,6 +133,7 @@ async fn test_transition_frontier_actor_no_update_on_lower_height() -> anyhow::R
         height: TRANSITION_FRONTIER_DISTANCE as u64 + 10,
         state_hash: "initial_hash".to_string(),
         canonical: true,
+        was_canonical: false,
     };
 
     // Send initial BestBlock event to set the transition frontier
@@ -150,6 +152,7 @@ async fn test_transition_frontier_actor_no_update_on_lower_height() -> anyhow::R
         height: TRANSITION_FRONTIER_DISTANCE as u64 + 5,
         state_hash: "lower_hash".to_string(),
         canonical: true,
+        was_canonical: false,
     };
     tokio::time::sleep(Duration::from_secs(1)).await;
     actor

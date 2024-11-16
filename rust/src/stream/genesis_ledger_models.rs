@@ -53,7 +53,7 @@ impl GenesisLedger {
                 rhs: vec![AccountingEntry {
                     entry_type: AccountingEntryType::Credit,
                     account: account.pk.to_string(),
-                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
                     amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
                     timestamp: 1615939200,
                 }],

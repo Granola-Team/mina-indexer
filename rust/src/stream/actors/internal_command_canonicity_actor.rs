@@ -145,6 +145,7 @@ mod internal_command_canonicity_actor_tests {
             height: 10,
             canonical: true,
             state_hash: "sample_hash".to_string(),
+            was_canonical: false,
         };
 
         actor
@@ -243,6 +244,7 @@ mod internal_command_canonicity_actor_tests {
             height: 15,
             canonical: true,
             state_hash: "sample_hash_pending".to_string(),
+            was_canonical: false,
         };
 
         actor

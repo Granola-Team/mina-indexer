@@ -136,6 +136,7 @@ async fn test_snark_summary_persistence_actor_processes_snark_summary() -> anyho
         height: 10,
         canonical: true,
         state_hash: "does_not_matter".to_string(),
+        was_canonical: false,
     };
 
     actor
@@ -232,6 +233,7 @@ async fn test_snark_canonicity_summary_actor_defers_processing_until_snark_summa
         height: 10,
         canonical: true,
         state_hash: "does_not_matter".to_string(),
+        was_canonical: false,
     };
     actor
         .handle_event(Event {

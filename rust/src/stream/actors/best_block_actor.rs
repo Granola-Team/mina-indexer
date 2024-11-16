@@ -98,6 +98,7 @@ async fn test_best_block_actor_updates() -> anyhow::Result<()> {
         height: 2,
         state_hash: "new_canonical_hash".to_string(),
         canonical: true,
+        was_canonical: false,
     };
 
     // Handle the canonical block update event
@@ -147,6 +148,7 @@ async fn test_best_block_actor_does_not_publish_on_non_canonical_or_lower_height
         height: 2,
         state_hash: "canonical_hash_2".to_string(),
         canonical: true,
+        was_canonical: false,
     };
 
     // Handle the canonical block to set an initial best block
@@ -173,6 +175,7 @@ async fn test_best_block_actor_does_not_publish_on_non_canonical_or_lower_height
         height: 3,
         state_hash: "non_canonical_hash_3".to_string(),
         canonical: false,
+        was_canonical: false,
     };
     actor
         .handle_event(Event {
@@ -186,6 +189,7 @@ async fn test_best_block_actor_does_not_publish_on_non_canonical_or_lower_height
         height: 1,
         state_hash: "canonical_hash_1".to_string(),
         canonical: true,
+        was_canonical: false,
     };
     actor
         .handle_event(Event {

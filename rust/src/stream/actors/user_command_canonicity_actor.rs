@@ -154,6 +154,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
         height: 10,
         canonical: true,
         state_hash: "sample_hash".to_string(),
+        was_canonical: false,
     };
 
     actor

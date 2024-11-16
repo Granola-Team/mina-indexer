@@ -48,6 +48,7 @@ pub struct BlockCanonicityUpdatePayload {
     pub height: u64,
     pub state_hash: String,
     pub canonical: bool,
+    pub was_canonical: bool,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

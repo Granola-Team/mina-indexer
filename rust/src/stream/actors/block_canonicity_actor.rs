@@ -31,10 +31,10 @@ impl BlockCanonicityActor {
     fn process_equal_height(&self, current_best_block: &Node, next_node: Node, next_best_block: &Node) {
         let is_canonical = current_best_block != next_best_block;
         if is_canonical {
-            self.publish_canonical_update(current_best_block.clone(), false);
-            self.publish_canonical_update(next_node, true);
+            self.publish_canonical_update(current_best_block.clone(), false, true);
+            self.publish_canonical_update(next_node, true, false);
         } else {
-            self.publish_canonical_update(next_node, false);
+            self.publish_canonical_update(next_node, false, false);
         }
     }
 
@@ -43,7 +43,7 @@ impl BlockCanonicityActor {
         if parent != current_best_block {
             self.update_ancestries(blockchain_tree, current_best_block, &next_node);
         }
-        self.publish_canonical_update(next_node, true);
+        self.publish_canonical_update(next_node, true, false);
     }
 
     fn update_ancestries(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: &Node) {
@@ -52,20 +52,21 @@ impl BlockCanonicityActor {
             .unwrap();
 
         for prior in prior_ancestry.iter() {
-            self.publish_canonical_update(prior.clone(), false);
+            self.publish_canonical_update(prior.clone(), false, true);
         }
 
         new_ancestry.reverse();
         for new_a in new_ancestry.iter() {
-            self.publish_canonical_update(new_a.clone(), true);
+            self.publish_canonical_update(new_a.clone(), true, false);
         }
     }
 
-    fn publish_canonical_update(&self, node: Node, canonical: bool) {
+    fn publish_canonical_update(&self, node: Node, canonical: bool, was_canonical: bool) {
         let update = BlockCanonicityUpdatePayload {
             height: node.height.0,
             state_hash: node.state_hash.0.clone(),
             canonical,
+            was_canonical,
         };
         self.publish_event(update);
     }
@@ -102,7 +103,7 @@ impl Actor for BlockCanonicityActor {
             };
             if next_node.height.0 == 1 {
                 blockchain_tree.set_root(next_node.clone()).unwrap();
-                self.publish_canonical_update(next_node, true);
+                self.publish_canonical_update(next_node, true, false);
                 return;
             }
             if blockchain_tree.has_parent(&next_node) {
@@ -118,7 +119,7 @@ impl Actor for BlockCanonicityActor {
                         self.process_greater_height(&mut blockchain_tree, &current_best_block, next_node);
                     }
                     std::cmp::Ordering::Less => {
-                        self.publish_canonical_update(next_node, false);
+                        self.publish_canonical_update(next_node, false, false);
                     }
                 }
                 blockchain_tree.prune_tree().unwrap();
@@ -404,48 +405,57 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
             height: 2,
             state_hash: "original_block_1".to_string(),
             canonical: true,
+            was_canonical: false,
         },
         BlockCanonicityUpdatePayload {
             height: 3,
             state_hash: "original_block_2".to_string(),
             canonical: true,
+            was_canonical: false,
         },
         // Competing blocks are added as non-canonical until the tiebreaker
         BlockCanonicityUpdatePayload {
             height: 2,
             state_hash: "competing_block_1".to_string(),
             canonical: false,
+            was_canonical: false,
         },
         BlockCanonicityUpdatePayload {
             height: 3,
             state_hash: "competing_block_2".to_string(),
             canonical: false,
+            was_canonical: false,
         },
         // Competing branch wins, update the blocks
         BlockCanonicityUpdatePayload {
             height: 3,
             state_hash: "original_block_2".to_string(),
             canonical: false,
+            was_canonical: true,
         },
         BlockCanonicityUpdatePayload {
             height: 2,
             state_hash: "original_block_1".to_string(),
             canonical: false,
+            was_canonical: true,
         },
         BlockCanonicityUpdatePayload {
             height: 2,
             state_hash: "competing_block_1".to_string(),
             canonical: true,
+            was_canonical: false,
         },
         BlockCanonicityUpdatePayload {
             height: 3,
             state_hash: "competing_block_2".to_string(),
             canonical: true,
+            was_canonical: false,
         },
         BlockCanonicityUpdatePayload {
             height: 4,
             state_hash: "competing_block_3".to_string(),
             canonical: true,
+            was_canonical: false,
         },
     ];
 
