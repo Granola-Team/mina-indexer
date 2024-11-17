@@ -167,7 +167,7 @@ pub struct InternalCommandPayload {
     pub source: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct InternalCommandCanonicityPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
@@ -180,7 +180,7 @@ pub struct InternalCommandCanonicityPayload {
     pub was_canonical: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UserCommandCanonicityPayload {
     pub height: u64,
     pub state_hash: String,

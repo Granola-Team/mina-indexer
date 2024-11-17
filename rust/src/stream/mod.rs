@@ -1,9 +1,9 @@
 use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
 use actors::{
-    account_summary_persistence_actor::AccountSummaryPersistenceActor, accounting_actor::AccountingActor,
-    berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
-    block_canonicity_actor::BlockCanonicityActor, block_summary_actor::BlockSummaryActor, block_summary_persistence_actor::BlockSummaryPersistenceActor,
-    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
+    block_summary_actor::BlockSummaryActor, block_summary_persistence_actor::BlockSummaryPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
+    fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
     transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
@@ -33,15 +33,9 @@ pub async fn subscribe_actors(
 
     let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let user_command_persistence_actor_m_0 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 0).await;
-    let user_command_persistence_actor_m_1 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 1).await;
-    let user_command_persistence_actor_m_2 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 2).await;
-    let user_command_persistence_actor_m_3 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 3).await;
-    let user_command_persistence_actor_m_4 = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), 4).await;
+    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let account_summary_persistence_actor_m_0 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 0).await;
-    let account_summary_persistence_actor_m_1 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 1).await;
-    let account_summary_persistence_actor_m_2 = AccountSummaryPersistenceActor::new(Arc::clone(shared_publisher), 2).await;
+    let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher)).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher)).await;
 
     // Define actors
@@ -66,15 +60,9 @@ pub async fn subscribe_actors(
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(block_persistence_actor),
         // Arc::new(snark_persistence_actor),
-        Arc::new(user_command_persistence_actor_m_0),
-        Arc::new(user_command_persistence_actor_m_1),
-        Arc::new(user_command_persistence_actor_m_2),
-        Arc::new(user_command_persistence_actor_m_3),
-        Arc::new(user_command_persistence_actor_m_4),
+        Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
-        Arc::new(account_summary_persistence_actor_m_0),
-        Arc::new(account_summary_persistence_actor_m_1),
-        Arc::new(account_summary_persistence_actor_m_2),
+        Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
     ];
 

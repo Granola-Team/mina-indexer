@@ -12,14 +12,14 @@ use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::{Client, NoTls};
 
-pub struct AccountSummaryPersistenceActor {
+pub struct AccountsLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub client: Client,
 }
 
-impl AccountSummaryPersistenceActor {
+impl AccountsLogActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
@@ -111,7 +111,7 @@ impl AccountSummaryPersistenceActor {
 }
 
 #[async_trait]
-impl Actor for AccountSummaryPersistenceActor {
+impl Actor for AccountsLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -166,7 +166,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(shared_publisher).await;
+        let actor = AccountsLogActor::new(shared_publisher).await;
 
         // Accounting entry payload
         let accounting_entry = AccountingEntry {
@@ -210,7 +210,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(shared_publisher).await;
+        let actor = AccountsLogActor::new(shared_publisher).await;
 
         // Initial accounting entry
         let accounting_entry = AccountingEntry {
@@ -281,7 +281,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher)).await;
+        let actor = AccountsLogActor::new(Arc::clone(&shared_publisher)).await;
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {

@@ -45,7 +45,7 @@ impl GenesisLedger {
                 state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
                 lhs: vec![AccountingEntry {
                     entry_type: AccountingEntryType::Debit,
-                    account: "MinaGenesisLedger".to_string(),
+                    account: format!("MinaGenesisLedger#{}", account.pk.to_string()),
                     account_type: AccountingEntryAccountType::VirtualAddess,
                     amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
                     timestamp: 1615939200,
