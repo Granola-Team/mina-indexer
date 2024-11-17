@@ -1,4 +1,8 @@
-use super::{genesis_ledger_models::GenesisLedger, payloads::GenesisBlockPayload, shared_publisher::SharedPublisher};
+use super::{
+    genesis_ledger_models::GenesisLedger,
+    payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload},
+    shared_publisher::SharedPublisher,
+};
 use crate::{
     stream::events::{Event, EventType},
     utility::extract_height_and_hash,
@@ -8,9 +12,34 @@ use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::broadcast;
 
 pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
+    let payload = GenesisBlockPayload::new();
     shared_publisher.publish(Event {
         event_type: EventType::GenesisBlock,
-        payload: sonic_rs::to_string(&GenesisBlockPayload::new()).unwrap(),
+        payload: sonic_rs::to_string(&payload).unwrap(),
+    });
+
+    //B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+    shared_publisher.publish(Event {
+        event_type: EventType::DoubleEntryTransaction,
+        payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
+            height: 1,
+            state_hash: payload.state_hash,
+            lhs: vec![AccountingEntry {
+                account: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+                entry_type: AccountingEntryType::Credit,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1000,
+                timestamp: payload.unix_timestamp,
+            }],
+            rhs: vec![AccountingEntry {
+                account: "MagicMinaForBlock0".to_string(),
+                entry_type: AccountingEntryType::Debit,
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: 1000,
+                timestamp: payload.unix_timestamp,
+            }],
+        })
+        .unwrap(),
     });
 
     Ok(())
