@@ -109,6 +109,8 @@ impl Actor for UserCommandCanonicityActor {
                 let mut user_commands = self.user_commands.lock().await;
                 user_commands.retain(|key, _| key.0 > height);
                 drop(user_commands);
+                let mut queue = self.block_canonicity_queue.lock().await;
+                queue.retain(|c| c.height > height);
             }
             _ => return,
         }

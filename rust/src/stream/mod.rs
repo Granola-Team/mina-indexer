@@ -98,7 +98,7 @@ pub async fn subscribe_actors(
                     break;
                 }
                 _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                    println!("Actor statuses:");
+                    println!("Actor reports:");
                     for actor in monitor_actors.clone() {
                         actor.report().await;
                     }
