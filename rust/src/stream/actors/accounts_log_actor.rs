@@ -39,8 +39,7 @@ impl AccountsLogActor {
                         height BIGINT NOT NULL,
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
-                        entry_id BIGSERIAL PRIMARY KEY,
-                        UNIQUE (address, height, state_hash, timestamp, balance_delta)
+                        entry_id BIGSERIAL PRIMARY KEY
                     );",
                     &[],
                 )
@@ -55,9 +54,7 @@ impl AccountsLogActor {
                         address,
                         address_type,
                         SUM(balance_delta) AS balance,
-                        MAX(height) AS latest_height,
-                        (ARRAY_AGG(state_hash ORDER BY height DESC, entry_id DESC))[1] AS latest_state_hash,
-                        (ARRAY_AGG(timestamp ORDER BY height DESC, entry_id DESC))[1] AS latest_timestamp
+                        MAX(height) AS latest_height
                     FROM
                         accounts_log
                     GROUP BY
@@ -130,14 +127,7 @@ impl Actor for AccountsLogActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::DoubleEntryTransaction {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if event_payload.contains("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy") {
-                println!("{:#?}", event_payload);
-            }
-
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
-                // if accounting_entry.contains("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy") {
-                //     println!("{}", accounting_entry.amount_nanomina);
-                // }
                 match self
                     .db_update(
                         accounting_entry,
