@@ -95,6 +95,17 @@ impl BlockchainTree {
         }
     }
 
+    pub fn get_parent_mut(&mut self, node: &Node) -> Option<&mut Node> {
+        if node.height.0 == 0 {
+            return None;
+        }
+        if let Some(parents) = self.tree.get_mut(&Height(node.height.0 - 1)) {
+            parents.iter_mut().find(|entry| entry.state_hash == node.previous_state_hash)
+        } else {
+            None
+        }
+    }
+
     pub fn has_parent(&self, node: &Node) -> bool {
         self.get_parent(node).is_some()
     }

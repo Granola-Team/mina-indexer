@@ -68,6 +68,13 @@ pub struct GenesisBlockPayload {
     pub unix_timestamp: u64,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct BlockConfirmationPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub confirmations: u8,
+}
+
 impl Default for GenesisBlockPayload {
     fn default() -> Self {
         Self::new()

@@ -26,7 +26,7 @@ end
 desc "Test"
 task :test do
   chdir "rust"
-  sh "cargo test"
+  sh "cargo test -- --test-threads=1"
   chdir root_dir
 end
 
