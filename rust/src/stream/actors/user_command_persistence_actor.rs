@@ -14,11 +14,10 @@ pub struct UserCommandPersistenceActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub client: Client,
-    pub modulo_5: u64,
 }
 
 impl UserCommandPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, modulo_5: u64) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
@@ -54,7 +53,6 @@ impl UserCommandPersistenceActor {
                 id: "UserCommandPersistenceActor".to_string(),
                 shared_publisher,
                 client,
-                modulo_5,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -133,16 +131,15 @@ impl Actor for UserCommandPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::UserCommandCanonicityUpdate {
             let event_payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if event_payload.height % 5 == self.modulo_5 {
-                match self.db_upsert(&event_payload).await {
-                    Ok(affected_rows) => {
-                        assert_eq!(affected_rows, 1);
-                        self.shared_publisher.incr_database_insert();
-                        self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    }
-                    Err(e) => {
-                        panic!("{}", e);
-                    }
+
+            match self.db_upsert(&event_payload).await {
+                Ok(affected_rows) => {
+                    assert_eq!(affected_rows, 1);
+                    self.shared_publisher.incr_database_insert();
+                    self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                }
+                Err(e) => {
+                    panic!("{}", e);
                 }
             }
         }
