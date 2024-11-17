@@ -108,8 +108,6 @@ impl Actor for NewAccountActor {
                                         .map(|row| row.get::<_, bool>(0))
                                         .unwrap_or(false);
 
-                                    println!("accountcheck? {:#?}", account_check);
-
                                     if !account_check {
                                         // Publish a NewAccount event
                                         let new_account_event = Event {
