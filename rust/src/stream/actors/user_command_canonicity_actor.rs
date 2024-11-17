@@ -37,9 +37,9 @@ impl UserCommandCanonicityActor {
         let mut queue = self.block_canonicity_queue.lock().await;
 
         while let Some(update) = queue.pop_front() {
-            let snarks = self.user_commands.lock().await;
-            if let Some(entries) = snarks.get(&Height(update.height)) {
-                for entry in entries {
+            let user_commands = self.user_commands.lock().await;
+            if let Some(entries) = user_commands.get(&Height(update.height)) {
+                for entry in entries.iter().filter(|uc| uc.state_hash == update.state_hash) {
                     let payload = UserCommandCanonicityPayload {
                         height: entry.height,
                         state_hash: entry.state_hash.to_string(),
@@ -96,7 +96,8 @@ impl Actor for UserCommandCanonicityActor {
         match event.event_type {
             EventType::BlockCanonicityUpdate => {
                 let mut queue = self.block_canonicity_queue.lock().await;
-                queue.push_back(sonic_rs::from_str(&event.payload).unwrap());
+                let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.payload).unwrap();
+                queue.push_back(payload.clone());
                 drop(queue);
                 self.process_user_commands()
                     .await
@@ -163,11 +164,32 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
         ..Default::default()
     };
 
+    let user_command_payload_2 = UserCommandSummaryPayload {
+        height: 10,
+        state_hash: "other_hash".to_string(),
+        timestamp: 123456,
+        txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
+        status: CommandStatus::Applied,
+        sender: "sender_public_key".to_string(),
+        receiver: "receiver_public_key".to_string(),
+        nonce: 1,
+        fee_nanomina: 10_000_000,
+        amount_nanomina: 500_000_000,
+        ..Default::default()
+    };
+
     // Send a UserCommandSummary event to populate the user_commands map
     actor
         .handle_event(Event {
             event_type: EventType::UserCommandSummary,
             payload: sonic_rs::to_string(&user_command_payload).unwrap(),
+        })
+        .await;
+
+    actor
+        .handle_event(Event {
+            event_type: EventType::UserCommandSummary,
+            payload: sonic_rs::to_string(&user_command_payload_2).unwrap(),
         })
         .await;
 
