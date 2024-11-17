@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::stream::{
-    mainnet_block_models::{CommandStatus, CommandType},
+    mainnet_block_models::CommandStatus,
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
         NewAccountPayload, UserCommandCanonicityPayload,
@@ -83,13 +83,6 @@ impl AccountingActor {
             amount_nanomina: payload.amount_nanomina,
             timestamp: payload.timestamp,
         };
-        let mut fee_payer_entry = AccountingEntry {
-            entry_type: AccountingEntryType::Debit,
-            account: payload.fee_payer.to_string(),
-            account_type: AccountingEntryAccountType::BlockchainAddress,
-            amount_nanomina: payload.fee_nanomina,
-            timestamp: payload.timestamp,
-        };
         let mut receiver_entry = AccountingEntry {
             entry_type: AccountingEntryType::Credit,
             account: payload.receiver.to_string(),
@@ -97,6 +90,31 @@ impl AccountingActor {
             amount_nanomina: payload.amount_nanomina,
             timestamp: payload.timestamp,
         };
+        if !payload.canonical {
+            // Swap debits and credits
+            sender_entry.entry_type = AccountingEntryType::Credit;
+            receiver_entry.entry_type = AccountingEntryType::Debit;
+        }
+        if payload.status == CommandStatus::Applied {
+            // Split into two separate transactions for publishing
+            let txn_1 = DoubleEntryRecordPayload {
+                height: payload.height,
+                state_hash: payload.state_hash.to_string(),
+                lhs: vec![sender_entry],   // Sender entry
+                rhs: vec![receiver_entry], // Receiver entry
+            };
+
+            self.publish_transaction(&txn_1).await;
+        }
+
+        let mut fee_payer_entry = AccountingEntry {
+            entry_type: AccountingEntryType::Debit,
+            account: payload.fee_payer.to_string(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: payload.fee_nanomina,
+            timestamp: payload.timestamp,
+        };
+
         let mut block_reward_pool_entry = AccountingEntry {
             entry_type: AccountingEntryType::Credit,
             account: format!("BlockRewardPool#{}", payload.state_hash),
@@ -106,31 +124,19 @@ impl AccountingActor {
         };
 
         if !payload.canonical {
-            // swap debits and credits
-            sender_entry.entry_type = AccountingEntryType::Credit;
+            // Swap debits and credits
             fee_payer_entry.entry_type = AccountingEntryType::Credit;
-            receiver_entry.entry_type = AccountingEntryType::Debit;
             block_reward_pool_entry.entry_type = AccountingEntryType::Debit;
         }
-        if payload.status == CommandStatus::Failed {
-            // no balance is transferred but fees are paid
-            sender_entry.amount_nanomina = 0;
-            receiver_entry.amount_nanomina = 0;
-        }
-        let (lhs, rhs) = match payload.txn_type {
-            // stake delegation does not affect balance of sender or receiver from accounting perspective
-            CommandType::StakeDelegation => (vec![fee_payer_entry], vec![block_reward_pool_entry]),
-            CommandType::Payment => (vec![sender_entry, fee_payer_entry], vec![receiver_entry, block_reward_pool_entry]),
-        };
 
-        let double_entry_record = DoubleEntryRecordPayload {
+        let txn_2 = DoubleEntryRecordPayload {
             height: payload.height,
             state_hash: payload.state_hash.to_string(),
-            lhs,
-            rhs,
+            lhs: vec![fee_payer_entry],
+            rhs: vec![block_reward_pool_entry],
         };
 
-        self.publish_transaction(&double_entry_record).await;
+        self.publish_transaction(&txn_2).await;
     }
 }
 
@@ -236,26 +242,36 @@ mod accounting_actor_tests {
         };
 
         actor.process_user_command(&payload).await;
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
+        // Verify the first published transaction (fee payer to block reward pool)
+        let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event_1.is_ok(), "Expected the first DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event_1 {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
-            assert_eq!(published_payload.lhs.len(), 2);
-            assert_eq!(published_payload.rhs.len(), 2);
 
+            // Verify the fee transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            // Debit: Fee payer
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
-            assert_eq!(published_payload.lhs[0].account, payload.sender);
-            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.rhs[0].account, payload.receiver);
+            assert_eq!(published_payload.lhs[0].account, payload.fee_payer);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.fee_nanomina);
 
-            // no money sent but fee still paid
-            assert_eq!(published_payload.rhs[0].amount_nanomina, 0);
-            assert_eq!(published_payload.lhs[0].amount_nanomina, 0);
-            assert_eq!(published_payload.rhs[1].amount_nanomina, 1_000_000);
-            assert_eq!(published_payload.lhs[1].amount_nanomina, 1_000_000);
+            // Credit: Block reward pool
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.fee_nanomina);
         }
+
+        // Verify that no balance transfer transaction is published for a failed status
+        let published_event_2 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(
+            published_event_2.is_err(),
+            "No balance transfer transaction should be published for a failed status."
+        );
 
         assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
     }
@@ -281,22 +297,50 @@ mod accounting_actor_tests {
         };
 
         actor.process_user_command(&payload).await;
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
+        // Verify the first published transaction (sender to receiver)
+        let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event_1.is_ok(), "Expected the first DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event_1 {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
-            assert_eq!(published_payload.lhs.len(), 2);
-            assert_eq!(published_payload.rhs.len(), 2);
+
+            // Verify the balance transfer transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
 
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.lhs[0].account, payload.sender);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.amount_nanomina);
+
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.receiver);
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.amount_nanomina);
         }
 
-        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+        // Verify the second published transaction (fee payer to block reward pool)
+        let published_event_2 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event_2.is_ok(), "Expected the second DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event_2 {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+
+            // Verify the fee transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, payload.fee_payer);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.fee_nanomina);
+
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.fee_nanomina);
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
@@ -316,19 +360,58 @@ mod accounting_actor_tests {
             fee_nanomina: 1_000_000,
             amount_nanomina: 100_000_000,
             canonical: false,
-            was_canonical: false,
+            was_canonical: true,
         };
 
-        actor
-            .handle_event(Event {
-                event_type: EventType::UserCommandCanonicityUpdate,
-                payload: sonic_rs::to_string(&payload).unwrap(),
-            })
-            .await;
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_err(), "Did not expected a DoubleEntryTransaction event to be published.");
+        actor.process_user_command(&payload).await;
 
-        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 0);
+        // Verify the first published transaction (receiver to sender due to non-canonical status)
+        let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event_1.is_ok(), "Expected the first DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event_1 {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+
+            // Verify the reversed balance transfer transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            // Credit: Receiver
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, payload.sender);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.amount_nanomina);
+
+            // Debit: Sender
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, payload.receiver);
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.amount_nanomina);
+        }
+
+        // Verify the second published transaction (block reward pool to fee payer due to non-canonical status)
+        let published_event_2 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event_2.is_ok(), "Expected the second DoubleEntryTransaction event to be published.");
+
+        if let Ok(Ok(event)) = published_event_2 {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+
+            // Verify the reversed fee transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            // Debit: Block reward pool
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.fee_nanomina);
+
+            // Credit: Fee payer
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, payload.fee_payer);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.fee_nanomina);
+        }
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 2);
     }
 
     #[tokio::test]

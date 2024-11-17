@@ -87,7 +87,7 @@ impl AccountsLogActor {
             VALUES ($1, $2, $3, $4, $5, $6);
         "#;
 
-        let amount: i64 = match payload.entry_type {
+        let balance_delta: i64 = match payload.entry_type {
             AccountingEntryType::Credit => payload.amount_nanomina as i64,
             AccountingEntryType::Debit => -(payload.amount_nanomina as i64),
         };
@@ -96,7 +96,14 @@ impl AccountsLogActor {
             .client
             .execute(
                 upsert_query,
-                &[&payload.account, &payload.account_type.to_string(), &amount, height, &state_hash, timestamp],
+                &[
+                    &payload.account,
+                    &payload.account_type.to_string(),
+                    &balance_delta,
+                    height,
+                    &state_hash,
+                    timestamp,
+                ],
             )
             .await
         {
@@ -123,7 +130,14 @@ impl Actor for AccountsLogActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::DoubleEntryTransaction {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            if event_payload.contains("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy") {
+                println!("{:#?}", event_payload);
+            }
+
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
+                // if accounting_entry.contains("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy") {
+                //     println!("{}", accounting_entry.amount_nanomina);
+                // }
                 match self
                     .db_update(
                         accounting_entry,
@@ -153,7 +167,7 @@ impl Actor for AccountsLogActor {
 }
 
 #[cfg(test)]
-mod account_summary_persistence_actor_tests {
+mod accounts_log_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
@@ -318,6 +332,8 @@ mod account_summary_persistence_actor_tests {
                 .await
                 .expect("Failed to query database");
             assert!(!rows.is_empty(), "No records found for account: {}", account);
+
+            println!("{:#?}", rows);
 
             for row in rows {
                 // Validate that records were inserted as expected

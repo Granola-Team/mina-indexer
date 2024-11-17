@@ -214,6 +214,10 @@ impl DoubleEntryRecordPayload {
             self.rhs.iter().map(|e| e.amount_nanomina).sum::<u64>()
         )
     }
+
+    pub fn contains(&self, account: &str) -> bool {
+        self.lhs.iter().chain(self.rhs.iter()).filter(|ae| ae.account == account).count() > 0
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -255,4 +259,10 @@ pub struct AccountingEntry {
     pub account_type: AccountingEntryAccountType,
     pub amount_nanomina: u64,
     pub timestamp: u64,
+}
+
+impl AccountingEntry {
+    pub fn contains(&self, account: &str) -> bool {
+        self.account == account
+    }
 }
