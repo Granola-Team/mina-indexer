@@ -89,7 +89,7 @@ impl Actor for UserCommandCanonicityActor {
         self.print_report("User Commands HashMap", user_commands.len());
         drop(user_commands);
         let canonicity = self.block_canonicity_queue.lock().await;
-        self.print_report("Block Canonicity Queue", canonicity.len());
+        self.print_report("Block Canonicity VecDeque", canonicity.len());
     }
 
     async fn handle_event(&self, event: Event) {

@@ -169,10 +169,10 @@ impl Actor for BlockSummaryPersistenceActor {
 
     async fn report(&self) {
         let tree = self.blockchain_tree.lock().await;
-        self.print_report("Blockchain Tree", tree.size());
+        self.print_report("Blockchain BTreeMap", tree.size());
         drop(tree);
         let canonicity = self.block_canonicity_queue.lock().await;
-        self.print_report("Block Canonicity Queue", canonicity.len());
+        self.print_report("Block Canonicity VecDeque", canonicity.len());
     }
 
     async fn handle_event(&self, event: Event) {

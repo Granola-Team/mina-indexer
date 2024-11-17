@@ -80,7 +80,7 @@ impl Actor for InternalCommandCanonicityActor {
         self.print_report("Internal Commands HashMap", internal_commands.len());
         drop(internal_commands);
         let canonicity = self.block_canonicity_queue.lock().await;
-        self.print_report("Block Canonicity Queue", canonicity.len());
+        self.print_report("Block Canonicity VecDeque", canonicity.len());
     }
 
     async fn handle_event(&self, event: Event) {

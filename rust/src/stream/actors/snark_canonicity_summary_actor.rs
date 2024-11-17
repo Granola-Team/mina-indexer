@@ -79,7 +79,7 @@ impl Actor for SnarkCanonicitySummaryActor {
         self.print_report("Internal Commands HashMap", snarks_map.len());
         drop(snarks_map);
         let canonicity = self.block_canonicity_queue.lock().await;
-        self.print_report("Block Canonicity Queue", canonicity.len());
+        self.print_report("Block Canonicity VecDeque", canonicity.len());
     }
 
     async fn handle_event(&self, event: Event) {

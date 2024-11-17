@@ -92,7 +92,7 @@ impl Actor for BlockCanonicityActor {
 
     async fn report(&self) {
         let tree = self.blockchain_tree.lock().await;
-        self.print_report("Blockchain Tree", tree.size());
+        self.print_report("Blockchain BTreeMap", tree.size());
     }
 
     async fn handle_event(&self, event: Event) {
