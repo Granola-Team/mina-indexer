@@ -16,12 +16,11 @@ pub struct AccountSummaryPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub modulo_3: u64,
     pub client: Client,
 }
 
 impl AccountSummaryPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, modulo_3: u64) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
@@ -41,7 +40,7 @@ impl AccountSummaryPersistenceActor {
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
                         entry_id BIGSERIAL PRIMARY KEY,
-                        UNIQUE (address, height, state_hash, timestamp)
+                        UNIQUE (address, height, state_hash, timestamp, balance_delta)
                     );",
                     &[],
                 )
@@ -49,11 +48,32 @@ impl AccountSummaryPersistenceActor {
             {
                 println!("Unable to create accounts_log table {:?}", e);
             }
+            if let Err(e) = client
+                .execute(
+                    "CREATE OR REPLACE VIEW account_summary AS
+                    SELECT
+                        address,
+                        address_type,
+                        SUM(balance_delta) AS balance,
+                        MAX(height) AS latest_height,
+                        (ARRAY_AGG(state_hash ORDER BY height DESC, entry_id DESC))[1] AS latest_state_hash,
+                        (ARRAY_AGG(timestamp ORDER BY height DESC, entry_id DESC))[1] AS latest_timestamp
+                    FROM
+                        accounts_log
+                    GROUP BY
+                        address, address_type
+                    ORDER BY
+                        latest_height DESC;",
+                    &[],
+                )
+                .await
+            {
+                println!("Unable to create account_summary table {:?}", e);
+            }
             Self {
                 id: "AccountSummaryPersistenceActor".to_string(),
                 shared_publisher,
                 client,
-                modulo_3,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -64,11 +84,7 @@ impl AccountSummaryPersistenceActor {
     async fn db_update(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
         let upsert_query = r#"
             INSERT INTO accounts_log (address, address_type, balance_delta, height, state_hash, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT (address, height, state_hash, timestamp)
-            DO UPDATE SET
-                address_type = EXCLUDED.address_type,
-                balance_delta = EXCLUDED.balance_delta;
+            VALUES ($1, $2, $3, $4, $5, $6);
         "#;
 
         let amount: i64 = match payload.entry_type {
@@ -107,25 +123,23 @@ impl Actor for AccountSummaryPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::DoubleEntryTransaction {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if event_payload.height % 3 == self.modulo_3 {
-                for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
-                    match self
-                        .db_update(
-                            accounting_entry,
-                            &(event_payload.height as i64),
-                            &event_payload.state_hash,
-                            &(accounting_entry.timestamp as i64),
-                        )
-                        .await
-                    {
-                        Ok(affected_rows) => {
-                            assert_eq!(affected_rows, 1);
-                            self.shared_publisher.incr_database_insert();
-                            self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                        }
-                        Err(e) => {
-                            panic!("{:?}", e);
-                        }
+            for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
+                match self
+                    .db_update(
+                        accounting_entry,
+                        &(event_payload.height as i64),
+                        &event_payload.state_hash,
+                        &(accounting_entry.timestamp as i64),
+                    )
+                    .await
+                {
+                    Ok(affected_rows) => {
+                        assert_eq!(affected_rows, 1);
+                        self.shared_publisher.incr_database_insert();
+                        self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    Err(e) => {
+                        panic!("{:?}", e);
                     }
                 }
             }
@@ -152,7 +166,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(shared_publisher, 0).await;
+        let actor = AccountSummaryPersistenceActor::new(shared_publisher).await;
 
         // Accounting entry payload
         let accounting_entry = AccountingEntry {
@@ -196,7 +210,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(shared_publisher, 0).await;
+        let actor = AccountSummaryPersistenceActor::new(shared_publisher).await;
 
         // Initial accounting entry
         let accounting_entry = AccountingEntry {
@@ -267,7 +281,7 @@ mod account_summary_persistence_actor_tests {
     // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher), 0).await;
+        let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher)).await;
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {
