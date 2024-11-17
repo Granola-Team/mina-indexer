@@ -106,12 +106,11 @@ impl Actor for BlockCanonicityActor {
                 last_vrf_output: block_payload.last_vrf_output,
                 ..Default::default()
             };
-            if next_node.height.0 == 1 {
+            if blockchain_tree.is_empty() {
                 blockchain_tree.set_root(next_node.clone()).unwrap();
                 self.publish_canonical_update(next_node, true, false);
                 return;
-            }
-            if blockchain_tree.has_parent(&next_node) {
+            } else if blockchain_tree.has_parent(&next_node) {
                 let (height, current_best_block) = blockchain_tree.get_best_tip().unwrap();
                 blockchain_tree.add_node(next_node.clone()).unwrap();
                 let (_, next_best_block) = blockchain_tree.get_best_tip().unwrap();
