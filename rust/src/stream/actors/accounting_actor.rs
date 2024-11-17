@@ -148,8 +148,9 @@ impl Actor for AccountingActor {
         match event.event_type {
             EventType::NewAccount => {
                 let payload: NewAccountPayload = sonic_rs::from_str(&event.payload).unwrap();
-                if payload.height == 0 {
+                if payload.height < 2 {
                     // genesis ledger accounts pay no account creation fees
+                    // magic mina receiver in block 1 is also no subject to account creation fee
                     return;
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
