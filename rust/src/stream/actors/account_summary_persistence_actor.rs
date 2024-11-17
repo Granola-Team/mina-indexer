@@ -40,30 +40,9 @@ impl AccountSummaryPersistenceActor {
                         height BIGINT NOT NULL,
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
-                        PRIMARY KEY (address, height, state_hash, timestamp)
+                        entry_id BIGSERIAL PRIMARY KEY,
+                        UNIQUE (address, height, state_hash, timestamp)
                     );",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create accounts_log table {:?}", e);
-            }
-            if let Err(e) = client
-                .execute(
-                    "CREATE OR REPLACE VIEW account_balance_summary AS
-                    SELECT
-                        a.address,
-                        a.address_type,
-                        SUM(a.balance_delta) AS total_balance,
-                        MAX(a.height) AS latest_height,
-                        (SELECT state_hash FROM accounts_log WHERE address = a.address AND height = MAX(a.height) ORDER BY timestamp DESC LIMIT 1) AS latest_state_hash,
-                        (SELECT timestamp FROM accounts_log WHERE address = a.address AND height = MAX(a.height) ORDER BY timestamp DESC LIMIT 1) AS latest_timestamp
-                    FROM
-                        accounts_log a
-                    GROUP BY
-                        a.address, a.address_type
-                    ORDER BY
-                        a.address;",
                     &[],
                 )
                 .await
@@ -87,7 +66,9 @@ impl AccountSummaryPersistenceActor {
             INSERT INTO accounts_log (address, address_type, balance_delta, height, state_hash, timestamp)
             VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (address, height, state_hash, timestamp)
-            DO UPDATE SET balance_delta = $3;
+            DO UPDATE SET
+                address_type = EXCLUDED.address_type,
+                balance_delta = EXCLUDED.balance_delta;
         "#;
 
         let amount: i64 = match payload.entry_type {
@@ -156,6 +137,7 @@ impl Actor for AccountSummaryPersistenceActor {
         self.shared_publisher.publish(event);
     }
 }
+
 #[cfg(test)]
 mod account_summary_persistence_actor_tests {
     use super::*;
@@ -163,9 +145,11 @@ mod account_summary_persistence_actor_tests {
         events::{Event, EventType},
         payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload},
     };
+    // use serial_test::serial;
     use std::sync::Arc;
 
     #[tokio::test]
+    // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let actor = AccountSummaryPersistenceActor::new(shared_publisher, 0).await;
@@ -209,6 +193,7 @@ mod account_summary_persistence_actor_tests {
     }
 
     #[tokio::test]
+    // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let actor = AccountSummaryPersistenceActor::new(shared_publisher, 0).await;
@@ -279,6 +264,7 @@ mod account_summary_persistence_actor_tests {
     }
 
     #[tokio::test]
+    // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher), 0).await;
@@ -336,4 +322,149 @@ mod account_summary_persistence_actor_tests {
             }
         }
     }
+
+    // #[tokio::test]
+    // #[serial]
+    // async fn test_account_balance_log() -> anyhow::Result<()> {
+    //     use crate::stream::{
+    //         events::{Event, EventType},
+    //         payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload},
+    //     };
+
+    //     let shared_publisher = Arc::new(SharedPublisher::new(100));
+    //     let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher), 0).await;
+
+    //     // Define a series of events with balanced lhs/rhs entries
+    //     let events = vec![
+    //         // Different heights
+    //         Event {
+    //             event_type: EventType::DoubleEntryTransaction,
+    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
+    //                 height: 10,
+    //                 state_hash: "hash_1".to_string(),
+    //                 lhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Debit,
+    //                     account: "address_1".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 500,
+    //                     timestamp: 123456789,
+    //                 }],
+    //                 rhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Credit,
+    //                     account: "address_2".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 500,
+    //                     timestamp: 123456789,
+    //                 }],
+    //             })?,
+    //         },
+    //         Event {
+    //             event_type: EventType::DoubleEntryTransaction,
+    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
+    //                 height: 20,
+    //                 state_hash: "hash_2".to_string(),
+    //                 lhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Debit,
+    //                     account: "address_1".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 300,
+    //                     timestamp: 123456790,
+    //                 }],
+    //                 rhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Credit,
+    //                     account: "address_2".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 300,
+    //                     timestamp: 123456790,
+    //                 }],
+    //             })?,
+    //         },
+    //         // Same height, same state_hash, same timestamp
+    //         Event {
+    //             event_type: EventType::DoubleEntryTransaction,
+    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
+    //                 height: 10,
+    //                 state_hash: "hash_1".to_string(),
+    //                 lhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Debit,
+    //                     account: "address_1".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 200,
+    //                     timestamp: 123456789,
+    //                 }],
+    //                 rhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Credit,
+    //                     account: "address_2".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 200,
+    //                     timestamp: 123456789,
+    //                 }],
+    //             })?,
+    //         },
+    //         // Same height, different state_hash
+    //         Event {
+    //             event_type: EventType::DoubleEntryTransaction,
+    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
+    //                 height: 10,
+    //                 state_hash: "hash_3".to_string(),
+    //                 lhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Debit,
+    //                     account: "address_1".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 100,
+    //                     timestamp: 123456791,
+    //                 }],
+    //                 rhs: vec![AccountingEntry {
+    //                     entry_type: AccountingEntryType::Credit,
+    //                     account: "address_2".to_string(),
+    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
+    //                     amount_nanomina: 100,
+    //                     timestamp: 123456791,
+    //                 }],
+    //             })?,
+    //         },
+    //     ];
+
+    //     // Process each event
+    //     for event in events {
+    //         actor.handle_event(event).await;
+    //     }
+
+    //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    //     // Query the accounts_log table to verify entries
+    //     let log_rows = actor
+    //         .client
+    //         .query("SELECT * FROM accounts_log ORDER BY entry_id", &[])
+    //         .await
+    //         .expect("Failed to query accounts_log table");
+
+    //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+    //     // Assert that the number of log entries matches the expected count
+    //     assert_eq!(log_rows.len(), 8, "Unexpected number of log entries in accounts_log");
+
+    //     // Verify individual log entries
+    //     let expected_logs = vec![
+    //         ("address_1", "BlockchainAddress", -500, 10, "hash_1", 123456789),
+    //         ("address_2", "BlockchainAddress", 500, 10, "hash_1", 123456789),
+    //         ("address_1", "BlockchainAddress", -300, 20, "hash_2", 123456790),
+    //         ("address_2", "BlockchainAddress", 300, 20, "hash_2", 123456790),
+    //         ("address_1", "BlockchainAddress", -200, 10, "hash_1", 123456789),
+    //         ("address_2", "BlockchainAddress", 200, 10, "hash_1", 123456789),
+    //         ("address_1", "BlockchainAddress", -100, 10, "hash_3", 123456791),
+    //         ("address_2", "BlockchainAddress", 100, 10, "hash_3", 123456791),
+    //     ];
+
+    //     for (i, row) in log_rows.iter().enumerate() {
+    //         assert_eq!(row.get::<_, String>("address"), expected_logs[i].0);
+    //         assert_eq!(row.get::<_, String>("address_type"), expected_logs[i].1);
+    //         assert_eq!(row.get::<_, i64>("balance_delta"), expected_logs[i].2);
+    //         assert_eq!(row.get::<_, i64>("height"), expected_logs[i].3);
+    //         assert_eq!(row.get::<_, String>("state_hash"), expected_logs[i].4);
+    //         assert_eq!(row.get::<_, i64>("timestamp"), expected_logs[i].5);
+    //     }
+
+    //     Ok(())
+    // }
 }
