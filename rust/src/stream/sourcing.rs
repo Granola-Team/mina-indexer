@@ -63,6 +63,24 @@ pub fn publish_genesis_ledger_double_entries(shared_publisher: &Arc<SharedPublis
     Ok(())
 }
 
+pub fn publish_exempt_accounts(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
+    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
+
+    // Ensure the file exists before testing
+    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
+
+    let genesis_ledger: GenesisLedger = sonic_rs::from_str(&file_content)?;
+
+    for account in genesis_ledger.get_accounts() {
+        shared_publisher.publish(Event {
+            event_type: EventType::PreExistingAccount,
+            payload: account,
+        });
+    }
+
+    Ok(())
+}
+
 pub async fn publish_block_dir_paths(
     blocks_dir: PathBuf,
     shared_publisher: &Arc<SharedPublisher>,

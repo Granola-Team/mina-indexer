@@ -60,6 +60,10 @@ impl GenesisLedger {
             })
             .collect::<Vec<DoubleEntryRecordPayload>>()
     }
+
+    pub fn get_accounts(&self) -> Vec<String> {
+        self.ledger.accounts.iter().map(|a| a.pk.to_string()).collect()
+    }
 }
 
 #[cfg(test)]

@@ -43,6 +43,27 @@ pub struct MainnetBlockPayload {
     pub fee_transfers: Vec<FeeTransfer>,
 }
 
+impl MainnetBlockPayload {
+    pub fn accounts(&self) -> Vec<String> {
+        let snark_accounts: Vec<String> = self.snark_work.iter().map(|s| s.prover.to_string()).collect();
+        let fee_transfer_accounts: Vec<String> = self.fee_transfers.iter().map(|ft| ft.recipient.to_string()).collect();
+        let user_command_sender_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.sender.to_string()).collect();
+        let user_command_receiver_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.receiver.to_string()).collect();
+        let user_command_fee_payer_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.fee_payer.to_string()).collect();
+        [
+            snark_accounts,
+            fee_transfer_accounts,
+            user_command_sender_accounts,
+            user_command_receiver_accounts,
+            user_command_fee_payer_accounts,
+            vec![self.coinbase_receiver.to_string()],
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NewBlockPayload {
     pub height: u64,
@@ -68,7 +89,7 @@ pub struct GenesisBlockPayload {
     pub unix_timestamp: u64,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct BlockConfirmationPayload {
     pub height: u64,
     pub state_hash: String,
@@ -224,6 +245,10 @@ impl DoubleEntryRecordPayload {
 
     pub fn contains(&self, account: &str) -> bool {
         self.lhs.iter().chain(self.rhs.iter()).filter(|ae| ae.account == account).count() > 0
+    }
+
+    pub fn accounts(&self) -> Vec<String> {
+        self.lhs.iter().chain(self.rhs.iter()).map(|a| a.account.to_string()).collect()
     }
 }
 

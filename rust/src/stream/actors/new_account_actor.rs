@@ -4,25 +4,25 @@ use super::super::{
     Actor,
 };
 use crate::{
+    blockchain_tree::Height,
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{AccountingEntryAccountType, BlockConfirmationPayload, DoubleEntryRecordPayload, NewAccountPayload},
+    stream::payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
 };
-use anyhow::Result;
 use async_trait::async_trait;
+use futures::lock::Mutex;
 use std::{
-    collections::VecDeque,
+    collections::HashMap,
     sync::{atomic::AtomicUsize, Arc},
 };
-use tokio::sync::Mutex;
-use tokio_postgres::{error::SqlState, Client, NoTls};
+use tokio_postgres::{Client, NoTls};
 
 pub struct NewAccountActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
+    pub events_published: AtomicUsize,
     pub database_inserts: AtomicUsize,
+    pub mainnet_blocks: Arc<Mutex<HashMap<Height, Vec<MainnetBlockPayload>>>>,
     pub client: Client,
-    pub deep_canonical_block: Mutex<Option<BlockConfirmationPayload>>,
-    pub transaction_queue: Mutex<VecDeque<DoubleEntryRecordPayload>>,
 }
 
 impl NewAccountActor {
@@ -33,99 +33,34 @@ impl NewAccountActor {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client.execute("DROP TABLE IF EXISTS account_tracking;", &[]).await {
-                println!("Unable to drop account_tracking table {:?}", e);
+            if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
+                println!("Unable to drop user_commands table {:?}", e);
             }
             if let Err(e) = client
                 .execute(
-                    "CREATE TABLE IF NOT EXISTS account_tracking (
-                        account TEXT PRIMARY KEY,
-                        height BIGINT NOT NULL
-                    );",
+                    "CREATE TABLE IF NOT EXISTS discovered_accounts (
+                        account TEXT PRIMARY KEY NOT NULL
+                    );
+                    ",
                     &[],
                 )
                 .await
             {
-                println!("Unable to create account_tracking table {:?}", e);
+                println!("Unable to create discovered_accounts table {:?}", e);
             }
             Self {
                 id: "NewAccountActor".to_string(),
                 shared_publisher,
                 client,
+                mainnet_blocks: Arc::new(Mutex::new(HashMap::new())),
+                events_published: AtomicUsize::new(0),
                 database_inserts: AtomicUsize::new(0),
-                deep_canonical_block: Mutex::new(None),
-                transaction_queue: Mutex::new(VecDeque::new()),
             }
         } else {
             panic!("Unable to establish connection to database")
         }
     }
-
-    async fn insert_account(&self, account: &str, height: i64) -> Result<u64, &'static str> {
-        let insert_query = r#"
-            INSERT INTO account_tracking (account, height)
-            VALUES ($1, $2)
-        "#;
-
-        match self.client.execute(insert_query, &[&account, &height]).await {
-            Ok(affected_rows) => Ok(affected_rows),
-            Err(e) => {
-                if let Some(db_error) = e.as_db_error() {
-                    if db_error.code() == &SqlState::UNIQUE_VIOLATION {
-                        return Err("duplicate key violation");
-                    }
-                }
-                println!("Database error: {:?}", e);
-                Err("unable to insert into account_tracking table")
-            }
-        }
-    }
-
-    async fn process_transaction(&self, transaction: &DoubleEntryRecordPayload) {
-        let block = self.deep_canonical_block.lock().await;
-        if let Some(confirmed_block) = &*block {
-            if transaction.height == confirmed_block.height && transaction.state_hash == confirmed_block.state_hash {
-                for accounting_entry in transaction.lhs.iter().chain(transaction.rhs.iter()) {
-                    let account = &accounting_entry.account;
-                    if accounting_entry.account_type == AccountingEntryAccountType::BlockchainAddress {
-                        match self.insert_account(account, transaction.height as i64).await {
-                            Ok(affected_rows) => {
-                                if affected_rows == 1 {
-                                    // Publish NewAccount event
-                                    let new_account_event = Event {
-                                        event_type: EventType::NewAccount,
-                                        payload: sonic_rs::to_string(&NewAccountPayload {
-                                            height: transaction.height,
-                                            state_hash: transaction.state_hash.to_string(),
-                                            timestamp: accounting_entry.timestamp,
-                                            account: account.to_string(),
-                                        })
-                                        .unwrap(),
-                                    };
-                                    self.publish(new_account_event);
-                                    self.shared_publisher.incr_database_insert();
-                                }
-                            }
-                            Err(e) => {
-                                if e != "duplicate key violation" {
-                                    eprintln!("Error inserting account: {:?}", e);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    async fn process_queue(&self) {
-        let mut queue = self.transaction_queue.lock().await;
-        while let Some(transaction) = queue.pop_front() {
-            self.process_transaction(&transaction).await;
-        }
-    }
 }
-
 #[async_trait]
 impl Actor for NewAccountActor {
     fn id(&self) -> String {
@@ -133,27 +68,73 @@ impl Actor for NewAccountActor {
     }
 
     fn actor_outputs(&self) -> &AtomicUsize {
-        &self.database_inserts
+        &self.events_published
     }
 
     async fn handle_event(&self, event: Event) {
         match event.event_type {
-            EventType::BlockConfirmation => {
-                let payload: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).unwrap();
-
-                if payload.confirmations >= 10 {
-                    let mut block = self.deep_canonical_block.lock().await;
-                    *block = Some(payload);
-                    drop(block);
-
-                    // Process the transaction queue
-                    self.process_queue().await;
+            EventType::PreExistingAccount => {
+                let account: String = event.payload.to_string();
+                // Insert the account into the `discovered_accounts` table
+                let insert_query = "INSERT INTO discovered_accounts (account) VALUES ($1) ON CONFLICT DO NOTHING";
+                if let Err(e) = self.client.execute(insert_query, &[&account]).await {
+                    eprintln!("Failed to insert account {} into database: {:?}", account, e);
+                } else {
+                    self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }
             }
-            EventType::DoubleEntryTransaction => {
-                let payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let mut queue = self.transaction_queue.lock().await;
-                queue.push_back(payload);
+            EventType::MainnetBlock => {
+                let block: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let mut mainnet_blocks = self.mainnet_blocks.lock().await;
+                mainnet_blocks.entry(Height(block.height)).or_insert_with(Vec::new).push(block);
+            }
+            EventType::BlockConfirmation => {
+                let block_confirmation: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).unwrap();
+                if block_confirmation.confirmations == 10 {
+                    let mainnet_blocks = self.mainnet_blocks.lock().await;
+
+                    // Look up the blocks at the confirmed height
+                    if let Some(blocks) = mainnet_blocks.get(&Height(block_confirmation.height)) {
+                        for block in blocks {
+                            for account in block.accounts().iter() {
+                                if block.state_hash == block_confirmation.state_hash {
+                                    // Check if the account is already in the database
+                                    let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
+
+                                    let account_check = self
+                                        .client
+                                        .query_one(check_query, &[&account])
+                                        .await
+                                        .map(|row| row.get::<_, bool>(0))
+                                        .unwrap_or(false);
+
+                                    if !account_check {
+                                        // Publish a NewAccount event
+                                        let new_account_event = Event {
+                                            event_type: EventType::NewAccount,
+                                            payload: sonic_rs::to_string(&NewAccountPayload {
+                                                height: block.height,
+                                                state_hash: block.state_hash.clone(),
+                                                timestamp: block.timestamp,
+                                                account: account.clone(),
+                                            })
+                                            .unwrap(),
+                                        };
+                                        self.publish(new_account_event);
+
+                                        // Insert the account into the database
+                                        let insert_query = "INSERT INTO discovered_accounts (account) VALUES ($1)";
+                                        if let Err(e) = self.client.execute(insert_query, &[&account]).await {
+                                            eprintln!("Failed to insert new account into database: {:?}", e);
+                                        } else {
+                                            self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -163,12 +144,6 @@ impl Actor for NewAccountActor {
         self.incr_event_published();
         self.shared_publisher.publish(event);
     }
-
-    async fn report(&self) {
-        let txn_queue = self.transaction_queue.lock().await;
-        self.print_report("Transaction VecDeque", txn_queue.len());
-        drop(txn_queue);
-    }
 }
 
 #[cfg(test)]
@@ -176,103 +151,92 @@ mod new_account_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BlockConfirmationPayload, DoubleEntryRecordPayload, NewAccountPayload},
+        mainnet_block_models::CommandSummary,
+        payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
     };
     use std::sync::Arc;
     use tokio::time::timeout;
 
     async fn setup_actor() -> (Arc<NewAccountActor>, tokio::sync::broadcast::Receiver<Event>) {
-        let shared_publisher = Arc::new(SharedPublisher::new(200));
-        let actor = NewAccountActor::new(Arc::clone(&shared_publisher)).await;
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = Arc::new(NewAccountActor::new(Arc::clone(&shared_publisher)).await);
         let receiver = shared_publisher.subscribe();
-        (Arc::new(actor), receiver)
+        (actor, receiver)
     }
 
     #[tokio::test]
-    async fn test_handle_block_confirmation() {
+    async fn test_preexisting_account_inserted() {
         let (actor, _) = setup_actor().await;
 
-        let payload = BlockConfirmationPayload {
-            height: 1,
-            state_hash: "hash_1".to_string(),
-            confirmations: 10,
-        };
-
+        let account = "B62qtestaccount1".to_string();
         let event = Event {
-            event_type: EventType::BlockConfirmation,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::PreExistingAccount,
+            payload: sonic_rs::to_string(&account).unwrap(),
         };
 
         actor.handle_event(event).await;
 
-        let deep_canonical_block = actor.deep_canonical_block.lock().await;
-        assert!(deep_canonical_block.is_some());
-        assert_eq!(deep_canonical_block.as_ref().unwrap().height, 1);
-        assert_eq!(deep_canonical_block.as_ref().unwrap().state_hash, "hash_1");
+        // Verify the account is inserted in the database
+        let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
+        let account_exists: bool = actor.client.query_one(check_query, &[&account]).await.unwrap().get(0);
+
+        assert!(account_exists, "Pre-existing account should be inserted into the database");
     }
 
     #[tokio::test]
-    async fn test_handle_double_entry_transaction() {
+    async fn test_mainnet_block_handling() {
         let (actor, _) = setup_actor().await;
 
-        let unique_account = "B62qtestaccount1".to_string();
-
-        let payload = DoubleEntryRecordPayload {
+        let block = MainnetBlockPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
-            lhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Debit,
-                account: unique_account.clone(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: 100_000,
-                timestamp: 123456789,
+            user_commands: vec![CommandSummary {
+                sender: "B62qaccount1".to_string(),
+                receiver: "B62qaccount2".to_string(),
+                ..Default::default()
             }],
-            rhs: vec![],
+            timestamp: 1234567890,
+            ..Default::default()
         };
 
         let event = Event {
-            event_type: EventType::DoubleEntryTransaction,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::MainnetBlock,
+            payload: sonic_rs::to_string(&block).unwrap(),
         };
 
         actor.handle_event(event).await;
 
-        let txn_queue = actor.transaction_queue.lock().await;
-        assert_eq!(txn_queue.len(), 1);
-        let queued_txn = txn_queue.front().unwrap();
-        assert_eq!(queued_txn.height, 1);
-        assert_eq!(queued_txn.state_hash, "hash_1");
+        // Verify the block is stored in the mainnet_blocks map
+        let mainnet_blocks = actor.mainnet_blocks.lock().await;
+        let stored_blocks = mainnet_blocks.get(&Height(block.height));
+        assert!(stored_blocks.is_some(), "Mainnet block should be stored in memory");
+        assert_eq!(stored_blocks.unwrap().len(), 1, "Mainnet block should contain one entry");
     }
 
     #[tokio::test]
-    async fn test_handle_event_with_queue_processing() {
+    async fn test_block_confirmation_with_new_accounts() {
         let (actor, mut receiver) = setup_actor().await;
 
-        // Use a unique account for this test
-        let unique_account = "B62qtestaccount2".to_string();
-
-        // Publish a DoubleEntryTransaction event first
-        let transaction_payload = DoubleEntryRecordPayload {
+        let block = MainnetBlockPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
-            lhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Debit,
-                account: unique_account.clone(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: 100_000,
-                timestamp: 123456789,
+            user_commands: vec![CommandSummary {
+                sender: "B62qnewaccount".to_string(),
+                receiver: "B62qnewaccount".to_string(),
+                ..Default::default()
             }],
-            rhs: vec![],
+            timestamp: 1234567890,
+            ..Default::default()
         };
 
-        let transaction_event = Event {
-            event_type: EventType::DoubleEntryTransaction,
-            payload: sonic_rs::to_string(&transaction_payload).unwrap(),
+        // Add the mainnet block
+        let block_event = Event {
+            event_type: EventType::MainnetBlock,
+            payload: sonic_rs::to_string(&block).unwrap(),
         };
+        actor.handle_event(block_event).await;
 
-        actor.handle_event(transaction_event).await;
-
-        // Publish a BlockConfirmation event with 10 confirmations
+        // Confirm the block
         let confirmation_payload = BlockConfirmationPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
@@ -286,94 +250,53 @@ mod new_account_actor_tests {
 
         actor.handle_event(confirmation_event).await;
 
-        // Verify that the NewAccount event is published
-        if let Ok(received_event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
-            let event = received_event.unwrap();
-            assert_eq!(event.event_type, EventType::NewAccount);
+        // Verify a NewAccount event is published
+        if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+            let received_event = event.unwrap();
+            assert_eq!(received_event.event_type, EventType::NewAccount);
 
-            let new_account_payload: NewAccountPayload = sonic_rs::from_str(&event.payload).unwrap();
-            assert_eq!(new_account_payload.height, 1);
-            assert_eq!(new_account_payload.account, unique_account);
+            let new_account_payload: NewAccountPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            assert_eq!(new_account_payload.height, block.height);
+            assert_eq!(new_account_payload.account, "B62qnewaccount".to_string());
         } else {
-            panic!("Did not receive NewAccount event");
+            panic!("Expected NewAccount event not received");
         }
     }
 
     #[tokio::test]
-    async fn test_handle_event_with_non_matching_transaction() {
+    async fn test_block_confirmation_with_existing_account() {
         let (actor, mut receiver) = setup_actor().await;
 
-        let unique_account = "B62qtestaccount3".to_string();
+        let account = "B62qexistingaccount".to_string();
 
-        {
-            let mut deep_canonical_block = actor.deep_canonical_block.lock().await;
-            *deep_canonical_block = Some(BlockConfirmationPayload {
-                height: 1,
-                state_hash: "hash_1".to_string(),
-                confirmations: 10,
-            });
-        }
-
-        let transaction_payload = DoubleEntryRecordPayload {
-            height: 2,
-            state_hash: "hash_2".to_string(),
-            lhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Debit,
-                account: unique_account.clone(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: 100_000,
-                timestamp: 123456789,
-            }],
-            rhs: vec![],
+        // Add the preexisting account to the database
+        let preexisting_event = Event {
+            event_type: EventType::PreExistingAccount,
+            payload: sonic_rs::to_string(&account).unwrap(),
         };
+        actor.handle_event(preexisting_event).await;
 
-        let transaction_event = Event {
-            event_type: EventType::DoubleEntryTransaction,
-            payload: sonic_rs::to_string(&transaction_payload).unwrap(),
-        };
-
-        actor.handle_event(transaction_event).await;
-
-        let received_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(received_event.is_err(), "No NewAccount event should be published for non-matching blocks.");
-    }
-
-    #[tokio::test]
-    async fn test_handle_event_does_not_publish_duplicate_account() {
-        let (actor, mut receiver) = setup_actor().await;
-
-        // Use a unique account for this test
-        let unique_account = "B62qtestaccount3".to_string();
-
-        // Manually insert the account into the database
-        actor
-            .client
-            .execute("INSERT INTO account_tracking (account, height) VALUES ($1, $2)", &[&unique_account, &1_i64])
-            .await
-            .expect("Failed to insert account into the database");
-
-        // Publish a DoubleEntryTransaction event
-        let transaction_payload = DoubleEntryRecordPayload {
+        let block = MainnetBlockPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
-            lhs: vec![AccountingEntry {
-                entry_type: AccountingEntryType::Debit,
-                account: unique_account.clone(),
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: 100_000,
-                timestamp: 123456789,
+            user_commands: vec![CommandSummary {
+                sender: account.clone(),
+                ..Default::default()
             }],
-            rhs: vec![],
+            timestamp: 1234567890,
+            ..Default::default()
         };
 
-        let transaction_event = Event {
-            event_type: EventType::DoubleEntryTransaction,
-            payload: sonic_rs::to_string(&transaction_payload).unwrap(),
+        // Add the mainnet block
+        let block_event = Event {
+            event_type: EventType::MainnetBlock,
+            payload: sonic_rs::to_string(&block).unwrap(),
         };
+        actor.handle_event(block_event).await;
 
-        actor.handle_event(transaction_event).await;
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-        // Publish a BlockConfirmation event with 10 confirmations
+        // Confirm the block
         let confirmation_payload = BlockConfirmationPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
@@ -387,11 +310,21 @@ mod new_account_actor_tests {
 
         actor.handle_event(confirmation_event).await;
 
-        // Verify that no NewAccount event is published
-        let received_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(
-            received_event.is_err(),
-            "No NewAccount event should be published for an already tracked account."
-        );
+        // Filter the events to ensure no NewAccount event is published for the sender
+        let mut received_events = vec![];
+        while let Ok(event) = timeout(std::time::Duration::from_millis(100), receiver.recv()).await {
+            received_events.push(event.unwrap());
+        }
+
+        // Check for NewAccount events and ensure none is published for the sender
+        let new_account_events: Vec<_> = received_events
+            .iter()
+            .filter(|event| {
+                let event_payload: NewAccountPayload = sonic_rs::from_str(&event.payload).unwrap();
+                event_payload.account == account
+            })
+            .collect();
+
+        assert!(new_account_events.is_empty(), "No NewAccount event should be published for existing accounts");
     }
 }

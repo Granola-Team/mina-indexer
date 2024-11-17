@@ -331,7 +331,7 @@ impl Command {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
 pub struct CommandSummary {
     pub memo: String,
     pub fee_payer: String,

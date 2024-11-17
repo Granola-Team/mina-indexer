@@ -21,6 +21,7 @@ pub enum EventType {
     DoubleEntryTransaction,
     NewAccount,
     BlockConfirmation,
+    PreExistingAccount,
 }
 
 #[derive(Debug, Clone, PartialEq)]

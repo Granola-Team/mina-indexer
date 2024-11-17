@@ -5,7 +5,7 @@ use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
     stream::{
         shared_publisher::SharedPublisher,
-        sourcing::{publish_block_dir_paths, publish_genesis_block, publish_genesis_ledger_double_entries},
+        sourcing::{publish_block_dir_paths, publish_exempt_accounts, publish_genesis_block, publish_genesis_ledger_double_entries},
         subscribe_actors,
     },
 };
@@ -32,6 +32,8 @@ async fn main() -> Result<()> {
     // Publish genesis block after a brief delay to allow initialization
     tokio::time::sleep(Duration::from_secs(1)).await;
     publish_genesis_ledger_double_entries(&shared_publisher)?;
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    publish_exempt_accounts(&shared_publisher)?;
     tokio::time::sleep(Duration::from_secs(1)).await;
     publish_genesis_block(&shared_publisher)?;
     let publish_handle = spawn_block_publisher(blocks_dir, Arc::clone(&shared_publisher), shutdown_receiver.resubscribe());
