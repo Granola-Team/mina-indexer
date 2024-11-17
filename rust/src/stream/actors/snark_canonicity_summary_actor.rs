@@ -38,7 +38,7 @@ impl SnarkCanonicitySummaryActor {
         while let Some(update) = queue.pop_front() {
             let snarks = self.snark_map.lock().await;
             if let Some(entries) = snarks.get(&Height(update.height)) {
-                for entry in entries {
+                for entry in entries.iter().filter(|s| s.state_hash == update.state_hash) {
                     let payload = SnarkCanonicitySummaryPayload {
                         canonical: update.canonical,
                         height: entry.height,
@@ -75,9 +75,9 @@ impl Actor for SnarkCanonicitySummaryActor {
     }
 
     async fn report(&self) {
-        let snarks = self.snark_map.lock().await;
-        self.print_report("Internal Commands HashMap", snarks.len());
-        drop(snarks);
+        let snarks_map = self.snark_map.lock().await;
+        self.print_report("Internal Commands HashMap", snarks_map.len());
+        drop(snarks_map);
         let canonicity = self.block_canonicity_queue.lock().await;
         self.print_report("Block Canonicity Queue", canonicity.len());
     }
@@ -134,18 +134,29 @@ async fn test_snark_summary_persistence_actor_processes_snark_summary() -> anyho
         prover: "test_prover".to_string(),
         fee: 0.25,
     };
+    let snark_payload_2 = SnarkWorkSummaryPayload {
+        height: 10,
+        state_hash: "other_hash".to_string(),
+        timestamp: 123456,
+        prover: "test_prover".to_string(),
+        fee: 0.25,
+    };
 
     // Insert the snark work summary payload into the actor's snark map
     {
         let mut snarks = actor.snark_map.lock().await;
         snarks.entry(Height(snark_payload.height)).or_insert_with(Vec::new).push(snark_payload.clone());
+        snarks
+            .entry(Height(snark_payload_2.height))
+            .or_insert_with(Vec::new)
+            .push(snark_payload_2.clone());
     }
 
     // Send a canonical block update to trigger processing
     let canonical_update_payload = BlockCanonicityUpdatePayload {
         height: 10,
         canonical: true,
-        state_hash: "does_not_matter".to_string(),
+        state_hash: "sample_hash".to_string(),
         was_canonical: false,
     };
 
@@ -242,7 +253,7 @@ async fn test_snark_canonicity_summary_actor_defers_processing_until_snark_summa
     let deferred_update_payload = BlockCanonicityUpdatePayload {
         height: 10,
         canonical: true,
-        state_hash: "does_not_matter".to_string(),
+        state_hash: "state_hash1".to_string(),
         was_canonical: false,
     };
     actor
@@ -259,7 +270,7 @@ async fn test_snark_canonicity_summary_actor_defers_processing_until_snark_summa
     // Now add the corresponding SnarkWorkSummaryPayload and verify processing
     let snark_payload = SnarkWorkSummaryPayload {
         height: 10,
-        state_hash: "sample_hash".to_string(),
+        state_hash: "state_hash1".to_string(),
         timestamp: 123456,
         prover: "test_prover".to_string(),
         fee: 0.25,
