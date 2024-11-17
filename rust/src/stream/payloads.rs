@@ -50,7 +50,7 @@ impl MainnetBlockPayload {
         let user_command_sender_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.sender.to_string()).collect();
         let user_command_receiver_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.receiver.to_string()).collect();
         let user_command_fee_payer_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.fee_payer.to_string()).collect();
-        [
+        let accounts: Vec<String> = [
             snark_accounts,
             fee_transfer_accounts,
             user_command_sender_accounts,
@@ -60,7 +60,9 @@ impl MainnetBlockPayload {
         ]
         .into_iter()
         .flatten()
-        .collect()
+        .collect();
+        let unique: HashSet<_> = accounts.into_iter().collect();
+        unique.into_iter().collect()
     }
 }
 
@@ -171,7 +173,7 @@ pub enum InternalCommandType {
     FeeTransfer,
 }
 
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 impl fmt::Display for InternalCommandType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

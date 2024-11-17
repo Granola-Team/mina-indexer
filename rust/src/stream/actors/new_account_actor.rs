@@ -108,6 +108,8 @@ impl Actor for NewAccountActor {
                                         .map(|row| row.get::<_, bool>(0))
                                         .unwrap_or(false);
 
+                                    println!("accountcheck? {:#?}", account_check);
+
                                     if !account_check {
                                         // Publish a NewAccount event
                                         let new_account_event = Event {
@@ -138,6 +140,11 @@ impl Actor for NewAccountActor {
             }
             _ => {}
         }
+    }
+
+    async fn report(&self) {
+        let mainnet_blocks = self.mainnet_blocks.lock().await;
+        self.print_report("Mainnet Blocks HashMap", mainnet_blocks.len());
     }
 
     fn publish(&self, event: Event) {
@@ -171,7 +178,7 @@ mod new_account_actor_tests {
         let account = "B62qtestaccount1".to_string();
         let event = Event {
             event_type: EventType::PreExistingAccount,
-            payload: sonic_rs::to_string(&account).unwrap(),
+            payload: account.to_string(),
         };
 
         actor.handle_event(event).await;
@@ -272,7 +279,7 @@ mod new_account_actor_tests {
         // Add the preexisting account to the database
         let preexisting_event = Event {
             event_type: EventType::PreExistingAccount,
-            payload: sonic_rs::to_string(&account).unwrap(),
+            payload: account.to_string(),
         };
         actor.handle_event(preexisting_event).await;
 
@@ -293,8 +300,6 @@ mod new_account_actor_tests {
             payload: sonic_rs::to_string(&block).unwrap(),
         };
         actor.handle_event(block_event).await;
-
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         // Confirm the block
         let confirmation_payload = BlockConfirmationPayload {
