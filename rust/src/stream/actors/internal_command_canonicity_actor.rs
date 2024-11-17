@@ -37,7 +37,7 @@ impl InternalCommandCanonicityActor {
         while let Some(update) = queue.pop_front() {
             let commands = self.internal_commands.lock().await;
             if let Some(entries) = commands.get(&Height(update.height)) {
-                for entry in entries {
+                for entry in entries.iter().filter(|it| it.state_hash == update.state_hash) {
                     let payload = InternalCommandCanonicityPayload {
                         internal_command_type: entry.internal_command_type.clone(),
                         height: entry.height,
@@ -144,11 +144,27 @@ mod internal_command_canonicity_actor_tests {
             recipient: "recipient_public_key".to_string(),
             source: None,
         };
+        let internal_command_payload_2 = InternalCommandPayload {
+            internal_command_type: InternalCommandType::Coinbase,
+            height: 10,
+            state_hash: "other_hash".to_string(),
+            timestamp: 123456,
+            amount_nanomina: 100_000_000,
+            recipient: "recipient_public_key".to_string(),
+            source: None,
+        };
 
         actor
             .handle_event(Event {
                 event_type: EventType::InternalCommand,
                 payload: sonic_rs::to_string(&internal_command_payload).unwrap(),
+            })
+            .await;
+
+        actor
+            .handle_event(Event {
+                event_type: EventType::InternalCommand,
+                payload: sonic_rs::to_string(&internal_command_payload_2).unwrap(),
             })
             .await;
 
