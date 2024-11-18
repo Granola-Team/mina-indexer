@@ -104,7 +104,7 @@ impl Actor for CanonicalBlockLogActor {
             EventType::TransitionFrontier => {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
                 let mut blocks = self.blocks.lock().await;
-                blocks.retain(|key, _| key > &height.saturating_sub(1000));
+                blocks.retain(|key, _| key > &height);
                 drop(blocks);
             }
             _ => {}

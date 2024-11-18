@@ -109,7 +109,7 @@ impl Actor for CanonicalUserCommandLogActor {
             EventType::TransitionFrontier => {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
                 let mut user_commands = self.user_commands.lock().await;
-                user_commands.retain(|key, _| key.0 > height.saturating_sub(1000));
+                user_commands.retain(|key, _| key.0 > height);
                 drop(user_commands);
                 let mut queue = self.block_canonicity_queue.lock().await;
                 queue.retain(|c| c.height > height);
