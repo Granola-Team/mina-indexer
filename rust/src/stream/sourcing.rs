@@ -85,8 +85,9 @@ pub async fn publish_block_dir_paths(
     blocks_dir: PathBuf,
     shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>,
+    root_node: Option<(u64, String)>, // height and state hash
 ) -> Result<()> {
-    let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir)?
+    let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir.clone())?
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
         .map(|e| e.path())
@@ -102,6 +103,29 @@ pub async fn publish_block_dir_paths(
             other => other,
         }
     });
+
+    if let Some((root_height, root_state_hash)) = root_node {
+        entries = entries
+            .into_iter()
+            .filter(|f| {
+                let (height, _) = extract_height_and_hash(f);
+                height as u64 > root_height
+            })
+            .collect::<Vec<_>>();
+        let root_file: PathBuf = fs::read_dir(blocks_dir)?
+            .filter_map(|entry| entry.ok()) // Filter out invalid entries
+            .map(|entry| entry.path()) // Map to the entry's path
+            .find(|path| path.is_file() && extract_height_and_hash(path) == (root_height as u32, &root_state_hash))
+            .expect("Expected to find a root file");
+
+        println!("root file: {}", root_file.to_str().unwrap());
+
+        shared_publisher.publish(Event {
+            event_type: EventType::PrecomputedBlockPath,
+            payload: root_file.to_str().unwrap().to_string(),
+        });
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
@@ -130,4 +154,85 @@ pub async fn publish_block_dir_paths(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod sourcing_tests {
+    use super::*;
+    use crate::stream::events::EventType;
+    use tokio::sync::broadcast;
+
+    fn setup_shared_publisher() -> Arc<SharedPublisher> {
+        Arc::new(SharedPublisher::new(100_000))
+    }
+
+    #[tokio::test]
+    async fn test_publish_genesis_block() {
+        let shared_publisher = setup_shared_publisher();
+        let mut receiver = shared_publisher.subscribe();
+
+        publish_genesis_block(&shared_publisher).unwrap();
+
+        let genesis_block_event = receiver.recv().await.unwrap();
+        assert_eq!(genesis_block_event.event_type, EventType::GenesisBlock);
+
+        let transaction_event = receiver.recv().await.unwrap();
+        assert_eq!(transaction_event.event_type, EventType::DoubleEntryTransaction);
+    }
+
+    #[tokio::test]
+    async fn test_publish_genesis_ledger_double_entries() {
+        let shared_publisher = setup_shared_publisher();
+        let mut receiver = shared_publisher.subscribe();
+
+        publish_genesis_ledger_double_entries(&shared_publisher).unwrap();
+
+        let event = receiver.recv().await.unwrap();
+        assert_eq!(event.event_type, EventType::DoubleEntryTransaction);
+    }
+
+    #[tokio::test]
+    async fn test_publish_exempt_accounts() {
+        let shared_publisher = setup_shared_publisher();
+        let mut receiver = shared_publisher.subscribe();
+
+        publish_exempt_accounts(&shared_publisher).unwrap();
+
+        let event = receiver.recv().await.unwrap();
+        assert_eq!(event.event_type, EventType::PreExistingAccount);
+        assert_eq!(event.payload, "B62qmqMrgPshhHKLJ7DqWn1KeizEgga5MuGmWb2bXajUnyivfeMW6JE");
+    }
+
+    #[tokio::test]
+    async fn test_publish_block_dir_paths() {
+        // Create a mock blocks directory
+        let blocks_dir = "./src/stream/test_data/10_mainnet_blocks/";
+
+        let shared_publisher = setup_shared_publisher();
+        let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
+
+        let mut receiver = shared_publisher.subscribe();
+
+        // Publish block directory paths
+        publish_block_dir_paths(
+            PathBuf::from(blocks_dir),
+            &shared_publisher,
+            shutdown_receiver,
+            Some((5, "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY".to_string())),
+        )
+        .await
+        .unwrap();
+
+        // Verify the root block file event is published
+        if let Ok(event) = tokio::time::timeout(std::time::Duration::from_secs(2), receiver.recv()).await {
+            let event = event.unwrap();
+            assert_eq!(event.event_type, EventType::PrecomputedBlockPath);
+            assert!(event.payload.contains("mainnet-5-3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY.json"));
+        } else {
+            panic!("Did not receive the expected PrecomputedBlockPath event for the root block.");
+        }
+
+        // Clean up by sending the shutdown signal
+        let _ = shutdown_sender.send(());
+    }
 }
