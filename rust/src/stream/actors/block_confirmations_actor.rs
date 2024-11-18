@@ -69,15 +69,17 @@ impl Actor for BlockConfirmationsActor {
                         parent.metadata_str = metadata_str;
 
                         // Publish the confirmation event
-                        self.publish(Event {
-                            event_type: EventType::BlockConfirmation,
-                            payload: sonic_rs::to_string(&BlockConfirmationPayload {
-                                height: parent.height.0,
-                                state_hash: parent.state_hash.0.to_string(),
-                                confirmations: new_confirmations,
-                            })
-                            .unwrap(),
-                        });
+                        if new_confirmations == 10 {
+                            self.publish(Event {
+                                event_type: EventType::BlockConfirmation,
+                                payload: sonic_rs::to_string(&BlockConfirmationPayload {
+                                    height: parent.height.0,
+                                    state_hash: parent.state_hash.0.to_string(),
+                                    confirmations: new_confirmations,
+                                })
+                                .unwrap(),
+                            });
+                        }
                     }
                     iter_node = parent.clone();
                 }
@@ -137,54 +139,6 @@ mod block_confirmations_actor_tests {
     }
 
     #[tokio::test]
-    async fn test_add_child_nodes_and_publish_confirmations() {
-        let (actor, mut receiver) = setup_actor();
-
-        // Add the root node
-        let root_payload = NewBlockPayload {
-            height: 0,
-            state_hash: "root_hash".to_string(),
-            previous_state_hash: "".to_string(),
-            last_vrf_output: "vrf_output_root".to_string(),
-        };
-
-        let root_event = Event {
-            event_type: EventType::NewBlock,
-            payload: sonic_rs::to_string(&root_payload).unwrap(),
-        };
-
-        actor.handle_event(root_event).await;
-
-        // Add a child node
-        let child_payload = NewBlockPayload {
-            height: 1,
-            state_hash: "child_hash".to_string(),
-            previous_state_hash: "root_hash".to_string(),
-            last_vrf_output: "vrf_output_child".to_string(),
-        };
-
-        let child_event = Event {
-            event_type: EventType::NewBlock,
-            payload: sonic_rs::to_string(&child_payload).unwrap(),
-        };
-
-        actor.handle_event(child_event).await;
-
-        // Confirmations should be published for the root node
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a confirmation event for the root node.");
-
-        if let Ok(Ok(event)) = published_event {
-            assert_eq!(event.event_type, EventType::BlockConfirmation);
-
-            let confirmation_payload: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).unwrap();
-            assert_eq!(confirmation_payload.height, 0);
-            assert_eq!(confirmation_payload.state_hash, "root_hash");
-            assert_eq!(confirmation_payload.confirmations, 1);
-        }
-    }
-
-    #[tokio::test]
     async fn test_block_confirmations_actor_last_updates() {
         let shared_publisher = Arc::new(SharedPublisher::new(200));
         let actor = BlockConfirmationsActor::new(Arc::clone(&shared_publisher));
@@ -223,29 +177,17 @@ mod block_confirmations_actor_tests {
 
         // Collect confirmation events for the 10th block
         let mut received_events = vec![];
-        for _ in 0..12 {
-            // listen to 10+1 events
-            if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
-                received_events.push(event.unwrap());
-            }
+
+        // listen to 10+1 events
+        if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+            received_events.push(event.unwrap());
         }
 
         // Verify the last ten confirmation events explicitly
-        assert_eq!(received_events.len(), 10, "Expected 10 BlockConfirmation events for the 11th block.");
+        assert_eq!(received_events.len(), 1, "Expected 1 BlockConfirmation events for the 11th block.");
 
         // Check each individual event
-        let expected_events = vec![
-            (10, "hash_10", 1),
-            (9, "hash_9", 2),
-            (8, "hash_8", 3),
-            (7, "hash_7", 4),
-            (6, "hash_6", 5),
-            (5, "hash_5", 6),
-            (4, "hash_4", 7),
-            (3, "hash_3", 8),
-            (2, "hash_2", 9),
-            (1, "hash_1", 10),
-        ];
+        let expected_events = vec![(1, "hash_1", 10)];
 
         for (i, (expected_height, expected_hash, expected_confirmations)) in expected_events.iter().enumerate() {
             let confirmation_payload: BlockConfirmationPayload = sonic_rs::from_str(&received_events[i].payload).unwrap();
