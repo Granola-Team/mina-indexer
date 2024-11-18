@@ -21,8 +21,8 @@ pub(crate) mod snark_canonicity_summary_actor;
 pub(crate) mod snark_summary_persistence_actor;
 pub(crate) mod snark_work_actor;
 pub(crate) mod transition_frontier_actor;
-pub(crate) mod user_command_actor;
 pub(crate) mod user_command_canonicity_actor;
+pub(crate) mod user_command_log_actor;
 pub(crate) mod user_command_persistence_actor;
 
 use super::events::Event;

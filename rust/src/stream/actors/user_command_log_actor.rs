@@ -7,13 +7,13 @@ use crate::stream::payloads::{MainnetBlockPayload, UserCommandSummaryPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
-pub struct UserCommandActor {
+pub struct UserCommandLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
 }
 
-impl UserCommandActor {
+impl UserCommandLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
             id: "UserCommandActor".to_string(),
@@ -24,7 +24,7 @@ impl UserCommandActor {
 }
 
 #[async_trait]
-impl Actor for UserCommandActor {
+impl Actor for UserCommandLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -81,7 +81,7 @@ async fn test_user_command_actor_handle_event() {
 
     // Create a shared publisher to capture published events
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = UserCommandActor::new(Arc::clone(&shared_publisher));
+    let actor = UserCommandLogActor::new(Arc::clone(&shared_publisher));
 
     // Mock a MainnetBlockPayload with user commands
     let user_commands = vec![

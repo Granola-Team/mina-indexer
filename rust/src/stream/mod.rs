@@ -7,7 +7,7 @@ use actors::{
     fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
+    transition_frontier_actor::TransitionFrontierActor, user_command_canonicity_actor::UserCommandCanonicityActor, user_command_log_actor::UserCommandLogActor,
     user_command_persistence_actor::UserCommandPersistenceActor, Actor,
 };
 use events::Event;
@@ -53,7 +53,7 @@ pub async fn subscribe_actors(
         Arc::new(BlockLogActor::new(Arc::clone(shared_publisher))),
         // Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         // Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
-        Arc::new(UserCommandActor::new(Arc::clone(shared_publisher))),
+        Arc::new(UserCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(UserCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferViaCoinbaseActor::new(Arc::clone(shared_publisher))),
