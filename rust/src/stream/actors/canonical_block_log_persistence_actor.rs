@@ -26,11 +26,10 @@ impl CanonicalBlockLogPersistenceActor {
             });
 
             if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS canonical_block_log;", &[]).await {
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS canonical_block_log CASCADE;", &[]).await {
                     println!("Unable to drop canonical_block_log table {:?}", e);
                 }
             }
-
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS canonical_block_log (
@@ -55,7 +54,18 @@ impl CanonicalBlockLogPersistenceActor {
             {
                 println!("Unable to create canonical_block_log table {:?}", e);
             }
-
+            if let Err(e) = client
+                .execute(
+                    "CREATE OR REPLACE VIEW canonical_blocks AS
+                    SELECT DISTINCT ON (height, state_hash) *
+                    FROM canonical_block_log
+                    ORDER BY height, state_hash, entry_id DESC;",
+                    &[],
+                )
+                .await
+            {
+                println!("Unable to create canonical_block_log table {:?}", e);
+            }
             Self {
                 id: "CanonicalBlockLogActor".to_string(),
                 shared_publisher,
@@ -228,5 +238,69 @@ mod canonical_block_log_persistence_tests {
         assert_eq!(row.get::<_, String>("last_vrf_output"), payload.last_vrf_output);
         assert_eq!(row.get::<_, bool>("is_berkeley_block"), payload.is_berkeley_block);
         assert_eq!(row.get::<_, bool>("canonical"), payload.canonical);
+    }
+
+    #[tokio::test]
+    async fn test_canonical_blocks_view() {
+        // Set up the actor and database connection
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+
+        // Insert multiple entries for the same (height, state_hash) with different canonicities
+        let payload1 = CanonicalBlockLogPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            previous_state_hash: "prev_hash".to_string(),
+            user_command_count: 10,
+            snark_work_count: 2,
+            timestamp: 1234567890,
+            coinbase_receiver: "receiver_1".to_string(),
+            coinbase_reward_nanomina: 1000,
+            global_slot_since_genesis: 100,
+            last_vrf_output: "vrf_output_1".to_string(),
+            is_berkeley_block: false,
+            canonical: false,
+        };
+
+        let payload2 = CanonicalBlockLogPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            previous_state_hash: "prev_hash".to_string(),
+            user_command_count: 12,
+            snark_work_count: 3,
+            timestamp: 1234567891, // Later timestamp
+            coinbase_receiver: "receiver_1".to_string(),
+            coinbase_reward_nanomina: 1100,
+            global_slot_since_genesis: 101,
+            last_vrf_output: "vrf_output_2".to_string(),
+            is_berkeley_block: true,
+            canonical: true,
+        };
+
+        // Insert the payloads into the database
+        actor.insert_canonical_block_log(&payload1).await.unwrap();
+        actor.insert_canonical_block_log(&payload2).await.unwrap();
+
+        // Query the canonical_blocks view
+        let query = "SELECT * FROM canonical_blocks WHERE height = $1 AND state_hash = $2";
+        let rows = actor.client.query(query, &[&(payload1.height as i64), &payload1.state_hash]).await.unwrap();
+
+        // Ensure only one row is returned
+        assert_eq!(rows.len(), 1);
+
+        // Validate the returned row matches the payload with the highest entry_id
+        let row = &rows[0];
+        assert_eq!(row.get::<_, i64>("height"), payload2.height as i64);
+        assert_eq!(row.get::<_, String>("state_hash"), payload2.state_hash);
+        assert_eq!(row.get::<_, String>("previous_state_hash"), payload2.previous_state_hash);
+        assert_eq!(row.get::<_, i32>("user_command_count"), payload2.user_command_count as i32);
+        assert_eq!(row.get::<_, i32>("snark_work_count"), payload2.snark_work_count as i32);
+        assert_eq!(row.get::<_, i64>("timestamp"), payload2.timestamp as i64);
+        assert_eq!(row.get::<_, String>("coinbase_receiver"), payload2.coinbase_receiver);
+        assert_eq!(row.get::<_, i64>("coinbase_reward_nanomina"), payload2.coinbase_reward_nanomina as i64);
+        assert_eq!(row.get::<_, i64>("global_slot_since_genesis"), payload2.global_slot_since_genesis as i64);
+        assert_eq!(row.get::<_, String>("last_vrf_output"), payload2.last_vrf_output);
+        assert_eq!(row.get::<_, bool>("is_berkeley_block"), payload2.is_berkeley_block);
+        assert_eq!(row.get::<_, bool>("canonical"), payload2.canonical);
     }
 }
