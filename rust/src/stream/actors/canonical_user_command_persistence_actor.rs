@@ -9,14 +9,14 @@ use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::{Client, NoTls};
 
-pub struct UserCommandPersistenceActor {
+pub struct CanonicalUserCommandPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub client: Client,
 }
 
-impl UserCommandPersistenceActor {
+impl CanonicalUserCommandPersistenceActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
@@ -123,7 +123,7 @@ impl UserCommandPersistenceActor {
 }
 
 #[async_trait]
-impl Actor for UserCommandPersistenceActor {
+impl Actor for CanonicalUserCommandPersistenceActor {
     fn id(&self) -> String {
         self.id.clone()
     }

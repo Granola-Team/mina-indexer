@@ -4,11 +4,11 @@ use actors::{
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
     block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
     canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_user_command_log_actor::CanonicalUserCommandLogActor,
-    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
+    fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor,
-    user_command_persistence_actor::UserCommandPersistenceActor, Actor,
+    transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -35,7 +35,7 @@ pub async fn subscribe_actors(
 
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
