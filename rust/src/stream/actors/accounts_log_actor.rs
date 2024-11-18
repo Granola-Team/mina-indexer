@@ -38,6 +38,8 @@ impl AccountsLogActor {
                         address TEXT NOT NULL,
                         address_type TEXT NOT NULL,
                         balance_delta BIGINT NOT NULL,
+                        counterparty TEXT NOT NULL,
+                        transfer_type TEXT NOT NULL,
                         height BIGINT NOT NULL,
                         state_hash TEXT NOT NULL,
                         timestamp BIGINT NOT NULL,
@@ -80,10 +82,10 @@ impl AccountsLogActor {
         }
     }
 
-    async fn db_update(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
+    async fn log_accounting_entry(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
         let upsert_query = r#"
-            INSERT INTO accounts_log (address, address_type, balance_delta, height, state_hash, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6);
+            INSERT INTO accounts_log (address, address_type, balance_delta, height, state_hash, timestamp, counterparty, transfer_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
         "#;
 
         let balance_delta: i64 = match payload.entry_type {
@@ -102,6 +104,8 @@ impl AccountsLogActor {
                     height,
                     &state_hash,
                     timestamp,
+                    &payload.counterparty.to_string(),
+                    &payload.transfer_type.to_string(),
                 ],
             )
             .await
@@ -131,7 +135,7 @@ impl Actor for AccountsLogActor {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
                 match self
-                    .db_update(
+                    .log_accounting_entry(
                         accounting_entry,
                         &(event_payload.height as i64),
                         &event_payload.state_hash,
@@ -181,6 +185,8 @@ mod accounts_log_actor_tests {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: 1000,
             timestamp: 123456789,
+            counterparty: "counterparty_1".to_string(),
+            transfer_type: "transfer_type_1".to_string(),
         };
 
         let height: i64 = 10;
@@ -188,7 +194,7 @@ mod accounts_log_actor_tests {
 
         // Perform database update
         let result = actor
-            .db_update(&accounting_entry, &height, state_hash, &(accounting_entry.timestamp as i64))
+            .log_accounting_entry(&accounting_entry, &height, state_hash, &(accounting_entry.timestamp as i64))
             .await;
 
         // Assert successful insertion
@@ -225,13 +231,15 @@ mod accounts_log_actor_tests {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: 1000,
             timestamp: 123456789,
+            counterparty: "counterparty_1".to_string(),
+            transfer_type: "transfer_type_1".to_string(),
         };
 
         let height: i64 = 10;
         let state_hash = "test_state_hash";
 
         actor
-            .db_update(&accounting_entry, &height, state_hash, &(accounting_entry.timestamp as i64))
+            .log_accounting_entry(&accounting_entry, &height, state_hash, &(accounting_entry.timestamp as i64))
             .await
             .unwrap();
 
@@ -242,13 +250,15 @@ mod accounts_log_actor_tests {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: 500,
             timestamp: 123456790,
+            counterparty: "counterparty_1".to_string(),
+            transfer_type: "transfer_type_1".to_string(),
         };
 
         let updated_height: i64 = 11; // Use a new height for the append-only log
         let updated_state_hash = "updated_state_hash";
 
         let result = actor
-            .db_update(&updated_entry, &updated_height, updated_state_hash, &(updated_entry.timestamp as i64))
+            .log_accounting_entry(&updated_entry, &updated_height, updated_state_hash, &(updated_entry.timestamp as i64))
             .await;
 
         // Assert successful append
@@ -299,6 +309,8 @@ mod accounts_log_actor_tests {
                 account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 1000,
                 timestamp: 123456789,
+                counterparty: "counterparty_1".to_string(),
+                transfer_type: "transfer_type_1".to_string(),
             }],
             rhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
@@ -306,6 +318,8 @@ mod accounts_log_actor_tests {
                 account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 1000,
                 timestamp: 123456789,
+                counterparty: "counterparty_1".to_string(),
+                transfer_type: "transfer_type_1".to_string(),
             }],
         };
 

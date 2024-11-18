@@ -44,6 +44,8 @@ impl GenesisLedger {
                 height: 0,
                 state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
                 lhs: vec![AccountingEntry {
+                    counterparty: account.pk.to_string(),
+                    transfer_type: "InitialDistribution".to_string(),
                     entry_type: AccountingEntryType::Debit,
                     account: format!("MinaGenesisLedger#{}", account.pk),
                     account_type: AccountingEntryAccountType::VirtualAddess,
@@ -51,6 +53,8 @@ impl GenesisLedger {
                     timestamp: 1615939200,
                 }],
                 rhs: vec![AccountingEntry {
+                    counterparty: format!("MinaGenesisLedger#{}", account.pk),
+                    transfer_type: "InitialDistribution".to_string(),
                     entry_type: AccountingEntryType::Credit,
                     account: account.pk.to_string(),
                     account_type: AccountingEntryAccountType::BlockchainAddress,

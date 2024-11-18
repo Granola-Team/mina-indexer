@@ -25,6 +25,8 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
             height: 1,
             state_hash: payload.state_hash,
             lhs: vec![AccountingEntry {
+                counterparty: "MagicMinaForBlock0".to_string(),
+                transfer_type: "BlockReward".to_string(),
                 account: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
                 entry_type: AccountingEntryType::Credit,
                 account_type: AccountingEntryAccountType::BlockchainAddress,
@@ -32,6 +34,8 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
                 timestamp: payload.unix_timestamp,
             }],
             rhs: vec![AccountingEntry {
+                counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+                transfer_type: "BlockReward".to_string(),
                 account: "MagicMinaForBlock0".to_string(),
                 entry_type: AccountingEntryType::Debit,
                 account_type: AccountingEntryAccountType::VirtualAddess,

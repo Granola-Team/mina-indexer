@@ -304,6 +304,8 @@ impl fmt::Display for AccountingEntryAccountType {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AccountingEntry {
+    pub transfer_type: String,
+    pub counterparty: String,
     pub entry_type: AccountingEntryType, // "debit" or "credit"
     pub account: String,
     pub account_type: AccountingEntryAccountType,

@@ -108,7 +108,7 @@ impl Actor for CanonicalInternalCommandLogActor {
             EventType::TransitionFrontier => {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
                 let mut internal_commands = self.internal_commands.lock().await;
-                internal_commands.retain(|key, _| key.0 > height);
+                internal_commands.retain(|key, _| key.0 > height.saturating_sub(1000));
                 drop(internal_commands);
             }
             _ => return,

@@ -100,7 +100,7 @@ impl Actor for SnarkCanonicitySummaryActor {
             EventType::TransitionFrontier => {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
                 let mut snarks = self.snark_map.lock().await;
-                snarks.retain(|key, _| key.0 > height);
+                snarks.retain(|key, _| key.0 > height.saturating_sub(1000));
                 drop(snarks);
             }
             _ => return,

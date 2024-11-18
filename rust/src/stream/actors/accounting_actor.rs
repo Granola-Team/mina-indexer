@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::stream::{
-    mainnet_block_models::CommandStatus,
+    mainnet_block_models::{CommandStatus, CommandType},
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload,
         DoubleEntryRecordPayload, InternalCommandType, NewAccountPayload,
@@ -41,6 +41,8 @@ impl AccountingActor {
 
     async fn process_internal_command(&self, payload: &CanonicalInternalCommandLogPayload) {
         let mut source_entry = AccountingEntry {
+            transfer_type: payload.internal_command_type.to_string(),
+            counterparty: payload.recipient.to_string(),
             entry_type: AccountingEntryType::Debit,
             account: match payload.internal_command_type {
                 InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
@@ -52,6 +54,12 @@ impl AccountingActor {
             timestamp: payload.timestamp,
         };
         let mut recipient_entry = AccountingEntry {
+            transfer_type: payload.internal_command_type.to_string(),
+            counterparty: match payload.internal_command_type {
+                InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
+                InternalCommandType::FeeTransfer => format!("BlockRewardPool#{}", payload.state_hash),
+                InternalCommandType::FeeTransferViaCoinbase => payload.source.as_ref().cloned().unwrap(),
+            },
             entry_type: AccountingEntryType::Credit,
             account: payload.recipient.clone(),
             account_type: AccountingEntryAccountType::BlockchainAddress,
@@ -77,6 +85,8 @@ impl AccountingActor {
 
     async fn process_user_command(&self, payload: &CanonicalUserCommandLogPayload) {
         let mut sender_entry = AccountingEntry {
+            transfer_type: CommandType::Payment.to_string(),
+            counterparty: payload.receiver.to_string(),
             entry_type: AccountingEntryType::Debit,
             account: payload.sender.to_string(),
             account_type: AccountingEntryAccountType::BlockchainAddress,
@@ -84,6 +94,8 @@ impl AccountingActor {
             timestamp: payload.timestamp,
         };
         let mut receiver_entry = AccountingEntry {
+            transfer_type: CommandType::Payment.to_string(),
+            counterparty: payload.sender.to_string(),
             entry_type: AccountingEntryType::Credit,
             account: payload.receiver.to_string(),
             account_type: AccountingEntryAccountType::BlockchainAddress,
@@ -108,6 +120,8 @@ impl AccountingActor {
         }
 
         let mut fee_payer_entry = AccountingEntry {
+            counterparty: format!("BlockRewardPool#{}", payload.state_hash),
+            transfer_type: "BlockRewardPool".to_string(),
             entry_type: AccountingEntryType::Debit,
             account: payload.fee_payer.to_string(),
             account_type: AccountingEntryAccountType::BlockchainAddress,
@@ -116,6 +130,8 @@ impl AccountingActor {
         };
 
         let mut block_reward_pool_entry = AccountingEntry {
+            counterparty: payload.fee_payer.to_string(),
+            transfer_type: "BlockRewardPool".to_string(),
             entry_type: AccountingEntryType::Credit,
             account: format!("BlockRewardPool#{}", payload.state_hash),
             account_type: AccountingEntryAccountType::VirtualAddess,
@@ -163,13 +179,17 @@ impl Actor for AccountingActor {
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
                     lhs: vec![AccountingEntry {
+                        counterparty: format!("AccountCreationFee#{}", payload.state_hash),
+                        transfer_type: "AccountCreationFee".to_string(),
                         entry_type: AccountingEntryType::Debit,
-                        account: payload.account,
+                        account: payload.account.to_string(),
                         account_type: AccountingEntryAccountType::BlockchainAddress,
                         amount_nanomina: 1_000_000_000,
                         timestamp: 0,
                     }],
                     rhs: vec![AccountingEntry {
+                        counterparty: payload.account,
+                        transfer_type: "AccountCreationFee".to_string(),
                         entry_type: AccountingEntryType::Credit,
                         account: format!("AccountCreationFee#{}", payload.state_hash),
                         account_type: AccountingEntryAccountType::VirtualAddess,
@@ -182,7 +202,7 @@ impl Actor for AccountingActor {
             }
             EventType::CanonicalInternalCommandLog => {
                 let payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-                // not canonical, and never wasn't before. No need to deduct
+                // not canonical, and wasn't before. No need to deduct
                 if !payload.canonical && !payload.was_canonical {
                     return;
                 }
@@ -190,7 +210,7 @@ impl Actor for AccountingActor {
             }
             EventType::CanonicalUserCommandLog => {
                 let payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-                // not canonical, and never wasn't before. No need to deduct
+                // not canonical, and wasn't before. No need to deduct
                 if !payload.canonical && !payload.was_canonical {
                     return;
                 }
