@@ -35,8 +35,8 @@ impl CanonicalBlockLogActor {
         let mut queue = self.block_canonicity_queue.lock().await;
 
         while let Some(update) = queue.pop_front() {
-            let mut blocks_map = self.blocks.lock().await;
-            if let Some(blocks) = blocks_map.remove(&update.height) {
+            let blocks_map = self.blocks.lock().await;
+            if let Some(blocks) = blocks_map.get(&update.height) {
                 for block in blocks.iter().filter(|uc| uc.state_hash == update.state_hash) {
                     let payload = CanonicalBlockLogPayload {
                         height: block.height,

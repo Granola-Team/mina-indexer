@@ -45,8 +45,7 @@ impl CanonicalBlockLogPersistenceActor {
                         last_vrf_output TEXT,
                         is_berkeley_block BOOLEAN,
                         canonical BOOLEAN,
-                        entry_id BIGSERIAL PRIMARY KEY,
-                        UNIQUE (height, state_hash, timestamp)
+                        entry_id BIGSERIAL PRIMARY KEY
                     );",
                     &[],
                 )
@@ -85,7 +84,7 @@ impl CanonicalBlockLogPersistenceActor {
                 last_vrf_output, is_berkeley_block, canonical
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
-            ) ON CONFLICT DO NOTHING
+            )
         "#;
 
         self.client
