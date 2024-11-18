@@ -91,10 +91,10 @@ impl Actor for NewAccountActor {
             EventType::BlockConfirmation => {
                 let block_confirmation: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).unwrap();
                 if block_confirmation.confirmations == 10 {
-                    let mainnet_blocks = self.mainnet_blocks.lock().await;
+                    let mut mainnet_blocks = self.mainnet_blocks.lock().await;
 
                     // Look up the blocks at the confirmed height
-                    if let Some(blocks) = mainnet_blocks.get(&Height(block_confirmation.height)) {
+                    if let Some(blocks) = mainnet_blocks.remove(&Height(block_confirmation.height)) {
                         for block in blocks {
                             for account in block.accounts().iter() {
                                 if block.state_hash == block_confirmation.state_hash {
