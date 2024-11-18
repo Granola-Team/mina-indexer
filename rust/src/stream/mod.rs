@@ -2,7 +2,7 @@ use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderA
 use actors::{
     accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
-    block_confirmations_actor::BlockConfirmationsActor, block_summary_actor::BlockLogActor, block_summary_persistence_actor::BlockSummaryPersistenceActor,
+    block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, block_summary_persistence_actor::BlockSummaryPersistenceActor,
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,

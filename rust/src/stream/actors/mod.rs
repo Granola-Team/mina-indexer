@@ -5,7 +5,7 @@ pub(crate) mod best_block_actor;
 pub(crate) mod block_ancestor_actor;
 pub(crate) mod block_canonicity_actor;
 pub(crate) mod block_confirmations_actor;
-pub(crate) mod block_summary_actor;
+pub(crate) mod block_log_actor;
 pub(crate) mod block_summary_persistence_actor;
 pub(crate) mod blockchain_tree_builder_actor;
 pub(crate) mod coinbase_transfer_actor;
