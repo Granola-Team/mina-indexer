@@ -187,7 +187,7 @@ mod block_confirmations_actor_tests {
         assert_eq!(received_events.len(), 1, "Expected 1 BlockConfirmation events for the 11th block.");
 
         // Check each individual event
-        let expected_events = vec![(1, "hash_1", 10)];
+        let expected_events = [(1, "hash_1", 10)];
 
         for (i, (expected_height, expected_hash, expected_confirmations)) in expected_events.iter().enumerate() {
             let confirmation_payload: BlockConfirmationPayload = sonic_rs::from_str(&received_events[i].payload).unwrap();
