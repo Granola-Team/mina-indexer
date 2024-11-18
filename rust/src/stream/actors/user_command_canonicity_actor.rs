@@ -18,7 +18,6 @@ pub struct UserCommandCanonicityActor {
     pub events_published: AtomicUsize,
     pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
     pub user_commands: Arc<Mutex<HashMap<Height, Vec<UserCommandSummaryPayload>>>>,
-    pub last_height_processed: Arc<Mutex<Height>>,
 }
 
 impl UserCommandCanonicityActor {
@@ -29,7 +28,6 @@ impl UserCommandCanonicityActor {
             events_published: AtomicUsize::new(0),
             block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
             user_commands: Arc::new(Mutex::new(HashMap::new())),
-            last_height_processed: Arc::new(Mutex::new(Height(0))),
         }
     }
 
@@ -60,9 +58,6 @@ impl UserCommandCanonicityActor {
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
-                let mut last_height_processed = self.last_height_processed.lock().await;
-                last_height_processed.0 = update.height;
-                drop(last_height_processed);
             } else {
                 queue.push_back(update);
                 drop(queue);
@@ -112,11 +107,6 @@ impl Actor for UserCommandCanonicityActor {
             }
             EventType::TransitionFrontier => {
                 let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
-                let last_height_processed = self.last_height_processed.lock().await;
-                if height > last_height_processed.0 {
-                    drop(last_height_processed);
-                    panic!("Last processed height is behind the transition frontier");
-                }
                 let mut user_commands = self.user_commands.lock().await;
                 user_commands.retain(|key, _| key.0 > height);
                 drop(user_commands);
@@ -344,99 +334,4 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
     }
 
     Ok(())
-}
-
-#[tokio::test]
-#[should_panic(expected = "Last processed height is behind the transition frontier")]
-async fn test_user_command_canonicity_actor_handles_pruning_and_processing_correctly() {
-    use crate::stream::{
-        mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, UserCommandSummaryPayload},
-    };
-
-    // Setup the shared publisher and actor
-    let shared_publisher = Arc::new(SharedPublisher::new(200));
-    let actor = UserCommandCanonicityActor::new(Arc::clone(&shared_publisher));
-
-    // Add user commands for different heights
-    {
-        let mut user_commands = actor.user_commands.lock().await;
-        user_commands.insert(
-            Height(5),
-            vec![UserCommandSummaryPayload {
-                height: 5,
-                state_hash: "hash_5".to_string(),
-                timestamp: 1000,
-                txn_type: crate::stream::mainnet_block_models::CommandType::StakeDelegation,
-                status: CommandStatus::Applied,
-                sender: "sender_5".to_string(),
-                receiver: "receiver_5".to_string(),
-                fee_payer: "fee_payer".to_string(),
-                nonce: 1,
-                fee_nanomina: 5000,
-                amount_nanomina: 10000,
-            }],
-        );
-        user_commands.insert(
-            Height(10),
-            vec![UserCommandSummaryPayload {
-                height: 10,
-                state_hash: "hash_10".to_string(),
-                timestamp: 2000,
-                txn_type: crate::stream::mainnet_block_models::CommandType::StakeDelegation,
-                status: CommandStatus::Applied,
-                sender: "sender_10".to_string(),
-                receiver: "receiver_10".to_string(),
-                fee_payer: "fee_payer".to_string(),
-                nonce: 2,
-                fee_nanomina: 1000,
-                amount_nanomina: 20000,
-            }],
-        );
-    }
-
-    // Simulate a TransitionFrontier event with height 7 to prune commands with height <= 7
-    actor
-        .handle_event(Event {
-            event_type: EventType::TransitionFrontier,
-            payload: sonic_rs::to_string(&7u64).unwrap(),
-        })
-        .await;
-
-    // Verify pruning
-    {
-        let user_commands = actor.user_commands.lock().await;
-        assert!(!user_commands.contains_key(&Height(5)), "Commands at height 5 should be pruned");
-        assert!(user_commands.contains_key(&Height(10)), "Commands at height 10 should not be pruned");
-    }
-
-    // Simulate a BlockCanonicityUpdate event to trigger processing
-    let canonical_update_payload = BlockCanonicityUpdatePayload {
-        height: 10,
-        canonical: true,
-        state_hash: "hash_10".to_string(),
-        was_canonical: false,
-    };
-
-    actor
-        .handle_event(Event {
-            event_type: EventType::BlockCanonicityUpdate,
-            payload: sonic_rs::to_string(&canonical_update_payload).unwrap(),
-        })
-        .await;
-
-    // Verify `last_height_processed` is updated
-    {
-        let last_height_processed = actor.last_height_processed.lock().await;
-        assert_eq!(last_height_processed.0, 10, "Last processed height should be updated to 10");
-    }
-
-    // Simulate a TransitionFrontier event to trigger falling-behind panic
-
-    actor
-        .handle_event(Event {
-            event_type: EventType::TransitionFrontier,
-            payload: sonic_rs::to_string(&11u64).unwrap(),
-        })
-        .await;
 }
