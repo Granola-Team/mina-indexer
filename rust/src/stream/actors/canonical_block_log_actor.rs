@@ -17,7 +17,7 @@ use std::{
 };
 use tokio_postgres::{Client, NoTls};
 
-pub struct BlockSummaryPersistenceActor {
+pub struct CanonicalBlockLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
@@ -26,7 +26,7 @@ pub struct BlockSummaryPersistenceActor {
     pub client: Client,
 }
 
-impl BlockSummaryPersistenceActor {
+impl CanonicalBlockLogActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
@@ -160,7 +160,7 @@ impl BlockSummaryPersistenceActor {
 }
 
 #[async_trait]
-impl Actor for BlockSummaryPersistenceActor {
+impl Actor for CanonicalBlockLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
