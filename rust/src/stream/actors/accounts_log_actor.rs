@@ -20,15 +20,17 @@ pub struct AccountsLogActor {
 }
 
 impl AccountsLogActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client.execute("DROP TABLE IF EXISTS accounts_log CASCADE;", &[]).await {
-                println!("Unable to drop accounts_log table {:?}", e);
+            if !preserve_existing_data {
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS accounts_log CASCADE;", &[]).await {
+                    println!("Unable to drop accounts_log table {:?}", e);
+                }
             }
             if let Err(e) = client
                 .execute(
@@ -170,7 +172,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(shared_publisher).await;
+        let actor = AccountsLogActor::new(shared_publisher, false).await;
 
         // Accounting entry payload
         let accounting_entry = AccountingEntry {
@@ -214,7 +216,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(shared_publisher).await;
+        let actor = AccountsLogActor::new(shared_publisher, false).await;
 
         // Initial accounting entry
         let accounting_entry = AccountingEntry {
@@ -285,7 +287,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(Arc::clone(&shared_publisher)).await;
+        let actor = AccountsLogActor::new(Arc::clone(&shared_publisher), false).await;
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {

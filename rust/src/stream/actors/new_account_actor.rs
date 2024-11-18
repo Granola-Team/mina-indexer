@@ -26,15 +26,17 @@ pub struct NewAccountActor {
 }
 
 impl NewAccountActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
-                println!("Unable to drop user_commands table {:?}", e);
+            if !preserve_existing_data {
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
+                    println!("Unable to drop user_commands table {:?}", e);
+                }
             }
             if let Err(e) = client
                 .execute(
@@ -164,7 +166,7 @@ mod new_account_actor_tests {
 
     async fn setup_actor() -> (Arc<NewAccountActor>, tokio::sync::broadcast::Receiver<Event>) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = Arc::new(NewAccountActor::new(Arc::clone(&shared_publisher)).await);
+        let actor = Arc::new(NewAccountActor::new(Arc::clone(&shared_publisher), false).await);
         let receiver = shared_publisher.subscribe();
         (actor, receiver)
     }

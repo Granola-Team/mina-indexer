@@ -27,15 +27,17 @@ pub struct BlockSummaryPersistenceActor {
 }
 
 impl BlockSummaryPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client.execute("DROP TABLE IF EXISTS block_summary;", &[]).await {
-                println!("Unable to drop block_summary table {:?}", e);
+            if !preserve_existing_data {
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS block_summary;", &[]).await {
+                    println!("Unable to drop block_summary table {:?}", e);
+                }
             }
             if let Err(e) = client
                 .execute(

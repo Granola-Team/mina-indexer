@@ -17,15 +17,17 @@ pub struct InternalCommandPersistenceActor {
 }
 
 impl InternalCommandPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client.execute("DROP TABLE IF EXISTS internal_commands;", &[]).await {
-                println!("Unable to drop internal_commands table {:?}", e);
+            if !preserve_existing_data {
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS internal_commands;", &[]).await {
+                    println!("Unable to drop internal_commands table {:?}", e);
+                }
             }
             if let Err(e) = client
                 .execute(
