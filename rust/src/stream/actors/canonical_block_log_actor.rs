@@ -3,154 +3,63 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{
-    blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    constants::{POSTGRES_CONNECTION_STRING, TRANSITION_FRONTIER_DISTANCE},
-    stream::payloads::*,
-};
+use crate::stream::payloads::*;
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::{atomic::AtomicUsize, Arc},
 };
-use tokio_postgres::{Client, NoTls};
 
 pub struct CanonicalBlockLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub database_inserts: AtomicUsize,
+    pub events_published: AtomicUsize,
     pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
-    pub blockchain_tree: Arc<Mutex<BlockchainTree>>,
-    pub client: Client,
+    pub blocks: Arc<Mutex<HashMap<u64, Vec<BlockLogPayload>>>>,
 }
 
 impl CanonicalBlockLogActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
-        if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
-            tokio::spawn(async move {
-                if let Err(e) = connection.await {
-                    eprintln!("connection error: {}", e);
-                }
-            });
-            if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS block_summary;", &[]).await {
-                    println!("Unable to drop block_summary table {:?}", e);
-                }
-            }
-            if let Err(e) = client
-                .execute(
-                    "CREATE TABLE IF NOT EXISTS block_summary (
-                        height BIGINT,
-                        state_hash TEXT,
-                        previous_state_hash TEXT,
-                        user_command_count INTEGER,
-                        snark_work_count INTEGER,
-                        timestamp BIGINT,
-                        coinbase_receiver TEXT,
-                        coinbase_reward_nanomina BIGINT,
-                        global_slot_since_genesis BIGINT,
-                        last_vrf_output TEXT,
-                        is_berkeley_block BOOLEAN,
-                        is_canonical BOOLEAN,
-                        UNIQUE (height, state_hash)
-                    );",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create block_summary table {:?}", e);
-            }
-            Self {
-                id: "BlockSummaryPersistenceActor".to_string(),
-                shared_publisher,
-                client,
-                database_inserts: AtomicUsize::new(0),
-                block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
-                blockchain_tree: Arc::new(Mutex::new(BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE))),
-            }
-        } else {
-            panic!("Unable to establish connection to database")
+    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+        Self {
+            id: "CanonicalBlockLogActor".to_string(),
+            shared_publisher,
+            events_published: AtomicUsize::new(0),
+            block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
+            blocks: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
-    async fn db_upsert(&self, summary: &BlockSummaryPayload, canonical: bool) -> Result<u64, &'static str> {
-        let upsert_query = r#"
-            INSERT INTO block_summary (
-                height, state_hash, previous_state_hash, user_command_count, snark_work_count,
-                timestamp, coinbase_receiver, coinbase_reward_nanomina, global_slot_since_genesis,
-                last_vrf_output, is_berkeley_block, is_canonical
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-            ON CONFLICT (height, state_hash)
-            DO UPDATE SET
-                previous_state_hash = EXCLUDED.previous_state_hash,
-                user_command_count = EXCLUDED.user_command_count,
-                snark_work_count = EXCLUDED.snark_work_count,
-                timestamp = EXCLUDED.timestamp,
-                coinbase_receiver = EXCLUDED.coinbase_receiver,
-                coinbase_reward_nanomina = EXCLUDED.coinbase_reward_nanomina,
-                global_slot_since_genesis = EXCLUDED.global_slot_since_genesis,
-                last_vrf_output = EXCLUDED.last_vrf_output,
-                is_berkeley_block = EXCLUDED.is_berkeley_block,
-                is_canonical = EXCLUDED.is_canonical
-        "#;
-
-        match self
-            .client
-            .execute(
-                upsert_query,
-                &[
-                    &(summary.height as i64),
-                    &summary.state_hash,
-                    &summary.previous_state_hash,
-                    &(summary.user_command_count as i32),
-                    &(summary.snark_work_count as i32),
-                    &(summary.timestamp as i64),
-                    &summary.coinbase_receiver,
-                    &(summary.coinbase_reward_nanomina as i64),
-                    &(summary.global_slot_since_genesis as i64),
-                    &summary.last_vrf_output,
-                    &summary.is_berkeley_block,
-                    &canonical,
-                ],
-            )
-            .await
-        {
-            Err(_) => Err("Unable to upsert into block_summary table"),
-            Ok(affected_rows) => Ok(affected_rows),
-        }
-    }
-
-    async fn upsert_block_summary(&self) -> Result<(), &'static str> {
+    async fn process_canonical_blocks(&self) -> Result<(), &'static str> {
         let mut queue = self.block_canonicity_queue.lock().await;
-        // Continue looping until the queue is empty
+
         while let Some(update) = queue.pop_front() {
-            let mut tree = self.blockchain_tree.lock().await;
-
-            // Try to retrieve the node based on the update's height and state hash
-            if let Some(node) = tree.get_node(Height(update.height), Hash(update.state_hash.clone())) {
-                // Deserialize the metadata string to extract block summary
-                let block_summary: BlockSummaryPayload = sonic_rs::from_str(&node.metadata_str.unwrap()).unwrap();
-
-                match self.db_upsert(&block_summary, update.canonical).await {
-                    Ok(affected_rows) => {
-                        assert_eq!(affected_rows, 1);
-                        self.shared_publisher.incr_database_insert();
-                        self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-                    }
-                    Err(e) => {
-                        panic!("{}", e);
-                    }
-                };
-
-                // Prune the tree as needed
-                tree.prune_tree().unwrap();
+            let mut blocks_map = self.blocks.lock().await;
+            if let Some(blocks) = blocks_map.remove(&update.height) {
+                for block in blocks.iter().filter(|uc| uc.state_hash == update.state_hash) {
+                    let payload = CanonicalBlockLogPayload {
+                        height: block.height,
+                        state_hash: block.state_hash.to_string(),
+                        previous_state_hash: block.previous_state_hash.to_string(),
+                        user_command_count: block.user_command_count,
+                        snark_work_count: block.snark_work_count,
+                        timestamp: block.timestamp,
+                        coinbase_receiver: block.coinbase_receiver.to_string(),
+                        coinbase_reward_nanomina: block.coinbase_reward_nanomina,
+                        global_slot_since_genesis: block.global_slot_since_genesis,
+                        last_vrf_output: block.last_vrf_output.to_string(),
+                        is_berkeley_block: block.is_berkeley_block,
+                        canonical: update.canonical,
+                    };
+                    self.publish(Event {
+                        event_type: EventType::CanonicalBlockLog,
+                        payload: sonic_rs::to_string(&payload).unwrap(),
+                    });
+                }
             } else {
-                // If the node is not found, push the update to the front of the queue
-                queue.push_front(update);
+                queue.push_back(update);
                 drop(queue);
-                // Exit to avoid a busy loop if we keep finding no nodes
                 break;
             }
         }
@@ -166,13 +75,13 @@ impl Actor for CanonicalBlockLogActor {
     }
 
     fn actor_outputs(&self) -> &AtomicUsize {
-        &self.database_inserts
+        &self.events_published
     }
 
     async fn report(&self) {
-        let tree = self.blockchain_tree.lock().await;
-        self.print_report("Blockchain BTreeMap", tree.size());
-        drop(tree);
+        let blocks = self.blocks.lock().await;
+        self.print_report("Blocks HashMap", blocks.len());
+        drop(blocks);
         let canonicity = self.block_canonicity_queue.lock().await;
         self.print_report("Block Canonicity VecDeque", canonicity.len());
     }
@@ -183,30 +92,20 @@ impl Actor for CanonicalBlockLogActor {
                 let mut queue = self.block_canonicity_queue.lock().await;
                 queue.push_back(sonic_rs::from_str(&event.payload).unwrap());
                 drop(queue);
-                self.upsert_block_summary().await.unwrap();
+                self.process_canonical_blocks().await.unwrap();
             }
-            EventType::BlockSummary => {
-                let event_payload: BlockSummaryPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let mut tree = self.blockchain_tree.lock().await;
-                let node = Node {
-                    height: Height(event_payload.height),
-                    state_hash: Hash(event_payload.state_hash),
-                    previous_state_hash: Hash(event_payload.previous_state_hash),
-                    last_vrf_output: event_payload.last_vrf_output,
-                    metadata_str: Some(event.payload),
-                };
-                if tree.is_empty() {
-                    tree.set_root(node).unwrap();
-                } else if tree.has_parent(&node) {
-                    tree.add_node(node).unwrap();
-                } else {
-                    println!(
-                        "Attempted to add block and height {} and state_hash {} but found no parent",
-                        node.height.0, node.state_hash.0
-                    )
-                }
-                drop(tree);
-                self.upsert_block_summary().await.unwrap();
+            EventType::BlockLog => {
+                let event_payload: BlockLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let mut blocks = self.blocks.lock().await;
+                blocks.entry(event_payload.height).or_insert_with(Vec::new).push(event_payload);
+                drop(blocks);
+                self.process_canonical_blocks().await.unwrap();
+            }
+            EventType::TransitionFrontier => {
+                let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
+                let mut blocks = self.blocks.lock().await;
+                blocks.retain(|key, _| key > &height);
+                drop(blocks);
             }
             _ => {}
         }
@@ -215,5 +114,146 @@ impl Actor for CanonicalBlockLogActor {
     fn publish(&self, event: Event) {
         self.incr_event_published();
         self.shared_publisher.publish(event);
+    }
+}
+
+#[cfg(test)]
+mod canonical_block_log_actor_tests {
+    use super::*;
+    use crate::stream::events::{Event, EventType};
+    use std::sync::Arc;
+    use tokio::time::timeout;
+
+    async fn setup_actor() -> (Arc<CanonicalBlockLogActor>, tokio::sync::broadcast::Receiver<Event>) {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = Arc::new(CanonicalBlockLogActor::new(Arc::clone(&shared_publisher)));
+        let receiver = shared_publisher.subscribe();
+        (actor, receiver)
+    }
+
+    #[tokio::test]
+    async fn test_block_log_persistence() {
+        let (actor, _) = setup_actor().await;
+
+        // Send a BlockLog event
+        let block_log_payload = BlockLogPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            previous_state_hash: "hash_0".to_string(),
+            user_command_count: 10,
+            snark_work_count: 5,
+            timestamp: 1234567890,
+            coinbase_receiver: "receiver".to_string(),
+            coinbase_reward_nanomina: 1000,
+            global_slot_since_genesis: 123,
+            last_vrf_output: "vrf_output".to_string(),
+            is_berkeley_block: true,
+        };
+
+        let block_log_event = Event {
+            event_type: EventType::BlockLog,
+            payload: sonic_rs::to_string(&block_log_payload).unwrap(),
+        };
+
+        actor.handle_event(block_log_event).await;
+
+        // Confirm block was added to blocks map
+        let blocks = actor.blocks.lock().await;
+        let block_entry = blocks.get(&1).unwrap();
+        assert_eq!(block_entry.len(), 1);
+        assert_eq!(block_entry[0].state_hash, "hash_1");
+    }
+
+    #[tokio::test]
+    async fn test_canonical_block_log() {
+        let (actor, mut receiver) = setup_actor().await;
+
+        // Add a BlockLog event
+        let block_log_payload = BlockLogPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            previous_state_hash: "hash_0".to_string(),
+            user_command_count: 10,
+            snark_work_count: 5,
+            timestamp: 1234567890,
+            coinbase_receiver: "receiver".to_string(),
+            coinbase_reward_nanomina: 1000,
+            global_slot_since_genesis: 123,
+            last_vrf_output: "vrf_output".to_string(),
+            is_berkeley_block: true,
+        };
+
+        let block_log_event = Event {
+            event_type: EventType::BlockLog,
+            payload: sonic_rs::to_string(&block_log_payload).unwrap(),
+        };
+
+        actor.handle_event(block_log_event).await;
+
+        // Send a BlockCanonicityUpdate event
+        let block_canonicity_update_payload = BlockCanonicityUpdatePayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            canonical: true,
+            was_canonical: false,
+        };
+
+        let block_canonicity_update_event = Event {
+            event_type: EventType::BlockCanonicityUpdate,
+            payload: sonic_rs::to_string(&block_canonicity_update_payload).unwrap(),
+        };
+
+        actor.handle_event(block_canonicity_update_event).await;
+
+        // Confirm CanonicalBlockLog event was published
+        let received_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(received_event.is_ok(), "Expected a CanonicalBlockLog event");
+
+        let event = received_event.unwrap().unwrap();
+        assert_eq!(event.event_type, EventType::CanonicalBlockLog);
+
+        let canonical_payload: CanonicalBlockLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(canonical_payload.height, 1);
+        assert_eq!(canonical_payload.state_hash, "hash_1");
+        assert!(canonical_payload.canonical);
+    }
+
+    #[tokio::test]
+    async fn test_transition_frontier_removal() {
+        let (actor, _) = setup_actor().await;
+
+        // Add a BlockLog event
+        let block_log_payload = BlockLogPayload {
+            height: 5,
+            state_hash: "hash_5".to_string(),
+            previous_state_hash: "hash_4".to_string(),
+            user_command_count: 8,
+            snark_work_count: 4,
+            timestamp: 1234567891,
+            coinbase_receiver: "receiver_5".to_string(),
+            coinbase_reward_nanomina: 500,
+            global_slot_since_genesis: 125,
+            last_vrf_output: "vrf_output_5".to_string(),
+            is_berkeley_block: false,
+        };
+
+        let block_log_event = Event {
+            event_type: EventType::BlockLog,
+            payload: sonic_rs::to_string(&block_log_payload).unwrap(),
+        };
+
+        actor.handle_event(block_log_event).await;
+
+        // Send a TransitionFrontier event
+        let transition_frontier_event = Event {
+            event_type: EventType::TransitionFrontier,
+            payload: sonic_rs::to_string(&6).unwrap(),
+        };
+
+        actor.handle_event(transition_frontier_event).await;
+
+        // Validate that blocks with height <= 4 are removed
+        let blocks = actor.blocks.lock().await;
+        assert!(blocks.get(&5).is_none(), "Block at height 5 should be removed");
     }
 }

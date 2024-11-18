@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{BlockSummaryPayload, GenesisBlockPayload, MainnetBlockPayload};
+use crate::stream::payloads::{BlockLogPayload, GenesisBlockPayload, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -16,7 +16,7 @@ pub struct BlockLogActor {
 impl BlockLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "BlockSummaryActor".to_string(),
+            id: "BlockLogActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
         }
@@ -36,7 +36,7 @@ impl Actor for BlockLogActor {
         match event.event_type {
             EventType::GenesisBlock => {
                 let block_payload: GenesisBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let payload = BlockSummaryPayload {
+                let payload = BlockLogPayload {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash,
                     previous_state_hash: block_payload.previous_state_hash,
@@ -50,13 +50,13 @@ impl Actor for BlockLogActor {
                     is_berkeley_block: false,
                 };
                 self.publish(Event {
-                    event_type: EventType::BlockSummary,
+                    event_type: EventType::BlockLog,
                     payload: sonic_rs::to_string(&payload).unwrap(),
                 });
             }
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let payload = BlockSummaryPayload {
+                let payload = BlockLogPayload {
                     height: block_payload.height,
                     state_hash: block_payload.state_hash,
                     previous_state_hash: block_payload.previous_state_hash,
@@ -70,7 +70,7 @@ impl Actor for BlockLogActor {
                     is_berkeley_block: false,
                 };
                 self.publish(Event {
-                    event_type: EventType::BlockSummary,
+                    event_type: EventType::BlockLog,
                     payload: sonic_rs::to_string(&payload).unwrap(),
                 });
             }
@@ -92,7 +92,7 @@ async fn test_block_summary_actor_handle_event() {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        payloads::{BlockSummaryPayload, MainnetBlockPayload},
+        payloads::{BlockLogPayload, MainnetBlockPayload},
     };
     // Create a shared publisher to test if events are published
     let shared_publisher = Arc::new(SharedPublisher::new(100));
@@ -129,10 +129,10 @@ async fn test_block_summary_actor_handle_event() {
 
     // Check if the BlockSummary event was published
     if let Ok(received_event) = receiver.recv().await {
-        assert_eq!(received_event.event_type, EventType::BlockSummary);
+        assert_eq!(received_event.event_type, EventType::BlockLog);
 
         // Deserialize the payload of the BlockSummary event
-        let summary_payload: BlockSummaryPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        let summary_payload: BlockLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
         // Verify that the BlockSummaryPayload matches expected values
         assert_eq!(summary_payload.height, 100);

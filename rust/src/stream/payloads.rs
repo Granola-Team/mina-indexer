@@ -136,7 +136,7 @@ pub struct SnarkCanonicitySummaryPayload {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct BlockSummaryPayload {
+pub struct BlockLogPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,
@@ -148,6 +148,22 @@ pub struct BlockSummaryPayload {
     pub global_slot_since_genesis: u64,
     pub last_vrf_output: String,
     pub is_berkeley_block: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CanonicalBlockLogPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub previous_state_hash: String,
+    pub user_command_count: usize,
+    pub snark_work_count: usize,
+    pub timestamp: u64,
+    pub coinbase_receiver: String,
+    pub coinbase_reward_nanomina: u64,
+    pub global_slot_since_genesis: u64,
+    pub last_vrf_output: String,
+    pub is_berkeley_block: bool,
+    pub canonical: bool,
 }
 
 #[derive(Serialize, Deserialize, Default)]

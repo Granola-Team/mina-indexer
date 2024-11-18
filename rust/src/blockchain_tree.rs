@@ -29,6 +29,7 @@ impl BlockchainTree {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_node(&self, height: Height, state_hash: Hash) -> Option<Node> {
         self.tree
             .get(&height)

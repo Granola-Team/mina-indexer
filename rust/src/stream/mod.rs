@@ -32,7 +32,6 @@ pub async fn subscribe_actors(
 ) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
-    let block_persistence_actor = CanonicalBlockLogActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
@@ -60,7 +59,7 @@ pub async fn subscribe_actors(
         Arc::new(InternalCommandCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
-        Arc::new(block_persistence_actor),
+        Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         // Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
@@ -198,7 +197,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::MainnetBlockPath).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
-    assert_eq!(event_counts.get(&EventType::BlockSummary).cloned().unwrap(), paths_plus_genesis_count);
+    assert_eq!(event_counts.get(&EventType::BlockLog).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::UserCommandSummary).cloned().unwrap(), number_of_user_commands);
 
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() > length_of_chain);
