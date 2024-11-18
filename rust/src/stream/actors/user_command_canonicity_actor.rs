@@ -17,7 +17,7 @@ pub struct UserCommandCanonicityActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
     pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
-    pub user_commands: Arc<Mutex<HashMap<Height, Vec<UserCommandSummaryPayload>>>>,
+    pub user_commands: Arc<Mutex<HashMap<Height, Vec<UserCommandLogPayload>>>>,
 }
 
 impl UserCommandCanonicityActor {
@@ -98,8 +98,8 @@ impl Actor for UserCommandCanonicityActor {
                     .await
                     .expect("Expected to published user command canonicity updates");
             }
-            EventType::UserCommandSummary => {
-                let event_payload: UserCommandSummaryPayload = sonic_rs::from_str(&event.payload).unwrap();
+            EventType::UserCommandLog => {
+                let event_payload: UserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let mut user_commands = self.user_commands.lock().await;
                 user_commands.entry(Height(event_payload.height)).or_insert_with(Vec::new).push(event_payload);
                 drop(user_commands);
@@ -127,7 +127,7 @@ impl Actor for UserCommandCanonicityActor {
 async fn test_user_command_canonicity_actor_processes_user_command_updates() -> anyhow::Result<()> {
     use crate::stream::{
         mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, UserCommandCanonicityPayload, UserCommandSummaryPayload},
+        payloads::{BlockCanonicityUpdatePayload, UserCommandCanonicityPayload, UserCommandLogPayload},
     };
     use std::sync::atomic::Ordering;
     use tokio::time::timeout;
@@ -140,7 +140,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
     let mut receiver = shared_publisher.subscribe();
 
     // Define a sample UserCommandSummaryPayload
-    let user_command_payload = UserCommandSummaryPayload {
+    let user_command_payload = UserCommandLogPayload {
         height: 10,
         state_hash: "sample_hash".to_string(),
         timestamp: 123456,
@@ -154,7 +154,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
         ..Default::default()
     };
 
-    let user_command_payload_2 = UserCommandSummaryPayload {
+    let user_command_payload_2 = UserCommandLogPayload {
         height: 10,
         state_hash: "other_hash".to_string(),
         timestamp: 123456,
@@ -171,14 +171,14 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
     // Send a UserCommandSummary event to populate the user_commands map
     actor
         .handle_event(Event {
-            event_type: EventType::UserCommandSummary,
+            event_type: EventType::UserCommandLog,
             payload: sonic_rs::to_string(&user_command_payload).unwrap(),
         })
         .await;
 
     actor
         .handle_event(Event {
-            event_type: EventType::UserCommandSummary,
+            event_type: EventType::UserCommandLog,
             payload: sonic_rs::to_string(&user_command_payload_2).unwrap(),
         })
         .await;
@@ -227,7 +227,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
 async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_frontier() -> anyhow::Result<()> {
     use crate::stream::{
         mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, UserCommandSummaryPayload},
+        payloads::{BlockCanonicityUpdatePayload, UserCommandLogPayload},
     };
 
     // Set up the shared publisher and actor
@@ -235,7 +235,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
     let actor = UserCommandCanonicityActor::new(Arc::clone(&shared_publisher));
 
     // Add a UserCommandSummaryPayload event for height 5
-    let user_command_5 = UserCommandSummaryPayload {
+    let user_command_5 = UserCommandLogPayload {
         height: 5,
         state_hash: "hash_5".to_string(),
         timestamp: 1000,
@@ -250,13 +250,13 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
     };
     actor
         .handle_event(Event {
-            event_type: EventType::UserCommandSummary,
+            event_type: EventType::UserCommandLog,
             payload: sonic_rs::to_string(&user_command_5).unwrap(),
         })
         .await;
 
     // Add a UserCommandSummaryPayload event for height 10
-    let user_command_10 = UserCommandSummaryPayload {
+    let user_command_10 = UserCommandLogPayload {
         height: 10,
         state_hash: "hash_10".to_string(),
         timestamp: 2000,
@@ -271,7 +271,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
     };
     actor
         .handle_event(Event {
-            event_type: EventType::UserCommandSummary,
+            event_type: EventType::UserCommandLog,
             payload: sonic_rs::to_string(&user_command_10).unwrap(),
         })
         .await;

@@ -201,7 +201,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
     assert_eq!(event_counts.get(&EventType::BlockAncestor).cloned().unwrap(), paths_count);
     assert_eq!(event_counts.get(&EventType::NewBlock).cloned().unwrap(), paths_plus_genesis_count);
     assert_eq!(event_counts.get(&EventType::BlockLog).cloned().unwrap(), paths_plus_genesis_count);
-    assert_eq!(event_counts.get(&EventType::UserCommandSummary).cloned().unwrap(), number_of_user_commands);
+    assert_eq!(event_counts.get(&EventType::UserCommandLog).cloned().unwrap(), number_of_user_commands);
 
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() > length_of_chain);
     assert!(event_counts.get(&EventType::BestBlock).cloned().unwrap() < paths_count);

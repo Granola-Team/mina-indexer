@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{MainnetBlockPayload, UserCommandSummaryPayload};
+use crate::stream::payloads::{MainnetBlockPayload, UserCommandLogPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -37,7 +37,7 @@ impl Actor for UserCommandLogActor {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 for user_command in block_payload.user_commands.iter() {
-                    let payload = UserCommandSummaryPayload {
+                    let payload = UserCommandLogPayload {
                         height: block_payload.height,
                         state_hash: block_payload.state_hash.to_string(),
                         timestamp: block_payload.timestamp,
@@ -51,7 +51,7 @@ impl Actor for UserCommandLogActor {
                         amount_nanomina: user_command.amount_nanomina,
                     };
                     self.publish(Event {
-                        event_type: EventType::UserCommandSummary,
+                        event_type: EventType::UserCommandLog,
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
@@ -75,7 +75,7 @@ async fn test_user_command_actor_handle_event() {
     use crate::stream::{
         events::{Event, EventType},
         mainnet_block_models::*,
-        payloads::{MainnetBlockPayload, UserCommandSummaryPayload},
+        payloads::{MainnetBlockPayload, UserCommandLogPayload},
     };
     use std::sync::Arc;
 
@@ -143,10 +143,10 @@ async fn test_user_command_actor_handle_event() {
     for user_command in block_payload.user_commands.iter() {
         // Check if the UserCommandSummary event was published
         if let Ok(received_event) = receiver.recv().await {
-            assert_eq!(received_event.event_type, EventType::UserCommandSummary);
+            assert_eq!(received_event.event_type, EventType::UserCommandLog);
 
             // Deserialize the payload of the UserCommandSummary event
-            let summary_payload: UserCommandSummaryPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            let summary_payload: UserCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
             // Verify that the UserCommandSummaryPayload matches the expected values
             assert_eq!(summary_payload.height, block_payload.height);

@@ -15,7 +15,7 @@ pub enum EventType {
     SnarkWorkSummary,
     SnarkCanonicitySummary,
     TransitionFrontier,
-    UserCommandSummary,
+    UserCommandLog,
     UserCommandCanonicityUpdate,
     InternalCommand,
     InternalCommandCanonicityUpdate,

@@ -167,7 +167,7 @@ pub struct CanonicalBlockLogPayload {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub struct UserCommandSummaryPayload {
+pub struct UserCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
     // pub txn_hash: String,    //
