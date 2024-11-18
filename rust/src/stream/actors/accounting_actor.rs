@@ -6,8 +6,8 @@ use super::super::{
 use crate::stream::{
     mainnet_block_models::CommandStatus,
     payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType,
-        NewAccountPayload, UserCommandCanonicityPayload,
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalUserCommandLogPayload, DoubleEntryRecordPayload,
+        InternalCommandCanonicityPayload, InternalCommandType, NewAccountPayload,
     },
 };
 use async_trait::async_trait;
@@ -75,7 +75,7 @@ impl AccountingActor {
         self.publish_transaction(&double_entry_record).await;
     }
 
-    async fn process_user_command(&self, payload: &UserCommandCanonicityPayload) {
+    async fn process_user_command(&self, payload: &CanonicalUserCommandLogPayload) {
         let mut sender_entry = AccountingEntry {
             entry_type: AccountingEntryType::Debit,
             account: payload.sender.to_string(),
@@ -188,8 +188,8 @@ impl Actor for AccountingActor {
                 }
                 self.process_internal_command(&payload).await;
             }
-            EventType::UserCommandCanonicityUpdate => {
-                let payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+            EventType::CanonicalUserCommandLog => {
+                let payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
                 // not canonical, and never wasn't before. No need to deduct
                 if !payload.canonical && !payload.was_canonical {
                     return;
@@ -209,7 +209,7 @@ impl Actor for AccountingActor {
 #[cfg(test)]
 mod accounting_actor_tests {
     use super::*;
-    use crate::stream::payloads::{DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType, UserCommandCanonicityPayload};
+    use crate::stream::payloads::{CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType};
     use std::sync::{atomic::Ordering, Arc};
     use tokio::time::timeout;
 
@@ -225,7 +225,7 @@ mod accounting_actor_tests {
     async fn test_process_user_command_canonical_true_but_failed_with_fee_paid() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = UserCommandCanonicityPayload {
+        let payload = CanonicalUserCommandLogPayload {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -280,7 +280,7 @@ mod accounting_actor_tests {
     async fn test_process_user_command_canonical_true() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = UserCommandCanonicityPayload {
+        let payload = CanonicalUserCommandLogPayload {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -347,7 +347,7 @@ mod accounting_actor_tests {
     async fn test_process_user_command_canonical_false() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = UserCommandCanonicityPayload {
+        let payload = CanonicalUserCommandLogPayload {
             height: 200,
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,

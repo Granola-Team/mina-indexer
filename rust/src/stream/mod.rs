@@ -3,11 +3,11 @@ use actors::{
     accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
     block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
-    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
-    fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_user_command_log_actor::CanonicalUserCommandLogActor,
+    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    transition_frontier_actor::TransitionFrontierActor, user_command_canonicity_actor::UserCommandCanonicityActor, user_command_log_actor::UserCommandLogActor,
+    transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor,
     user_command_persistence_actor::UserCommandPersistenceActor, Actor,
 };
 use events::Event;
@@ -54,7 +54,7 @@ pub async fn subscribe_actors(
         // Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         // Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(UserCommandLogActor::new(Arc::clone(shared_publisher))),
-        Arc::new(UserCommandCanonicityActor::new(Arc::clone(shared_publisher))),
+        Arc::new(CanonicalUserCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferViaCoinbaseActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferActor::new(Arc::clone(shared_publisher))),

@@ -227,7 +227,7 @@ pub struct InternalCommandCanonicityPayload {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UserCommandCanonicityPayload {
+pub struct CanonicalUserCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
     // pub txn_hash: String,    //

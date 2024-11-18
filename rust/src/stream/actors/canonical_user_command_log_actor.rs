@@ -12,7 +12,7 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-pub struct UserCommandCanonicityActor {
+pub struct CanonicalUserCommandLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
@@ -20,7 +20,7 @@ pub struct UserCommandCanonicityActor {
     pub user_commands: Arc<Mutex<HashMap<Height, Vec<UserCommandLogPayload>>>>,
 }
 
-impl UserCommandCanonicityActor {
+impl CanonicalUserCommandLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
             id: "UserCommandCanonicityActor".to_string(),
@@ -38,7 +38,7 @@ impl UserCommandCanonicityActor {
             let user_commands = self.user_commands.lock().await;
             if let Some(entries) = user_commands.get(&Height(update.height)) {
                 for entry in entries.iter().filter(|uc| uc.state_hash == update.state_hash) {
-                    let payload = UserCommandCanonicityPayload {
+                    let payload = CanonicalUserCommandLogPayload {
                         height: entry.height,
                         state_hash: entry.state_hash.to_string(),
                         timestamp: entry.timestamp,
@@ -54,7 +54,7 @@ impl UserCommandCanonicityActor {
                         was_canonical: update.was_canonical,
                     };
                     self.publish(Event {
-                        event_type: EventType::UserCommandCanonicityUpdate,
+                        event_type: EventType::CanonicalUserCommandLog,
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
@@ -70,7 +70,7 @@ impl UserCommandCanonicityActor {
 }
 
 #[async_trait]
-impl Actor for UserCommandCanonicityActor {
+impl Actor for CanonicalUserCommandLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -127,14 +127,14 @@ impl Actor for UserCommandCanonicityActor {
 async fn test_user_command_canonicity_actor_processes_user_command_updates() -> anyhow::Result<()> {
     use crate::stream::{
         mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, UserCommandCanonicityPayload, UserCommandLogPayload},
+        payloads::{BlockCanonicityUpdatePayload, CanonicalUserCommandLogPayload, UserCommandLogPayload},
     };
     use std::sync::atomic::Ordering;
     use tokio::time::timeout;
 
     // Set up a shared publisher and instantiate the actor
     let shared_publisher = Arc::new(SharedPublisher::new(200));
-    let actor = UserCommandCanonicityActor::new(Arc::clone(&shared_publisher));
+    let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
 
     // Subscribe to capture any output events from the actor
     let mut receiver = shared_publisher.subscribe();
@@ -203,7 +203,7 @@ async fn test_user_command_canonicity_actor_processes_user_command_updates() -> 
     assert!(published_event.is_ok(), "Expected a UserCommandCanonicityUpdate event to be published.");
 
     if let Ok(Ok(event)) = published_event {
-        let published_payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+        let published_payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
         assert_eq!(published_payload.height, user_command_payload.height);
         assert_eq!(published_payload.state_hash, user_command_payload.state_hash);
         assert_eq!(published_payload.timestamp, user_command_payload.timestamp);
@@ -232,7 +232,7 @@ async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_f
 
     // Set up the shared publisher and actor
     let shared_publisher = Arc::new(SharedPublisher::new(200));
-    let actor = UserCommandCanonicityActor::new(Arc::clone(&shared_publisher));
+    let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
 
     // Add a UserCommandSummaryPayload event for height 5
     let user_command_5 = UserCommandLogPayload {

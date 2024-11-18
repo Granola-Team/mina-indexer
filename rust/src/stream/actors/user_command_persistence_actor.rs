@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{constants::POSTGRES_CONNECTION_STRING, stream::payloads::UserCommandCanonicityPayload};
+use crate::{constants::POSTGRES_CONNECTION_STRING, stream::payloads::CanonicalUserCommandLogPayload};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -63,7 +63,7 @@ impl UserCommandPersistenceActor {
         }
     }
 
-    async fn db_upsert(&self, payload: &UserCommandCanonicityPayload) -> Result<u64, &'static str> {
+    async fn db_upsert(&self, payload: &CanonicalUserCommandLogPayload) -> Result<u64, &'static str> {
         let upsert_query = r#"
             INSERT INTO user_commands (
                 height,
@@ -132,8 +132,8 @@ impl Actor for UserCommandPersistenceActor {
         &self.database_inserts
     }
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::UserCommandCanonicityUpdate {
-            let event_payload: UserCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::CanonicalUserCommandLog {
+            let event_payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
 
             match self.db_upsert(&event_payload).await {
                 Ok(affected_rows) => {
