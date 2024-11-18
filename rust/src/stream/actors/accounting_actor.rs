@@ -6,8 +6,8 @@ use super::super::{
 use crate::stream::{
     mainnet_block_models::CommandStatus,
     payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalUserCommandLogPayload, DoubleEntryRecordPayload,
-        InternalCommandCanonicityPayload, InternalCommandType, NewAccountPayload,
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload,
+        DoubleEntryRecordPayload, InternalCommandType, NewAccountPayload,
     },
 };
 use async_trait::async_trait;
@@ -39,7 +39,7 @@ impl AccountingActor {
         self.entries_processed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
-    async fn process_internal_command(&self, payload: &InternalCommandCanonicityPayload) {
+    async fn process_internal_command(&self, payload: &CanonicalInternalCommandLogPayload) {
         let mut source_entry = AccountingEntry {
             entry_type: AccountingEntryType::Debit,
             account: match payload.internal_command_type {
@@ -171,7 +171,7 @@ impl Actor for AccountingActor {
                     }],
                     rhs: vec![AccountingEntry {
                         entry_type: AccountingEntryType::Credit,
-                        account: format!("AccountCreationFee#{}", payload.height),
+                        account: format!("AccountCreationFee#{}", payload.state_hash),
                         account_type: AccountingEntryAccountType::VirtualAddess,
                         amount_nanomina: 1_000_000_000,
                         timestamp: 0,
@@ -180,8 +180,8 @@ impl Actor for AccountingActor {
 
                 self.publish_transaction(&double_entry_record).await;
             }
-            EventType::InternalCommandCanonicityUpdate => {
-                let payload: InternalCommandCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+            EventType::CanonicalInternalCommandLog => {
+                let payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
                 // not canonical, and never wasn't before. No need to deduct
                 if !payload.canonical && !payload.was_canonical {
                     return;
@@ -209,7 +209,7 @@ impl Actor for AccountingActor {
 #[cfg(test)]
 mod accounting_actor_tests {
     use super::*;
-    use crate::stream::payloads::{CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandCanonicityPayload, InternalCommandType};
+    use crate::stream::payloads::{CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType};
     use std::sync::{atomic::Ordering, Arc};
     use tokio::time::timeout;
 
@@ -421,7 +421,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_coinbase_canonical_true() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::Coinbase,
             height: 300,
             state_hash: "state_hash_4".to_string(),
@@ -451,7 +451,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_coinbase_canonical_false() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::Coinbase,
             height: 300,
             state_hash: "state_hash_4".to_string(),
@@ -481,7 +481,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_fee_transfer_canonical_true() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::FeeTransfer,
             height: 300,
             state_hash: "state_hash_5".to_string(),
@@ -511,7 +511,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_fee_transfer_canonical_false() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::FeeTransfer,
             height: 300,
             state_hash: "state_hash_5".to_string(),
@@ -525,7 +525,7 @@ mod accounting_actor_tests {
 
         actor
             .handle_event(Event {
-                event_type: EventType::InternalCommandCanonicityUpdate,
+                event_type: EventType::CanonicalInternalCommandLog,
                 payload: sonic_rs::to_string(&payload).unwrap(),
             })
             .await;
@@ -539,7 +539,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_fee_transfer_via_coinbase_canonical_true() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
             height: 300,
             state_hash: "state_hash_6".to_string(),
@@ -569,7 +569,7 @@ mod accounting_actor_tests {
     async fn test_process_internal_command_fee_transfer_via_coinbase_canonical_false() {
         let (actor, mut receiver) = setup_actor();
 
-        let payload = InternalCommandCanonicityPayload {
+        let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::FeeTransferViaCoinbase,
             height: 300,
             state_hash: "state_hash_6".to_string(),
@@ -639,7 +639,7 @@ mod accounting_actor_tests {
 
             // Verify the RHS (credit) entry
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
-            assert_eq!(published_payload.rhs[0].account, format!("AccountCreationFee#{}", payload.height));
+            assert_eq!(published_payload.rhs[0].account, format!("AccountCreationFee#{}", payload.state_hash));
             assert_eq!(published_payload.rhs[0].account_type, AccountingEntryAccountType::VirtualAddess);
             assert_eq!(published_payload.rhs[0].amount_nanomina, 1_000_000_000);
             assert_eq!(published_payload.rhs[0].timestamp, 0);
