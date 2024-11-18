@@ -3,12 +3,12 @@ use actors::{
     accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
     block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
-    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_user_command_log_actor::CanonicalUserCommandLogActor,
-    canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
-    fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
-    internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
-    mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor, Actor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
+    canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
+    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    internal_command_persistence_actor::InternalCommandPersistenceActor, mainnet_block_parser_actor::MainnetBlockParserActor,
+    new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor, transition_frontier_actor::TransitionFrontierActor,
+    user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -58,7 +58,7 @@ pub async fn subscribe_actors(
         Arc::new(CoinbaseTransferActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferViaCoinbaseActor::new(Arc::clone(shared_publisher))),
         Arc::new(FeeTransferActor::new(Arc::clone(shared_publisher))),
-        Arc::new(InternalCommandCanonicityActor::new(Arc::clone(shared_publisher))),
+        Arc::new(CanonicalInternalCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),

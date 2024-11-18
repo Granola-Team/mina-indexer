@@ -12,7 +12,7 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-pub struct InternalCommandCanonicityActor {
+pub struct CanonicalInternalCommandLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
@@ -20,10 +20,10 @@ pub struct InternalCommandCanonicityActor {
     pub internal_commands: Arc<Mutex<HashMap<Height, Vec<InternalCommandLogPayload>>>>,
 }
 
-impl InternalCommandCanonicityActor {
+impl CanonicalInternalCommandLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "InternalCommandCanonicityActor".to_string(),
+            id: "CanonicalInternalCommandLogActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
             block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
@@ -66,7 +66,7 @@ impl InternalCommandCanonicityActor {
 }
 
 #[async_trait]
-impl Actor for InternalCommandCanonicityActor {
+impl Actor for CanonicalInternalCommandLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -131,7 +131,7 @@ mod internal_command_canonicity_actor_tests {
     #[tokio::test]
     async fn test_internal_command_canonicity_actor_processes_internal_command_updates() -> anyhow::Result<()> {
         let shared_publisher = Arc::new(SharedPublisher::new(200));
-        let actor = InternalCommandCanonicityActor::new(Arc::clone(&shared_publisher));
+        let actor = CanonicalInternalCommandLogActor::new(Arc::clone(&shared_publisher));
 
         let mut receiver = shared_publisher.subscribe();
 
@@ -204,7 +204,7 @@ mod internal_command_canonicity_actor_tests {
     #[tokio::test]
     async fn test_internal_command_canonicity_actor_prunes_internal_commands_on_transition_frontier() -> anyhow::Result<()> {
         let shared_publisher = Arc::new(SharedPublisher::new(200));
-        let actor = InternalCommandCanonicityActor::new(Arc::clone(&shared_publisher));
+        let actor = CanonicalInternalCommandLogActor::new(Arc::clone(&shared_publisher));
 
         {
             let mut internal_commands = actor.internal_commands.lock().await;
@@ -263,7 +263,7 @@ mod internal_command_canonicity_actor_tests {
 
         // Set up a shared publisher and instantiate the actor
         let shared_publisher = Arc::new(SharedPublisher::new(200));
-        let actor = InternalCommandCanonicityActor::new(Arc::clone(&shared_publisher));
+        let actor = CanonicalInternalCommandLogActor::new(Arc::clone(&shared_publisher));
 
         // Subscribe to capture any output events from the actor
         let mut receiver = shared_publisher.subscribe();
