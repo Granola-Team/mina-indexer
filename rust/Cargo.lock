@@ -1019,6 +1019,7 @@ dependencies = [
  "futures",
  "rayon",
  "serde",
+ "sha2",
  "sonic-rs",
  "tempfile",
  "tokio",

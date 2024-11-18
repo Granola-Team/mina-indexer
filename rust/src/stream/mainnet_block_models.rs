@@ -4,6 +4,7 @@ use serde::{
     de::{SeqAccess, Visitor},
     Deserializer,
 };
+use sha2::{Digest, Sha256};
 use sonic_rs::{Deserialize, JsonValueTrait, Serialize, Value};
 use std::collections::HashMap;
 
@@ -227,7 +228,7 @@ pub struct Command {
     pub status: Vec<Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum CommandStatus {
     Applied,
     #[default]
@@ -244,7 +245,7 @@ impl fmt::Display for CommandStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum CommandType {
     #[default]
     Payment,
@@ -331,7 +332,7 @@ impl Command {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default, Hash, Debug)]
 pub struct CommandSummary {
     pub memo: String,
     pub fee_payer: String,
@@ -342,6 +343,19 @@ pub struct CommandSummary {
     pub nonce: usize,
     pub fee_nanomina: u64,
     pub amount_nanomina: u64,
+}
+
+impl CommandSummary {
+    // TODO: this needs to use bin_prot
+    // but for now we'll make up a hash
+    pub fn txn_hash(&self) -> String {
+        let serialized = sonic_rs::to_string(self).unwrap();
+        // Use a SHA-256 hasher
+        let mut hasher = Sha256::new();
+        hasher.update(serialized);
+        // Return the hash as a hexadecimal string
+        format!("{:x}", hasher.finalize())
+    }
 }
 
 fn deserialize_signed_command<'de, D>(deserializer: D) -> Result<Option<SignedCommand>, D::Error>

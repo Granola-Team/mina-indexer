@@ -40,6 +40,7 @@ impl CanonicalUserCommandLogActor {
                 for entry in entries.iter().filter(|uc| uc.state_hash == update.state_hash) {
                     let payload = CanonicalUserCommandLogPayload {
                         height: entry.height,
+                        txn_hash: entry.txn_hash.to_string(),
                         state_hash: entry.state_hash.to_string(),
                         timestamp: entry.timestamp,
                         txn_type: entry.txn_type.clone(),

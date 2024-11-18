@@ -170,7 +170,7 @@ pub struct CanonicalBlockLogPayload {
 pub struct UserCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
-    // pub txn_hash: String,    //
+    pub txn_hash: String,
     pub timestamp: u64,
     pub txn_type: CommandType,
     pub status: CommandStatus,
@@ -230,7 +230,7 @@ pub struct InternalCommandCanonicityPayload {
 pub struct CanonicalUserCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
-    // pub txn_hash: String,    //
+    pub txn_hash: String,
     pub timestamp: u64,
     pub txn_type: CommandType,
     pub status: CommandStatus,

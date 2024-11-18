@@ -227,6 +227,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
             txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
@@ -282,6 +283,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
             txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
@@ -349,6 +351,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
             txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
