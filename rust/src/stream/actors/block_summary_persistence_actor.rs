@@ -195,10 +195,15 @@ impl Actor for BlockSummaryPersistenceActor {
                     last_vrf_output: event_payload.last_vrf_output,
                     metadata_str: Some(event.payload),
                 };
-                if node.height.0 == 1 {
+                if tree.is_empty() {
                     tree.set_root(node).unwrap();
-                } else {
+                } else if tree.has_parent(&node) {
                     tree.add_node(node).unwrap();
+                } else {
+                    println!(
+                        "Attempted to add block and height {} and state_hash {} but found no parent",
+                        node.height.0, node.state_hash.0
+                    )
                 }
                 drop(tree);
                 self.upsert_block_summary().await.unwrap();

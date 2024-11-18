@@ -128,7 +128,10 @@ impl Actor for BlockCanonicityActor {
                 }
                 blockchain_tree.prune_tree().unwrap();
             } else {
-                panic!("Block received out of order");
+                println!(
+                    "Attempted to add block and height {} and state_hash {} but found no parent",
+                    next_node.height.0, next_node.state_hash.0
+                )
             }
         }
     }

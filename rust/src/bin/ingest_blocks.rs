@@ -14,7 +14,15 @@ use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    println!("Starting...");
+    let args: Vec<String> = env::args().collect();
+
+    let mut root_node = None;
+    if args.len() == 3 {
+        root_node = Some((args[1].parse::<u64>().unwrap(), args[2].to_string()));
+        println!("Starting from canonical root at height {} and state hash {}", &args[1], &args[2]);
+    } else {
+        println!("Starting from genesis root");
+    }
 
     // Create a shutdown channel
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
@@ -27,16 +35,22 @@ async fn main() -> Result<()> {
     let shared_publisher = Arc::new(SharedPublisher::new(CHANNEL_MESSAGE_CAPACITY));
 
     // Spawn tasks
-    let process_handle = spawn_actor_subscribers(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe());
+    let process_handle = spawn_actor_subscribers(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe(), root_node.is_some());
 
-    // Publish genesis block after a brief delay to allow initialization
+    if root_node.is_none() {
+        // Publish genesis block after a brief delay to allow initialization
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        publish_genesis_ledger_double_entries(&shared_publisher)?;
+        // Publish accounts that are excempt from 1 mina account creation fee
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        publish_exempt_accounts(&shared_publisher)?;
+        // Publish the genesis block
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        publish_genesis_block(&shared_publisher)?;
+    }
     tokio::time::sleep(Duration::from_secs(1)).await;
-    publish_genesis_ledger_double_entries(&shared_publisher)?;
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    publish_exempt_accounts(&shared_publisher)?;
-    tokio::time::sleep(Duration::from_secs(1)).await;
-    publish_genesis_block(&shared_publisher)?;
-    let publish_handle = spawn_block_publisher(blocks_dir, Arc::clone(&shared_publisher), shutdown_receiver.resubscribe());
+
+    let publish_handle = spawn_block_publisher(blocks_dir, Arc::clone(&shared_publisher), shutdown_receiver.resubscribe(), root_node);
     let monitor_handle = spawn_monitor(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe());
 
     // Wait for SIGINT to trigger shutdown
@@ -53,9 +67,13 @@ async fn main() -> Result<()> {
 }
 
 /// Spawn a task for subscribing actors to events
-fn spawn_actor_subscribers(shared_publisher: Arc<SharedPublisher>, shutdown_receiver: broadcast::Receiver<()>) -> tokio::task::JoinHandle<()> {
+fn spawn_actor_subscribers(
+    shared_publisher: Arc<SharedPublisher>,
+    shutdown_receiver: broadcast::Receiver<()>,
+    preserve_prior_data: bool,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        if let Err(e) = subscribe_actors(&shared_publisher, shutdown_receiver).await {
+        if let Err(e) = subscribe_actors(&shared_publisher, shutdown_receiver, preserve_prior_data).await {
             eprintln!("Error in actor subscription: {:?}", e);
         }
     })
@@ -66,9 +84,10 @@ fn spawn_block_publisher(
     blocks_dir: PathBuf,
     shared_publisher: Arc<SharedPublisher>,
     shutdown_receiver: broadcast::Receiver<()>,
+    root_node: Option<(u64, String)>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        if let Err(e) = publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await {
+        if let Err(e) = publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver, root_node).await {
             eprintln!("Error publishing block paths: {:?}", e);
         }
     })

@@ -41,7 +41,7 @@ impl BlockchainTree {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.tree.is_empty()
+        self.size() == 0
     }
 
     pub fn set_root(&mut self, node: Node) -> Result<(), &'static str> {

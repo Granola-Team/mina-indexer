@@ -37,6 +37,25 @@ task ingest: [:build] do
   chdir root_dir
 end
 
+desc "Ingest From Root"
+task :ingest_from_root, [:height, :state_hash] => [:build] do |t, args|
+  args.with_defaults(height: nil, state_hash: nil)
+
+  # Construct the command
+  cmd = "cargo run --bin ingest_blocks --"
+  if args.height && args.state_hash
+    cmd += " #{args.height} #{args.state_hash}"
+  end
+
+  # Run the command
+  chdir "rust" do
+    sh cmd
+  end
+
+  chdir root_dir
+end
+
+
 desc "Clean database"
 task :clean_db do
   chdir "rust"

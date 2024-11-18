@@ -230,6 +230,7 @@ mod new_account_actor_tests {
             user_commands: vec![CommandSummary {
                 sender: "B62qnewaccount".to_string(),
                 receiver: "B62qnewaccount".to_string(),
+                fee_payer: "B62qnewaccount".to_string(),
                 ..Default::default()
             }],
             timestamp: 1234567890,

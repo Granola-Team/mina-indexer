@@ -28,15 +28,16 @@ pub mod sourcing;
 pub async fn subscribe_actors(
     shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
+    preserve_prior_data: bool,
 ) -> anyhow::Result<()> {
     println!("Starting process_blocks_dir...");
 
-    let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let block_persistence_actor = BlockSummaryPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher)).await;
-    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher)).await;
+    let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -152,14 +153,14 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
         let shared_publisher = Arc::clone(&shared_publisher);
         let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            subscribe_actors(&shared_publisher, shutdown_receiver).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver, false).await.unwrap();
         }
     });
 
     let blocks_dir = PathBuf::from_str("./src/stream/test_data/100_mainnet_blocks").expect("Directory with mainnet blocks should exist");
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     publish_genesis_block(&shared_publisher).unwrap();
-    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await?;
+    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver, None).await?;
 
     // Wait a short duration for some events to be processed, then trigger shutdown
     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -232,14 +233,14 @@ async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
         let shared_publisher = Arc::clone(&shared_publisher);
         let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            subscribe_actors(&shared_publisher, shutdown_receiver).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver, false).await.unwrap();
         }
     });
 
     let blocks_dir = PathBuf::from_str("./src/stream/test_data/10_mainnet_blocks").expect("Directory with mainnet blocks should exist");
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     publish_genesis_block(&shared_publisher).unwrap();
-    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver).await?;
+    publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver, None).await?;
 
     // Wait a short duration for some events to be processed, then trigger shutdown
     tokio::time::sleep(Duration::from_secs(5)).await;
