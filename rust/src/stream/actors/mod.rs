@@ -8,6 +8,7 @@ pub(crate) mod block_confirmations_actor;
 pub(crate) mod block_log_actor;
 pub(crate) mod blockchain_tree_builder_actor;
 pub(crate) mod canonical_block_log_actor;
+pub(crate) mod canonical_block_log_persistence_actor;
 pub(crate) mod coinbase_transfer_actor;
 pub(crate) mod fee_transfer_actor;
 pub(crate) mod fee_transfer_via_coinbase_actor;

@@ -3,7 +3,8 @@ use actors::{
     accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
     block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
-    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, coinbase_transfer_actor::CoinbaseTransferActor,
+    fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     internal_command_canonicity_actor::InternalCommandCanonicityActor, internal_command_persistence_actor::InternalCommandPersistenceActor,
     mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
     transition_frontier_actor::TransitionFrontierActor, user_command_actor::UserCommandActor, user_command_canonicity_actor::UserCommandCanonicityActor,
@@ -33,6 +34,7 @@ pub async fn subscribe_actors(
     println!("Starting process_blocks_dir...");
 
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let user_command_persistence_actor = UserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let internal_command_persistence_actor = InternalCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
@@ -65,6 +67,7 @@ pub async fn subscribe_actors(
         Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
+        Arc::new(canonical_block_log_persistence_actor),
     ];
 
     let monitor_actors = actors.clone();
