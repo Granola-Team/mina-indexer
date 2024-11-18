@@ -7,13 +7,13 @@ use crate::stream::payloads::{BlockSummaryPayload, GenesisBlockPayload, MainnetB
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
-pub struct BlockSummaryActor {
+pub struct BlockLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
 }
 
-impl BlockSummaryActor {
+impl BlockLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
             id: "BlockSummaryActor".to_string(),
@@ -24,7 +24,7 @@ impl BlockSummaryActor {
 }
 
 #[async_trait]
-impl Actor for BlockSummaryActor {
+impl Actor for BlockLogActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -96,7 +96,7 @@ async fn test_block_summary_actor_handle_event() {
     };
     // Create a shared publisher to test if events are published
     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = BlockSummaryActor::new(Arc::clone(&shared_publisher));
+    let actor = BlockLogActor::new(Arc::clone(&shared_publisher));
 
     // Create a mock MainnetBlockPayload
     let block_payload = MainnetBlockPayload {
