@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{InternalCommandPayload, InternalCommandType, MainnetBlockPayload};
+use crate::stream::payloads::{InternalCommandLogPayload, InternalCommandType, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -36,7 +36,7 @@ impl Actor for CoinbaseTransferActor {
         match event.event_type {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let payload = InternalCommandPayload {
+                let payload = InternalCommandLogPayload {
                     internal_command_type: InternalCommandType::Coinbase,
                     height: block_payload.height,
                     state_hash: block_payload.state_hash.to_string(),
@@ -46,7 +46,7 @@ impl Actor for CoinbaseTransferActor {
                     source: None,
                 };
                 self.publish(Event {
-                    event_type: EventType::InternalCommand,
+                    event_type: EventType::InternalCommandLog,
                     payload: sonic_rs::to_string(&payload).unwrap(),
                 });
             }

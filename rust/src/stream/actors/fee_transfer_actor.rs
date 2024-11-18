@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::{InternalCommandPayload, InternalCommandType, MainnetBlockPayload};
+use crate::stream::payloads::{InternalCommandLogPayload, InternalCommandType, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -40,7 +40,7 @@ impl Actor for FeeTransferActor {
                 let total_snark_fees = block_payload.fee_transfers.iter().map(|ft| ft.fee_nanomina).sum::<u64>();
                 let total_fees_paid = block_payload.user_commands.iter().map(|uc| uc.fee_nanomina).sum::<u64>();
                 if total_fees_paid > total_snark_fees {
-                    let payload = InternalCommandPayload {
+                    let payload = InternalCommandLogPayload {
                         internal_command_type: InternalCommandType::FeeTransfer,
                         height: block_payload.height,
                         state_hash: block_payload.state_hash.clone(),
@@ -50,12 +50,12 @@ impl Actor for FeeTransferActor {
                         source: None,
                     };
                     self.publish(Event {
-                        event_type: EventType::InternalCommand,
+                        event_type: EventType::InternalCommandLog,
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
                 for fee_transfer in block_payload.fee_transfers.iter() {
-                    let payload = InternalCommandPayload {
+                    let payload = InternalCommandLogPayload {
                         internal_command_type: InternalCommandType::FeeTransfer,
                         height: block_payload.height,
                         state_hash: block_payload.state_hash.clone(),
@@ -65,7 +65,7 @@ impl Actor for FeeTransferActor {
                         source: None,
                     };
                     self.publish(Event {
-                        event_type: EventType::InternalCommand,
+                        event_type: EventType::InternalCommandLog,
                         payload: sonic_rs::to_string(&payload).unwrap(),
                     });
                 }
@@ -89,7 +89,7 @@ async fn test_fee_transfer_actor_handle_event() {
     use crate::stream::{
         events::{Event, EventType},
         mainnet_block_models::*,
-        payloads::{InternalCommandPayload, MainnetBlockPayload},
+        payloads::{InternalCommandLogPayload, MainnetBlockPayload},
     };
     use std::sync::Arc;
 
@@ -137,10 +137,10 @@ async fn test_fee_transfer_actor_handle_event() {
     for fee_transfer in block_payload.fee_transfers.iter() {
         // Check if the InternalCommand event was published
         if let Ok(received_event) = receiver.recv().await {
-            assert_eq!(received_event.event_type, EventType::InternalCommand);
+            assert_eq!(received_event.event_type, EventType::InternalCommandLog);
 
             // Deserialize the payload of the InternalCommand event
-            let command_payload: InternalCommandPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
             // Verify that the InternalCommandPayload matches the expected values
             assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);
@@ -164,7 +164,7 @@ async fn test_fee_transfer_actor_handle_event_with_coinbase_payment() {
     use crate::stream::{
         events::{Event, EventType},
         mainnet_block_models::*,
-        payloads::{InternalCommandPayload, MainnetBlockPayload},
+        payloads::{InternalCommandLogPayload, MainnetBlockPayload},
     };
     use std::sync::Arc;
     use tokio::time::timeout;
@@ -227,10 +227,10 @@ async fn test_fee_transfer_actor_handle_event_with_coinbase_payment() {
     // Verify the payment to the coinbase receiver
     if let Ok(received_event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
         let received_event = received_event.unwrap();
-        assert_eq!(received_event.event_type, EventType::InternalCommand);
+        assert_eq!(received_event.event_type, EventType::InternalCommandLog);
 
         // Deserialize the payload of the InternalCommand event
-        let command_payload: InternalCommandPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
         // Verify the coinbase receiver payment
         assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);
@@ -251,10 +251,10 @@ async fn test_fee_transfer_actor_handle_event_with_coinbase_payment() {
     for fee_transfer in block_payload.fee_transfers.iter() {
         if let Ok(received_event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let received_event = received_event.unwrap();
-            assert_eq!(received_event.event_type, EventType::InternalCommand);
+            assert_eq!(received_event.event_type, EventType::InternalCommandLog);
 
             // Deserialize the payload of the InternalCommand event
-            let command_payload: InternalCommandPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
             // Verify the fee transfer payloads
             assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);

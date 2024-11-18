@@ -203,7 +203,7 @@ impl fmt::Display for InternalCommandType {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct InternalCommandPayload {
+pub struct InternalCommandLogPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
     pub state_hash: String,
@@ -214,7 +214,7 @@ pub struct InternalCommandPayload {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct InternalCommandCanonicityPayload {
+pub struct CanonicalInternalCommandLogPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
     pub state_hash: String,

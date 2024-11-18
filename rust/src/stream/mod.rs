@@ -180,8 +180,8 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
             last_best_block = Some(sonic_rs::from_str(&event.payload).unwrap());
         }
         match event.event_type {
-            EventType::InternalCommand => {
-                if let Ok(InternalCommandPayload { internal_command_type, .. }) = sonic_rs::from_str(&event.payload) {
+            EventType::InternalCommandLog => {
+                if let Ok(InternalCommandLogPayload { internal_command_type, .. }) = sonic_rs::from_str(&event.payload) {
                     *internal_command_counts.entry(internal_command_type).or_insert(0) += 1
                 }
             }
