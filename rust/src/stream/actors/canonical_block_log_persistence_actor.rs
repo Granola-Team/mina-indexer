@@ -126,6 +126,7 @@ impl Actor for CanonicalBlockLogPersistenceActor {
         if event.event_type == EventType::CanonicalBlockLog {
             let log: CanonicalBlockLogPayload = sonic_rs::from_str(&event.payload).unwrap();
             self.insert_canonical_block_log(&log).await.unwrap();
+            self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
     }
 
