@@ -3,11 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{
-    blockchain_tree::Height,
-    constants::TRANSITION_FRONTIER_DISTANCE,
-    stream::{payloads::BlockCanonicityUpdatePayload, sourcing::get_millisecond_pause_from_rate},
-};
+use crate::{blockchain_tree::Height, constants::TRANSITION_FRONTIER_DISTANCE, stream::payloads::BlockCanonicityUpdatePayload};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -19,6 +15,7 @@ pub struct TransitionFrontierActor {
     pub transition_frontier: Arc<Mutex<Option<Height>>>,
 }
 
+#[allow(dead_code)]
 impl TransitionFrontierActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
