@@ -4,7 +4,10 @@ use super::{
     shared_publisher::SharedPublisher,
 };
 use crate::{
-    stream::events::{Event, EventType},
+    stream::{
+        events::{Event, EventType},
+        payloads::ActorHeightPayload,
+    },
     utility::extract_height_and_hash,
 };
 use anyhow::Result;
@@ -134,7 +137,6 @@ pub async fn publish_block_dir_paths(
 
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
-        let mut counter = 0;
         async move {
             for entry in entries {
                 let path = entry.as_path();
@@ -143,15 +145,14 @@ pub async fn publish_block_dir_paths(
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
                 });
 
+                let (height, _) = extract_height_and_hash(path);
+
+                shared_publisher.publish(Event {
+                    event_type: EventType::ActorHeight,
+                    payload: sonic_rs::to_string(&ActorHeightPayload { height: height as u64 }).unwrap(),
+                });
+
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
-
-                counter += 1;
-
-                if counter % 50_000 == 0 {
-                    println!("Processed {} files. Pausing for 1 minute...", counter);
-                    tokio::time::sleep(Duration::from_secs(60)).await;
-                    println!("Resuming file publishing...");
-                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
