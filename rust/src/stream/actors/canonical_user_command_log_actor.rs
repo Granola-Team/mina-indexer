@@ -23,7 +23,7 @@ pub struct CanonicalUserCommandLogActor {
 impl CanonicalUserCommandLogActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "UserCommandCanonicityActor".to_string(),
+            id: "CanonicalUserCommandLogActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
             block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
