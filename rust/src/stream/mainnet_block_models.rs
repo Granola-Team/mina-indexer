@@ -31,7 +31,6 @@ impl MainnetBlock {
                 fee_transfers.remove(&ftvc.receiver);
             }
         }
-        fee_transfers.remove(&self.get_coinbase_receiver());
         fee_transfers.retain(|_, v| *v > 0u64);
         fee_transfers
             .into_iter()
