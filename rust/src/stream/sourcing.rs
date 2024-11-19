@@ -147,9 +147,9 @@ pub async fn publish_block_dir_paths(
 
                 counter += 1;
 
-                if counter % 100_000 == 0 {
-                    println!("Processed {} files. Pausing for 3 minutes...", counter);
-                    tokio::time::sleep(Duration::from_secs(3 * 60)).await;
+                if counter % 50_000 == 0 {
+                    println!("Processed {} files. Pausing for 1 minute...", counter);
+                    tokio::time::sleep(Duration::from_secs(60)).await;
                     println!("Resuming file publishing...");
                 }
 
