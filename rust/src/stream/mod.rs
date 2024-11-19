@@ -47,7 +47,7 @@ pub async fn subscribe_actors(
         Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
-        // Arc::new(TransitionFrontierActor::new(Arc::clone(shared_publisher))),
+        Arc::new(TransitionFrontierActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockLogActor::new(Arc::clone(shared_publisher))),
         // Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         // Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
