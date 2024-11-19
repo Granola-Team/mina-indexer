@@ -3,7 +3,10 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::payloads::ActorHeightPayload;
+use crate::{
+    constants::{FILE_PUBLISHER_ACTOR_ID, TRANSITION_FRONTIER_DISTANCE},
+    stream::payloads::ActorHeightPayload,
+};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::{
@@ -40,8 +43,18 @@ impl Actor for MonitorActor {
 
     async fn report(&self) {
         let actor_heights = self.actor_heights.lock().await;
+        let file_publisher_height = actor_heights.get(FILE_PUBLISHER_ACTOR_ID).unwrap_or(&0u64);
         for (actor, height) in actor_heights.iter() {
-            println!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
+            if height < &(file_publisher_height - TRANSITION_FRONTIER_DISTANCE as u64) {
+                eprintln!(
+                    "{}: Actor {} fallen too far behind in processing and will lose data. height {}",
+                    self.id(),
+                    actor,
+                    height
+                );
+            } else {
+                println!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
+            }
         }
     }
 

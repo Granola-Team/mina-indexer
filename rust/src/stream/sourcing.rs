@@ -4,6 +4,7 @@ use super::{
     shared_publisher::SharedPublisher,
 };
 use crate::{
+    constants::FILE_PUBLISHER_ACTOR_ID,
     stream::{
         events::{Event, EventType},
         payloads::ActorHeightPayload,
@@ -150,7 +151,7 @@ pub async fn publish_block_dir_paths(
                 shared_publisher.publish(Event {
                     event_type: EventType::ActorHeight,
                     payload: sonic_rs::to_string(&ActorHeightPayload {
-                        actor: "FilePublisher".to_string(),
+                        actor: FILE_PUBLISHER_ACTOR_ID.to_string(),
                         height: height as u64,
                     })
                     .unwrap(),
