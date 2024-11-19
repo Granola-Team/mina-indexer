@@ -1,5 +1,4 @@
 pub(crate) mod accounting_actor;
-pub(crate) mod accounts_log_actor;
 pub(crate) mod berkeley_block_parser_actor;
 pub(crate) mod best_block_actor;
 pub(crate) mod block_ancestor_actor;
@@ -16,6 +15,7 @@ pub(crate) mod canonical_user_command_persistence_actor;
 pub(crate) mod coinbase_transfer_actor;
 pub(crate) mod fee_transfer_actor;
 pub(crate) mod fee_transfer_via_coinbase_actor;
+pub(crate) mod ledger_actor;
 pub(crate) mod mainnet_block_parser_actor;
 pub(crate) mod new_account_actor;
 pub(crate) mod pcb_path_actor;

@@ -318,7 +318,7 @@ mod new_account_actor_tests {
 
         // Filter the events to ensure no NewAccount event is published for the sender
         let mut received_events = vec![];
-        while let Ok(event) = timeout(std::time::Duration::from_millis(100), receiver.recv()).await {
+        while let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             received_events.push(event.unwrap());
         }
 
