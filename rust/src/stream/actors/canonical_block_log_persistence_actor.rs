@@ -127,10 +127,19 @@ impl Actor for CanonicalBlockLogPersistenceActor {
             let log: CanonicalBlockLogPayload = sonic_rs::from_str(&event.payload).unwrap();
             self.insert_canonical_block_log(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.publish(Event {
+                event_type: EventType::ActorHeight,
+                payload: sonic_rs::to_string(&ActorHeightPayload {
+                    actor: self.id(),
+                    height: log.height,
+                })
+                .unwrap(),
+            });
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -302,5 +311,52 @@ mod canonical_block_log_persistence_tests {
         assert_eq!(row.get::<_, String>("last_vrf_output"), payload2.last_vrf_output);
         assert_eq!(row.get::<_, bool>("is_berkeley_block"), payload2.is_berkeley_block);
         assert_eq!(row.get::<_, bool>("canonical"), payload2.canonical);
+    }
+
+    #[tokio::test]
+    async fn test_actor_height_event_published() {
+        let (actor, _, mut receiver) = setup_actor().await;
+
+        // Create a payload for a canonical block log
+        let payload = CanonicalBlockLogPayload {
+            height: 300,
+            state_hash: "state_hash_300".to_string(),
+            previous_state_hash: "state_hash_299".to_string(),
+            user_command_count: 15,
+            snark_work_count: 5,
+            timestamp: 1627891234,
+            coinbase_receiver: "receiver_300".to_string(),
+            coinbase_reward_nanomina: 3000,
+            global_slot_since_genesis: 120,
+            last_vrf_output: "vrf_output_300".to_string(),
+            is_berkeley_block: false,
+            canonical: true,
+        };
+
+        // Create and publish the event
+        let event = Event {
+            event_type: EventType::CanonicalBlockLog,
+            payload: sonic_rs::to_string(&payload).unwrap(),
+        };
+
+        actor.handle_event(event).await;
+
+        // Listen for the `ActorHeight` event
+        let received_event = receiver.recv().await.unwrap();
+
+        // Verify the event type is `ActorHeight`
+        assert_eq!(received_event.event_type, EventType::ActorHeight);
+
+        // Deserialize the payload
+        let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+
+        // Validate the `ActorHeightPayload` content
+        assert_eq!(actor_height_payload.actor, actor.id());
+        assert_eq!(actor_height_payload.height, payload.height);
+
+        println!(
+            "ActorHeight event published: actor = {}, height = {}",
+            actor_height_payload.actor, actor_height_payload.height
+        );
     }
 }

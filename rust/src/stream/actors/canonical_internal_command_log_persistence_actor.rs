@@ -3,7 +3,10 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{constants::POSTGRES_CONNECTION_STRING, stream::payloads::CanonicalInternalCommandLogPayload};
+use crate::{
+    constants::POSTGRES_CONNECTION_STRING,
+    stream::payloads::{ActorHeightPayload, CanonicalInternalCommandLogPayload},
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -128,6 +131,14 @@ impl Actor for CanonicalInternalCommandLogPersistenceActor {
                     assert_eq!(affected_rows, 1);
                     self.shared_publisher.incr_database_insert();
                     self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    self.publish(Event {
+                        event_type: EventType::ActorHeight,
+                        payload: sonic_rs::to_string(&ActorHeightPayload {
+                            actor: self.id(),
+                            height: event_payload.height,
+                        })
+                        .unwrap(),
+                    });
                 }
                 Err(e) => {
                     panic!("{}", e);
@@ -289,5 +300,49 @@ mod canonical_internal_command_log_tests {
         assert_eq!(row.get::<_, i64>("amount_nanomina"), payload2.amount_nanomina as i64);
         assert_eq!(row.get::<_, String>("recipient"), payload2.recipient);
         assert_eq!(row.get::<_, bool>("is_canonical"), payload2.canonical);
+    }
+
+    #[tokio::test]
+    async fn test_actor_height_event_published() {
+        let (actor, _, mut receiver) = setup_actor().await;
+
+        // Create a payload for a canonical internal command
+        let payload = CanonicalInternalCommandLogPayload {
+            internal_command_type: InternalCommandType::Coinbase,
+            height: 150,
+            state_hash: "state_hash_150".to_string(),
+            timestamp: 1234567890,
+            amount_nanomina: 10000,
+            recipient: "recipient_150".to_string(),
+            canonical: true,
+            source: None,
+            was_canonical: false,
+        };
+
+        // Create and publish the event
+        let event = Event {
+            event_type: EventType::CanonicalInternalCommandLog,
+            payload: sonic_rs::to_string(&payload).unwrap(),
+        };
+
+        actor.handle_event(event).await;
+
+        // Listen for the `ActorHeight` event
+        let received_event = receiver.recv().await.unwrap();
+
+        // Verify the event type is `ActorHeight`
+        assert_eq!(received_event.event_type, EventType::ActorHeight);
+
+        // Deserialize the payload
+        let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+
+        // Validate the `ActorHeightPayload` content
+        assert_eq!(actor_height_payload.actor, actor.id());
+        assert_eq!(actor_height_payload.height, payload.height);
+
+        println!(
+            "ActorHeight event published: actor = {}, height = {}",
+            actor_height_payload.actor, actor_height_payload.height
+        );
     }
 }
