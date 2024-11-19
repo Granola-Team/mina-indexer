@@ -91,6 +91,7 @@ pub async fn publish_block_dir_paths(
     mut shutdown_receiver: broadcast::Receiver<()>,
     root_node: Option<(u64, String)>, // height and state hash
 ) -> Result<()> {
+    let millisecond_pause = get_millisecond_pause_from_rate();
     let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir.clone())?
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
@@ -142,7 +143,7 @@ pub async fn publish_block_dir_paths(
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
                 });
 
-                tokio::time::sleep(Duration::from_millis(100)).await; // Adjust duration as needed
+                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
 
                 counter += 1;
 
@@ -167,6 +168,16 @@ pub async fn publish_block_dir_paths(
     }
 
     Ok(())
+}
+
+pub fn get_publish_rate() -> u64 {
+    std::env::var("PUBLISH_RATE_PER_SECOND")
+        .map(|rate_str| rate_str.parse::<u64>().ok().unwrap())
+        .unwrap_or(10)
+}
+
+pub fn get_millisecond_pause_from_rate() -> u64 {
+    1000u64 / get_publish_rate()
 }
 
 #[cfg(test)]

@@ -3,7 +3,11 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{blockchain_tree::Height, constants::TRANSITION_FRONTIER_DISTANCE, stream::payloads::BlockCanonicityUpdatePayload};
+use crate::{
+    blockchain_tree::Height,
+    constants::TRANSITION_FRONTIER_DISTANCE,
+    stream::{payloads::BlockCanonicityUpdatePayload, sourcing::get_millisecond_pause_from_rate},
+};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
@@ -52,6 +56,13 @@ impl Actor for TransitionFrontierActor {
                 }
                 _ => return, // Early return if no action is needed
             }
+            // Slow down the publishing of transition frontier events.
+            // This event is often used to trim internal structures in
+            // other actors, and having a publish rate that exceeds processing
+            // of other actors can result in lost data. For this reason, we publish
+            // a EventType::TransitionFrontier at a rate twice as slow as the publish rate
+            let millisecond_pause = get_millisecond_pause_from_rate();
+            tokio::time::sleep(std::time::Duration::from_millis(millisecond_pause * 2)).await;
             self.publish(Event {
                 event_type: EventType::TransitionFrontier,
                 payload: get_transition_frontier(&payload).to_string(),
