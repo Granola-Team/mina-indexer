@@ -17,6 +17,7 @@ pub(crate) mod fee_transfer_actor;
 pub(crate) mod fee_transfer_via_coinbase_actor;
 pub(crate) mod ledger_actor;
 pub(crate) mod mainnet_block_parser_actor;
+pub(crate) mod monitor_actor;
 pub(crate) mod new_account_actor;
 pub(crate) mod pcb_path_actor;
 pub(crate) mod snark_canonicity_summary_actor;

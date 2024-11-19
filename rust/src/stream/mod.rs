@@ -7,8 +7,8 @@ use actors::{
     canonical_internal_command_log_persistence_actor::CanonicalInternalCommandLogPersistenceActor,
     canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
-    ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor, Actor,
+    ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
+    pcb_path_actor::PCBBlockPathActor, transition_frontier_actor::TransitionFrontierActor, user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -60,6 +60,7 @@ pub async fn subscribe_actors(
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
+        Arc::new(MonitorActor::new(Arc::clone(shared_publisher))),
         // Arc::new(snark_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
