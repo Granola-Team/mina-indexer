@@ -141,7 +141,7 @@ pub async fn publish_block_dir_paths(
                     payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
                 });
 
-                tokio::time::sleep(Duration::from_millis(50)).await; // Adjust duration as needed
+                tokio::time::sleep(Duration::from_millis(100)).await; // Adjust duration as needed
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
