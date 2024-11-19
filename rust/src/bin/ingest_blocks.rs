@@ -23,7 +23,10 @@ async fn main() -> Result<()> {
     } else {
         println!("Starting from genesis root");
     }
+    async_main(root_node).await
+}
 
+async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
     // Create a shutdown channel
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
@@ -120,3 +123,57 @@ fn spawn_monitor(shared_publisher: Arc<SharedPublisher>, mut shutdown_receiver: 
         }
     })
 }
+
+// #[cfg(test)]
+// mod ingest_blocks_tests {
+//     use super::*;
+//     use anyhow::Result;
+//     use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
+//     use std::env;
+//     use tokio_postgres::{Client, NoTls};
+
+//     async fn setup_client() -> Client {
+//         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+//             .await
+//             .expect("Failed to connect to the database");
+
+//         tokio::spawn(async move {
+//             if let Err(e) = connection.await {
+//                 eprintln!("Database connection error: {}", e);
+//             }
+//         });
+
+//         client
+//     }
+
+//     #[tokio::test]
+//     async fn test_ledger_at_height_5000() -> Result<()> {
+//         env::set_var("BLOCKS_DIR", "./src/stream/test_data/5000_mainnet_blocks");
+
+//         let client = setup_client().await;
+
+//         let main_handle = tokio::spawn(async { async_main(None).await });
+
+//         // Allow time for processing to complete
+//         tokio::time::sleep(std::time::Duration::from_secs(5 * 60)).await;
+
+//         drop(main_handle);
+//         // -- 472 (fee transfer goes to coinbase receiver)
+
+//         // 1. Assert that the number of accounts in the ledger is correct. This includes accounts that did not make it into the canonical chain at any point.
+//         let row = client
+//             .query_one(
+//                 "SELECT count(distinct address) FROM blockchain_ledger WHERE address_type = 'BlockchainAddress'",
+//                 &[],
+//             )
+//             .await
+//             .expect("Failed to query database");
+
+//         let count: i64 = row.get(0);
+
+//         assert_eq!(count, 1980, "No data was inserted into the database");
+//         println!("Number of rows with address_type='BlockchainAddress': {}", count);
+
+//         Ok(())
+//     }
+// }
