@@ -127,10 +127,19 @@ impl Actor for CanonicalUserCommandPersistenceActor {
             let log: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
             self.insert_canonical_user_command_log(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.publish(Event {
+                event_type: EventType::ActorHeight,
+                payload: sonic_rs::to_string(&ActorHeightPayload {
+                    actor: self.id(),
+                    height: log.height,
+                })
+                .unwrap(),
+            });
         }
     }
 
     fn publish(&self, event: Event) {
+        self.incr_event_published();
         self.shared_publisher.publish(event);
     }
 }
@@ -304,5 +313,49 @@ mod canonical_user_command_log_persistence_tests {
         assert_eq!(row.get::<_, String>("state_hash"), payload2.state_hash);
         assert_eq!(row.get::<_, String>("txn_hash"), payload2.txn_hash);
         assert_eq!(row.get::<_, bool>("canonical"), payload2.canonical);
+    }
+
+    #[tokio::test]
+    async fn test_actor_height_event_published() {
+        let (actor, _, mut receiver) = setup_actor().await;
+
+        // Create a payload for a canonical user command
+        let payload = CanonicalUserCommandLogPayload {
+            height: 200,
+            txn_hash: "txn_hash_2".to_string(),
+            state_hash: "state_hash_200".to_string(),
+            timestamp: 987654321,
+            txn_type: CommandType::Payment,
+            status: CommandStatus::Applied,
+            sender: "sender_2".to_string(),
+            receiver: "receiver_2".to_string(),
+            nonce: 43,
+            fee_nanomina: 1500,
+            fee_payer: "fee_payer_2".to_string(),
+            amount_nanomina: 7500,
+            canonical: true,
+            was_canonical: false,
+        };
+
+        // Create and publish the event
+        let event = Event {
+            event_type: EventType::CanonicalUserCommandLog,
+            payload: sonic_rs::to_string(&payload).unwrap(),
+        };
+
+        actor.handle_event(event).await;
+
+        // Listen for the `ActorHeight` event
+        let received_event = receiver.recv().await.unwrap();
+
+        // Verify the event type is `ActorHeight`
+        assert_eq!(received_event.event_type, EventType::ActorHeight);
+
+        // Deserialize the payload
+        let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+
+        // Validate the `ActorHeightPayload` content
+        assert_eq!(actor_height_payload.actor, actor.id());
+        assert_eq!(actor_height_payload.height, payload.height);
     }
 }
