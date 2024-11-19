@@ -149,7 +149,11 @@ impl Actor for LedgerActor {
                         self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         self.publish(Event {
                             event_type: EventType::ActorHeight,
-                            payload: sonic_rs::to_string(&ActorHeightPayload { height: event_payload.height }).unwrap(),
+                            payload: sonic_rs::to_string(&ActorHeightPayload {
+                                actor: self.id(),
+                                height: event_payload.height,
+                            })
+                            .unwrap(),
                         });
                     }
                     Err(e) => {

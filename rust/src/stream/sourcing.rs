@@ -149,7 +149,11 @@ pub async fn publish_block_dir_paths(
 
                 shared_publisher.publish(Event {
                     event_type: EventType::ActorHeight,
-                    payload: sonic_rs::to_string(&ActorHeightPayload { height: height as u64 }).unwrap(),
+                    payload: sonic_rs::to_string(&ActorHeightPayload {
+                        actor: "FilePublisher".to_string(),
+                        height: height as u64,
+                    })
+                    .unwrap(),
                 });
 
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
