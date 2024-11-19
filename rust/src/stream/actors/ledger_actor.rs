@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{AccountingEntry, AccountingEntryType, DoubleEntryRecordPayload},
+    stream::payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -147,6 +147,10 @@ impl Actor for LedgerActor {
                         assert_eq!(affected_rows, 1);
                         self.shared_publisher.incr_database_insert();
                         self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        self.publish(Event {
+                            event_type: EventType::ActorHeight,
+                            payload: sonic_rs::to_string(&ActorHeightPayload { height: event_payload.height }).unwrap(),
+                        });
                     }
                     Err(e) => {
                         panic!("{:?}", e);
@@ -357,6 +361,56 @@ mod blockchain_ledger_actor_tests {
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_publishes_heights() {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = LedgerActor::new(Arc::clone(&shared_publisher), false).await;
+
+        // Define a double-entry transaction payload
+        let double_entry_payload = DoubleEntryRecordPayload {
+            height: 15,
+            state_hash: "test_state_hash".to_string(),
+            lhs: vec![AccountingEntry {
+                entry_type: AccountingEntryType::Debit,
+                account: "lhs_account".to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1000,
+                timestamp: 123456789,
+                counterparty: "counterparty_1".to_string(),
+                transfer_type: "transfer_type_1".to_string(),
+            }],
+            rhs: vec![AccountingEntry {
+                entry_type: AccountingEntryType::Credit,
+                account: "rhs_account".to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1000,
+                timestamp: 123456789,
+                counterparty: "counterparty_1".to_string(),
+                transfer_type: "transfer_type_1".to_string(),
+            }],
+        };
+
+        // Create an event with the payload
+        let event = Event {
+            event_type: EventType::DoubleEntryTransaction,
+            payload: sonic_rs::to_string(&double_entry_payload).unwrap(),
+        };
+
+        let mut receiver = shared_publisher.subscribe();
+
+        // Process the event
+        actor.handle_event(event).await;
+
+        // Verify that the height was published
+        let published_event = receiver.recv().await.expect("No event was published");
+
+        assert_eq!(published_event.event_type, EventType::ActorHeight);
+        let payload: ActorHeightPayload = sonic_rs::from_str(&published_event.payload).expect("Failed to deserialize payload");
+        assert_eq!(payload.height, double_entry_payload.height);
+
+        println!("Published height: {}", payload.height);
     }
 
     // #[tokio::test]

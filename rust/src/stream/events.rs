@@ -23,6 +23,7 @@ pub enum EventType {
     NewAccount,
     BlockConfirmation,
     PreExistingAccount,
+    ActorHeight,
 }
 
 #[derive(Debug, Clone, PartialEq)]

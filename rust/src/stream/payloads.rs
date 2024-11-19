@@ -9,6 +9,11 @@ pub struct NewAccountPayload {
     pub account: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ActorHeightPayload {
+    pub height: u64,
+}
+
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub struct BlockAncestorPayload {
     pub height: u64,
