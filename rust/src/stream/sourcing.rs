@@ -133,6 +133,7 @@ pub async fn publish_block_dir_paths(
 
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
+        let mut counter = 0;
         async move {
             for entry in entries {
                 let path = entry.as_path();
@@ -142,6 +143,14 @@ pub async fn publish_block_dir_paths(
                 });
 
                 tokio::time::sleep(Duration::from_millis(100)).await; // Adjust duration as needed
+
+                counter += 1;
+
+                if counter % 100_000 == 0 {
+                    println!("Processed {} files. Pausing for 3 minutes...", counter);
+                    tokio::time::sleep(Duration::from_secs(3 * 60)).await; // Pause for 5 minutes
+                    println!("Resuming file publishing...");
+                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
