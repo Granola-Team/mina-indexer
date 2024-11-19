@@ -1,6 +1,6 @@
 use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
 use actors::{
-    accounting_actor::AccountingActor, accounts_log_actor::AccountsLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    accounting_actor::AccountingActor, accounts_log_actor::LedgerActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
     best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
     block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
     canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
@@ -37,7 +37,7 @@ pub async fn subscribe_actors(
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let account_summary_persistence_actor = AccountsLogActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
 
     // Define actors

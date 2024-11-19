@@ -12,14 +12,14 @@ use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::{Client, NoTls};
 
-pub struct AccountsLogActor {
+pub struct LedgerActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub client: Client,
 }
 
-impl AccountsLogActor {
+impl LedgerActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
@@ -28,13 +28,13 @@ impl AccountsLogActor {
                 }
             });
             if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS accounts_log CASCADE;", &[]).await {
-                    println!("Unable to drop accounts_log table {:?}", e);
+                if let Err(e) = client.execute("DROP TABLE IF EXISTS blockchain_ledger CASCADE;", &[]).await {
+                    println!("Unable to drop blockchain_ledger table {:?}", e);
                 }
             }
             if let Err(e) = client
                 .execute(
-                    "CREATE TABLE IF NOT EXISTS accounts_log (
+                    "CREATE TABLE IF NOT EXISTS blockchain_ledger (
                         address TEXT NOT NULL,
                         address_type TEXT NOT NULL,
                         balance_delta BIGINT NOT NULL,
@@ -49,7 +49,7 @@ impl AccountsLogActor {
                 )
                 .await
             {
-                println!("Unable to create accounts_log table {:?}", e);
+                println!("Unable to create blockchain_ledger table {:?}", e);
             }
             if let Err(e) = client
                 .execute(
@@ -60,7 +60,7 @@ impl AccountsLogActor {
                         SUM(balance_delta) AS balance,
                         MAX(height) AS latest_height
                     FROM
-                        accounts_log
+                        blockchain_ledger
                     GROUP BY
                         address, address_type
                     ORDER BY
@@ -72,7 +72,7 @@ impl AccountsLogActor {
                 println!("Unable to create account_summary table {:?}", e);
             }
             Self {
-                id: "AccountSummaryPersistenceActor".to_string(),
+                id: "LedgerActor".to_string(),
                 shared_publisher,
                 client,
                 database_inserts: AtomicUsize::new(0),
@@ -84,7 +84,7 @@ impl AccountsLogActor {
 
     async fn log_accounting_entry(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
         let upsert_query = r#"
-            INSERT INTO accounts_log (address, address_type, balance_delta, height, state_hash, timestamp, counterparty, transfer_type)
+            INSERT INTO blockchain_ledger (address, address_type, balance_delta, height, state_hash, timestamp, counterparty, transfer_type)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
         "#;
 
@@ -113,7 +113,7 @@ impl AccountsLogActor {
             Err(e) => {
                 let msg = e.to_string();
                 println!("{}", msg);
-                Err("unable to upsert into accounts_log table")
+                Err("unable to upsert into blockchain_ledger table")
             }
             Ok(affected_rows) => Ok(affected_rows),
         }
@@ -121,7 +121,7 @@ impl AccountsLogActor {
 }
 
 #[async_trait]
-impl Actor for AccountsLogActor {
+impl Actor for LedgerActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -163,7 +163,7 @@ impl Actor for AccountsLogActor {
 }
 
 #[cfg(test)]
-mod accounts_log_actor_tests {
+mod blockchain_ledger_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
@@ -176,7 +176,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(shared_publisher, false).await;
+        let actor = LedgerActor::new(shared_publisher, false).await;
 
         // Accounting entry payload
         let accounting_entry = AccountingEntry {
@@ -204,7 +204,7 @@ mod accounts_log_actor_tests {
         // Query the database directly to validate the record
         let rows = actor
             .client
-            .query("SELECT * FROM accounts_log WHERE address = $1", &[&accounting_entry.account])
+            .query("SELECT * FROM blockchain_ledger WHERE address = $1", &[&accounting_entry.account])
             .await
             .expect("Failed to query database");
         assert_eq!(rows.len(), 1);
@@ -222,7 +222,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(shared_publisher, false).await;
+        let actor = LedgerActor::new(shared_publisher, false).await;
 
         // Initial accounting entry
         let accounting_entry = AccountingEntry {
@@ -269,7 +269,7 @@ mod accounts_log_actor_tests {
         let rows = actor
             .client
             .query(
-                "SELECT * FROM accounts_log WHERE address = $1 ORDER BY timestamp ASC",
+                "SELECT * FROM blockchain_ledger WHERE address = $1 ORDER BY timestamp ASC",
                 &[&updated_entry.account],
             )
             .await
@@ -297,7 +297,7 @@ mod accounts_log_actor_tests {
     // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = AccountsLogActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = LedgerActor::new(Arc::clone(&shared_publisher), false).await;
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {
@@ -334,7 +334,7 @@ mod accounts_log_actor_tests {
         for account in ["lhs_account", "rhs_account"] {
             let rows = actor
                 .client
-                .query("SELECT * FROM accounts_log WHERE address = $1", &[&account])
+                .query("SELECT * FROM blockchain_ledger WHERE address = $1", &[&account])
                 .await
                 .expect("Failed to query database");
             assert!(!rows.is_empty(), "No records found for account: {}", account);
@@ -468,17 +468,17 @@ mod accounts_log_actor_tests {
 
     //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-    //     // Query the accounts_log table to verify entries
+    //     // Query the blockchain_ledger table to verify entries
     //     let log_rows = actor
     //         .client
-    //         .query("SELECT * FROM accounts_log ORDER BY entry_id", &[])
+    //         .query("SELECT * FROM blockchain_ledger ORDER BY entry_id", &[])
     //         .await
-    //         .expect("Failed to query accounts_log table");
+    //         .expect("Failed to query blockchain_ledger table");
 
     //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
     //     // Assert that the number of log entries matches the expected count
-    //     assert_eq!(log_rows.len(), 8, "Unexpected number of log entries in accounts_log");
+    //     assert_eq!(log_rows.len(), 8, "Unexpected number of log entries in blockchain_ledger");
 
     //     // Verify individual log entries
     //     let expected_logs = vec![
