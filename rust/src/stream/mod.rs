@@ -31,8 +31,6 @@ pub async fn subscribe_actors(
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
     preserve_prior_data: bool,
 ) -> anyhow::Result<()> {
-    println!("Starting process_blocks_dir...");
-
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
     let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
