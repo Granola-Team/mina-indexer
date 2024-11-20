@@ -18,6 +18,7 @@ use tokio::{sync::broadcast, task};
 
 mod actors;
 pub mod berkeley_block_models;
+pub mod canonical_items_manager;
 pub mod events;
 pub mod genesis_ledger_models;
 pub mod mainnet_block_models;
