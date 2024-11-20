@@ -29,12 +29,12 @@ standard.pkg-path = "rubyPackages.standard"
 # Database
 duckdb.pkg-path = "duckdb"
 postgresql_16.pkg-path = "postgresql_16"
-timescaledb.pkg-path = "timescaledb"
 sqlfluff.pkg-path = "sqlfluff"
 
 # Cargo
 cargo-machete.pkg-path = "cargo-machete"
 cargo-edit.pkg-path = "cargo-edit"
+libpqxx.pkg-path = "libpqxx"
 
 # Misc
 
@@ -61,12 +61,10 @@ on-activate = """
 
         # Configure postgresql.conf
         cat > \"$PGDATA/postgresql.conf\" << EOF
-shared_preload_libraries = 'timescaledb'
 max_connections = 100
 shared_buffers = '1GB'
 effective_cache_size = '3GB'
 maintenance_work_mem = '256MB'
-timescaledb.telemetry_level = off
 unix_socket_permissions = 0700
 unix_socket_directories = '${PGHOST}'
 listen_addresses = '*'
@@ -93,8 +91,11 @@ EOF
             createdb -U $PGUSER -h $PGHOST -p $PGPORT $PGDATABASE
         fi
 
-        psql -d $PGDATABASE -c \"CREATE EXTENSION IF NOT EXISTS timescaledb\"
+        ./db/install_pg_graphql.sh
+        ./db/install_postgrest.sh
     fi
+
+    nohup postgrest db/postgrest.conf > db/postgrest.log 2>&1 &
 """
 
 [profile]
