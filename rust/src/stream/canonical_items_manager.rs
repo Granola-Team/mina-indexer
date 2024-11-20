@@ -52,45 +52,23 @@ where
     }
 
     pub async fn report(&self, prefix: &str) {
-        {
-            let updates = self.block_canonicity_updates.lock().await;
-            if let Some(lowest_height) = updates.keys().map(|k| k.height).min() {
-                let max_height = updates.keys().map(|k| k.height).max().unwrap();
+        async fn log_collection<T>(prefix: &str, name: &str, collection: &Mutex<HashMap<CompositeKey, T>>) {
+            let map = collection.lock().await;
+            if let (Some(lowest_height), Some(max_height)) = (map.keys().map(|k| k.height).min(), map.keys().map(|k| k.height).max()) {
                 println!(
-                    "{}: Collection BlockCanonicityUpdates is of size {} and lowest key range is ({},{})",
+                    "{}: Collection {} is of size {} and key range is ({},{})",
                     prefix,
-                    updates.len(),
-                    lowest_height,
-                    max_height,
-                )
-            }
-        }
-        {
-            let counts = self.expected_counts.lock().await;
-            if let Some(lowest_height) = counts.keys().map(|k| k.height).min() {
-                let max_height = counts.keys().map(|k| k.height).max().unwrap();
-                println!(
-                    "{}: Collection ExpectedCounts is of size {} and lowest key range is ({},{})",
-                    prefix,
-                    counts.len(),
+                    name,
+                    map.len(),
                     lowest_height,
                     max_height
-                )
+                );
             }
         }
-        {
-            let items = self.items.lock().await;
-            if let Some(lowest_height) = items.keys().map(|k| k.height).min() {
-                let max_height = items.keys().map(|k| k.height).max().unwrap();
-                println!(
-                    "{}: Collection ExpectedCounts is of size {} and lowest key range is ({},{})",
-                    prefix,
-                    items.len(),
-                    lowest_height,
-                    max_height
-                )
-            }
-        }
+
+        log_collection(prefix, "BlockCanonicityUpdates", &self.block_canonicity_updates).await;
+        log_collection(prefix, "ExpectedCounts", &self.expected_counts).await;
+        log_collection(prefix, "Items", &self.items).await;
     }
 
     pub async fn get_len(&self) -> usize {
@@ -126,37 +104,53 @@ where
         let mut processed_items = Vec::new();
 
         for height in (0..=start_height).rev() {
-            for (key, queue) in updates.iter_mut().filter(|(k, _)| k.height == height) {
-                let mut requeue_updates = VecDeque::new();
+            let keys_to_remove: Vec<_> = updates
+                .iter_mut()
+                .filter(|(k, _)| k.height == height)
+                .filter_map(|(key, queue)| {
+                    let mut requeue_updates = VecDeque::new();
 
-                while let Some(update) = queue.pop_front() {
-                    if let Some(entries) = items.get(key) {
-                        if let Some(&expected_count) = counts.get(key) {
-                            if entries.len() as u64 == expected_count {
-                                let matching_items: Vec<_> = entries.iter().collect();
+                    while let Some(update) = queue.pop_front() {
+                        if let Some(entries) = items.get(key) {
+                            if let Some(&expected_count) = counts.get(key) {
+                                if entries.len() as u64 == expected_count {
+                                    let matching_items: Vec<_> = entries.iter().collect();
 
-                                for item in matching_items {
-                                    let mut cloned_item = item.clone();
-                                    cloned_item.set_canonical(update.canonical);
-                                    cloned_item.set_was_canonical(update.was_canonical);
-                                    processed_items.push(cloned_item);
+                                    for item in matching_items {
+                                        let mut cloned_item = item.clone();
+                                        cloned_item.set_canonical(update.canonical);
+                                        cloned_item.set_was_canonical(update.was_canonical);
+                                        processed_items.push(cloned_item);
+                                    }
+                                } else {
+                                    // Criteria not met; requeue the update
+                                    requeue_updates.push_back(update);
                                 }
                             } else {
-                                // Criteria not met; requeue the update
-                                requeue_updates.push_front(update);
+                                // No count found; requeue the update
+                                requeue_updates.push_back(update);
                             }
                         } else {
-                            // No count found; requeue the update
-                            requeue_updates.push_front(update);
+                            // No entries found; requeue the update
+                            requeue_updates.push_back(update);
                         }
-                    } else {
-                        // No entries found; requeue the update
-                        requeue_updates.push_front(update);
                     }
-                }
 
-                // Reassign the requeued updates back to the queue
-                *queue = requeue_updates;
+                    // Update the queue with remaining updates
+                    *queue = requeue_updates;
+
+                    // Mark the key for removal if the queue is now empty
+                    if queue.is_empty() {
+                        Some(key.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
+            // Remove all keys with empty queues
+            for key in keys_to_remove {
+                updates.remove(&key);
             }
         }
 
@@ -276,7 +270,7 @@ mod canonical_items_manager_tests {
                 );
             } else {
                 assert!(
-                    remaining_updates.get(&composite_key).unwrap().is_empty(),
+                    !remaining_updates.contains_key(&composite_key),
                     "Updates for height {} should be removed after processing",
                     height
                 );
