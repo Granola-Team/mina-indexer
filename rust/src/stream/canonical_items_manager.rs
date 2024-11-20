@@ -157,21 +157,31 @@ where
         processed_items
     }
 
-    pub async fn prune(&self) {
+    pub async fn prune(&self) -> Result<(), String> {
         let mut updates = self.block_canonicity_updates.lock().await;
         let mut items = self.items.lock().await;
         let mut counts = self.expected_counts.lock().await;
 
         if let Some(highest_height) = updates.keys().map(|k| k.height).max() {
             if highest_height < self.prune_limit {
-                return;
+                return Ok(());
             }
             let prune_below = highest_height - self.prune_limit;
 
+            // Check for data below the prune threshold
+            let has_data_below = updates.keys().any(|k| k.height <= prune_below);
+
+            if has_data_below {
+                return Err(format!("Cannot prune: Canonical updates exists below the prune threshold of {}.", prune_below));
+            }
+
+            // Perform the pruning
             updates.retain(|k, _| k.height > prune_below);
             items.retain(|k, _| k.height > prune_below);
             counts.retain(|k, _| k.height > prune_below);
         }
+
+        Ok(())
     }
 }
 
@@ -331,5 +341,126 @@ mod canonical_items_manager_tests {
         // Validate that item_2 remains unprocessed
         let remaining_updates = manager.block_canonicity_updates.lock().await;
         assert!(remaining_updates.contains_key(&CompositeKey::new(10, "state_hash_2")));
+    }
+
+    #[tokio::test]
+    async fn test_prune_successful() {
+        let manager = CanonicalItemsManager::<MockCanonicityItem>::new(4);
+
+        // Add data from height 5 and above
+        for height in 5..=10 {
+            let item = MockCanonicityItem {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: false,
+                was_canonical: false,
+            };
+            manager.add_item(item).await;
+            manager.add_items_count(height, &format!("state_hash_{}", height), 1).await;
+
+            let update = BlockCanonicityUpdatePayload {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: true,
+                was_canonical: false,
+            };
+            manager.add_block_canonicity_update(update).await;
+        }
+
+        // Perform prune
+        assert!(manager.prune().await.is_ok());
+
+        let updates = manager.block_canonicity_updates.lock().await;
+        let items = manager.items.lock().await;
+        let counts = manager.expected_counts.lock().await;
+
+        // Verify that only heights above the prune threshold remain
+        for height in 5..=10 {
+            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_prune_fails_with_data_below_threshold() {
+        let manager = CanonicalItemsManager::<MockCanonicityItem>::new(4);
+
+        // Add data from height 3 and above
+        for height in 3..=10 {
+            let item = MockCanonicityItem {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: false,
+                was_canonical: false,
+            };
+            manager.add_item(item).await;
+            manager.add_items_count(height, &format!("state_hash_{}", height), 1).await;
+
+            let update = BlockCanonicityUpdatePayload {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: true,
+                was_canonical: false,
+            };
+            manager.add_block_canonicity_update(update).await;
+        }
+
+        // Perform prune
+        let result = manager.prune().await;
+
+        // Verify that the prune failed with an error
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Cannot prune: Canonical updates exists below the prune threshold of 6.");
+
+        // Verify that no data was removed
+        let updates = manager.block_canonicity_updates.lock().await;
+        let items = manager.items.lock().await;
+        let counts = manager.expected_counts.lock().await;
+
+        for height in 3..=10 {
+            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_prune_no_changes_needed() {
+        let manager = CanonicalItemsManager::<MockCanonicityItem>::new(10);
+
+        // Add data from height 1 to 5
+        for height in 1..=5 {
+            let item = MockCanonicityItem {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: false,
+                was_canonical: false,
+            };
+            manager.add_item(item).await;
+            manager.add_items_count(height, &format!("state_hash_{}", height), 1).await;
+
+            let update = BlockCanonicityUpdatePayload {
+                height,
+                state_hash: format!("state_hash_{}", height),
+                canonical: true,
+                was_canonical: false,
+            };
+            manager.add_block_canonicity_update(update).await;
+        }
+
+        // Perform prune
+        assert!(manager.prune().await.is_ok());
+
+        // Verify that no data was removed
+        let updates = manager.block_canonicity_updates.lock().await;
+        let items = manager.items.lock().await;
+        let counts = manager.expected_counts.lock().await;
+
+        for height in 1..=5 {
+            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+        }
     }
 }

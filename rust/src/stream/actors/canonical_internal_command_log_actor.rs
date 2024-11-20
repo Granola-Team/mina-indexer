@@ -60,7 +60,9 @@ impl Actor for CanonicalInternalCommandLogActor {
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
-                    manager.prune().await;
+                    if let Err(e) = manager.prune().await {
+                        eprintln!("{}", e);
+                    }
                 }
             }
             EventType::MainnetBlock => {
@@ -96,7 +98,10 @@ impl Actor for CanonicalInternalCommandLogActor {
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
-                    manager.prune().await;
+
+                    if let Err(e) = manager.prune().await {
+                        eprintln!("{}", e);
+                    }
                 }
             }
 
