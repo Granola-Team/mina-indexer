@@ -164,7 +164,7 @@ pub struct FeeTransferViaCoinbase {
     pub fee: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FeeTransfer {
     pub recipient: String,
     pub fee_nanomina: u64,

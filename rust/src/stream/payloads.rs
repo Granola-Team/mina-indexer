@@ -73,6 +73,10 @@ impl MainnetBlockPayload {
         let unique: HashSet<_> = accounts.into_iter().collect();
         unique.into_iter().collect()
     }
+
+    pub fn internal_commands_count(&self) -> usize {
+        self.fee_transfers.len() + self.fee_transfer_via_coinbase.clone().unwrap_or_default().len() + 1 // coinbase receiver
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -222,7 +226,7 @@ pub struct InternalCommandLogPayload {
     pub source: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CanonicalInternalCommandLogPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
@@ -233,6 +237,24 @@ pub struct CanonicalInternalCommandLogPayload {
     pub source: Option<String>,
     pub canonical: bool,
     pub was_canonical: bool,
+}
+
+impl CanonicalItem for CanonicalInternalCommandLogPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, was_canonical: bool) {
+        self.was_canonical = was_canonical;
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
