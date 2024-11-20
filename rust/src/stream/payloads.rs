@@ -1,4 +1,7 @@
-use super::mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase};
+use super::{
+    canonical_items_manager::CanonicalItem,
+    mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase},
+};
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -232,7 +235,7 @@ pub struct CanonicalInternalCommandLogPayload {
     pub was_canonical: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CanonicalUserCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
@@ -248,6 +251,24 @@ pub struct CanonicalUserCommandLogPayload {
     pub amount_nanomina: u64,
     pub canonical: bool,
     pub was_canonical: bool,
+}
+
+impl CanonicalItem for CanonicalUserCommandLogPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, was_canonical: bool) {
+        self.was_canonical = was_canonical;
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

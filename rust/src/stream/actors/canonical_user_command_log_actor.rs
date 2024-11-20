@@ -3,21 +3,19 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::stream::{models::Height, payloads::*};
-use anyhow::Result;
+use crate::{
+    constants::TRANSITION_FRONTIER_DISTANCE,
+    stream::{canonical_items_manager::CanonicalItemsManager, payloads::*},
+};
 use async_trait::async_trait;
 use futures::lock::Mutex;
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{atomic::AtomicUsize, Arc},
-};
+use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct CanonicalUserCommandLogActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
-    pub block_canonicity_queue: Arc<Mutex<VecDeque<BlockCanonicityUpdatePayload>>>,
-    pub user_commands: Arc<Mutex<HashMap<Height, Vec<UserCommandLogPayload>>>>,
+    pub canonical_items_manager: Arc<Mutex<CanonicalItemsManager<CanonicalUserCommandLogPayload>>>,
 }
 
 impl CanonicalUserCommandLogActor {
@@ -26,47 +24,8 @@ impl CanonicalUserCommandLogActor {
             id: "CanonicalUserCommandLogActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
-            block_canonicity_queue: Arc::new(Mutex::new(VecDeque::new())),
-            user_commands: Arc::new(Mutex::new(HashMap::new())),
+            canonical_items_manager: Arc::new(Mutex::new(CanonicalItemsManager::new(TRANSITION_FRONTIER_DISTANCE as u64))),
         }
-    }
-
-    async fn process_user_commands(&self) -> Result<(), &'static str> {
-        let mut queue = self.block_canonicity_queue.lock().await;
-
-        while let Some(update) = queue.pop_front() {
-            let user_commands = self.user_commands.lock().await;
-            if let Some(entries) = user_commands.get(&Height(update.height)) {
-                for entry in entries.iter().filter(|uc| uc.state_hash == update.state_hash) {
-                    let payload = CanonicalUserCommandLogPayload {
-                        height: entry.height,
-                        txn_hash: entry.txn_hash.to_string(),
-                        state_hash: entry.state_hash.to_string(),
-                        timestamp: entry.timestamp,
-                        txn_type: entry.txn_type.clone(),
-                        status: entry.status.clone(),
-                        sender: entry.sender.to_string(),
-                        receiver: entry.receiver.to_string(),
-                        nonce: entry.nonce,
-                        fee_nanomina: entry.fee_nanomina,
-                        fee_payer: entry.fee_payer.to_string(),
-                        amount_nanomina: entry.amount_nanomina,
-                        canonical: update.canonical,
-                        was_canonical: update.was_canonical,
-                    };
-                    self.publish(Event {
-                        event_type: EventType::CanonicalUserCommandLog,
-                        payload: sonic_rs::to_string(&payload).unwrap(),
-                    });
-                }
-            } else {
-                queue.push_back(update);
-                drop(queue);
-                break;
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -80,40 +39,57 @@ impl Actor for CanonicalUserCommandLogActor {
         &self.events_published
     }
 
-    async fn report(&self) {
-        let user_commands = self.user_commands.lock().await;
-        self.print_report("User Commands HashMap", user_commands.len());
-        drop(user_commands);
-        let canonicity = self.block_canonicity_queue.lock().await;
-        self.print_report("Block Canonicity VecDeque", canonicity.len());
-    }
+    async fn report(&self) {}
 
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BlockCanonicityUpdate => {
-                let mut queue = self.block_canonicity_queue.lock().await;
                 let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.payload).unwrap();
-                queue.push_back(payload.clone());
-                drop(queue);
-                self.process_user_commands()
-                    .await
-                    .expect("Expected to published user command canonicity updates");
+                let manager = self.canonical_items_manager.lock().await;
+                manager.add_block_canonicity_update(payload.clone()).await;
+                for payload in manager.get_updates(payload.height).await.iter() {
+                    self.publish(Event {
+                        event_type: EventType::CanonicalUserCommandLog,
+                        payload: sonic_rs::to_string(&payload).unwrap(),
+                    });
+                }
+                manager.prune().await;
+            }
+            EventType::MainnetBlock => {
+                let event_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let manager = self.canonical_items_manager.lock().await;
+                manager.add_items_count(event_payload.height, event_payload.user_command_count as u64).await;
             }
             EventType::UserCommandLog => {
                 let event_payload: UserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let mut user_commands = self.user_commands.lock().await;
-                user_commands.entry(Height(event_payload.height)).or_insert_with(Vec::new).push(event_payload);
-                drop(user_commands);
-                self.process_user_commands().await.expect("Expected to published snark canonicity updates");
+                let manager = self.canonical_items_manager.lock().await;
+                manager
+                    .add_item(CanonicalUserCommandLogPayload {
+                        height: event_payload.height,
+                        txn_hash: event_payload.txn_hash.to_string(),
+                        state_hash: event_payload.state_hash.to_string(),
+                        timestamp: event_payload.timestamp,
+                        txn_type: event_payload.txn_type.clone(),
+                        status: event_payload.status.clone(),
+                        sender: event_payload.sender.to_string(),
+                        receiver: event_payload.receiver.to_string(),
+                        nonce: event_payload.nonce,
+                        fee_nanomina: event_payload.fee_nanomina,
+                        fee_payer: event_payload.fee_payer.to_string(),
+                        amount_nanomina: event_payload.amount_nanomina,
+                        canonical: false,     // use a default value
+                        was_canonical: false, // use a default value
+                    })
+                    .await;
+                for payload in manager.get_updates(event_payload.height).await.iter() {
+                    self.publish(Event {
+                        event_type: EventType::CanonicalUserCommandLog,
+                        payload: sonic_rs::to_string(&payload).unwrap(),
+                    });
+                }
+                manager.prune().await;
             }
-            EventType::TransitionFrontier => {
-                let height: u64 = sonic_rs::from_str(&event.payload).unwrap();
-                let mut user_commands = self.user_commands.lock().await;
-                user_commands.retain(|key, _| key.0 > height);
-                drop(user_commands);
-                let mut queue = self.block_canonicity_queue.lock().await;
-                queue.retain(|c| c.height > height);
-            }
+
             _ => return,
         }
     }
@@ -124,215 +100,162 @@ impl Actor for CanonicalUserCommandLogActor {
     }
 }
 
-#[tokio::test]
-async fn test_user_command_canonicity_actor_processes_user_command_updates() -> anyhow::Result<()> {
+#[cfg(test)]
+mod canonical_user_command_log_actor_tests {
+    use super::*;
     use crate::stream::{
-        mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, CanonicalUserCommandLogPayload, UserCommandLogPayload},
+        events::{Event, EventType},
+        mainnet_block_models::{CommandStatus, CommandType},
+        payloads::{CanonicalUserCommandLogPayload, MainnetBlockPayload, UserCommandLogPayload},
     };
-    use std::sync::atomic::Ordering;
-    use tokio::time::timeout;
+    use std::sync::Arc;
 
-    // Set up a shared publisher and instantiate the actor
-    let shared_publisher = Arc::new(SharedPublisher::new(200));
-    let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
+    #[tokio::test]
+    async fn test_publishes_after_all_conditions_met() {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
 
-    // Subscribe to capture any output events from the actor
-    let mut receiver = shared_publisher.subscribe();
+        let mut receiver = shared_publisher.subscribe();
 
-    // Define a sample UserCommandSummaryPayload
-    let user_command_payload = UserCommandLogPayload {
-        height: 10,
-        state_hash: "sample_hash".to_string(),
-        timestamp: 123456,
-        txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
-        status: CommandStatus::Applied,
-        sender: "sender_public_key".to_string(),
-        receiver: "receiver_public_key".to_string(),
-        nonce: 1,
-        fee_nanomina: 10_000_000,
-        amount_nanomina: 500_000_000,
-        ..Default::default()
-    };
+        // Add a mainnet block with user command count
+        let mainnet_block = MainnetBlockPayload {
+            height: 10,
+            user_command_count: 2,
+            ..Default::default()
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&mainnet_block).unwrap(),
+            })
+            .await;
 
-    let user_command_payload_2 = UserCommandLogPayload {
-        height: 10,
-        state_hash: "other_hash".to_string(),
-        timestamp: 123456,
-        txn_type: crate::stream::mainnet_block_models::CommandType::Payment,
-        status: CommandStatus::Applied,
-        sender: "sender_public_key".to_string(),
-        receiver: "receiver_public_key".to_string(),
-        nonce: 1,
-        fee_nanomina: 10_000_000,
-        amount_nanomina: 500_000_000,
-        ..Default::default()
-    };
+        // Add two user command logs
+        let user_command_1 = UserCommandLogPayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            txn_hash: "txn_hash_1".to_string(),
+            timestamp: 123456,
+            txn_type: CommandType::Payment,
+            status: CommandStatus::Applied,
+            sender: "sender_1".to_string(),
+            receiver: "receiver_1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1000,
+            fee_payer: "payer_1".to_string(),
+            amount_nanomina: 5000,
+        };
+        let user_command_2 = UserCommandLogPayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            txn_hash: "txn_hash_2".to_string(),
+            timestamp: 123456,
+            txn_type: CommandType::StakeDelegation,
+            status: CommandStatus::Applied,
+            sender: "sender_2".to_string(),
+            receiver: "receiver_2".to_string(),
+            nonce: 2,
+            fee_nanomina: 2000,
+            fee_payer: "payer_2".to_string(),
+            amount_nanomina: 7000,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::UserCommandLog,
+                payload: sonic_rs::to_string(&user_command_1).unwrap(),
+            })
+            .await;
+        actor
+            .handle_event(Event {
+                event_type: EventType::UserCommandLog,
+                payload: sonic_rs::to_string(&user_command_2).unwrap(),
+            })
+            .await;
 
-    // Send a UserCommandSummary event to populate the user_commands map
-    actor
-        .handle_event(Event {
-            event_type: EventType::UserCommandLog,
-            payload: sonic_rs::to_string(&user_command_payload).unwrap(),
-        })
-        .await;
+        // Add a block canonicity update for the same height
+        let update = BlockCanonicityUpdatePayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            canonical: true,
+            was_canonical: false,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::BlockCanonicityUpdate,
+                payload: sonic_rs::to_string(&update).unwrap(),
+            })
+            .await;
 
-    actor
-        .handle_event(Event {
-            event_type: EventType::UserCommandLog,
-            payload: sonic_rs::to_string(&user_command_payload_2).unwrap(),
-        })
-        .await;
+        // Expect the event to be published
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+            .await
+            .expect("Expected a published event")
+            .expect("Event received");
 
-    // Send a BlockCanonicityUpdate event to trigger processing
-    let canonical_update_payload = BlockCanonicityUpdatePayload {
-        height: 10,
-        canonical: true,
-        state_hash: "sample_hash".to_string(),
-        was_canonical: false,
-    };
-
-    actor
-        .handle_event(Event {
-            event_type: EventType::BlockCanonicityUpdate,
-            payload: sonic_rs::to_string(&canonical_update_payload).unwrap(),
-        })
-        .await;
-
-    // Confirm that the UserCommandCanonicityUpdate event was published with correct data
-    let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-    assert!(published_event.is_ok(), "Expected a UserCommandCanonicityUpdate event to be published.");
-
-    if let Ok(Ok(event)) = published_event {
-        let published_payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-        assert_eq!(published_payload.height, user_command_payload.height);
-        assert_eq!(published_payload.state_hash, user_command_payload.state_hash);
-        assert_eq!(published_payload.timestamp, user_command_payload.timestamp);
-        assert_eq!(published_payload.txn_type, user_command_payload.txn_type);
-        assert_eq!(published_payload.status, user_command_payload.status);
-        assert_eq!(published_payload.sender, user_command_payload.sender);
-        assert_eq!(published_payload.receiver, user_command_payload.receiver);
-        assert_eq!(published_payload.nonce, user_command_payload.nonce);
-        assert_eq!(published_payload.fee_nanomina, user_command_payload.fee_nanomina);
-        assert_eq!(published_payload.amount_nanomina, user_command_payload.amount_nanomina);
-        assert!(published_payload.canonical);
+        let payload: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(payload.height, 10);
+        assert_eq!(payload.state_hash, "state_hash_10");
+        assert!(payload.canonical);
     }
 
-    // Verify that events_published has been incremented
-    assert_eq!(actor.events_published.load(Ordering::SeqCst), 1);
+    #[tokio::test]
+    async fn test_does_not_publish_without_all_conditions_met() {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
 
-    Ok(())
-}
+        let mut receiver = shared_publisher.subscribe();
 
-#[tokio::test]
-async fn test_user_command_canonicity_actor_prunes_user_commands_on_transition_frontier() -> anyhow::Result<()> {
-    use crate::stream::{
-        mainnet_block_models::CommandStatus,
-        payloads::{BlockCanonicityUpdatePayload, UserCommandLogPayload},
-    };
+        // Add a mainnet block with user command count
+        let mainnet_block = MainnetBlockPayload {
+            height: 10,
+            user_command_count: 2,
+            ..Default::default()
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&mainnet_block).unwrap(),
+            })
+            .await;
 
-    // Set up the shared publisher and actor
-    let shared_publisher = Arc::new(SharedPublisher::new(200));
-    let actor = CanonicalUserCommandLogActor::new(Arc::clone(&shared_publisher));
+        // Add one user command log (not enough)
+        let user_command = UserCommandLogPayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            txn_hash: "txn_hash_1".to_string(),
+            timestamp: 123456,
+            txn_type: CommandType::Payment,
+            status: CommandStatus::Applied,
+            sender: "sender_1".to_string(),
+            receiver: "receiver_1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1000,
+            fee_payer: "payer_1".to_string(),
+            amount_nanomina: 5000,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::UserCommandLog,
+                payload: sonic_rs::to_string(&user_command).unwrap(),
+            })
+            .await;
 
-    // Add a UserCommandSummaryPayload event for height 5
-    let user_command_5 = UserCommandLogPayload {
-        height: 5,
-        state_hash: "hash_5".to_string(),
-        timestamp: 1000,
-        txn_type: crate::stream::mainnet_block_models::CommandType::StakeDelegation,
-        status: CommandStatus::Applied,
-        sender: "sender_5".to_string(),
-        receiver: "receiver_5".to_string(),
-        nonce: 1,
-        fee_nanomina: 5000,
-        amount_nanomina: 10000,
-        ..Default::default()
-    };
-    actor
-        .handle_event(Event {
-            event_type: EventType::UserCommandLog,
-            payload: sonic_rs::to_string(&user_command_5).unwrap(),
-        })
-        .await;
+        // Add a block canonicity update for the same height
+        let update = BlockCanonicityUpdatePayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            canonical: true,
+            was_canonical: false,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::BlockCanonicityUpdate,
+                payload: sonic_rs::to_string(&update).unwrap(),
+            })
+            .await;
 
-    // Add a UserCommandSummaryPayload event for height 10
-    let user_command_10 = UserCommandLogPayload {
-        height: 10,
-        state_hash: "hash_10".to_string(),
-        timestamp: 2000,
-        txn_type: crate::stream::mainnet_block_models::CommandType::StakeDelegation,
-        status: CommandStatus::Applied,
-        sender: "sender_10".to_string(),
-        receiver: "receiver_10".to_string(),
-        nonce: 2,
-        fee_nanomina: 1000,
-        amount_nanomina: 20000,
-        ..Default::default()
-    };
-    actor
-        .handle_event(Event {
-            event_type: EventType::UserCommandLog,
-            payload: sonic_rs::to_string(&user_command_10).unwrap(),
-        })
-        .await;
-
-    // Process canonicity update events for both heights
-    let canonicity_event_5 = BlockCanonicityUpdatePayload {
-        height: 5,
-        canonical: true,
-        state_hash: "hash_5".to_string(),
-        was_canonical: false,
-    };
-    actor
-        .handle_event(Event {
-            event_type: EventType::BlockCanonicityUpdate,
-            payload: sonic_rs::to_string(&canonicity_event_5).unwrap(),
-        })
-        .await;
-
-    let canonicity_event_10 = BlockCanonicityUpdatePayload {
-        height: 10,
-        canonical: true,
-        state_hash: "hash_10".to_string(),
-        was_canonical: false,
-    };
-    actor
-        .handle_event(Event {
-            event_type: EventType::BlockCanonicityUpdate,
-            payload: sonic_rs::to_string(&canonicity_event_10).unwrap(),
-        })
-        .await;
-
-    // Verify that the canonicity events processed the user commands
-    {
-        let user_commands = actor.user_commands.lock().await;
-        assert!(
-            user_commands.contains_key(&Height(5)),
-            "UserCommand with height 5 should exist after canonicity processing"
-        );
-        assert!(
-            user_commands.contains_key(&Height(10)),
-            "UserCommand with height 10 should exist after canonicity processing"
-        );
+        // Expect no event to be published
+        let no_event = tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv()).await;
+        assert!(no_event.is_err(), "No event should be published since not all conditions are met");
     }
-
-    // Trigger a TransitionFrontier event with height = 7 to prune user commands with height <= 7
-    let transition_event = Event {
-        event_type: EventType::TransitionFrontier,
-        payload: sonic_rs::to_string(&7u64).unwrap(),
-    };
-    actor.handle_event(transition_event).await;
-
-    // Verify that user commands with height <= 7 were removed
-    {
-        let user_commands = actor.user_commands.lock().await;
-        assert!(!user_commands.contains_key(&Height(5)), "UserCommand with height 5 should have been pruned");
-        assert!(
-            user_commands.contains_key(&Height(10)),
-            "UserCommand with height 10 should not have been pruned"
-        );
-    }
-
-    Ok(())
 }
