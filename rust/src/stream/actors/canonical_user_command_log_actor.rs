@@ -41,7 +41,7 @@ impl Actor for CanonicalUserCommandLogActor {
 
     async fn report(&self) {
         let manager = self.canonical_items_manager.lock().await;
-        self.print_report("CanonicalItemsManager", manager.get_len().await);
+        manager.report(&self.id()).await;
     }
 
     async fn handle_event(&self, event: Event) {
