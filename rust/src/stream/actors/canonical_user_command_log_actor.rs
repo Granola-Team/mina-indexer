@@ -60,7 +60,7 @@ impl Actor for CanonicalUserCommandLogActor {
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
-                    // manager.prune().await;
+                    manager.prune().await;
                 }
             }
             EventType::MainnetBlock => {
@@ -101,7 +101,7 @@ impl Actor for CanonicalUserCommandLogActor {
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
-                    // manager.prune().await;
+                    manager.prune().await;
                 }
             }
 
