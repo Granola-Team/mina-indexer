@@ -157,7 +157,13 @@ pub async fn publish_block_dir_paths(
                     .unwrap(),
                 });
 
-                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
+                if height % 2_500 == 0 {
+                    let ten_seconds = 30;
+                    println!("Processed up to height {}. Pausing for {} seconds", ten_seconds, ten_seconds);
+                    tokio::time::sleep(Duration::from_secs(ten_seconds)).await;
+                } else {
+                    tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
+                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
@@ -179,7 +185,7 @@ pub async fn publish_block_dir_paths(
 pub fn get_publish_rate() -> u64 {
     std::env::var("PUBLISH_RATE_PER_SECOND")
         .map(|rate_str| rate_str.parse::<u64>().ok().unwrap())
-        .unwrap_or(20)
+        .unwrap_or(5)
 }
 
 pub fn get_millisecond_pause_from_rate() -> u64 {
