@@ -39,55 +39,70 @@ impl Actor for CanonicalUserCommandLogActor {
         &self.events_published
     }
 
-    async fn report(&self) {}
+    async fn report(&self) {
+        let manager = self.canonical_items_manager.lock().await;
+        self.print_report("CanonicalItemsManager", manager.get_len().await);
+    }
 
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BlockCanonicityUpdate => {
                 let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.payload).unwrap();
-                let manager = self.canonical_items_manager.lock().await;
-                manager.add_block_canonicity_update(payload.clone()).await;
-                for payload in manager.get_updates(payload.height).await.iter() {
-                    self.publish(Event {
-                        event_type: EventType::CanonicalUserCommandLog,
-                        payload: sonic_rs::to_string(&payload).unwrap(),
-                    });
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    manager.add_block_canonicity_update(payload.clone()).await;
                 }
-                manager.prune().await;
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    for payload in manager.get_updates(payload.height).await.iter() {
+                        self.publish(Event {
+                            event_type: EventType::CanonicalUserCommandLog,
+                            payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
+                    }
+                    // manager.prune().await;
+                }
             }
             EventType::MainnetBlock => {
                 let event_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let manager = self.canonical_items_manager.lock().await;
-                manager.add_items_count(event_payload.height, event_payload.user_command_count as u64).await;
+                manager
+                    .add_items_count(event_payload.height, &event_payload.state_hash, event_payload.user_command_count as u64)
+                    .await;
             }
             EventType::UserCommandLog => {
                 let event_payload: UserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let manager = self.canonical_items_manager.lock().await;
-                manager
-                    .add_item(CanonicalUserCommandLogPayload {
-                        height: event_payload.height,
-                        txn_hash: event_payload.txn_hash.to_string(),
-                        state_hash: event_payload.state_hash.to_string(),
-                        timestamp: event_payload.timestamp,
-                        txn_type: event_payload.txn_type.clone(),
-                        status: event_payload.status.clone(),
-                        sender: event_payload.sender.to_string(),
-                        receiver: event_payload.receiver.to_string(),
-                        nonce: event_payload.nonce,
-                        fee_nanomina: event_payload.fee_nanomina,
-                        fee_payer: event_payload.fee_payer.to_string(),
-                        amount_nanomina: event_payload.amount_nanomina,
-                        canonical: false,     // use a default value
-                        was_canonical: false, // use a default value
-                    })
-                    .await;
-                for payload in manager.get_updates(event_payload.height).await.iter() {
-                    self.publish(Event {
-                        event_type: EventType::CanonicalUserCommandLog,
-                        payload: sonic_rs::to_string(&payload).unwrap(),
-                    });
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    manager
+                        .add_item(CanonicalUserCommandLogPayload {
+                            height: event_payload.height,
+                            txn_hash: event_payload.txn_hash.to_string(),
+                            state_hash: event_payload.state_hash.to_string(),
+                            timestamp: event_payload.timestamp,
+                            txn_type: event_payload.txn_type.clone(),
+                            status: event_payload.status.clone(),
+                            sender: event_payload.sender.to_string(),
+                            receiver: event_payload.receiver.to_string(),
+                            nonce: event_payload.nonce,
+                            fee_nanomina: event_payload.fee_nanomina,
+                            fee_payer: event_payload.fee_payer.to_string(),
+                            amount_nanomina: event_payload.amount_nanomina,
+                            canonical: false,     // use a default value
+                            was_canonical: false, // use a default value
+                        })
+                        .await;
                 }
-                manager.prune().await;
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    for payload in manager.get_updates(event_payload.height).await.iter() {
+                        self.publish(Event {
+                            event_type: EventType::CanonicalUserCommandLog,
+                            payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
+                    }
+                    // manager.prune().await;
+                }
             }
 
             _ => return,
@@ -121,6 +136,7 @@ mod canonical_user_command_log_actor_tests {
         let mainnet_block = MainnetBlockPayload {
             height: 10,
             user_command_count: 2,
+            state_hash: "state_hash_10".to_string(),
             ..Default::default()
         };
         actor
@@ -209,6 +225,7 @@ mod canonical_user_command_log_actor_tests {
         let mainnet_block = MainnetBlockPayload {
             height: 10,
             user_command_count: 2,
+            state_hash: "state_hash_other".to_string(), //no matching state hash
             ..Default::default()
         };
         actor
