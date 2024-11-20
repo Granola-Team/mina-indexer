@@ -55,33 +55,39 @@ where
         {
             let updates = self.block_canonicity_updates.lock().await;
             if let Some(lowest_height) = updates.keys().map(|k| k.height).min() {
+                let max_height = updates.keys().map(|k| k.height).max().unwrap();
                 println!(
-                    "{}: Collection BlockCanonicityUpdates is of size {} and lowest key is {}",
+                    "{}: Collection BlockCanonicityUpdates is of size {} and lowest key range is ({},{})",
                     prefix,
                     updates.len(),
-                    lowest_height
+                    lowest_height,
+                    max_height,
                 )
             }
         }
         {
             let counts = self.expected_counts.lock().await;
             if let Some(lowest_height) = counts.keys().map(|k| k.height).min() {
+                let max_height = counts.keys().map(|k| k.height).max().unwrap();
                 println!(
-                    "{}: Collection ExpectedCounts is of size {} and lowest key is {}",
+                    "{}: Collection ExpectedCounts is of size {} and lowest key range is ({},{})",
                     prefix,
                     counts.len(),
-                    lowest_height
+                    lowest_height,
+                    max_height
                 )
             }
         }
         {
             let items = self.items.lock().await;
             if let Some(lowest_height) = items.keys().map(|k| k.height).min() {
+                let max_height = items.keys().map(|k| k.height).max().unwrap();
                 println!(
-                    "{}: Collection ExpectedCounts is of size {} and lowest key is {}",
+                    "{}: Collection ExpectedCounts is of size {} and lowest key range is ({},{})",
                     prefix,
                     items.len(),
-                    lowest_height
+                    lowest_height,
+                    max_height
                 )
             }
         }
