@@ -45,6 +45,7 @@ impl Actor for MonitorActor {
         let actor_heights = self.actor_heights.lock().await;
         let file_publisher_height = actor_heights.get(FILE_PUBLISHER_ACTOR_ID).unwrap_or(&0u64);
         for (actor, height) in actor_heights.iter() {
+            println!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
             if file_publisher_height >= &(TRANSITION_FRONTIER_DISTANCE as u64) {
                 if height < &(file_publisher_height - TRANSITION_FRONTIER_DISTANCE as u64) {
                     eprintln!(
@@ -54,8 +55,6 @@ impl Actor for MonitorActor {
                         height
                     );
                 }
-            } else {
-                println!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
             }
         }
     }
