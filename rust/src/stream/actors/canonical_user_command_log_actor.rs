@@ -24,7 +24,7 @@ impl CanonicalUserCommandLogActor {
             id: "CanonicalUserCommandLogActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
-            canonical_items_manager: Arc::new(Mutex::new(CanonicalItemsManager::new(TRANSITION_FRONTIER_DISTANCE as u64))),
+            canonical_items_manager: Arc::new(Mutex::new(CanonicalItemsManager::new((TRANSITION_FRONTIER_DISTANCE / 5usize) as u64))),
         }
     }
 }
