@@ -51,6 +51,42 @@ where
         }
     }
 
+    pub async fn report(&self, prefix: &str) {
+        {
+            let updates = self.block_canonicity_updates.lock().await;
+            if let Some(lowest_height) = updates.keys().map(|k| k.height).min() {
+                println!(
+                    "{}: Collection BlockCanonicityUpdates is of size {} and lowest key is {}",
+                    prefix,
+                    updates.len(),
+                    lowest_height
+                )
+            }
+        }
+        {
+            let counts = self.expected_counts.lock().await;
+            if let Some(lowest_height) = counts.keys().map(|k| k.height).min() {
+                println!(
+                    "{}: Collection ExpectedCounts is of size {} and lowest key is {}",
+                    prefix,
+                    counts.len(),
+                    lowest_height
+                )
+            }
+        }
+        {
+            let items = self.items.lock().await;
+            if let Some(lowest_height) = items.keys().map(|k| k.height).min() {
+                println!(
+                    "{}: Collection ExpectedCounts is of size {} and lowest key is {}",
+                    prefix,
+                    items.len(),
+                    lowest_height
+                )
+            }
+        }
+    }
+
     pub async fn get_len(&self) -> usize {
         let updates = self.block_canonicity_updates.lock().await;
         let items = self.items.lock().await;
