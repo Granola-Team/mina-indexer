@@ -58,6 +58,7 @@ impl Actor for MainnetBlockParserActor {
                 user_commands: block.get_user_commands(),
                 fee_transfer_via_coinbase: block.get_fee_transfers_via_coinbase(),
                 fee_transfers: block.get_fee_transfers(),
+                internal_command_count: block.get_internal_command_count(),
             };
             self.publish(Event {
                 event_type: EventType::MainnetBlock,

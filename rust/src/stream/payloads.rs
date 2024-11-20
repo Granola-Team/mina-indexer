@@ -34,13 +34,14 @@ pub struct BerkeleyBlockPayload {
     pub last_vrf_output: String,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct MainnetBlockPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,
     pub last_vrf_output: String,
     pub user_command_count: usize,
+    pub internal_command_count: usize,
     pub user_commands: Vec<CommandSummary>,
     pub snark_work_count: usize,
     pub snark_work: Vec<CompletedWorks>,
@@ -72,10 +73,6 @@ impl MainnetBlockPayload {
         .collect();
         let unique: HashSet<_> = accounts.into_iter().collect();
         unique.into_iter().collect()
-    }
-
-    pub fn internal_commands_count(&self) -> usize {
-        self.fee_transfers.len() + self.fee_transfer_via_coinbase.clone().unwrap_or_default().len() + 1 // coinbase receiver
     }
 }
 
@@ -215,7 +212,7 @@ impl fmt::Display for InternalCommandType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InternalCommandLogPayload {
     pub internal_command_type: InternalCommandType,
     pub height: u64,
