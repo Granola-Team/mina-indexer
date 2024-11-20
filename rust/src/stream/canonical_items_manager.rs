@@ -376,9 +376,9 @@ mod canonical_items_manager_tests {
 
         // Verify that only heights above the prune threshold remain
         for height in 5..=10 {
-            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(updates.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
         }
     }
 
@@ -419,9 +419,9 @@ mod canonical_items_manager_tests {
         let counts = manager.expected_counts.lock().await;
 
         for height in 3..=10 {
-            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(updates.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
         }
     }
 
@@ -458,9 +458,9 @@ mod canonical_items_manager_tests {
         let counts = manager.expected_counts.lock().await;
 
         for height in 1..=5 {
-            assert!(updates.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(items.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
-            assert!(counts.contains_key(&CompositeKey::new(height, &format!("state_hash_{}", height))));
+            assert!(updates.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(items.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(counts.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
         }
     }
 }

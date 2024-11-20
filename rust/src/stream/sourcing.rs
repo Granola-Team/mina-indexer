@@ -157,13 +157,8 @@ pub async fn publish_block_dir_paths(
                     .unwrap(),
                 });
 
-                if height % 2_500 == 0 {
-                    let ten_seconds = 30;
-                    println!("Processed up to height {}. Pausing for {} seconds", ten_seconds, ten_seconds);
-                    tokio::time::sleep(Duration::from_secs(ten_seconds)).await;
-                } else {
-                    tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
-                }
+                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
+                                                                                    // }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
