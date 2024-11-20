@@ -39,52 +39,65 @@ impl Actor for CanonicalInternalCommandLogActor {
         &self.events_published
     }
 
-    async fn report(&self) {}
+    async fn report(&self) {
+        let manager = self.canonical_items_manager.lock().await;
+        self.print_report("CanonicalItemsManager", manager.get_len().await);
+    }
 
     async fn handle_event(&self, event: Event) {
         match event.event_type {
             EventType::BlockCanonicityUpdate => {
                 let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.payload).unwrap();
-                let manager = self.canonical_items_manager.lock().await;
-                manager.add_block_canonicity_update(payload.clone()).await;
-                for payload in manager.get_updates(payload.height).await.iter() {
-                    self.publish(Event {
-                        event_type: EventType::CanonicalInternalCommandLog,
-                        payload: sonic_rs::to_string(&payload).unwrap(),
-                    });
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    manager.add_block_canonicity_update(payload.clone()).await;
                 }
-                manager.prune().await;
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    for payload in manager.get_updates(payload.height).await.iter() {
+                        self.publish(Event {
+                            event_type: EventType::CanonicalInternalCommandLog,
+                            payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
+                    }
+                    manager.prune().await;
+                }
             }
             EventType::MainnetBlock => {
                 let event_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let manager = self.canonical_items_manager.lock().await;
                 manager
-                    .add_items_count(event_payload.height, event_payload.internal_commands_count() as u64)
+                    .add_items_count(event_payload.height, &event_payload.state_hash, event_payload.internal_command_count as u64)
                     .await;
             }
             EventType::InternalCommandLog => {
                 let event_payload: InternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let manager = self.canonical_items_manager.lock().await;
-                manager
-                    .add_item(CanonicalInternalCommandLogPayload {
-                        internal_command_type: event_payload.internal_command_type.clone(),
-                        height: event_payload.height,
-                        state_hash: event_payload.state_hash.to_string(),
-                        timestamp: event_payload.timestamp,
-                        amount_nanomina: event_payload.amount_nanomina,
-                        recipient: event_payload.recipient.to_string(),
-                        source: event_payload.source.clone(),
-                        canonical: false,     // use a default value
-                        was_canonical: false, // use a default value
-                    })
-                    .await;
-                for payload in manager.get_updates(event_payload.height).await.iter() {
-                    self.publish(Event {
-                        event_type: EventType::CanonicalInternalCommandLog,
-                        payload: sonic_rs::to_string(&payload).unwrap(),
-                    });
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    manager
+                        .add_item(CanonicalInternalCommandLogPayload {
+                            internal_command_type: event_payload.internal_command_type.clone(),
+                            height: event_payload.height,
+                            state_hash: event_payload.state_hash.to_string(),
+                            timestamp: event_payload.timestamp,
+                            amount_nanomina: event_payload.amount_nanomina,
+                            recipient: event_payload.recipient.to_string(),
+                            source: event_payload.source.clone(),
+                            canonical: false,     // use a default value
+                            was_canonical: false, // use a default value
+                        })
+                        .await;
                 }
-                manager.prune().await;
+                {
+                    let manager = self.canonical_items_manager.lock().await;
+                    for payload in manager.get_updates(event_payload.height).await.iter() {
+                        self.publish(Event {
+                            event_type: EventType::CanonicalInternalCommandLog,
+                            payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
+                    }
+                    manager.prune().await;
+                }
             }
 
             _ => return,
@@ -102,7 +115,6 @@ mod canonical_internal_command_log_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        mainnet_block_models::FeeTransfer,
         payloads::{CanonicalInternalCommandLogPayload, InternalCommandLogPayload, MainnetBlockPayload},
     };
     use std::sync::Arc;
@@ -117,7 +129,8 @@ mod canonical_internal_command_log_actor_tests {
         // Add a mainnet block with internal command count
         let mainnet_block = MainnetBlockPayload {
             height: 10,
-            fee_transfers: vec![FeeTransfer { ..Default::default() }],
+            state_hash: "state_hash_10".to_string(),
+            internal_command_count: 2,
             ..Default::default()
         };
         actor
@@ -196,7 +209,8 @@ mod canonical_internal_command_log_actor_tests {
         // Add a mainnet block with internal command count
         let mainnet_block = MainnetBlockPayload {
             height: 10,
-            fee_transfers: vec![FeeTransfer { ..Default::default() }, FeeTransfer { ..Default::default() }],
+            state_hash: "state_hash_10".to_string(),
+            internal_command_count: 2, // one more than we intend to publish
             ..Default::default()
         };
         actor
@@ -252,7 +266,21 @@ mod canonical_internal_command_log_actor_tests {
         // Add a mainnet block
         let mainnet_block = MainnetBlockPayload {
             height: 10,
-            fee_transfers: vec![FeeTransfer { ..Default::default() }],
+            state_hash: "state_hash_10_other".to_string(),
+            internal_command_count: 1,
+            ..Default::default()
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&mainnet_block).unwrap(),
+            })
+            .await;
+
+        let mainnet_block = MainnetBlockPayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            internal_command_count: 1,
             ..Default::default()
         };
         actor
