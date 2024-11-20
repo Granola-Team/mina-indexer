@@ -41,6 +41,16 @@ impl MainnetBlock {
             .collect()
     }
 
+    pub fn get_internal_command_count(&self) -> usize {
+        let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
+        let total_fees_paid = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
+        let mut total_internal_commands = self.get_fee_transfers().len() + self.get_fee_transfers_via_coinbase().unwrap_or_default().len() + 1; // coinbase;
+        if total_fees_paid > total_snark_fees {
+            total_internal_commands += 1 // additional transfer for remainder of fees not paid to snark workers
+        }
+        total_internal_commands
+    }
+
     pub fn get_fee_transfers_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
         // Combine pre and post diff coinbase arrays
         let diffs = [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()];
@@ -612,5 +622,21 @@ mod mainnet_block_parsing_tests {
         let first_ftva = fee_transfer_via_coinbase.first().unwrap();
         assert_eq!(first_ftva.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
         assert_eq!(first_ftva.fee, 0.00005f64);
+    }
+
+    #[test]
+    fn test_mainnet_block_has_two_internal_commands() {
+        // Path to your test JSON file
+        let path = Path::new("./src/stream/test_data/100_mainnet_blocks/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
+        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+
+        // Deserialize JSON into MainnetBlock struct
+        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        // this block has no compelted works so the user command fees are transferred to the coinbase receiver,
+        // for a total of two internal commands
+        // 1. coinbase receiver
+        // 2. fee transfer of excess fees
+        assert_eq!(mainnet_block.get_internal_command_count(), 2);
     }
 }
