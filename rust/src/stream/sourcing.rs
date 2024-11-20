@@ -179,7 +179,7 @@ pub async fn publish_block_dir_paths(
 pub fn get_publish_rate() -> u64 {
     std::env::var("PUBLISH_RATE_PER_SECOND")
         .map(|rate_str| rate_str.parse::<u64>().ok().unwrap())
-        .unwrap_or(10)
+        .unwrap_or(20)
 }
 
 pub fn get_millisecond_pause_from_rate() -> u64 {
