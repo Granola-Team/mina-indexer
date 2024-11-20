@@ -168,14 +168,13 @@ where
             }
             let prune_below = highest_height - self.prune_limit;
 
-            // Check for data below the prune threshold
-            let has_data_below = updates.keys().any(|k| k.height <= prune_below);
-
-            if has_data_below {
-                return Err(format!("Cannot prune: Canonical updates exists below the prune threshold of {}.", prune_below));
+            // Ensure no updates exist below the prune threshold, and if they do,
+            // ensure there are no items to process at that height
+            if updates.keys().any(|k| k.height <= prune_below && counts.get(k).map_or(0, |&v| v) > 0) {
+                return Err(format!("Cannot prune: Canonical updates exist below the prune threshold of {}.", prune_below));
             }
 
-            // Perform the pruning
+            // Perform the pruning for items and counts
             updates.retain(|k, _| k.height > prune_below);
             items.retain(|k, _| k.height > prune_below);
             counts.retain(|k, _| k.height > prune_below);
@@ -357,14 +356,6 @@ mod canonical_items_manager_tests {
             };
             manager.add_item(item).await;
             manager.add_items_count(height, &format!("state_hash_{}", height), 1).await;
-
-            let update = BlockCanonicityUpdatePayload {
-                height,
-                state_hash: format!("state_hash_{}", height),
-                canonical: true,
-                was_canonical: false,
-            };
-            manager.add_block_canonicity_update(update).await;
         }
 
         // Perform prune
@@ -374,9 +365,13 @@ mod canonical_items_manager_tests {
         let items = manager.items.lock().await;
         let counts = manager.expected_counts.lock().await;
 
+        assert!(!updates.contains_key(&CompositeKey::new(4, format!("state_hash_{}", 4))));
+        assert!(!items.contains_key(&CompositeKey::new(4, format!("state_hash_{}", 4))));
+        assert!(!counts.contains_key(&CompositeKey::new(4, format!("state_hash_{}", 4))));
+
         // Verify that only heights above the prune threshold remain
         for height in 5..=10 {
-            assert!(updates.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
+            assert!(!updates.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
             assert!(items.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
             assert!(counts.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
         }
@@ -411,7 +406,7 @@ mod canonical_items_manager_tests {
 
         // Verify that the prune failed with an error
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Cannot prune: Canonical updates exists below the prune threshold of 6.");
+        assert_eq!(result.unwrap_err(), "Cannot prune: Canonical updates exist below the prune threshold of 6.");
 
         // Verify that no data was removed
         let updates = manager.block_canonicity_updates.lock().await;
@@ -462,5 +457,64 @@ mod canonical_items_manager_tests {
             assert!(items.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
             assert!(counts.contains_key(&CompositeKey::new(height, format!("state_hash_{}", height))));
         }
+    }
+
+    #[tokio::test]
+    async fn test_prune_successful_with_zero_expected_items() {
+        let manager = CanonicalItemsManager::<MockCanonicityItem>::new(5);
+
+        // Add an item at height 4 with zero expected count
+        {
+            let update = BlockCanonicityUpdatePayload {
+                height: 4,
+                state_hash: format!("state_hash_{}", 4),
+                canonical: true,
+                was_canonical: false,
+            };
+            manager.add_block_canonicity_update(update).await;
+            manager.add_items_count(4, &"state_hash_4".to_string(), 0).await;
+        }
+        {
+            let update = BlockCanonicityUpdatePayload {
+                height: 10,
+                state_hash: format!("state_hash_{}", 10),
+                canonical: true,
+                was_canonical: false,
+            };
+            manager.add_block_canonicity_update(update).await;
+            manager.add_items_count(10, &"state_hash_10".to_string(), 0).await;
+        }
+        let _ = manager.get_updates(10).await; // Process updates
+
+        // Perform prune
+        assert!(manager.prune().await.is_ok());
+
+        let updates = manager.block_canonicity_updates.lock().await;
+        let items = manager.items.lock().await;
+        let counts = manager.expected_counts.lock().await;
+
+        // Ensure height 4 is pruned as expected count is 0
+        assert!(
+            !items.contains_key(&CompositeKey::new(4, "state_hash_4".to_string())),
+            "Items for height 4 should be pruned"
+        );
+        assert!(
+            !counts.contains_key(&CompositeKey::new(4, "state_hash_4".to_string())),
+            "Counts for height 4 should be pruned"
+        );
+        assert!(
+            !updates.contains_key(&CompositeKey::new(4, "state_hash_4".to_string())),
+            "Updates for height 4 should be pruned"
+        );
+
+        // Ensure height 10 is not pruned
+        assert!(
+            counts.contains_key(&CompositeKey::new(10, "state_hash_10".to_string())),
+            "Counts for height 10 should not be pruned"
+        );
+        assert!(
+            updates.contains_key(&CompositeKey::new(10, "state_hash_10".to_string())),
+            "Updates for height 10 should not be pruned"
+        );
     }
 }
