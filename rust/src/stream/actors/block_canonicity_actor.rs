@@ -28,11 +28,9 @@ impl BlockCanonicityActor {
         }
     }
 
-    fn process_equal_height(&self, current_best_block: &Node, next_node: Node, next_best_block: &Node) {
-        let is_canonical = current_best_block != next_best_block;
-        if is_canonical {
-            self.publish_canonical_update(current_best_block.clone(), false, true);
-            self.publish_canonical_update(next_node, true, false);
+    fn process_equal_height(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: Node) {
+        if BlockchainTree::greater(&next_node, current_best_block) {
+            self.update_ancestries(blockchain_tree, current_best_block, &next_node);
         } else {
             self.publish_canonical_update(next_node, false, false);
         }
@@ -40,16 +38,14 @@ impl BlockCanonicityActor {
 
     fn process_greater_height(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: Node) {
         let parent = blockchain_tree.get_parent(&next_node).unwrap();
-        if parent != current_best_block {
-            self.update_ancestries(blockchain_tree, current_best_block, &next_node);
+        if parent.state_hash != current_best_block.state_hash {
+            self.update_ancestries(blockchain_tree, current_best_block, &parent);
         }
         self.publish_canonical_update(next_node, true, false);
     }
 
-    fn update_ancestries(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: &Node) {
-        let (prior_ancestry, mut new_ancestry, _) = blockchain_tree
-            .get_shared_ancestry(current_best_block, blockchain_tree.get_parent(next_node).unwrap())
-            .unwrap();
+    fn update_ancestries(&self, blockchain_tree: &BlockchainTree, current_best_block: &Node, next_node: &Node) {
+        let (prior_ancestry, mut new_ancestry, _) = blockchain_tree.get_shared_ancestry(current_best_block, next_node).unwrap();
 
         for prior in prior_ancestry.iter() {
             self.publish_canonical_update(prior.clone(), false, true);
@@ -113,11 +109,10 @@ impl Actor for BlockCanonicityActor {
             } else if blockchain_tree.has_parent(&next_node) {
                 let (height, current_best_block) = blockchain_tree.get_best_tip().unwrap();
                 blockchain_tree.add_node(next_node.clone()).unwrap();
-                let (_, next_best_block) = blockchain_tree.get_best_tip().unwrap();
 
                 match next_node.height.cmp(&height) {
                     std::cmp::Ordering::Equal => {
-                        self.process_equal_height(&current_best_block, next_node, &next_best_block);
+                        self.process_equal_height(&mut blockchain_tree, &current_best_block, next_node);
                     }
                     std::cmp::Ordering::Greater => {
                         self.process_greater_height(&mut blockchain_tree, &current_best_block, next_node);
@@ -478,6 +473,197 @@ async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() -> an
 
     let genesis_event = 1;
     assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), num_expected_events + genesis_event);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_block_with_different_parent_at_same_height() -> anyhow::Result<()> {
+    use crate::{
+        constants::GENESIS_STATE_HASH,
+        stream::payloads::{BlockCanonicityUpdatePayload, NewBlockPayload},
+    };
+
+    // Create shared publisher
+    let shared_publisher = Arc::new(SharedPublisher::new(200));
+    let actor = BlockCanonicityActor::new(Arc::clone(&shared_publisher));
+
+    // Root block payload
+    let root_block = NewBlockPayload {
+        height: 1228,
+        state_hash: "3NLGaCf4zNXouyKDkmrFuYBVt8BHnCuLC9PMvkytfFgiuuqv5xsH".to_string(),
+        previous_state_hash: GENESIS_STATE_HASH.to_string(),
+        last_vrf_output: "QNWhrsZ3Ld1gsJTUGBUBCs9iQD00hKUvZkR1GeFjEgA=".to_string(),
+    };
+
+    // First branch payloads
+    let branch1_block1 = NewBlockPayload {
+        height: 1229,
+        state_hash: "3NLU6jZai3xytD6PkpdKNFTYjfYSsEWoksr9AmufqYbxJN2Mpuke".to_string(),
+        previous_state_hash: root_block.state_hash.clone(),
+        last_vrf_output: "PhNdMGQWACdnDnOg3D75icmHf5Mu_0F44ua-fzz4DwA=".to_string(),
+    };
+    let branch1_block2 = NewBlockPayload {
+        height: 1230,
+        state_hash: "3NKNqeqRjSY8Qy1x4qwzfCVSCGUq2czp4Jo9E7pUY6ZnHTBg4JiW".to_string(),
+        previous_state_hash: branch1_block1.state_hash.clone(),
+        last_vrf_output: "h8fO60ijmmBdiMfCBSPz47vsRW8BHg2hnYo4iwl3BAA=".to_string(),
+    };
+    let branch1_block3 = NewBlockPayload {
+        height: 1231,
+        state_hash: "3NKMBzGM1pySPanKkLdxjnUS9mZ88oCeanq3Nhm2QZ6eNB5ZkeGn".to_string(),
+        previous_state_hash: branch1_block2.state_hash.clone(),
+        last_vrf_output: "h8fO60ijmmBdiMfCBSPz47vsRW8BHg2hnYo4iwl3BAA=".to_string(),
+    };
+
+    // Second branch payloads
+    let branch2_block1 = NewBlockPayload {
+        height: 1229,
+        state_hash: "3NL63pX2kKi4pezYnm6MPjsDK9VSvJ1XFiUaed9vxPEa5PuWPLeZ".to_string(),
+        previous_state_hash: root_block.state_hash.clone(),
+        last_vrf_output: "hPuL8ZcZI2pIZhbVLVVD0U4CO0FLlnIgW_rYULV_HAA=".to_string(),
+    };
+    let branch2_block2 = NewBlockPayload {
+        height: 1230,
+        state_hash: "3NKcSppgUnmuGp9kGQdp7ZXUh5vcf7rm9mhKE4UMvwcuUaB8wb7S".to_string(),
+        previous_state_hash: branch2_block1.state_hash.clone(),
+        last_vrf_output: "Wl4EiJDCuzNCCn2w_6vDywRZStf4iNM5h4qUxXvOFAA=".to_string(),
+    };
+    let branch2_block3 = NewBlockPayload {
+        height: 1231,
+        state_hash: "3NLN2uxCoRsiB2C4uZHDcY6WxJDz6EEWmoruCFva74E4cgTYgJCQ".to_string(),
+        previous_state_hash: branch2_block2.state_hash.clone(),
+        last_vrf_output: "qQNTDpNokYfZs1wlQNcSLWazVCu43O7mLAhxlgwjBAA=".to_string(),
+    };
+
+    // Initialize with the root block
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&root_block).unwrap(),
+        })
+        .await;
+
+    // Subscribe to shared publisher to capture events
+    let mut receiver = shared_publisher.subscribe();
+
+    // Process branch 1
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch1_block1).unwrap(),
+        })
+        .await;
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch1_block2).unwrap(),
+        })
+        .await;
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch1_block3).unwrap(),
+        })
+        .await;
+
+    // Process branch 2
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch2_block1).unwrap(),
+        })
+        .await;
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch2_block2).unwrap(),
+        })
+        .await;
+    actor
+        .handle_event(Event {
+            event_type: EventType::NewBlock,
+            payload: sonic_rs::to_string(&branch2_block3).unwrap(),
+        })
+        .await;
+
+    let mut expected_events = vec![
+        BlockCanonicityUpdatePayload {
+            height: 1231,
+            state_hash: "3NLN2uxCoRsiB2C4uZHDcY6WxJDz6EEWmoruCFva74E4cgTYgJCQ".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1230,
+            state_hash: "3NKcSppgUnmuGp9kGQdp7ZXUh5vcf7rm9mhKE4UMvwcuUaB8wb7S".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1229,
+            state_hash: "3NL63pX2kKi4pezYnm6MPjsDK9VSvJ1XFiUaed9vxPEa5PuWPLeZ".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1229,
+            state_hash: "3NLU6jZai3xytD6PkpdKNFTYjfYSsEWoksr9AmufqYbxJN2Mpuke".to_string(),
+            canonical: false,
+            was_canonical: true,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1230,
+            state_hash: "3NKNqeqRjSY8Qy1x4qwzfCVSCGUq2czp4Jo9E7pUY6ZnHTBg4JiW".to_string(),
+            canonical: false,
+            was_canonical: true,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1231,
+            state_hash: "3NKMBzGM1pySPanKkLdxjnUS9mZ88oCeanq3Nhm2QZ6eNB5ZkeGn".to_string(),
+            canonical: false,
+            was_canonical: true,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1230,
+            state_hash: "3NKcSppgUnmuGp9kGQdp7ZXUh5vcf7rm9mhKE4UMvwcuUaB8wb7S".to_string(),
+            canonical: false,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1229,
+            state_hash: "3NL63pX2kKi4pezYnm6MPjsDK9VSvJ1XFiUaed9vxPEa5PuWPLeZ".to_string(),
+            canonical: false,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1231,
+            state_hash: "3NKMBzGM1pySPanKkLdxjnUS9mZ88oCeanq3Nhm2QZ6eNB5ZkeGn".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1230,
+            state_hash: "3NKNqeqRjSY8Qy1x4qwzfCVSCGUq2czp4Jo9E7pUY6ZnHTBg4JiW".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+        BlockCanonicityUpdatePayload {
+            height: 1229,
+            state_hash: "3NLU6jZai3xytD6PkpdKNFTYjfYSsEWoksr9AmufqYbxJN2Mpuke".to_string(),
+            canonical: true,
+            was_canonical: false,
+        },
+    ];
+
+    while let Some(expected_event) = expected_events.pop() {
+        let event = receiver.recv().await;
+        let payload: BlockCanonicityUpdatePayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
+        assert_eq!(payload.height, expected_event.height);
+        assert_eq!(payload.state_hash, expected_event.state_hash);
+        assert_eq!(payload.canonical, expected_event.canonical);
+        assert_eq!(payload.was_canonical, expected_event.was_canonical);
+    }
 
     Ok(())
 }
