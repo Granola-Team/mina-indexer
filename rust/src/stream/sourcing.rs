@@ -54,14 +54,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
 }
 
 pub fn publish_genesis_ledger_double_entries(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
-    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
-
-    // Ensure the file exists before testing
-    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
-
-    let genesis_ledger: GenesisLedger = sonic_rs::from_str(&file_content)?;
-
-    for de in genesis_ledger.get_accounting_double_entries() {
+    for de in get_genesis_ledger().get_accounting_double_entries() {
         shared_publisher.publish(Event {
             event_type: EventType::DoubleEntryTransaction,
             payload: sonic_rs::to_string(&de).unwrap(),
@@ -72,14 +65,7 @@ pub fn publish_genesis_ledger_double_entries(shared_publisher: &Arc<SharedPublis
 }
 
 pub fn publish_exempt_accounts(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
-    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
-
-    // Ensure the file exists before testing
-    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
-
-    let genesis_ledger: GenesisLedger = sonic_rs::from_str(&file_content)?;
-
-    for account in genesis_ledger.get_accounts() {
+    for account in get_genesis_ledger().get_accounts() {
         shared_publisher.publish(Event {
             event_type: EventType::PreExistingAccount,
             payload: account,
@@ -87,6 +73,15 @@ pub fn publish_exempt_accounts(shared_publisher: &Arc<SharedPublisher>) -> Resul
     }
 
     Ok(())
+}
+
+fn get_genesis_ledger() -> GenesisLedger {
+    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
+
+    // Ensure the file exists before testing
+    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
+
+    sonic_rs::from_str(&file_content).expect("Failed to parse genesis_ledger.json")
 }
 
 pub async fn publish_block_dir_paths(
