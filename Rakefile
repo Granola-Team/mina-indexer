@@ -26,7 +26,14 @@ end
 desc "Test"
 task :test do
   chdir "rust"
-  sh "cargo test -- --test-threads=1"
+  sh "cargo test --lib -- --test-threads=1"
+  chdir root_dir
+end
+
+desc "Integration Tests"
+task :it do
+  chdir "rust"
+  sh "cargo test --test regression_tests -- --test-threads=1"
   chdir root_dir
 end
 
