@@ -472,7 +472,7 @@ mod canonical_items_manager_tests {
                 was_canonical: false,
             };
             manager.add_block_canonicity_update(update).await;
-            manager.add_items_count(4, &"state_hash_4".to_string(), 0).await;
+            manager.add_items_count(4, "state_hash_4", 0).await;
         }
         {
             let update = BlockCanonicityUpdatePayload {
@@ -482,7 +482,7 @@ mod canonical_items_manager_tests {
                 was_canonical: false,
             };
             manager.add_block_canonicity_update(update).await;
-            manager.add_items_count(10, &"state_hash_10".to_string(), 0).await;
+            manager.add_items_count(10, "state_hash_10", 0).await;
         }
         let _ = manager.get_updates(10).await; // Process updates
 

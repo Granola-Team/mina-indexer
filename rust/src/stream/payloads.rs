@@ -160,7 +160,7 @@ pub struct BlockLogPayload {
     pub is_berkeley_block: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CanonicalBlockLogPayload {
     pub height: u64,
     pub state_hash: String,
@@ -174,6 +174,24 @@ pub struct CanonicalBlockLogPayload {
     pub last_vrf_output: String,
     pub is_berkeley_block: bool,
     pub canonical: bool,
+}
+
+impl CanonicalItem for CanonicalBlockLogPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, _was_canonical: bool) {
+        // noop
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
