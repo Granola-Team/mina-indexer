@@ -15,7 +15,7 @@ pub struct Node {
     pub metadata_str: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockchainTree {
     tree: BTreeMap<Height, Vec<Node>>,
     max_ancestors_from_best_tip: usize,
@@ -109,6 +109,14 @@ impl BlockchainTree {
 
     pub fn has_parent(&self, node: &Node) -> bool {
         self.get_parent(node).is_some()
+    }
+
+    pub fn greater(a: &Node, b: &Node) -> bool {
+        match a.last_vrf_output.cmp(&b.last_vrf_output) {
+            std::cmp::Ordering::Greater => true,
+            std::cmp::Ordering::Equal => a.state_hash > b.state_hash,
+            std::cmp::Ordering::Less => false,
+        }
     }
 
     fn sort_entries(entries: &mut [Node]) {
@@ -535,6 +543,39 @@ mod blockchain_tree_tests {
         // Verify that the tree now contains the new root node at height 2
         assert!(tree.tree.contains_key(&Height(root_payload.height)));
         assert_eq!(tree.tree[&Height(root_payload.height)][0], new_root_node);
+    }
+
+    #[test]
+    fn test_node_greater_comparison() {
+        let node_a = Node {
+            height: Height(1),
+            state_hash: Hash("c_state_hash".to_string()),
+            previous_state_hash: Hash("prev_hash".to_string()),
+            last_vrf_output: "b_vrf_output".to_string(),
+            ..Default::default()
+        };
+
+        let node_b = Node {
+            height: Height(1),
+            state_hash: Hash("b_state_hash".to_string()),
+            previous_state_hash: Hash("prev_hash".to_string()),
+            last_vrf_output: "a_vrf_output".to_string(),
+            ..Default::default()
+        };
+
+        // node_a > node_b because vrf_output is greater
+        assert!(BlockchainTree::greater(&node_a, &node_b));
+
+        let node_c = Node {
+            height: Height(1),
+            state_hash: Hash("a_state_hash".to_string()),
+            previous_state_hash: Hash("prev_hash".to_string()),
+            last_vrf_output: "b_vrf_output".to_string(),
+            ..Default::default()
+        };
+
+        // node_a > node_c because state_hash_a > state_hash_c when vrf_output is tied
+        assert!(BlockchainTree::greater(&node_a, &node_c));
     }
 }
 
