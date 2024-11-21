@@ -94,7 +94,7 @@ impl AccountingActor {
             timestamp: payload.timestamp,
         };
         let mut receiver_entry = AccountingEntry {
-            transfer_type: payload.txn_hash.to_string(),
+            transfer_type: payload.txn_type.to_string(),
             counterparty: payload.sender.to_string(),
             entry_type: AccountingEntryType::Credit,
             account: payload.receiver.to_string(),
