@@ -1,7 +1,11 @@
-# Mina Indexer
+<h1 align="center">mina-indexer</h1>
 
-[![Build
-status](https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg)](https://buildkite.com/granola/mina-indexer)
+<p align="center">
+    <a href="https://buildkite.com/granola/mina-indexer"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a>
+    <img src="https://github.com/Granola-Team/mina-indexer/workflows/CI/badge.svg?branch=main">
+    <a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
+</p>
+
 
 The Mina Indexer is a redesigned version of the software collectively
 called the "[Mina archive
