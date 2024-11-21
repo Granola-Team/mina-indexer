@@ -1,21 +1,59 @@
 use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
+use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},
+    path::Path,
     process::{Command, Stdio},
     thread,
     time::{Duration, Instant},
 };
 use tokio_postgres::NoTls;
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Account {
+    public_key: String,
+    balance: u64,
+}
+
 #[tokio::test]
 async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-        Duration::from_secs(10 * 60), // 5-minute timeout
+        Duration::from_secs(9 * 60),
     );
 
+    test_ledger_ingested_up_to_5000().await;
     test_blockchain_ledger_accounting_per_block().await;
+}
+
+async fn test_ledger_ingested_up_to_5000() {
+    if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
+        let handle = tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+
+        let query = r#"
+            SELECT
+           	CAST(MAX(height) AS BIGINT) AS max_height
+                    FROM
+           	blockchain_ledger;
+        "#;
+
+        // Execute the query using the SQL client from the actor
+        if let Ok(row) = client.query_one(query, &[]).await.map_err(|_| "Unable to get max height of blockchain ledger") {
+            let max_height: i64 = row.get("max_height");
+            assert_eq!(max_height, 5000, "Expected the ledger to have been ingested up to height 5000");
+        } else {
+            panic!("Could not execute query")
+        }
+        drop(handle);
+    } else {
+        panic!("Unable to open connection to database");
+    }
 }
 
 async fn test_blockchain_ledger_accounting_per_block() {
@@ -27,7 +65,7 @@ async fn test_blockchain_ledger_accounting_per_block() {
         });
 
         let query = r#"
-            SELECT SUM(balance_delta_sum) AS total_balance
+            SELECT CAST(SUM(balance_delta_sum) AS BIGINT) AS total_balance
             FROM (
                 SELECT SUM(balance_delta) AS balance_delta_sum
                 FROM blockchain_ledger
