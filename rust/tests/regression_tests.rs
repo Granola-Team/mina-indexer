@@ -1,6 +1,7 @@
 use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
 use serde::Deserialize;
 use std::{
+    collections::HashMap,
     io::{BufRead, BufReader},
     path::Path,
     process::{Command, Stdio},
@@ -9,7 +10,7 @@ use std::{
 };
 use tokio_postgres::NoTls;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 struct Account {
     public_key: String,
@@ -26,6 +27,7 @@ async fn test_blockchain_ledger() {
 
     test_ledger_ingested_up_to_5000().await;
     test_blockchain_ledger_accounting_per_block().await;
+    test_account_balances().await;
 }
 
 async fn test_ledger_ingested_up_to_5000() {
@@ -84,6 +86,57 @@ async fn test_blockchain_ledger_accounting_per_block() {
     } else {
         panic!("Unable to open connection to database");
     }
+}
+
+async fn test_account_balances() {
+    let file_content = std::fs::read_to_string(Path::new("./tests/data/ledger_at_height_5000.json")).expect("Failed to read JSON file from disk");
+
+    // Parse the JSON into a vector of Account structs
+    let accounts: Vec<Account> = sonic_rs::from_str(&file_content).unwrap();
+    // let account_map: HashMap<String, Account> = accounts.into_iter().map(|account| (account.public_key.clone(), account)).collect();
+
+    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+        .await
+        .expect("Expected to open conneciton");
+
+    let handle = tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    let query = r#"
+        SELECT address, CAST(balance AS BIGINT) AS balance
+        FROM account_summary
+        WHERE address_type = 'BlockchainAddress'
+        ORDER BY balance ASC;
+    "#;
+
+    // Execute the query using the SQL client from the actor
+    let rows = client
+        .query(query, &[])
+        .await
+        .map_err(|_| "Unable to fetch account balances")
+        .expect("Unable to execute query");
+
+    let rows_map: HashMap<String, i64> = rows
+        .into_iter()
+        .map(|row| (row.get::<_, String>("address"), row.get::<_, i64>("balance")))
+        .collect();
+
+    let mut incorrect_accounts: Vec<(String, i64, i64)> = vec![];
+    for account in accounts {
+        assert!(rows_map.contains_key(&account.public_key));
+        let ledger_account_balance = rows_map.get(&account.public_key).expect("Unable to get address from hash map");
+        if &(account.balance as i64) != ledger_account_balance {
+            incorrect_accounts.push((account.public_key.to_string(), account.balance as i64, ledger_account_balance.to_owned()));
+            println!("{}: {} != {}", account.public_key, account.balance, ledger_account_balance);
+        }
+    }
+
+    assert_eq!(incorrect_accounts.len(), 0, "Expected ledger to match");
+
+    drop(handle);
 }
 
 /// Spawns a child process for an integration test.
