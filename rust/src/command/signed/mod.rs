@@ -922,11 +922,11 @@ mod tests {
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block.command_hashes();
 
-        // TODO
+        // see https://minaexplorer.com/block/3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg
         assert_eq!(
             hashes,
             vec![TxnHash::V2(
-                "KwXwuXo65x6V8VJ7U34ReBLPGVUMKeNGCiGEHJrWG1b9g9f8XNqc5".to_string()
+                "5JuJ1eRNWdE8jSMmCDoHnAdBGhLyBnCk2gkcvkfCZ7WvrKtGuWHB".to_string()
             )]
         );
         Ok(())
