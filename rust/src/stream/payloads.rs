@@ -54,23 +54,46 @@ pub struct MainnetBlockPayload {
 }
 
 impl MainnetBlockPayload {
-    pub fn accounts(&self) -> Vec<String> {
+    pub fn valid_accounts(&self) -> Vec<String> {
+        // Helper function to extract accounts from user commands based on a mapper
+        fn extract_accounts<F>(commands: &[CommandSummary], mapper: F) -> Vec<String>
+        where
+            F: Fn(&CommandSummary) -> &str,
+        {
+            commands
+                .iter()
+                .filter(|uc| uc.status == CommandStatus::Applied)
+                .map(mapper)
+                .map(|s| s.to_string())
+                .collect()
+        }
+
+        // Collect accounts from different sources
+        let fee_transfer_via_coinbase_accounts: Vec<String> = self
+            .fee_transfer_via_coinbase
+            .as_ref()
+            .map(|fts| fts.iter().map(|ft| ft.receiver.to_string()).collect())
+            .unwrap_or_default();
         let snark_accounts: Vec<String> = self.snark_work.iter().map(|s| s.prover.to_string()).collect();
         let fee_transfer_accounts: Vec<String> = self.fee_transfers.iter().map(|ft| ft.recipient.to_string()).collect();
-        let user_command_sender_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.sender.to_string()).collect();
-        let user_command_receiver_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.receiver.to_string()).collect();
-        let user_command_fee_payer_accounts: Vec<String> = self.user_commands.iter().map(|ft| ft.fee_payer.to_string()).collect();
+        let user_command_sender_accounts = extract_accounts(&self.user_commands, |uc| &uc.sender);
+        let user_command_receiver_accounts = extract_accounts(&self.user_commands, |uc| &uc.receiver);
+        let user_command_fee_payer_accounts = extract_accounts(&self.user_commands, |uc| &uc.fee_payer);
+
+        // Combine all accounts into a single collection
         let accounts: Vec<String> = [
             snark_accounts,
             fee_transfer_accounts,
             user_command_sender_accounts,
             user_command_receiver_accounts,
             user_command_fee_payer_accounts,
+            fee_transfer_via_coinbase_accounts,
             vec![self.coinbase_receiver.to_string()],
         ]
         .into_iter()
         .flatten()
         .collect();
+
         let unique: HashSet<_> = accounts.into_iter().collect();
         unique.into_iter().collect()
     }

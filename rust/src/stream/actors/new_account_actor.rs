@@ -98,7 +98,7 @@ impl Actor for NewAccountActor {
                     // Look up the blocks at the confirmed height
                     if let Some(blocks) = mainnet_blocks.remove(&Height(block_confirmation.height)) {
                         for block in blocks {
-                            for account in block.accounts().iter().filter(|a| !a.is_empty()) {
+                            for account in block.valid_accounts().iter().filter(|a| !a.is_empty()) {
                                 if block.state_hash == block_confirmation.state_hash {
                                     // Check if the account is already in the database
                                     let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
