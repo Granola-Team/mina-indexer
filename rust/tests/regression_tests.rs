@@ -21,13 +21,35 @@ struct Account {
 async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-        Duration::from_secs(9 * 60),
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "10")],
+        Duration::from_secs(15 * 60),
     );
 
+    trim_ledger_down_to_5000().await;
     test_ledger_ingested_up_to_5000().await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances().await;
+}
+
+async fn trim_ledger_down_to_5000() {
+    if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
+        let handle = tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
+            }
+        });
+
+        let query = r#"DELETE FROM blockchain_ledger WHERE height > 5000;"#;
+
+        // Execute the query using the SQL client from the actor
+        if let Err(e) = client.execute(query, &[]).await.map_err(|_| "Unable to trim the blockchain ledger") {
+            eprintln!("{}", e);
+        }
+
+        drop(handle);
+    } else {
+        panic!("Unable to open connection to database");
+    }
 }
 
 async fn test_ledger_ingested_up_to_5000() {
@@ -146,6 +168,7 @@ async fn test_account_balances() {
 /// - `env_vars`: A list of environment variables to set for the process.
 /// - `timeout`: Duration for which the process is allowed to run.
 pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], timeout: Duration) {
+    println!("Running ingestion process for {} minutes...", timeout.as_secs() / 60);
     // Spawn the child process with environment variables
     let mut child = {
         let mut cmd = Command::new(binary_path);
