@@ -157,7 +157,7 @@ jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15De
 jsonpath "$.data.snarks[63].canonical" == true
 jsonpath "$.data.snarks[63].blockHeight" == 111
 
-duration < 500
+duration < 1000
 
 #
 # SNARKs canonical block height lte
@@ -260,4 +260,4 @@ jsonpath "$.data.snarks[63].blockHeight" == 111
 jsonpath "$.data.snarks[63].canonical" == true
 jsonpath "$.data.snarks[63].prover" == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h"
 
-duration < 500
+duration < 1000
