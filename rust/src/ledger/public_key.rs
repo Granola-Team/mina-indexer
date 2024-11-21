@@ -115,6 +115,13 @@ impl From<PublicKey> for PublicKeyV1 {
     }
 }
 
+impl From<PublicKey> for PublicKey2V1 {
+    fn from(value: PublicKey) -> Self {
+        let pk = CompressedPubKey::from_address(&value.0).unwrap();
+        pk.into()
+    }
+}
+
 impl From<PublicKey> for PubKey {
     fn from(value: PublicKey) -> Self {
         PubKey::from_address(&value.0).unwrap()
