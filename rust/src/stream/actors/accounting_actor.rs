@@ -85,7 +85,7 @@ impl AccountingActor {
 
     async fn process_user_command(&self, payload: &CanonicalUserCommandLogPayload) {
         let mut sender_entry = AccountingEntry {
-            transfer_type: CommandType::Payment.to_string(),
+            transfer_type: payload.txn_type.to_string(),
             counterparty: payload.receiver.to_string(),
             entry_type: AccountingEntryType::Debit,
             account: payload.sender.to_string(),
@@ -94,7 +94,7 @@ impl AccountingActor {
             timestamp: payload.timestamp,
         };
         let mut receiver_entry = AccountingEntry {
-            transfer_type: CommandType::Payment.to_string(),
+            transfer_type: payload.txn_hash.to_string(),
             counterparty: payload.sender.to_string(),
             entry_type: AccountingEntryType::Credit,
             account: payload.receiver.to_string(),
@@ -107,7 +107,7 @@ impl AccountingActor {
             sender_entry.entry_type = AccountingEntryType::Credit;
             receiver_entry.entry_type = AccountingEntryType::Debit;
         }
-        if payload.status == CommandStatus::Applied {
+        if payload.status == CommandStatus::Applied && payload.txn_type != CommandType::StakeDelegation {
             // Split into two separate transactions for publishing
             let txn_1 = DoubleEntryRecordPayload {
                 height: payload.height,
@@ -696,5 +696,64 @@ mod accounting_actor_tests {
         assert!(published_event.is_err(), "Did not expected a DoubleEntryTransaction event to be published.");
 
         assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_process_user_command_stake_delegation() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = CanonicalUserCommandLogPayload {
+            height: 200,
+            txn_hash: "txn_hash".to_string(),
+            state_hash: "state_hash_3".to_string(),
+            timestamp: 1620000200,
+            txn_type: CommandType::StakeDelegation,
+            status: CommandStatus::Applied,
+            sender: "B62qsender1".to_string(),
+            receiver: "B62qreceiver1".to_string(),
+            fee_payer: "B62qsender1".to_string(),
+            nonce: 1,
+            fee_nanomina: 1_000_000,
+            amount_nanomina: 100_000_000,
+            canonical: true,
+            was_canonical: false,
+        };
+
+        actor.process_user_command(&payload).await;
+
+        // Verify the fee transaction (fee payer to block reward pool)
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(
+            published_event.is_ok(),
+            "Expected the DoubleEntryTransaction event for the fee to be published."
+        );
+
+        if let Ok(Ok(event)) = published_event {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+
+            // Verify the fee transaction
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            // Debit: Fee payer
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, payload.fee_payer);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, payload.fee_nanomina);
+
+            // Credit: Block reward pool
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].amount_nanomina, payload.fee_nanomina);
+        }
+
+        // Verify that no balance transfer transaction is published for stake delegations
+        let balance_transfer_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(
+            balance_transfer_event.is_err(),
+            "No balance transfer transaction should be published for a stake delegation."
+        );
+
+        assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
     }
 }
