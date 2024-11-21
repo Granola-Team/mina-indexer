@@ -40,7 +40,7 @@ end
 desc "Ingest blocks"
 task ingest: [:build] do
   chdir "rust"
-  sh "cargo run --bin ingest_blocks"
+  sh "cargo run --bin ingestion"
   chdir root_dir
 end
 
