@@ -301,7 +301,6 @@ impl SignedCommand {
 
                 let mut hash = hasher.finalize_boxed().to_vec();
                 hash.insert(0, hash.len() as u8);
-                hash.insert(0, 2); //version byte
 
                 Ok(TxnHash::V2(
                     bs58::encode(hash)
