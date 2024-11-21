@@ -158,7 +158,7 @@ mod new_account_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        mainnet_block_models::CommandSummary,
+        mainnet_block_models::{CommandStatus, CommandSummary},
         payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
     };
     use std::sync::Arc;
@@ -231,6 +231,7 @@ mod new_account_actor_tests {
                 sender: "B62qnewaccount".to_string(),
                 receiver: "B62qnewaccount".to_string(),
                 fee_payer: "B62qnewaccount".to_string(),
+                status: CommandStatus::Applied,
                 ..Default::default()
             }],
             timestamp: 1234567890,
@@ -269,6 +270,49 @@ mod new_account_actor_tests {
         } else {
             panic!("Expected NewAccount event not received");
         }
+    }
+
+    #[tokio::test]
+    async fn test_block_confirmation_with_new_accounts_failed_command() {
+        let (actor, mut receiver) = setup_actor().await;
+
+        let block = MainnetBlockPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            user_commands: vec![CommandSummary {
+                sender: "B62qnewaccount".to_string(),
+                receiver: "B62qnewaccount".to_string(),
+                fee_payer: "B62qnewaccount".to_string(),
+                status: CommandStatus::Failed,
+                ..Default::default()
+            }],
+            timestamp: 1234567890,
+            ..Default::default()
+        };
+
+        // Add the mainnet block
+        let block_event = Event {
+            event_type: EventType::MainnetBlock,
+            payload: sonic_rs::to_string(&block).unwrap(),
+        };
+        actor.handle_event(block_event).await;
+
+        // Confirm the block
+        let confirmation_payload = BlockConfirmationPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
+            confirmations: 10,
+        };
+
+        let confirmation_event = Event {
+            event_type: EventType::BlockConfirmation,
+            payload: sonic_rs::to_string(&confirmation_payload).unwrap(),
+        };
+
+        actor.handle_event(confirmation_event).await;
+
+        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
+        assert!(published_event.is_err(), "Expect failed user command to not publish event");
     }
 
     #[tokio::test]
