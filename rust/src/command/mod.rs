@@ -609,8 +609,26 @@ impl From<(UserCommand, bool)> for Command {
 }
 
 impl From<v2::staged_ledger_diff::Command> for UserCommandWithStatus {
-    fn from(_value: v2::staged_ledger_diff::Command) -> Self {
-        todo!("From<v2::staged_ledger_diff::Command> for UserCommandWithStatus")
+    fn from(value: v2::staged_ledger_diff::Command) -> Self {
+        use mina_rs::{SignedCommand2, UserCommand2, UserCommandWithStatus2};
+        use v2::staged_ledger_diff::CommandData;
+
+        match value.data.1 {
+            CommandData::UserCommandData(data) => {
+                let cmd =
+                    UserCommand2::SignedCommand(Versioned::new(Versioned::new(SignedCommand2 {
+                        payload: Versioned::new(Versioned::new(data.payload.into())),
+                        signer: data.signer.into(),
+                        signature: data.signature.into(),
+                    })));
+
+                Self::V2(Versioned::new(UserCommandWithStatus2 {
+                    data: Versioned::new(Versioned::new(cmd)),
+                    status: Versioned::new(value.status.into()),
+                }))
+            }
+            CommandData::ZkappCommandData(_data) => todo!(),
+        }
     }
 }
 
@@ -656,11 +674,29 @@ impl From<UserCommandWithStatus> for Command {
     }
 }
 
+// status conversions
+
 impl From<UserCommandWithStatus> for CommandStatusData {
     fn from(value: UserCommandWithStatus) -> Self {
         value.status_data()
     }
 }
+
+impl From<v2::staged_ledger_diff::Status> for mina_rs::TransactionStatus2 {
+    fn from(value: v2::staged_ledger_diff::Status) -> Self {
+        use v2::staged_ledger_diff::{Status, StatusKind};
+
+        match value {
+            Status::Status((StatusKind::Applied,)) => Self::Applied,
+            Status::StatusAndFailure(StatusKind::Failed, (((failure,),),)) => {
+                Self::Failed(vec![Versioned::new(failure)])
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+// debug/display
 
 impl std::fmt::Debug for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
