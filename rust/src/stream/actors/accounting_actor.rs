@@ -40,47 +40,114 @@ impl AccountingActor {
     }
 
     async fn process_internal_command(&self, payload: &CanonicalInternalCommandLogPayload) {
-        let mut source_entry = AccountingEntry {
-            transfer_type: payload.internal_command_type.to_string(),
-            counterparty: payload.recipient.to_string(),
-            entry_type: AccountingEntryType::Debit,
-            account: match payload.internal_command_type {
-                InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
-                InternalCommandType::FeeTransfer => format!("BlockRewardPool#{}", payload.state_hash),
-                InternalCommandType::FeeTransferViaCoinbase => payload.source.as_ref().cloned().unwrap(),
-            },
-            account_type: AccountingEntryAccountType::VirtualAddess,
-            amount_nanomina: payload.amount_nanomina,
-            timestamp: payload.timestamp,
-        };
-        let mut recipient_entry = AccountingEntry {
-            transfer_type: payload.internal_command_type.to_string(),
-            counterparty: match payload.internal_command_type {
-                InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
-                InternalCommandType::FeeTransfer => format!("BlockRewardPool#{}", payload.state_hash),
-                InternalCommandType::FeeTransferViaCoinbase => payload.source.as_ref().cloned().unwrap(),
-            },
-            entry_type: AccountingEntryType::Credit,
-            account: payload.recipient.clone(),
-            account_type: AccountingEntryAccountType::BlockchainAddress,
-            amount_nanomina: payload.amount_nanomina,
-            timestamp: payload.timestamp,
-        };
+        if payload.internal_command_type == InternalCommandType::FeeTransferViaCoinbase {
+            {
+                let mut source = AccountingEntry {
+                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    counterparty: format!("BlockRewardPool#{}", payload.state_hash),
+                    entry_type: AccountingEntryType::Debit,
+                    account: payload.source.clone().unwrap(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                };
+                let mut recipient = AccountingEntry {
+                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    counterparty: payload.source.clone().unwrap(),
+                    entry_type: AccountingEntryType::Credit,
+                    account: format!("BlockRewardPool#{}", payload.state_hash),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                };
+                // Swap debits and credits for non-canonical entries
+                if !payload.canonical {
+                    source.entry_type = AccountingEntryType::Credit;
+                    recipient.entry_type = AccountingEntryType::Debit;
+                }
+                let double_entry_record = DoubleEntryRecordPayload {
+                    height: payload.height,
+                    state_hash: payload.state_hash.to_string(),
+                    lhs: vec![source],
+                    rhs: vec![recipient],
+                };
 
-        if !payload.canonical {
-            // Swap debits and credits for non-canonical entries
-            source_entry.entry_type = AccountingEntryType::Credit;
-            recipient_entry.entry_type = AccountingEntryType::Debit;
+                self.publish_transaction(&double_entry_record).await;
+            }
+            {
+                let mut source = AccountingEntry {
+                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    counterparty: payload.recipient.to_string(),
+                    entry_type: AccountingEntryType::Debit,
+                    account: format!("BlockRewardPool#{}", payload.state_hash),
+                    account_type: AccountingEntryAccountType::VirtualAddess,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                };
+                let mut recipient = AccountingEntry {
+                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    counterparty: format!("BlockRewardPool#{}", payload.state_hash),
+                    entry_type: AccountingEntryType::Credit,
+                    account: payload.recipient.to_string(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: payload.amount_nanomina,
+                    timestamp: payload.timestamp,
+                };
+                // Swap debits and credits for non-canonical entries
+                if !payload.canonical {
+                    source.entry_type = AccountingEntryType::Credit;
+                    recipient.entry_type = AccountingEntryType::Debit;
+                }
+                let double_entry_record = DoubleEntryRecordPayload {
+                    height: payload.height,
+                    state_hash: payload.state_hash.to_string(),
+                    lhs: vec![source],
+                    rhs: vec![recipient],
+                };
+
+                self.publish_transaction(&double_entry_record).await;
+            }
+        } else {
+            let mut source = AccountingEntry {
+                transfer_type: payload.internal_command_type.to_string(),
+                counterparty: payload.recipient.to_string(),
+                entry_type: AccountingEntryType::Debit,
+                account: match payload.internal_command_type {
+                    InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
+                    _ => format!("BlockRewardPool#{}", payload.state_hash),
+                },
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: payload.amount_nanomina,
+                timestamp: payload.timestamp,
+            };
+            let mut recipient = AccountingEntry {
+                transfer_type: payload.internal_command_type.to_string(),
+                counterparty: match payload.internal_command_type {
+                    InternalCommandType::Coinbase => format!("MinaCoinbasePayment#{}", payload.state_hash),
+                    _ => format!("BlockRewardPool#{}", payload.state_hash),
+                },
+                entry_type: AccountingEntryType::Credit,
+                account: payload.recipient.clone(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: payload.amount_nanomina,
+                timestamp: payload.timestamp,
+            };
+
+            if !payload.canonical {
+                // Swap debits and credits for non-canonical entries
+                source.entry_type = AccountingEntryType::Credit;
+                recipient.entry_type = AccountingEntryType::Debit;
+            }
+
+            let double_entry_record = DoubleEntryRecordPayload {
+                height: payload.height,
+                state_hash: payload.state_hash.to_string(),
+                lhs: vec![source],
+                rhs: vec![recipient],
+            };
+
+            self.publish_transaction(&double_entry_record).await;
         }
-
-        let double_entry_record = DoubleEntryRecordPayload {
-            height: payload.height,
-            state_hash: payload.state_hash.to_string(),
-            lhs: vec![source_entry],
-            rhs: vec![recipient_entry],
-        };
-
-        self.publish_transaction(&double_entry_record).await;
     }
 
     async fn process_user_command(&self, payload: &CanonicalUserCommandLogPayload) {
@@ -572,16 +639,29 @@ mod accounting_actor_tests {
         };
 
         actor.process_internal_command(&payload).await;
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
+        // Verify the first transaction (Coinbase Receiver -> BlockRewardPool)
+        if let Ok(Ok(event)) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.lhs[0].account, "coinbase_receiver".to_string());
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+        } else {
+            panic!("Expected the first DoubleEntryTransaction event.");
+        }
+
+        // Verify the second transaction (BlockRewardPool -> Recipient)
+        if let Ok(Ok(event)) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        } else {
+            panic!("Expected the second DoubleEntryTransaction event.");
         }
     }
 
@@ -602,16 +682,29 @@ mod accounting_actor_tests {
         };
 
         actor.process_internal_command(&payload).await;
-        let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
-        assert!(published_event.is_ok(), "Expected a DoubleEntryTransaction event to be published.");
 
-        if let Ok(Ok(event)) = published_event {
+        // Verify the first transaction (BlockRewardPool -> Coinbase Receiver)
+        if let Ok(Ok(event)) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(published_payload.height, payload.height);
             assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
             assert_eq!(published_payload.lhs[0].account, "coinbase_receiver".to_string());
             assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+        } else {
+            panic!("Expected the first DoubleEntryTransaction event.");
+        }
+
+        // Verify the second transaction (Recipient -> BlockRewardPool)
+        if let Ok(Ok(event)) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.lhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Debit);
             assert_eq!(published_payload.rhs[0].account, payload.recipient);
+        } else {
+            panic!("Expected the second DoubleEntryTransaction event.");
         }
     }
 
