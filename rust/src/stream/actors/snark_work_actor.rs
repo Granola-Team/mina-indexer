@@ -111,6 +111,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
         fee_transfer_via_coinbase: block.get_fee_transfers_via_coinbase(),
         fee_transfers: block.get_fee_transfers(),
         internal_command_count: block.get_internal_command_count(),
+        excess_block_fees: block.get_excess_block_fees(),
     };
 
     // Create shared publisher and SnarkWorkSummaryActor

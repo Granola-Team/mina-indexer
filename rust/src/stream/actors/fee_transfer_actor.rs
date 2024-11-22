@@ -37,16 +37,14 @@ impl Actor for FeeTransferActor {
         match event.event_type {
             EventType::MainnetBlock => {
                 let block_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
-                let total_snark_fees = block_payload.fee_transfers.iter().map(|ft| ft.fee_nanomina).sum::<u64>();
-                let total_fees_paid = block_payload.user_commands.iter().map(|uc| uc.fee_nanomina).sum::<u64>();
-                if total_fees_paid > total_snark_fees {
+                if block_payload.excess_block_fees > 0 {
                     let payload = InternalCommandLogPayload {
                         internal_command_type: InternalCommandType::FeeTransfer,
                         height: block_payload.height,
                         state_hash: block_payload.state_hash.clone(),
                         timestamp: block_payload.timestamp,
                         recipient: block_payload.coinbase_receiver,
-                        amount_nanomina: total_fees_paid - total_snark_fees,
+                        amount_nanomina: block_payload.excess_block_fees,
                         source: None,
                     };
                     self.publish(Event {
@@ -208,6 +206,7 @@ async fn test_fee_transfer_actor_handle_event_with_coinbase_payment() {
         user_commands,
         timestamp: 1615986540000,
         coinbase_receiver: "coinbase_receiver".to_string(),
+        excess_block_fees: 200_000,
         ..Default::default()
     };
 
@@ -238,11 +237,7 @@ async fn test_fee_transfer_actor_handle_event_with_coinbase_payment() {
         assert_eq!(command_payload.state_hash, block_payload.state_hash);
         assert_eq!(command_payload.timestamp, block_payload.timestamp);
         assert_eq!(command_payload.recipient, block_payload.coinbase_receiver);
-        assert_eq!(
-            command_payload.amount_nanomina,
-            block_payload.user_commands.iter().map(|uc| uc.fee_nanomina).sum::<u64>()
-                - block_payload.fee_transfers.iter().map(|ft| ft.fee_nanomina).sum::<u64>()
-        );
+        assert_eq!(command_payload.amount_nanomina, block_payload.excess_block_fees);
     } else {
         panic!("Did not receive expected coinbase receiver payment event.");
     }

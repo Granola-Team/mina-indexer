@@ -20,16 +20,21 @@ impl MainnetBlock {
         self.protocol_state.body.consensus_state.block_creator.to_string()
     }
 
+    pub fn get_excess_block_fees(&self) -> u64 {
+        let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
+        let total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
+        let total_ftvc = self
+            .get_fee_transfers_via_coinbase()
+            .map(|fees| fees.iter().map(|ftvc| (ftvc.fee * 1_000_000_000f64) as u64).sum::<u64>())
+            .unwrap_or(0u64);
+        total_fees_paid_into_block_pool + total_ftvc - total_snark_fees
+    }
+
     pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
         let mut fee_transfers: HashMap<String, u64> = HashMap::new();
         for completed_work in self.get_snark_work() {
             let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
             *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
-        }
-        if let Some(fee_transfers_via_coinbase) = self.get_fee_transfers_via_coinbase() {
-            for ftvc in fee_transfers_via_coinbase.iter() {
-                fee_transfers.remove(&ftvc.receiver);
-            }
         }
         fee_transfers.retain(|_, v| *v > 0u64);
         fee_transfers
@@ -649,10 +654,14 @@ mod mainnet_block_parsing_tests {
         // Deserialize JSON into MainnetBlock struct
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
-        // this block has no compelted works so the user command fees are transferred to the coinbase receiver,
-        // for a total of two internal commands
+        // 6 internal commands
         // 1. coinbase receiver
-        // 2. fee transfer of excess fees
-        assert_eq!(mainnet_block.get_internal_command_count(), 4);
+        // 2. fee transfer via coinbase
+        // 3. 3 internal commands
+        // 4. A payment to the coinbase receiver out of the excess of fees
+        assert_eq!(mainnet_block.get_internal_command_count(), 6);
+
+        // Excess block fees
+        assert_eq!(mainnet_block.get_excess_block_fees(), 14889016);
     }
 }
