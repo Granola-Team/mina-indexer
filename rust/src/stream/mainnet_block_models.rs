@@ -27,7 +27,7 @@ impl MainnetBlock {
             .get_fee_transfers_via_coinbase()
             .map(|fees| fees.iter().map(|ftvc| (ftvc.fee * 1_000_000_000f64) as u64).sum::<u64>())
             .unwrap_or(0u64);
-        total_fees_paid_into_block_pool + total_ftvc - total_snark_fees
+        total_fees_paid_into_block_pool - total_snark_fees + total_ftvc
     }
 
     pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
