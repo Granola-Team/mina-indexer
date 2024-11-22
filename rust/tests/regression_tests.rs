@@ -21,8 +21,8 @@ struct Account {
 async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "10")],
-        Duration::from_secs(15 * 60),
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        Duration::from_secs(12 * 60),
     );
 
     trim_ledger_down_to_5000().await;
@@ -152,7 +152,13 @@ async fn test_account_balances() {
         let ledger_account_balance = rows_map.get(&account.public_key).expect("Unable to get address from hash map");
         if &(account.balance as i64) != ledger_account_balance {
             incorrect_accounts.push((account.public_key.to_string(), account.balance as i64, ledger_account_balance.to_owned()));
-            println!("{}: {} != {}", account.public_key, account.balance, ledger_account_balance);
+            println!(
+                "{}: {} != {} (diff: {})",
+                account.public_key,
+                account.balance,
+                ledger_account_balance,
+                account.balance as i64 - ledger_account_balance
+            );
         }
     }
 

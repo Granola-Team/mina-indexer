@@ -27,7 +27,11 @@ impl MainnetBlock {
             .get_fee_transfers_via_coinbase()
             .map(|fees| fees.iter().map(|ftvc| (ftvc.fee * 1_000_000_000f64) as u64).sum::<u64>())
             .unwrap_or(0u64);
-        total_fees_paid_into_block_pool - total_snark_fees + total_ftvc
+        if total_fees_paid_into_block_pool + total_ftvc > total_snark_fees {
+            total_fees_paid_into_block_pool + total_ftvc - total_snark_fees
+        } else {
+            0
+        }
     }
 
     pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
@@ -47,12 +51,26 @@ impl MainnetBlock {
     }
 
     pub fn get_internal_command_count(&self) -> usize {
-        let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
-        let total_fees_paid = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
-        let mut total_internal_commands = self.get_fee_transfers().len() + self.get_fee_transfers_via_coinbase().unwrap_or_default().len() + 1; // coinbase;
-        if total_fees_paid > total_snark_fees {
-            total_internal_commands += 1 // additional transfer for remainder of fees not paid to snark workers
+        let excess_block_fees = self.get_excess_block_fees();
+
+        // Get fee transfers and remove those also in fee transfers via coinbase
+        let fee_transfers = self.get_fee_transfers();
+        let fee_transfers_via_coinbase = self.get_fee_transfers_via_coinbase().unwrap_or_default();
+        let unique_fee_transfers = fee_transfers
+            .into_iter()
+            .filter(|ft| {
+                !fee_transfers_via_coinbase
+                    .iter()
+                    .any(|ft_via_coinbase| ft.recipient == ft_via_coinbase.receiver && ft.fee_nanomina == (ft_via_coinbase.fee * 1_000_000_000f64) as u64)
+            })
+            .collect::<Vec<_>>();
+
+        // Calculate total internal commands
+        let mut total_internal_commands = unique_fee_transfers.len() + fee_transfers_via_coinbase.len() + 1; // +1 for coinbase
+        if excess_block_fees > 0 {
+            total_internal_commands += 1; // additional transfer for remainder fees
         }
+
         total_internal_commands
     }
 
@@ -663,5 +681,17 @@ mod mainnet_block_parsing_tests {
 
         // Excess block fees
         assert_eq!(mainnet_block.get_excess_block_fees(), 14889016);
+    }
+
+    #[test]
+    fn test_mainnet_block_has_3_internal_commands() {
+        // Path to your test JSON file
+        let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-583-3NKQkwAitnSHvvKU2cHLqmRAzaueQMQsXKKxiurQoR7759s555Xu.json");
+        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+
+        // Deserialize JSON into MainnetBlock struct
+        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        assert_eq!(mainnet_block.get_internal_command_count(), 3);
     }
 }
