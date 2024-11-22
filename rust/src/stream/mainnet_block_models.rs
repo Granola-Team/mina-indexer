@@ -23,12 +23,8 @@ impl MainnetBlock {
     pub fn get_excess_block_fees(&self) -> u64 {
         let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
         let total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
-        let total_ftvc = self
-            .get_fee_transfers_via_coinbase()
-            .map(|fees| fees.iter().map(|ftvc| (ftvc.fee * 1_000_000_000f64) as u64).sum::<u64>())
-            .unwrap_or(0u64);
-        if total_fees_paid_into_block_pool + total_ftvc > total_snark_fees {
-            total_fees_paid_into_block_pool + total_ftvc - total_snark_fees
+        if total_fees_paid_into_block_pool > total_snark_fees {
+            total_fees_paid_into_block_pool - total_snark_fees
         } else {
             0
         }
@@ -41,10 +37,17 @@ impl MainnetBlock {
             *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
         }
 
-        // FTVC can be duplicated in both the completed works and coinbase sections of the PCB
+        // If the fee for a completed work is higher than the available fees, the remainder
+        // is allotted out of the coinbase via a fee transfer via coinbase
         for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
-            if fee_transfers.get(&ftvc.receiver) == Some(&((ftvc.fee * 1_000_000_000f64) as u64)) {
-                fee_transfers.remove(&ftvc.receiver);
+            let ftvc_fee_nanomina = (ftvc.fee * 1_000_000_000f64) as u64;
+
+            if let Some(current_fee) = fee_transfers.get_mut(&ftvc.receiver) {
+                if *current_fee > ftvc_fee_nanomina {
+                    *current_fee -= ftvc_fee_nanomina;
+                } else {
+                    fee_transfers.remove(&ftvc.receiver);
+                }
             }
         }
 
