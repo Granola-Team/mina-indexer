@@ -49,7 +49,7 @@ task :ingest_from_root, [:height, :state_hash] => [:build] do |t, args|
   args.with_defaults(height: nil, state_hash: nil)
 
   # Construct the command
-  cmd = "cargo run --bin ingest_blocks --"
+  cmd = "cargo run --bin ingestion --"
   if args.height && args.state_hash
     cmd += " #{args.height} #{args.state_hash}"
   end
