@@ -639,4 +639,20 @@ mod mainnet_block_parsing_tests {
         // 2. fee transfer of excess fees
         assert_eq!(mainnet_block.get_internal_command_count(), 2);
     }
+
+    #[test]
+    fn test_mainnet_block_has_4_internal_commands() {
+        // Path to your test JSON file
+        let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-4556-3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json");
+        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+
+        // Deserialize JSON into MainnetBlock struct
+        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        // this block has no compelted works so the user command fees are transferred to the coinbase receiver,
+        // for a total of two internal commands
+        // 1. coinbase receiver
+        // 2. fee transfer of excess fees
+        assert_eq!(mainnet_block.get_internal_command_count(), 4);
+    }
 }

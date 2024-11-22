@@ -43,7 +43,7 @@ impl AccountingActor {
         if payload.internal_command_type == InternalCommandType::FeeTransferViaCoinbase {
             {
                 let mut source = AccountingEntry {
-                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    transfer_type: "BlockRewardPool".to_string(),
                     counterparty: format!("BlockRewardPool#{}", payload.state_hash),
                     entry_type: AccountingEntryType::Debit,
                     account: payload.source.clone().unwrap(),
@@ -52,7 +52,7 @@ impl AccountingActor {
                     timestamp: payload.timestamp,
                 };
                 let mut recipient = AccountingEntry {
-                    transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
+                    transfer_type: "BlockRewardPool".to_string(),
                     counterparty: payload.source.clone().unwrap(),
                     entry_type: AccountingEntryType::Credit,
                     account: format!("BlockRewardPool#{}", payload.state_hash),
