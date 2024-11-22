@@ -667,7 +667,7 @@ mod mainnet_block_parsing_tests {
     }
 
     #[test]
-    fn test_mainnet_block_has_4_internal_commands() {
+    fn test_mainnet_block_4556() {
         // Path to your test JSON file
         let path = Path::new("./src/stream/test_data/misc_blocks/mainnet-4556-3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json");
         let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
@@ -682,8 +682,27 @@ mod mainnet_block_parsing_tests {
         // 4. A payment to the coinbase receiver out of the excess of fees
         assert_eq!(mainnet_block.get_internal_command_count(), 6);
 
-        // Excess block fees
-        assert_eq!(mainnet_block.get_excess_block_fees(), 14889016);
+        assert!(mainnet_block
+            .get_fee_transfers_via_coinbase()
+            .unwrap()
+            .iter()
+            .any(|ft| { ft.receiver == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h".to_string() && (ft.fee * 1_000_000_000f64) as u64 == 8 }));
+        assert!(mainnet_block
+            .get_fee_transfers()
+            .iter()
+            .any(|ft| { ft.recipient == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h".to_string() && ft.fee_nanomina == 984 }));
+        assert!(mainnet_block
+            .get_fee_transfers()
+            .iter()
+            .any(|ft| { ft.recipient == "B62qqyBD6cBATkdAa29tNAEJvJfkMTzwfuWyaJz6Ya3dJ76ZixfUter".to_string() && ft.fee_nanomina == 5_000_000 }));
+        assert!(mainnet_block
+            .get_fee_transfers()
+            .iter()
+            .any(|ft| { ft.recipient == "B62qr9jmNyuKG9Zhi1jENgPuswFRRDrkin3tP6D76qx8HNpjke5aUMs".to_string() && ft.fee_nanomina == 110_000 }));
+
+        // Excess block fees paid to coinbase receiver
+        // within one of the actors
+        assert_eq!(mainnet_block.get_excess_block_fees(), 14_889_016);
     }
 
     #[test]
