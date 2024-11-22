@@ -23,11 +23,7 @@ impl MainnetBlock {
     pub fn get_excess_block_fees(&self) -> u64 {
         let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
         let total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
-        if total_fees_paid_into_block_pool > total_snark_fees {
-            total_fees_paid_into_block_pool - total_snark_fees
-        } else {
-            0
-        }
+        total_fees_paid_into_block_pool.saturating_sub(total_snark_fees)
     }
 
     pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
@@ -686,19 +682,19 @@ mod mainnet_block_parsing_tests {
             .get_fee_transfers_via_coinbase()
             .unwrap()
             .iter()
-            .any(|ft| { ft.receiver == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h".to_string() && (ft.fee * 1_000_000_000f64) as u64 == 8 }));
+            .any(|ft| { ft.receiver == *"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h" && (ft.fee * 1_000_000_000f64) as u64 == 8 }));
         assert!(mainnet_block
             .get_fee_transfers()
             .iter()
-            .any(|ft| { ft.recipient == "B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h".to_string() && ft.fee_nanomina == 984 }));
+            .any(|ft| { ft.recipient == *"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h" && ft.fee_nanomina == 984 }));
         assert!(mainnet_block
             .get_fee_transfers()
             .iter()
-            .any(|ft| { ft.recipient == "B62qqyBD6cBATkdAa29tNAEJvJfkMTzwfuWyaJz6Ya3dJ76ZixfUter".to_string() && ft.fee_nanomina == 5_000_000 }));
+            .any(|ft| { ft.recipient == *"B62qqyBD6cBATkdAa29tNAEJvJfkMTzwfuWyaJz6Ya3dJ76ZixfUter" && ft.fee_nanomina == 5_000_000 }));
         assert!(mainnet_block
             .get_fee_transfers()
             .iter()
-            .any(|ft| { ft.recipient == "B62qr9jmNyuKG9Zhi1jENgPuswFRRDrkin3tP6D76qx8HNpjke5aUMs".to_string() && ft.fee_nanomina == 110_000 }));
+            .any(|ft| { ft.recipient == *"B62qr9jmNyuKG9Zhi1jENgPuswFRRDrkin3tP6D76qx8HNpjke5aUMs" && ft.fee_nanomina == 110_000 }));
 
         // Excess block fees paid to coinbase receiver
         // within one of the actors

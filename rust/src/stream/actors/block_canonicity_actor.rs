@@ -39,7 +39,7 @@ impl BlockCanonicityActor {
     fn process_greater_height(&self, blockchain_tree: &mut BlockchainTree, current_best_block: &Node, next_node: Node) {
         let parent = blockchain_tree.get_parent(&next_node).unwrap();
         if parent.state_hash != current_best_block.state_hash {
-            self.update_ancestries(blockchain_tree, current_best_block, &parent);
+            self.update_ancestries(blockchain_tree, current_best_block, parent);
         }
         self.publish_canonical_update(next_node, true, false);
     }
