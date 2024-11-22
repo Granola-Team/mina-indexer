@@ -40,6 +40,14 @@ impl MainnetBlock {
             let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
             *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
         }
+
+        // FTVC can be duplicated in both the completed works and coinbase sections of the PCB
+        for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
+            if fee_transfers.get(&ftvc.receiver) == Some(&((ftvc.fee * 1_000_000_000f64) as u64)) {
+                fee_transfers.remove(&ftvc.receiver);
+            }
+        }
+
         fee_transfers.retain(|_, v| *v > 0u64);
         fee_transfers
             .into_iter()
@@ -56,17 +64,9 @@ impl MainnetBlock {
         // Get fee transfers and remove those also in fee transfers via coinbase
         let fee_transfers = self.get_fee_transfers();
         let fee_transfers_via_coinbase = self.get_fee_transfers_via_coinbase().unwrap_or_default();
-        let unique_fee_transfers = fee_transfers
-            .into_iter()
-            .filter(|ft| {
-                !fee_transfers_via_coinbase
-                    .iter()
-                    .any(|ft_via_coinbase| ft.recipient == ft_via_coinbase.receiver && ft.fee_nanomina == (ft_via_coinbase.fee * 1_000_000_000f64) as u64)
-            })
-            .collect::<Vec<_>>();
 
         // Calculate total internal commands
-        let mut total_internal_commands = unique_fee_transfers.len() + fee_transfers_via_coinbase.len() + 1; // +1 for coinbase
+        let mut total_internal_commands = fee_transfers.len() + fee_transfers_via_coinbase.len() + 1; // +1 for coinbase
         if excess_block_fees > 0 {
             total_internal_commands += 1; // additional transfer for remainder fees
         }
