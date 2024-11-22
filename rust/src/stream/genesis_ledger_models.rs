@@ -1,5 +1,7 @@
 use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload};
+use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Genesis {
@@ -40,27 +42,30 @@ impl GenesisLedger {
         self.ledger
             .accounts
             .iter()
-            .map(|account| DoubleEntryRecordPayload {
-                height: 0,
-                state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
-                lhs: vec![AccountingEntry {
-                    counterparty: account.pk.to_string(),
-                    transfer_type: "InitialDistribution".to_string(),
-                    entry_type: AccountingEntryType::Debit,
-                    account: format!("MinaGenesisLedger#{}", account.pk),
-                    account_type: AccountingEntryAccountType::VirtualAddess,
-                    amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
-                    timestamp: 1615939200,
-                }],
-                rhs: vec![AccountingEntry {
-                    counterparty: format!("MinaGenesisLedger#{}", account.pk),
-                    transfer_type: "InitialDistribution".to_string(),
-                    entry_type: AccountingEntryType::Credit,
-                    account: account.pk.to_string(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: (account.balance.parse::<f64>().unwrap() * 1_000_000_000f64) as u64,
-                    timestamp: 1615939200,
-                }],
+            .map(|account| {
+                let balance = BigDecimal::from_str(&account.balance).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                DoubleEntryRecordPayload {
+                    height: 0,
+                    state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+                    lhs: vec![AccountingEntry {
+                        counterparty: account.pk.to_string(),
+                        transfer_type: "InitialDistribution".to_string(),
+                        entry_type: AccountingEntryType::Debit,
+                        account: format!("MinaGenesisLedger#{}", account.pk),
+                        account_type: AccountingEntryAccountType::VirtualAddess,
+                        amount_nanomina: balance.to_u64().expect("Number too large for u64"),
+                        timestamp: 1615939200,
+                    }],
+                    rhs: vec![AccountingEntry {
+                        counterparty: format!("MinaGenesisLedger#{}", account.pk),
+                        transfer_type: "InitialDistribution".to_string(),
+                        entry_type: AccountingEntryType::Credit,
+                        account: account.pk.to_string(),
+                        account_type: AccountingEntryAccountType::BlockchainAddress,
+                        amount_nanomina: balance.to_u64().expect("Number too large for u64"),
+                        timestamp: 1615939200,
+                    }],
+                }
             })
             .collect::<Vec<DoubleEntryRecordPayload>>()
     }
