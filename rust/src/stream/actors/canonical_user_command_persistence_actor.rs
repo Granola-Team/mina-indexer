@@ -52,7 +52,7 @@ impl CanonicalUserCommandPersistenceActor {
         if let Err(e) = logger
             .client
             .execute(
-                "CREATE OR REPLACE VIEW canonical_user_commands AS
+                "CREATE OR REPLACE VIEW user_commands AS
                 SELECT DISTINCT ON (height, txn_hash, state_hash) *
                 FROM canonical_user_command_log
                 ORDER BY height, txn_hash, state_hash, entry_id DESC;",
@@ -60,7 +60,7 @@ impl CanonicalUserCommandPersistenceActor {
             )
             .await
         {
-            println!("Unable to create canonical_user_commands table {:?}", e);
+            println!("Unable to create user_commands table {:?}", e);
         }
         Self {
             id: "CanonicalUserCommandPersistenceActor".to_string(),
@@ -283,7 +283,7 @@ mod canonical_user_command_log_persistence_tests {
         actor.log(&payload2).await.unwrap();
 
         // Query the database to ensure the correct row is returned
-        let query = "SELECT * FROM canonical_user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
+        let query = "SELECT * FROM user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
         let db_logger = actor.db_logger.lock().await;
         let rows = db_logger
             .client
