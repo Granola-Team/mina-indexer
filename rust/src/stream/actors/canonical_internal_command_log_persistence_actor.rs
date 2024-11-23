@@ -5,102 +5,81 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{ActorHeightPayload, CanonicalInternalCommandLogPayload},
+    stream::{
+        db_logger::DbLogger,
+        payloads::{ActorHeightPayload, CanonicalInternalCommandLogPayload},
+    },
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::NoTls;
 
 pub struct CanonicalInternalCommandLogPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub client: Client,
+    pub db_logger: Arc<Mutex<DbLogger>>,
 }
 
 impl CanonicalInternalCommandLogPersistenceActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
-        if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
-            tokio::spawn(async move {
-                if let Err(e) = connection.await {
-                    eprintln!("connection error: {}", e);
-                }
-            });
-            if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS canonical_internal_commands_log CASCADE;", &[]).await {
-                    println!("Unable to drop internal_commands table {:?}", e);
-                }
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Unable to connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
             }
-            if let Err(e) = client
-                .execute(
-                    "CREATE TABLE IF NOT EXISTS canonical_internal_commands_log (
-                        internal_command_type TEXT NOT NULL,
-                        height BIGINT NOT NULL,
-                        state_hash TEXT NOT NULL,
-                        timestamp BIGINT NOT NULL,
-                        amount_nanomina BIGINT NOT NULL,
-                        recipient TEXT NOT NULL,
-                        is_canonical BOOLEAN NOT NULL,
-                        entry_id BIGSERIAL PRIMARY KEY
-                    );",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create canonical_internal_commands_log table {:?}", e);
-            }
+        });
 
-            if let Err(e) = client
-                .execute(
-                    "CREATE OR REPLACE VIEW canonical_internal_commands AS
-                    SELECT DISTINCT ON (height, internal_command_type, state_hash, recipient, amount_nanomina) *
-                    FROM canonical_internal_commands_log
-                    ORDER BY height, internal_command_type, state_hash, recipient, amount_nanomina, entry_id DESC;",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create canonical_internal_commands_log table {:?}", e);
-            }
-            Self {
-                id: "CanonicalInternalCommandLogPersistenceActor".to_string(),
-                shared_publisher,
-                client,
-                database_inserts: AtomicUsize::new(0),
-            }
-        } else {
-            panic!("Unable to establish connection to database")
+        let logger = DbLogger::builder(client)
+            .name("canonical_internal_command_log")
+            .add_column("internal_command_type TEXT NOT NULL")
+            .add_column("height BIGINT NOT NULL")
+            .add_column("state_hash TEXT NOT NULL")
+            .add_column("timestamp BIGINT NOT NULL")
+            .add_column("amount_nanomina BIGINT NOT NULL")
+            .add_column("recipient TEXT NOT NULL")
+            .add_column("is_canonical BOOLEAN NOT NULL")
+            .build(!preserve_existing_data)
+            .await
+            .expect("Failed to build canonical_internal_command_log");
+
+        if let Err(e) = logger
+            .client
+            .execute(
+                "CREATE OR REPLACE VIEW internal_commands AS
+                SELECT DISTINCT ON (height, internal_command_type, state_hash, recipient, amount_nanomina) *
+                FROM canonical_internal_command_log
+                ORDER BY height, internal_command_type, state_hash, recipient, amount_nanomina, entry_id DESC;",
+                &[],
+            )
+            .await
+        {
+            println!("Unable to create canonical_internal_commands_log table {:?}", e);
+        }
+        Self {
+            id: "CanonicalInternalCommandLogPersistenceActor".to_string(),
+            shared_publisher,
+            db_logger: Arc::new(Mutex::new(logger)),
+            database_inserts: AtomicUsize::new(0),
         }
     }
 
-    async fn db_upsert(&self, payload: &CanonicalInternalCommandLogPayload) -> Result<u64, &'static str> {
-        let upsert_query = r#"
-            INSERT INTO canonical_internal_commands_log (
-                internal_command_type,
-                height,
-                state_hash,
-                timestamp,
-                amount_nanomina,
-                recipient,
-                is_canonical
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            "#;
-
-        match self
-            .client
-            .execute(
-                upsert_query,
-                &[
-                    &payload.internal_command_type.to_string(),
-                    &(payload.height as i64),
-                    &payload.state_hash,
-                    &(payload.timestamp as i64),
-                    &(payload.amount_nanomina as i64),
-                    &payload.recipient,
-                    &payload.canonical,
-                ],
-            )
+    async fn log(&self, payload: &CanonicalInternalCommandLogPayload) -> Result<u64, &'static str> {
+        let logger = self.db_logger.lock().await;
+        match logger
+            .insert(&[
+                &payload.internal_command_type.to_string(),
+                &(payload.height as i64),
+                &payload.state_hash,
+                &(payload.timestamp as i64),
+                &(payload.amount_nanomina as i64),
+                &payload.recipient,
+                &payload.canonical,
+            ])
             .await
         {
             Err(e) => {
@@ -126,7 +105,7 @@ impl Actor for CanonicalInternalCommandLogPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::CanonicalInternalCommandLog {
             let event_payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-            match self.db_upsert(&event_payload).await {
+            match self.log(&event_payload).await {
                 Ok(affected_rows) => {
                     assert_eq!(affected_rows, 1);
                     self.shared_publisher.incr_database_insert();
@@ -188,14 +167,15 @@ mod canonical_internal_command_log_tests {
             was_canonical: false,
         };
 
-        let affected_rows = actor.db_upsert(&payload).await.unwrap();
+        let affected_rows = actor.log(&payload).await.unwrap();
 
         // Validate that exactly one row was affected
         assert_eq!(affected_rows, 1);
 
         // Validate the data was correctly inserted into the table
-        let query = "SELECT * FROM canonical_internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
-        let row = actor
+        let query = "SELECT * FROM canonical_internal_command_log_dirty WHERE height = $1 AND state_hash = $2 AND recipient = $3";
+        let logger = actor.db_logger.lock().await;
+        let row = logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
             .await
@@ -234,8 +214,9 @@ mod canonical_internal_command_log_tests {
         actor.handle_event(event).await;
 
         // Validate the data was correctly inserted into the table
-        let query = "SELECT * FROM canonical_internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
-        let row = actor
+        let query = "SELECT * FROM canonical_internal_command_log_dirty WHERE height = $1 AND state_hash = $2 AND recipient = $3";
+        let logger = actor.db_logger.lock().await;
+        let row = logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
             .await
@@ -281,12 +262,13 @@ mod canonical_internal_command_log_tests {
             source: None,
         };
 
-        actor.db_upsert(&payload1).await.unwrap();
-        actor.db_upsert(&payload2).await.unwrap();
+        actor.log(&payload1).await.unwrap();
+        actor.log(&payload2).await.unwrap();
 
-        // Query the canonical_internal_commands view
-        let query = "SELECT * FROM canonical_internal_commands WHERE height = $1 AND state_hash = $2 AND recipient = $3";
-        let row = actor
+        // Query the internal_commands view
+        let query = "SELECT * FROM internal_commands WHERE height = $1 AND state_hash = $2 AND recipient = $3";
+        let logger = actor.db_logger.lock().await;
+        let row = logger
             .client
             .query_one(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.recipient])
             .await
