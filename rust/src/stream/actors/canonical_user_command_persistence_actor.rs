@@ -3,108 +3,91 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{constants::POSTGRES_CONNECTION_STRING, stream::payloads::*};
+use crate::{
+    constants::POSTGRES_CONNECTION_STRING,
+    stream::{db_logger::DbLogger, payloads::*},
+};
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::NoTls;
 
 pub struct CanonicalUserCommandPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
-    pub client: Client,
+    pub db_logger: Arc<Mutex<DbLogger>>,
     pub database_inserts: AtomicUsize,
 }
 
 impl CanonicalUserCommandPersistenceActor {
     pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
-        if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
-            tokio::spawn(async move {
-                if let Err(e) = connection.await {
-                    eprintln!("connection error: {}", e);
-                }
-            });
-            if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS canonical_user_command_log CASCADE;", &[]).await {
-                    println!("Unable to drop canonical_user_command_log table {:?}", e);
-                }
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Unable to connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("connection error: {}", e);
             }
-            if let Err(e) = client
-                .execute(
-                    "CREATE TABLE IF NOT EXISTS canonical_user_command_log (
-                        height BIGINT,
-                        txn_hash TEXT,
-                        state_hash TEXT,
-                        timestamp BIGINT,
-                        txn_type TEXT,
-                        status TEXT,
-                        sender TEXT,
-                        receiver TEXT,
-                        nonce BIGINT,
-                        fee_nanomina BIGINT,
-                        fee_payer TEXT,
-                        amount_nanomina BIGINT,
-                        canonical BOOLEAN,
-                        entry_id BIGSERIAL PRIMARY KEY
-                    );",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create canonical_user_command_log table {:?}", e);
-            }
-            if let Err(e) = client
-                .execute(
-                    "CREATE OR REPLACE VIEW canonical_user_commands AS
-                    SELECT DISTINCT ON (height, txn_hash, state_hash) *
-                    FROM canonical_user_command_log
-                    ORDER BY height, txn_hash, state_hash, entry_id DESC;",
-                    &[],
-                )
-                .await
-            {
-                println!("Unable to create canonical_user_command_log table {:?}", e);
-            }
-            Self {
-                id: "CanonicalUserCommandPersistenceActor".to_string(),
-                shared_publisher,
-                client,
-                database_inserts: AtomicUsize::new(0),
-            }
-        } else {
-            panic!("Unable to establish connection to database");
+        });
+        let logger = DbLogger::builder(client)
+            .name("canonical_user_command_log")
+            .add_column("height BIGINT")
+            .add_column("txn_hash TEXT")
+            .add_column("state_hash TEXT")
+            .add_column("timestamp BIGINT")
+            .add_column("txn_type TEXT")
+            .add_column("status TEXT")
+            .add_column("sender TEXT")
+            .add_column("receiver TEXT")
+            .add_column("nonce BIGINT")
+            .add_column("fee_nanomina BIGINT")
+            .add_column("fee_payer TEXT")
+            .add_column("amount_nanomina BIGINT")
+            .add_column("canonical BOOLEAN")
+            .build(!preserve_existing_data)
+            .await
+            .expect("Failed to build canonical_user_command_log");
+
+        if let Err(e) = logger
+            .client
+            .execute(
+                "CREATE OR REPLACE VIEW canonical_user_commands AS
+                SELECT DISTINCT ON (height, txn_hash, state_hash) *
+                FROM canonical_user_command_log
+                ORDER BY height, txn_hash, state_hash, entry_id DESC;",
+                &[],
+            )
+            .await
+        {
+            println!("Unable to create canonical_user_commands table {:?}", e);
+        }
+        Self {
+            id: "CanonicalUserCommandPersistenceActor".to_string(),
+            shared_publisher,
+            db_logger: Arc::new(Mutex::new(logger)),
+            database_inserts: AtomicUsize::new(0),
         }
     }
 
-    async fn insert_canonical_user_command_log(&self, payload: &CanonicalUserCommandLogPayload) -> Result<(), &'static str> {
-        let insert_query = r#"
-            INSERT INTO canonical_user_command_log (
-                height, txn_hash, state_hash, timestamp, txn_type, status, sender, receiver, nonce,
-                fee_nanomina, fee_payer, amount_nanomina, canonical
-            ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
-            )
-        "#;
-
-        self.client
-            .execute(
-                insert_query,
-                &[
-                    &(payload.height as i64),
-                    &payload.txn_hash,
-                    &payload.state_hash,
-                    &(payload.timestamp as i64),
-                    &format!("{:?}", payload.txn_type),
-                    &format!("{:?}", payload.status),
-                    &payload.sender,
-                    &payload.receiver,
-                    &(payload.nonce as i64),
-                    &(payload.fee_nanomina as i64),
-                    &payload.fee_payer,
-                    &(payload.amount_nanomina as i64),
-                    &payload.canonical,
-                ],
-            )
+    async fn log(&self, payload: &CanonicalUserCommandLogPayload) -> Result<(), &'static str> {
+        let logger = self.db_logger.lock().await;
+        logger
+            .insert(&[
+                &(payload.height as i64),
+                &payload.txn_hash,
+                &payload.state_hash,
+                &(payload.timestamp as i64),
+                &format!("{:?}", payload.txn_type),
+                &format!("{:?}", payload.status),
+                &payload.sender,
+                &payload.receiver,
+                &(payload.nonce as i64),
+                &(payload.fee_nanomina as i64),
+                &payload.fee_payer,
+                &(payload.amount_nanomina as i64),
+                &payload.canonical,
+            ])
             .await
             .map_err(|_| "Unable to insert into canonical_user_command_log table")?;
 
@@ -125,7 +108,7 @@ impl Actor for CanonicalUserCommandPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::CanonicalUserCommandLog {
             let log: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-            self.insert_canonical_user_command_log(&log).await.unwrap();
+            self.log(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.publish(Event {
                 event_type: EventType::ActorHeight,
@@ -184,10 +167,11 @@ mod canonical_user_command_log_persistence_tests {
             was_canonical: false,
         };
 
-        actor.insert_canonical_user_command_log(&payload).await.unwrap();
+        actor.log(&payload).await.unwrap();
 
-        let query = "SELECT * FROM canonical_user_command_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
-        let row = actor
+        let query = "SELECT * FROM canonical_user_command_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let db_logger = actor.db_logger.lock().await;
+        let row = db_logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
@@ -233,8 +217,9 @@ mod canonical_user_command_log_persistence_tests {
 
         actor.handle_event(event).await;
 
-        let query = "SELECT * FROM canonical_user_command_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
-        let row = actor
+        let query = "SELECT * FROM canonical_user_command_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let db_logger = actor.db_logger.lock().await;
+        let row = db_logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
@@ -294,12 +279,13 @@ mod canonical_user_command_log_persistence_tests {
         };
 
         // Insert the payloads into the database
-        actor.insert_canonical_user_command_log(&payload1).await.unwrap();
-        actor.insert_canonical_user_command_log(&payload2).await.unwrap();
+        actor.log(&payload1).await.unwrap();
+        actor.log(&payload2).await.unwrap();
 
         // Query the database to ensure the correct row is returned
         let query = "SELECT * FROM canonical_user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
-        let rows = actor
+        let db_logger = actor.db_logger.lock().await;
+        let rows = db_logger
             .client
             .query(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.txn_hash])
             .await
