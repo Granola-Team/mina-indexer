@@ -2,7 +2,7 @@ use anyhow::Result;
 use tokio_postgres::Client;
 
 pub struct DbLogger {
-    client: Client,
+    pub client: Client,
     table_name: String,
     columns: Vec<String>,
 }
@@ -56,28 +56,35 @@ impl DbLoggerBuilder {
         self.columns.push(column_definition.to_string());
         self
     }
-
-    /// Build and initialize the table and view, dropping any existing table and view first
+    /// Build and initialize the table and view, dropping any existing table, view, and sequence first
     pub async fn build(self, drop: bool) -> Result<DbLogger> {
         let table_name = format!("{}_dirty", self.name);
         let view_name = self.name.clone();
+        let sequence_name = format!("{}_entry_id_seq", table_name);
 
         if drop {
-            // Drop the existing table and view
+            // Drop the existing table, view, and sequence
             let drop_table_query = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
             let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
+            let drop_sequence_query = format!("DROP SEQUENCE IF EXISTS {} CASCADE;", sequence_name);
 
             self.client.execute(&drop_table_query, &[]).await?;
             self.client.execute(&drop_view_query, &[]).await?;
+            self.client.execute(&drop_sequence_query, &[]).await?;
         }
+
+        // Create the sequence
+        let create_sequence_query = format!("CREATE SEQUENCE IF NOT EXISTS {};", sequence_name);
+        self.client.execute(&create_sequence_query, &[]).await?;
 
         // Create the table
         let table_query = format!(
             "CREATE TABLE {} (
-                entry_id BIGSERIAL PRIMARY KEY,
+                entry_id BIGINT DEFAULT nextval('{}') PRIMARY KEY,
                 {}
             );",
             table_name,
+            sequence_name,
             self.columns.join(",\n")
         );
 
@@ -157,12 +164,8 @@ mod db_logger_tests {
         assert_eq!(log_rows.len(), 3, "Expected 3 rows in the log table");
 
         // Query the view
-        let view_query = "SELECT * FROM log WHERE height = $1 AND state_hash = $2";
-        let view_rows = logger
-            .client
-            .query(view_query, &[&(1_i64), &"state_hash_1"])
-            .await
-            .expect("Failed to query view");
+        let view_query = "SELECT * FROM log WHERE height = $1";
+        let view_rows = logger.client.query(view_query, &[&(1_i64)]).await.expect("Failed to query view");
 
         // Assert only one row is present in the view
         assert_eq!(view_rows.len(), 1, "Expected 1 row in the view");
