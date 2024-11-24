@@ -38,7 +38,7 @@ async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
     let shared_publisher = Arc::new(SharedPublisher::new(CHANNEL_MESSAGE_CAPACITY));
 
     // Spawn tasks
-    let process_handle = spawn_actor_subscribers(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe(), root_node.is_some());
+    let process_handle = spawn_actor_subscribers(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe(), root_node.clone());
 
     if root_node.is_none() {
         // Publish genesis block after a brief delay to allow initialization
@@ -73,10 +73,10 @@ async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
 fn spawn_actor_subscribers(
     shared_publisher: Arc<SharedPublisher>,
     shutdown_receiver: broadcast::Receiver<()>,
-    preserve_prior_data: bool,
+    root_node: Option<(u64, String)>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        if let Err(e) = subscribe_actors(&shared_publisher, shutdown_receiver, preserve_prior_data).await {
+        if let Err(e) = subscribe_actors(&shared_publisher, shutdown_receiver, root_node).await {
             eprintln!("Error in actor subscription: {:?}", e);
         }
     })

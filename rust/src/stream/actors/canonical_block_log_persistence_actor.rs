@@ -21,7 +21,7 @@ pub struct CanonicalBlockLogPersistenceActor {
 }
 
 impl CanonicalBlockLogPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to establish connection to database");
@@ -46,9 +46,22 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("is_berkeley_block BOOLEAN")
             .add_column("canonical BOOLEAN")
             .distinct_columns(&["height", "state_hash"])
-            .build(!preserve_existing_data)
+            .build(root_node.is_none())
             .await
             .expect("Failed to build blocks_log and blocks view");
+
+        if let Some((height, state_hash)) = root_node {
+            if let Err(e) = logger
+                .client
+                .execute(
+                    "DELETE FROM blocks_log WHERE height > $1 AND (height = $1 AND state_hash = $2)",
+                    &[&(height.to_owned() as i64), state_hash],
+                )
+                .await
+            {
+                eprintln!("Unable to drop data: {}", e);
+            }
+        }
 
         Self {
             id: "CanonicalBlockLogActor".to_string(),

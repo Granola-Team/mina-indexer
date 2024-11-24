@@ -81,7 +81,7 @@ impl DbLoggerBuilder {
 
         // Create the table
         let table_query = format!(
-            "CREATE TABLE {} (
+            "CREATE TABLE IF NOT EXISTS {} (
                 entry_id BIGSERIAL PRIMARY KEY,
                 {}
             );",

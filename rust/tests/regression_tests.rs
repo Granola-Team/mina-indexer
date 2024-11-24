@@ -30,7 +30,19 @@ async fn test_first_100_blocks() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &[],
         Duration::from_secs(20),
+    );
+
+    truncate_table("blocks_log", 100).await;
+    test_blocks_first_100().await;
+
+    // restart ingestion from block 52
+    run_test_process(
+        env!("CARGO_BIN_EXE_ingestion"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &["52", "3NLY4ci13GgX1GGkUrfTKr1Zt69U6Xj546d15nU9o1WrfHVnbosd"],
+        Duration::from_secs(10),
     );
 
     truncate_table("blocks_log", 100).await;
@@ -43,6 +55,7 @@ async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &[],
         Duration::from_secs(12 * 60),
     );
 
@@ -256,19 +269,23 @@ async fn test_account_balances() {
 
     drop(handle);
 }
-
 /// Spawns a child process for an integration test.
 ///
 /// # Arguments
 /// - `binary_path`: The path to the binary (e.g., `env!("CARGO_BIN_EXE_tool")`).
 /// - `env_vars`: A list of environment variables to set for the process.
+/// - `args`: A list of command-line arguments to pass to the binary.
 /// - `timeout`: Duration for which the process is allowed to run.
-pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], timeout: Duration) {
+pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], args: &[&str], timeout: Duration) {
     println!("Running ingestion process for {} minutes...", timeout.as_secs() / 60);
-    // Spawn the child process with environment variables
+
+    // Spawn the child process with environment variables and arguments
     let mut child = {
         let mut cmd = Command::new(binary_path);
-        let command = cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+        let command = cmd
+            .args(args) // Add command-line arguments
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         for (key, value) in env_vars {
             command.env(key, value);

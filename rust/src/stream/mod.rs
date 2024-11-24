@@ -31,14 +31,14 @@ pub mod sourcing;
 pub async fn subscribe_actors(
     shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
-    preserve_prior_data: bool,
+    root_node: Option<(u64, String)>,
 ) -> anyhow::Result<()> {
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
-    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), preserve_prior_data).await;
+    let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), root_node.is_some()).await;
+    let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), root_node.is_some()).await;
+    let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), root_node.is_some()).await;
+    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), root_node.is_some()).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -156,7 +156,7 @@ async fn test_process_blocks_dir_with_mainnet_blocks() -> anyhow::Result<()> {
         let shared_publisher = Arc::clone(&shared_publisher);
         let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            subscribe_actors(&shared_publisher, shutdown_receiver, false).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver, None).await.unwrap();
         }
     });
 
@@ -236,7 +236,7 @@ async fn test_process_blocks_dir_canonical_updates() -> anyhow::Result<()> {
         let shared_publisher = Arc::clone(&shared_publisher);
         let shutdown_receiver = shutdown_receiver.resubscribe();
         async move {
-            subscribe_actors(&shared_publisher, shutdown_receiver, false).await.unwrap();
+            subscribe_actors(&shared_publisher, shutdown_receiver, None).await.unwrap();
         }
     });
 
