@@ -38,7 +38,7 @@ pub async fn subscribe_actors(
     let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
-    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), root_node.is_some()).await;
+    let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![

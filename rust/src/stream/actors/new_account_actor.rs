@@ -26,14 +26,21 @@ pub struct NewAccountActor {
 }
 
 impl NewAccountActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if !preserve_existing_data {
+            if let Some((height, _)) = root_node {
+                if let Err(e) = client
+                    .execute("DELETE FROM discovered_accounts WHERE height >= $1;", &[&(height.to_owned() as i64)])
+                    .await
+                {
+                    println!("Unable to drop user_commands table {:?}", e);
+                }
+            } else {
                 if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
                     println!("Unable to drop user_commands table {:?}", e);
                 }
@@ -41,7 +48,8 @@ impl NewAccountActor {
             if let Err(e) = client
                 .execute(
                     "CREATE TABLE IF NOT EXISTS discovered_accounts (
-                        account TEXT PRIMARY KEY NOT NULL
+                        account TEXT PRIMARY KEY NOT NULL,
+                        height BIGINT NOT NULL
                     );
                     ",
                     &[],
@@ -78,8 +86,8 @@ impl Actor for NewAccountActor {
             EventType::PreExistingAccount => {
                 let account: String = event.payload.to_string();
                 // Insert the account into the `discovered_accounts` table
-                let insert_query = "INSERT INTO discovered_accounts (account) VALUES ($1) ON CONFLICT DO NOTHING";
-                if let Err(e) = self.client.execute(insert_query, &[&account]).await {
+                let insert_query = "INSERT INTO discovered_accounts (account, height) VALUES ($1, $2) ON CONFLICT DO NOTHING";
+                if let Err(e) = self.client.execute(insert_query, &[&account, &(0 as i64)]).await {
                     eprintln!("Failed to insert account {} into database: {:?}", account, e);
                 } else {
                     self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -125,8 +133,8 @@ impl Actor for NewAccountActor {
                                         self.publish(new_account_event);
 
                                         // Insert the account into the database
-                                        let insert_query = "INSERT INTO discovered_accounts (account) VALUES ($1)";
-                                        if let Err(e) = self.client.execute(insert_query, &[&account]).await {
+                                        let insert_query = "INSERT INTO discovered_accounts (account, height) VALUES ($1, $2)";
+                                        if let Err(e) = self.client.execute(insert_query, &[&account, &(block_confirmation.height as i64)]).await {
                                             eprintln!("Failed to insert new account into database: {:?}", e);
                                         } else {
                                             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -166,7 +174,7 @@ mod new_account_actor_tests {
 
     async fn setup_actor() -> (Arc<NewAccountActor>, tokio::sync::broadcast::Receiver<Event>) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = Arc::new(NewAccountActor::new(Arc::clone(&shared_publisher), false).await);
+        let actor = Arc::new(NewAccountActor::new(Arc::clone(&shared_publisher), &None).await);
         let receiver = shared_publisher.subscribe();
         (actor, receiver)
     }
@@ -376,5 +384,66 @@ mod new_account_actor_tests {
             .collect();
 
         assert!(new_account_events.is_empty(), "No NewAccount event should be published for existing accounts");
+    }
+
+    #[tokio::test]
+    async fn test_discovered_accounts_pruned_above_root_height() {
+        use std::sync::Arc;
+
+        // Step 1: Initialize the actor without a root node and add accounts at various heights
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor_without_root = NewAccountActor::new(Arc::clone(&shared_publisher), &None).await;
+
+        // Insert accounts at different heights
+        let accounts = vec![("B62qAccountAtHeight1", 1), ("B62qAccountAtHeight10", 10), ("B62qAccountAtHeight15", 15)];
+
+        for (account, height) in &accounts {
+            actor_without_root
+                .client
+                .execute(
+                    "INSERT INTO discovered_accounts (account, height) VALUES ($1, $2)",
+                    &[account, &(*height as i64)],
+                )
+                .await
+                .expect("Failed to insert account");
+        }
+
+        // Step 2: Initialize the actor with a root node at height 10
+        let root_node_height = 10;
+        let root_node = Some((root_node_height, "root_hash".to_string()));
+        let actor_with_root = NewAccountActor::new(Arc::clone(&shared_publisher), &root_node).await;
+
+        // Query and manually check each account
+        let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
+
+        // Account at height 1 should remain
+        let account_at_1 = "B62qAccountAtHeight1";
+        let exists_at_1: bool = actor_with_root
+            .client
+            .query_one(check_query, &[&account_at_1])
+            .await
+            .expect("Failed to query database for account at height 1")
+            .get(0);
+        assert!(exists_at_1, "Account at height 1 should remain");
+
+        // Account at height 10 should be deleted
+        let account_at_10 = "B62qAccountAtHeight10";
+        let exists_at_10: bool = actor_with_root
+            .client
+            .query_one(check_query, &[&account_at_10])
+            .await
+            .expect("Failed to query database for account at height 10")
+            .get(0);
+        assert!(!exists_at_10, "Account at height 10 should be deleted since it matches the root height");
+
+        // Account at height 15 should be deleted
+        let account_at_15 = "B62qAccountAtHeight15";
+        let exists_at_15: bool = actor_with_root
+            .client
+            .query_one(check_query, &[&account_at_15])
+            .await
+            .expect("Failed to query database for account at height 15")
+            .get(0);
+        assert!(!exists_at_15, "Account at height 15 should be deleted since it is above the root height");
     }
 }
