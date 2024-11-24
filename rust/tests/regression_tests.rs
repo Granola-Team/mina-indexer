@@ -1,7 +1,7 @@
 use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{BufRead, BufReader},
     path::Path,
     process::{Command, Stdio},
@@ -184,6 +184,18 @@ async fn test_blocks_first_100() {
         .collect();
 
     // Ensure the sizes match
+    // Calculate the symmetric difference
+    let file_keys: HashSet<_> = file_blocks_map.keys().collect();
+    let db_keys: HashSet<_> = db_blocks_map.keys().collect();
+
+    let missing_in_db: HashSet<_> = file_keys.difference(&db_keys).collect();
+    let extra_in_db: HashSet<_> = db_keys.difference(&file_keys).collect();
+
+    // Print the symmetric difference
+    if !missing_in_db.is_empty() || !extra_in_db.is_empty() {
+        println!("Blocks missing in DB: {:?}", missing_in_db);
+        println!("Blocks extra in DB: {:?}", extra_in_db);
+    }
     assert_eq!(file_blocks_map.len(), db_blocks_map.len(), "Mismatch in number of blocks");
 
     // Check that all blocks have the correct canonical status
