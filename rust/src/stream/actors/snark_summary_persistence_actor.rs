@@ -61,7 +61,7 @@ impl SnarkSummaryPersistenceActor {
                 &summary.state_hash,
                 &(summary.timestamp as i64),
                 &summary.prover,
-                &{ summary.fee },
+                &(summary.fee_nanomina as i64),
                 &summary.canonical,
             ])
             .await

@@ -77,7 +77,7 @@ impl Actor for SnarkCanonicitySummaryActor {
                         state_hash: event_payload.state_hash.to_string(),
                         timestamp: event_payload.timestamp,
                         prover: event_payload.prover.to_string(),
-                        fee: event_payload.fee,
+                        fee_nanomina: event_payload.fee_nanomina,
                         canonical: false, //set default value
                     })
                     .await;
@@ -130,12 +130,6 @@ async fn test_snark_canonicity_summary_actor_with_mainnet_block() -> anyhow::Res
             assert_eq!(published_event.state_hash, expected_payload.state_hash, "Mismatch in `state_hash` field");
             assert_eq!(published_event.timestamp, expected_payload.timestamp, "Mismatch in `timestamp` field");
             assert_eq!(published_event.prover, expected_payload.prover, "Mismatch in `prover` field");
-            assert!(
-                (published_event.fee - expected_payload.fee).abs() < f64::EPSILON,
-                "Mismatch in `fee` field: {} vs {}",
-                published_event.fee,
-                expected_payload.fee
-            );
             assert_eq!(published_event.canonical, expected_payload.canonical, "Mismatch in `canonical` field");
         } else {
             panic!("Expected event was not published.");
@@ -165,14 +159,14 @@ async fn test_snark_canonicity_summary_actor_with_mainnet_block() -> anyhow::Res
             state_hash: "sample_hash".to_string(),
             timestamp: 123456,
             prover: "test_prover_1".to_string(),
-            fee: 0.25,
+            fee_nanomina: 250_000_000,
         },
         SnarkWorkSummaryPayload {
             height: 10,
             state_hash: "sample_hash".to_string(),
             timestamp: 123457,
             prover: "test_prover_2".to_string(),
-            fee: 0.5,
+            fee_nanomina: 500_000_000,
         },
     ];
 
@@ -209,7 +203,7 @@ async fn test_snark_canonicity_summary_actor_with_mainnet_block() -> anyhow::Res
                 state_hash: snark.state_hash.clone(),
                 timestamp: snark.timestamp,
                 prover: snark.prover.clone(),
-                fee: snark.fee,
+                fee_nanomina: snark.fee_nanomina,
                 canonical: true,
             },
         )

@@ -43,7 +43,7 @@ impl Actor for SnarkWorkSummaryActor {
                         state_hash: block_payload.state_hash.to_string(),
                         timestamp: block_payload.timestamp,
                         prover: snark_job.prover.to_string(),
-                        fee: snark_job.fee.parse::<f64>().unwrap(),
+                        fee_nanomina: snark_job.fee_nanomina,
                     };
                     self.publish(Event {
                         event_type: EventType::SnarkWorkSummary,
@@ -82,7 +82,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
                 // Ensure that the published prover and fee are from the expected snark job
                 let expected_snark = &block_payload.snark_work[*counter];
                 assert_eq!(published_payload.prover, expected_snark.prover);
-                assert_eq!(published_payload.fee, expected_snark.fee.parse::<f64>().unwrap());
+                assert_eq!(published_payload.fee_nanomina, expected_snark.fee_nanomina);
 
                 *counter += 1;
             }
@@ -101,8 +101,8 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
         previous_state_hash: block.get_previous_state_hash(),
         last_vrf_output: block.get_last_vrf_output(),
         user_command_count: block.get_user_commands_count(),
-        snark_work_count: block.get_snark_work_count(),
-        snark_work: block.get_snark_work(),
+        snark_work_count: block.get_aggregated_snark_work().len(),
+        snark_work: block.get_aggregated_snark_work(),
         timestamp: block.get_timestamp(),
         coinbase_receiver: block.get_coinbase_receiver(),
         coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
@@ -134,7 +134,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
     verify_snark_work_events(&mut receiver, &block_payload, &mut snark_work_events_received).await;
 
     // Ensure that 64 SnarkWorkSummaryPayload events were published
-    assert_eq!(snark_work_events_received, 64, "Expected 64 SnarkWorkSummary events");
+    assert_eq!(snark_work_events_received, 1, "Expected 1 SnarkWorkSummary events");
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use super::{
     canonical_items_manager::CanonicalItem,
-    mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorks, FeeTransfer, FeeTransferViaCoinbase},
+    mainnet_block_models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase},
 };
 use sonic_rs::{Deserialize, Serialize};
 
@@ -44,7 +44,7 @@ pub struct MainnetBlockPayload {
     pub internal_command_count: usize,
     pub user_commands: Vec<CommandSummary>,
     pub snark_work_count: usize,
-    pub snark_work: Vec<CompletedWorks>,
+    pub snark_work: Vec<CompletedWorksNanomina>,
     pub timestamp: u64,
     pub coinbase_receiver: String,
     pub coinbase_reward_nanomina: u64,
@@ -156,7 +156,7 @@ pub struct SnarkWorkSummaryPayload {
     pub state_hash: String,
     pub timestamp: u64,
     pub prover: String,
-    pub fee: f64,
+    pub fee_nanomina: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -165,7 +165,7 @@ pub struct SnarkCanonicitySummaryPayload {
     pub state_hash: String,
     pub timestamp: u64,
     pub prover: String,
-    pub fee: f64,
+    pub fee_nanomina: u64,
     pub canonical: bool,
 }
 

@@ -1,4 +1,5 @@
 use crate::constants::MAINNET_COINBASE_REWARD;
+use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
 use serde::{
     de::{SeqAccess, Visitor},
@@ -6,7 +7,7 @@ use serde::{
 };
 use sha2::{Digest, Sha256};
 use sonic_rs::{Deserialize, JsonValueTrait, Serialize, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MainnetBlock {
@@ -165,17 +166,23 @@ impl MainnetBlock {
             .collect()
     }
 
-    pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorks> {
-        let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
+    pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorksNanomina> {
+        let mut aggregated_snark_work: HashMap<String, BigDecimal> = HashMap::new();
+
         for completed_work in self.get_snark_work() {
-            let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
-            *aggregated_snark_work.entry(completed_work.prover).or_insert(0) += fee_nanomina;
+            let fee_decimal = BigDecimal::from_str(&completed_work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+            *aggregated_snark_work.entry(completed_work.prover.clone()).or_insert(BigDecimal::from(0)) += fee_decimal;
         }
+
         aggregated_snark_work
             .into_iter()
-            .map(|(prover, fee_nanomina)| CompletedWorks {
-                prover,
-                fee: (fee_nanomina as f64 / 1_000_000_000f64).to_string(),
+            .map(|(prover, fee_decimal)| {
+                let fee_nanomina = fee_decimal
+                    .with_scale(0) // Ensure it's rounded to an integer (nanomina are integers)
+                    .to_u64()
+                    .unwrap();
+
+                CompletedWorksNanomina { prover, fee_nanomina }
             })
             .collect()
     }
@@ -264,6 +271,12 @@ pub struct CoinbaseData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompletedWorks {
     pub fee: String,
+    pub prover: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompletedWorksNanomina {
+    pub fee_nanomina: u64,
     pub prover: String,
 }
 
