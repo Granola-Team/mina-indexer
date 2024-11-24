@@ -35,9 +35,9 @@ impl SnarkSummaryPersistenceActor {
                 .add_column("state_hash TEXT NOT NULL")
                 .add_column("timestamp BIGINT NOT NULL")
                 .add_column("prover TEXT NOT NULL")
-                .add_column("fee DOUBLE PRECISION NOT NULL")
+                .add_column("fee_nanomina BIGINT NOT NULL")
                 .add_column("is_canonical BOOLEAN NOT NULL")
-                .distinct_columns(&["height", "state_hash", "timestamp", "prover", "fee"])
+                .distinct_columns(&["height", "state_hash", "timestamp", "prover", "fee_nanomina"])
                 .build(root_node)
                 .await
                 .expect("Failed to build snarks_log and snarks view");
