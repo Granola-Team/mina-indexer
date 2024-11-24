@@ -50,7 +50,6 @@ async fn test_first_100_blocks() {
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
