@@ -159,7 +159,7 @@ pub struct SnarkWorkSummaryPayload {
     pub fee: f64,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SnarkCanonicitySummaryPayload {
     pub height: u64,
     pub state_hash: String,
@@ -167,6 +167,24 @@ pub struct SnarkCanonicitySummaryPayload {
     pub prover: String,
     pub fee: f64,
     pub canonical: bool,
+}
+
+impl CanonicalItem for SnarkCanonicitySummaryPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, _was_canonical: bool) {
+        // noop
+    }
 }
 
 #[derive(Serialize, Deserialize)]
