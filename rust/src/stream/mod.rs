@@ -8,8 +8,8 @@ use actors::{
     canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
-    pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_work_actor::SnarkWorkSummaryActor,
-    user_command_log_actor::UserCommandLogActor, Actor,
+    pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -40,6 +40,7 @@ pub async fn subscribe_actors(
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -50,7 +51,6 @@ pub async fn subscribe_actors(
         Arc::new(BlockchainTreeBuilderActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockCanonicityActor::new(Arc::clone(shared_publisher))),
         Arc::new(BestBlockActor::new(Arc::clone(shared_publisher))),
-        // Arc::new(TransitionFrontierActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkWorkSummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(SnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
@@ -64,7 +64,7 @@ pub async fn subscribe_actors(
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher))),
-        // Arc::new(snark_persistence_actor),
+        Arc::new(snark_summary_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),

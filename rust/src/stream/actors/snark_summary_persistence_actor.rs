@@ -3,49 +3,49 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::{constants::POSTGRES_CONNECTION_STRING, stream::payloads::*};
+use crate::{
+    constants::POSTGRES_CONNECTION_STRING,
+    stream::{db_logger::DbLogger, payloads::*},
+};
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::lock::Mutex;
 use std::sync::{atomic::AtomicUsize, Arc};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::NoTls;
 
 pub struct SnarkSummaryPersistenceActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub client: Client,
+    pub db_logger: Arc<Mutex<DbLogger>>,
 }
 
-#[allow(dead_code)]
 impl SnarkSummaryPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if let Err(e) = client
-                .execute(
-                    "CREATE TABLE IF NOT EXISTS snark_work_summary (
-                        height BIGINT NOT NULL,
-                        state_hash TEXT NOT NULL,
-                        timestamp BIGINT NOT NULL,
-                        prover TEXT NOT NULL,
-                        fee DOUBLE PRECISION NOT NULL,
-                        is_canonical BOOLEAN NOT NULL,
-                        CONSTRAINT unique_snark_work_summary UNIQUE (height, state_hash, timestamp, prover, fee)
-                    );",
-                    &[],
-                )
+
+            let logger = DbLogger::builder(client)
+                .name("snarks")
+                .add_column("height BIGINT NOT NULL")
+                .add_column("state_hash TEXT NOT NULL")
+                .add_column("timestamp BIGINT NOT NULL")
+                .add_column("prover TEXT NOT NULL")
+                .add_column("fee DOUBLE PRECISION NOT NULL")
+                .add_column("is_canonical BOOLEAN NOT NULL")
+                .distinct_columns(&["height", "state_hash", "timestamp", "prover", "fee"])
+                .build(root_node)
                 .await
-            {
-                println!("Unable to create snark_work_summary table {:?}", e);
-            }
+                .expect("Failed to build snarks_log and snarks view");
+
             Self {
                 id: "SnarkSummaryPersistenceActor".to_string(),
                 shared_publisher,
-                client,
+                db_logger: Arc::new(Mutex::new(logger)),
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -53,39 +53,17 @@ impl SnarkSummaryPersistenceActor {
         }
     }
 
-    async fn db_upsert(&self, summary: &SnarkCanonicitySummaryPayload) -> Result<u64, &'static str> {
-        let upsert_query = r#"
-            INSERT INTO snark_work_summary (
-                height,
-                state_hash,
-                timestamp,
-                prover,
-                fee,
-                is_canonical
-            ) VALUES
-                ($1, $2, $3, $4, $5, $6)
-            ON CONFLICT ON CONSTRAINT unique_snark_work_summary -- Use the unique constraint name here
-            DO UPDATE SET
-                state_hash = EXCLUDED.state_hash,
-                timestamp = EXCLUDED.timestamp,
-                prover = EXCLUDED.prover,
-                fee = EXCLUDED.fee,
-                is_canonical = EXCLUDED.is_canonical;
-            "#;
-
-        match self
-            .client
-            .execute(
-                upsert_query,
-                &[
-                    &(summary.height as i64),
-                    &summary.state_hash,
-                    &(summary.timestamp as i64),
-                    &summary.prover,
-                    &{ summary.fee },
-                    &summary.canonical,
-                ],
-            )
+    async fn log(&self, summary: &SnarkCanonicitySummaryPayload) -> Result<u64, &'static str> {
+        let logger = self.db_logger.lock().await;
+        match logger
+            .insert(&[
+                &(summary.height as i64),
+                &summary.state_hash,
+                &(summary.timestamp as i64),
+                &summary.prover,
+                &{ summary.fee },
+                &summary.canonical,
+            ])
             .await
         {
             Err(e) => {
@@ -110,11 +88,18 @@ impl Actor for SnarkSummaryPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::SnarkCanonicitySummary {
             let event_payload: SnarkCanonicitySummaryPayload = sonic_rs::from_str(&event.payload).unwrap();
-            match self.db_upsert(&event_payload).await {
+            match self.log(&event_payload).await {
                 Ok(affected_rows) => {
                     assert_eq!(affected_rows, 1);
                     self.shared_publisher.incr_database_insert();
-                    self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    self.publish(Event {
+                        event_type: EventType::ActorHeight,
+                        payload: sonic_rs::to_string(&ActorHeightPayload {
+                            actor: self.id(),
+                            height: event_payload.height,
+                        })
+                        .unwrap(),
+                    });
                 }
                 Err(e) => {
                     panic!("{}", e);
