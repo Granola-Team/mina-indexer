@@ -25,13 +25,13 @@ async fn test_blockchain_ledger() {
         Duration::from_secs(12 * 60),
     );
 
-    trim_ledger_down_to_5000().await;
+    truncate_table("blockchain_ledger", 5000).await;
     test_ledger_ingested_up_to_5000().await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances().await;
 }
 
-async fn trim_ledger_down_to_5000() {
+async fn truncate_table(table: &str, height: u64) {
     if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
         let handle = tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -39,10 +39,10 @@ async fn trim_ledger_down_to_5000() {
             }
         });
 
-        let query = r#"DELETE FROM blockchain_ledger WHERE height > 5000;"#;
+        let query = format!("DELETE FROM {} WHERE height > {};", table, height);
 
         // Execute the query using the SQL client from the actor
-        if let Err(e) = client.execute(query, &[]).await.map_err(|_| "Unable to trim the blockchain ledger") {
+        if let Err(e) = client.execute(query.as_str(), &[]).await.map_err(|_| "Unable to trim the blockchain ledger") {
             eprintln!("{}", e);
         }
 
