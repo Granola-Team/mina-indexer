@@ -62,6 +62,19 @@ async fn test_blockchain_ledger() {
     test_ledger_ingested_up_to(5000).await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances().await;
+
+    // restart ingestion from height 4501
+    run_test_process(
+        env!("CARGO_BIN_EXE_ingestion"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &["4501", "3NLRAYzM1oPghMUJWaQqMrdpaAwj4FpQ8BUw6GQ8e9Q4zW3K864F"],
+        Duration::from_secs(2 * 60),
+    );
+
+    truncate_table("blockchain_ledger", 5000).await;
+    test_ledger_ingested_up_to(5000).await;
+    test_blockchain_ledger_accounting_per_block().await;
+    test_account_balances().await;
 }
 
 async fn truncate_table(table: &str, height: u64) {
