@@ -46,7 +46,7 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("is_berkeley_block BOOLEAN")
             .add_column("canonical BOOLEAN")
             .distinct_columns(&["height", "state_hash"])
-            .build(root_node.is_none())
+            .build(root_node)
             .await
             .expect("Failed to build blocks_log and blocks view");
 
@@ -138,7 +138,7 @@ mod canonical_block_log_persistence_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         (actor, shared_publisher, receiver)
     }
@@ -238,7 +238,7 @@ mod canonical_block_log_persistence_tests {
     async fn test_canonical_blocks_canonical_block_log() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Insert multiple entries for the same (height, state_hash) with different canonicities
         let payload1 = CanonicalBlockLogPayload {
@@ -291,7 +291,7 @@ mod canonical_block_log_persistence_tests {
     async fn test_canonical_blocks_view() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Insert multiple entries for the same (height, state_hash) with different canonicities
         let payload1 = CanonicalBlockLogPayload {

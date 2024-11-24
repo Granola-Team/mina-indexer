@@ -24,7 +24,7 @@ pub struct CanonicalInternalCommandLogPersistenceActor {
 }
 
 impl CanonicalInternalCommandLogPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -44,7 +44,7 @@ impl CanonicalInternalCommandLogPersistenceActor {
             .add_column("recipient TEXT NOT NULL")
             .add_column("is_canonical BOOLEAN NOT NULL")
             .distinct_columns(&["height", "internal_command_type", "state_hash", "recipient", "amount_nanomina"])
-            .build(!preserve_existing_data)
+            .build(root_node)
             .await
             .expect("Failed to build internal_commands_log and internal_commands view");
 
@@ -134,7 +134,7 @@ mod canonical_internal_command_log_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         (actor, shared_publisher, receiver)
     }
@@ -223,7 +223,7 @@ mod canonical_internal_command_log_tests {
     async fn test_canonical_internal_commands_view() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Insert multiple entries for the same (height, state_hash, recipient, amount) with different timestamps and canonicalities
         let payload1 = CanonicalInternalCommandLogPayload {

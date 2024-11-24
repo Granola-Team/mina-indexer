@@ -21,7 +21,7 @@ pub struct CanonicalUserCommandPersistenceActor {
 }
 
 impl CanonicalUserCommandPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -46,7 +46,7 @@ impl CanonicalUserCommandPersistenceActor {
             .add_column("amount_nanomina BIGINT")
             .add_column("canonical BOOLEAN")
             .distinct_columns(&["height", "txn_hash", "state_hash"])
-            .build(!preserve_existing_data)
+            .build(root_node)
             .await
             .expect("Failed to build user_commands_log and user_commands view");
 
@@ -129,7 +129,7 @@ mod canonical_user_command_log_persistence_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         (actor, shared_publisher, receiver)
     }
@@ -229,7 +229,7 @@ mod canonical_user_command_log_persistence_tests {
     async fn test_canonical_user_command_view() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Insert multiple entries for the same (height, state_hash) with different statuses
         let payload1 = CanonicalUserCommandLogPayload {
