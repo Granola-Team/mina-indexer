@@ -40,10 +40,8 @@ impl NewAccountActor {
                 {
                     println!("Unable to drop user_commands table {:?}", e);
                 }
-            } else {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
-                    println!("Unable to drop user_commands table {:?}", e);
-                }
+            } else if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
+                println!("Unable to drop user_commands table {:?}", e);
             }
             if let Err(e) = client
                 .execute(
@@ -87,7 +85,7 @@ impl Actor for NewAccountActor {
                 let account: String = event.payload.to_string();
                 // Insert the account into the `discovered_accounts` table
                 let insert_query = "INSERT INTO discovered_accounts (account, height) VALUES ($1, $2) ON CONFLICT DO NOTHING";
-                if let Err(e) = self.client.execute(insert_query, &[&account, &(0 as i64)]).await {
+                if let Err(e) = self.client.execute(insert_query, &[&account, &0_i64]).await {
                     eprintln!("Failed to insert account {} into database: {:?}", account, e);
                 } else {
                     self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
