@@ -165,6 +165,21 @@ impl MainnetBlock {
             .collect()
     }
 
+    pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorks> {
+        let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
+        for completed_work in self.get_snark_work() {
+            let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
+            *aggregated_snark_work.entry(completed_work.prover).or_insert(0) += fee_nanomina;
+        }
+        aggregated_snark_work
+            .into_iter()
+            .map(|(prover, fee_nanomina)| CompletedWorks {
+                prover,
+                fee: (fee_nanomina as f64 / 1_000_000_000f64).to_string(),
+            })
+            .collect()
+    }
+
     pub fn get_user_commands_count(&self) -> usize {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
@@ -699,6 +714,8 @@ mod mainnet_block_parsing_tests {
         // Excess block fees paid to coinbase receiver
         // within one of the actors
         assert_eq!(mainnet_block.get_excess_block_fees(), 14_889_016);
+
+        assert_eq!(mainnet_block.get_aggregated_snark_work().len(), 3);
     }
 
     #[test]
