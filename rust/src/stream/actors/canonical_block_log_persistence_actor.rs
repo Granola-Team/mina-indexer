@@ -32,7 +32,7 @@ impl CanonicalBlockLogPersistenceActor {
         });
 
         let logger = DbLogger::builder(client)
-            .name("canonical_block_log")
+            .name("blocks")
             .add_column("height BIGINT")
             .add_column("state_hash TEXT")
             .add_column("previous_state_hash TEXT")
@@ -45,23 +45,10 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("last_vrf_output TEXT")
             .add_column("is_berkeley_block BOOLEAN")
             .add_column("canonical BOOLEAN")
+            .distinct_columns(&["height", "state_hash"])
             .build(!preserve_existing_data)
             .await
-            .expect("Failed to build canonical_block_log");
-
-        if let Err(e) = logger
-            .client
-            .execute(
-                "CREATE OR REPLACE VIEW blocks AS
-                SELECT DISTINCT ON (height, state_hash) *
-                FROM canonical_block_log
-                ORDER BY height, state_hash, entry_id DESC;",
-                &[],
-            )
-            .await
-        {
-            println!("Unable to create canonical_block_log table {:?}", e);
-        }
+            .expect("Failed to build blocks_log and blocks view");
 
         Self {
             id: "CanonicalBlockLogActor".to_string(),
@@ -164,7 +151,7 @@ mod canonical_block_log_persistence_tests {
 
         actor.log(&payload).await.unwrap();
 
-        let query = "SELECT * FROM canonical_block_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let query = "SELECT * FROM blocks_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
@@ -212,7 +199,7 @@ mod canonical_block_log_persistence_tests {
 
         actor.handle_event(event).await;
 
-        let query = "SELECT * FROM canonical_block_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let query = "SELECT * FROM blocks_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
@@ -265,10 +252,10 @@ mod canonical_block_log_persistence_tests {
         actor.log(&payload2).await.unwrap();
 
         // Query the canonical_block_log view
-        let query = "SELECT * FROM canonical_block_log WHERE height = $1";
+        let query = "SELECT * FROM blocks WHERE height = $1";
         let db_logger = actor.db_logger.lock().await;
         let rows = db_logger.client.query(query, &[&1_i64]).await.unwrap();
-        assert_eq!(rows.len(), 2);
+        assert_eq!(rows.len(), 1);
 
         let row_last = rows.last().unwrap();
 
@@ -285,22 +272,6 @@ mod canonical_block_log_persistence_tests {
         assert_eq!(row_last.get::<_, String>("last_vrf_output"), payload2.last_vrf_output);
         assert_eq!(row_last.get::<_, bool>("is_berkeley_block"), payload2.is_berkeley_block);
         assert_eq!(row_last.get::<_, bool>("canonical"), payload2.canonical);
-
-        let row_first = rows.first().unwrap();
-
-        // Validate the returned row matches the payload with the highest entry_id
-        assert_eq!(row_first.get::<_, i64>("height"), payload1.height as i64);
-        assert_eq!(row_first.get::<_, String>("state_hash"), payload1.state_hash);
-        assert_eq!(row_first.get::<_, String>("previous_state_hash"), payload1.previous_state_hash);
-        assert_eq!(row_first.get::<_, i32>("user_command_count"), payload1.user_command_count as i32);
-        assert_eq!(row_first.get::<_, i32>("snark_work_count"), payload1.snark_work_count as i32);
-        assert_eq!(row_first.get::<_, i64>("timestamp"), payload1.timestamp as i64);
-        assert_eq!(row_first.get::<_, String>("coinbase_receiver"), payload1.coinbase_receiver);
-        assert_eq!(row_first.get::<_, i64>("coinbase_reward_nanomina"), payload1.coinbase_reward_nanomina as i64);
-        assert_eq!(row_first.get::<_, i64>("global_slot_since_genesis"), payload1.global_slot_since_genesis as i64);
-        assert_eq!(row_first.get::<_, String>("last_vrf_output"), payload1.last_vrf_output);
-        assert_eq!(row_first.get::<_, bool>("is_berkeley_block"), payload1.is_berkeley_block);
-        assert_eq!(row_first.get::<_, bool>("canonical"), payload1.canonical);
     }
 
     #[tokio::test]

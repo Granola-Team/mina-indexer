@@ -35,7 +35,7 @@ impl CanonicalInternalCommandLogPersistenceActor {
         });
 
         let logger = DbLogger::builder(client)
-            .name("canonical_internal_command_log")
+            .name("internal_commands")
             .add_column("internal_command_type TEXT NOT NULL")
             .add_column("height BIGINT NOT NULL")
             .add_column("state_hash TEXT NOT NULL")
@@ -43,23 +43,11 @@ impl CanonicalInternalCommandLogPersistenceActor {
             .add_column("amount_nanomina BIGINT NOT NULL")
             .add_column("recipient TEXT NOT NULL")
             .add_column("is_canonical BOOLEAN NOT NULL")
+            .distinct_columns(&["height", "internal_command_type", "state_hash", "recipient", "amount_nanomina"])
             .build(!preserve_existing_data)
             .await
-            .expect("Failed to build canonical_internal_command_log");
+            .expect("Failed to build internal_commands_log and internal_commands view");
 
-        if let Err(e) = logger
-            .client
-            .execute(
-                "CREATE OR REPLACE VIEW internal_commands AS
-                SELECT DISTINCT ON (height, internal_command_type, state_hash, recipient, amount_nanomina) *
-                FROM canonical_internal_command_log
-                ORDER BY height, internal_command_type, state_hash, recipient, amount_nanomina, entry_id DESC;",
-                &[],
-            )
-            .await
-        {
-            println!("Unable to create canonical_internal_commands_log table {:?}", e);
-        }
         Self {
             id: "CanonicalInternalCommandLogPersistenceActor".to_string(),
             shared_publisher,
@@ -173,7 +161,7 @@ mod canonical_internal_command_log_tests {
         assert_eq!(affected_rows, 1);
 
         // Validate the data was correctly inserted into the table
-        let query = "SELECT * FROM canonical_internal_command_log_dirty WHERE height = $1 AND state_hash = $2 AND recipient = $3";
+        let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
             .client
@@ -214,7 +202,7 @@ mod canonical_internal_command_log_tests {
         actor.handle_event(event).await;
 
         // Validate the data was correctly inserted into the table
-        let query = "SELECT * FROM canonical_internal_command_log_dirty WHERE height = $1 AND state_hash = $2 AND recipient = $3";
+        let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
             .client

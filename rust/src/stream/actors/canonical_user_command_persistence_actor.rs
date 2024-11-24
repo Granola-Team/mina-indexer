@@ -31,7 +31,7 @@ impl CanonicalUserCommandPersistenceActor {
             }
         });
         let logger = DbLogger::builder(client)
-            .name("canonical_user_command_log")
+            .name("user_commands")
             .add_column("height BIGINT")
             .add_column("txn_hash TEXT")
             .add_column("state_hash TEXT")
@@ -45,23 +45,11 @@ impl CanonicalUserCommandPersistenceActor {
             .add_column("fee_payer TEXT")
             .add_column("amount_nanomina BIGINT")
             .add_column("canonical BOOLEAN")
+            .distinct_columns(&["height", "txn_hash", "state_hash"])
             .build(!preserve_existing_data)
             .await
-            .expect("Failed to build canonical_user_command_log");
+            .expect("Failed to build user_commands_log and user_commands view");
 
-        if let Err(e) = logger
-            .client
-            .execute(
-                "CREATE OR REPLACE VIEW user_commands AS
-                SELECT DISTINCT ON (height, txn_hash, state_hash) *
-                FROM canonical_user_command_log
-                ORDER BY height, txn_hash, state_hash, entry_id DESC;",
-                &[],
-            )
-            .await
-        {
-            println!("Unable to create user_commands table {:?}", e);
-        }
         Self {
             id: "CanonicalUserCommandPersistenceActor".to_string(),
             shared_publisher,
@@ -169,7 +157,7 @@ mod canonical_user_command_log_persistence_tests {
 
         actor.log(&payload).await.unwrap();
 
-        let query = "SELECT * FROM canonical_user_command_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
@@ -217,7 +205,7 @@ mod canonical_user_command_log_persistence_tests {
 
         actor.handle_event(event).await;
 
-        let query = "SELECT * FROM canonical_user_command_log_dirty WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
