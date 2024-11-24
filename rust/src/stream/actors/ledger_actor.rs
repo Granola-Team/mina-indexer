@@ -20,17 +20,22 @@ pub struct LedgerActor {
 }
 
 impl LedgerActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, preserve_existing_data: bool) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
                     eprintln!("connection error: {}", e);
                 }
             });
-            if !preserve_existing_data {
-                if let Err(e) = client.execute("DROP TABLE IF EXISTS blockchain_ledger CASCADE;", &[]).await {
+            if let Some((height, _)) = root_node {
+                if let Err(e) = client
+                    .execute("DELETE FROM blockchain_ledger WHERE height >= $1;", &[&(height.to_owned() as i64)])
+                    .await
+                {
                     println!("Unable to drop blockchain_ledger table {:?}", e);
                 }
+            } else if let Err(e) = client.execute("DROP TABLE IF EXISTS blockchain_ledger CASCADE;", &[]).await {
+                println!("Unable to drop blockchain_ledger table {:?}", e);
             }
             if let Err(e) = client
                 .execute(
@@ -184,7 +189,7 @@ mod blockchain_ledger_actor_tests {
     // #[serial]
     async fn test_db_update_inserts_new_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = LedgerActor::new(shared_publisher, false).await;
+        let actor = LedgerActor::new(shared_publisher, &None).await;
 
         // Accounting entry payload
         let accounting_entry = AccountingEntry {
@@ -230,7 +235,7 @@ mod blockchain_ledger_actor_tests {
     // #[serial]
     async fn test_db_update_updates_existing_entry() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = LedgerActor::new(shared_publisher, false).await;
+        let actor = LedgerActor::new(shared_publisher, &None).await;
 
         // Initial accounting entry
         let accounting_entry = AccountingEntry {
@@ -305,7 +310,7 @@ mod blockchain_ledger_actor_tests {
     // #[serial]
     async fn test_handle_event_processes_double_entry_transaction() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = LedgerActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = LedgerActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {
@@ -370,7 +375,7 @@ mod blockchain_ledger_actor_tests {
     #[tokio::test]
     async fn test_publishes_heights() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = LedgerActor::new(Arc::clone(&shared_publisher), false).await;
+        let actor = LedgerActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Define a double-entry transaction payload
         let double_entry_payload = DoubleEntryRecordPayload {
@@ -417,148 +422,73 @@ mod blockchain_ledger_actor_tests {
         println!("Published height: {}", payload.height);
     }
 
-    // #[tokio::test]
-    // #[serial]
-    // async fn test_account_balance_log() -> anyhow::Result<()> {
-    //     use crate::stream::{
-    //         events::{Event, EventType},
-    //         payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload},
-    //     };
+    #[tokio::test]
+    async fn test_ledger_actor_discard_entries_at_or_above_root_node() {
+        use crate::stream::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType};
+        use std::sync::Arc;
 
-    //     let shared_publisher = Arc::new(SharedPublisher::new(100));
-    //     let actor = AccountSummaryPersistenceActor::new(Arc::clone(&shared_publisher), 0).await;
+        // Step 1: Create a shared publisher and initialize the actor without a root_node to populate the ledger
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor_without_root = LedgerActor::new(Arc::clone(&shared_publisher), &None).await;
 
-    //     // Define a series of events with balanced lhs/rhs entries
-    //     let events = vec![
-    //         // Different heights
-    //         Event {
-    //             event_type: EventType::DoubleEntryTransaction,
-    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
-    //                 height: 10,
-    //                 state_hash: "hash_1".to_string(),
-    //                 lhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Debit,
-    //                     account: "address_1".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 500,
-    //                     timestamp: 123456789,
-    //                 }],
-    //                 rhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Credit,
-    //                     account: "address_2".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 500,
-    //                     timestamp: 123456789,
-    //                 }],
-    //             })?,
-    //         },
-    //         Event {
-    //             event_type: EventType::DoubleEntryTransaction,
-    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
-    //                 height: 20,
-    //                 state_hash: "hash_2".to_string(),
-    //                 lhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Debit,
-    //                     account: "address_1".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 300,
-    //                     timestamp: 123456790,
-    //                 }],
-    //                 rhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Credit,
-    //                     account: "address_2".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 300,
-    //                     timestamp: 123456790,
-    //                 }],
-    //             })?,
-    //         },
-    //         // Same height, same state_hash, same timestamp
-    //         Event {
-    //             event_type: EventType::DoubleEntryTransaction,
-    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
-    //                 height: 10,
-    //                 state_hash: "hash_1".to_string(),
-    //                 lhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Debit,
-    //                     account: "address_1".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 200,
-    //                     timestamp: 123456789,
-    //                 }],
-    //                 rhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Credit,
-    //                     account: "address_2".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 200,
-    //                     timestamp: 123456789,
-    //                 }],
-    //             })?,
-    //         },
-    //         // Same height, different state_hash
-    //         Event {
-    //             event_type: EventType::DoubleEntryTransaction,
-    //             payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
-    //                 height: 10,
-    //                 state_hash: "hash_3".to_string(),
-    //                 lhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Debit,
-    //                     account: "address_1".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 100,
-    //                     timestamp: 123456791,
-    //                 }],
-    //                 rhs: vec![AccountingEntry {
-    //                     entry_type: AccountingEntryType::Credit,
-    //                     account: "address_2".to_string(),
-    //                     account_type: AccountingEntryAccountType::BlockchainAddress,
-    //                     amount_nanomina: 100,
-    //                     timestamp: 123456791,
-    //                 }],
-    //             })?,
-    //         },
-    //     ];
+        // Add ledger entries with varying heights
+        let ledger_entries = vec![
+            (5, "hash_5"),   // Below the root height
+            (10, "hash_10"), // At the root height
+            (15, "hash_15"), // Above the root height
+        ];
 
-    //     // Process each event
-    //     for event in events {
-    //         actor.handle_event(event).await;
-    //     }
+        for (height, state_hash) in &ledger_entries {
+            let accounting_entry = AccountingEntry {
+                entry_type: AccountingEntryType::Credit,
+                account: format!("account_{}", height),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1000,
+                timestamp: 123456789 + height,
+                counterparty: "counterparty".to_string(),
+                transfer_type: "transfer_type".to_string(),
+            };
 
-    //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            actor_without_root
+                .log_accounting_entry(&accounting_entry, &(*height as i64), state_hash, &(123456789_i64))
+                .await
+                .expect("Failed to log accounting entry");
+        }
 
-    //     // Query the blockchain_ledger table to verify entries
-    //     let log_rows = actor
-    //         .client
-    //         .query("SELECT * FROM blockchain_ledger ORDER BY entry_id", &[])
-    //         .await
-    //         .expect("Failed to query blockchain_ledger table");
+        // Verify that all entries were inserted
+        let rows = actor_without_root
+            .client
+            .query("SELECT * FROM blockchain_ledger ORDER BY height ASC", &[])
+            .await
+            .expect("Failed to query blockchain_ledger");
+        assert_eq!(rows.len(), ledger_entries.len(), "All entries should be present initially");
 
-    //     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // Step 2: Initialize the actor with a root_node and verify entries are discarded
+        let root_node_height = 10;
+        let root_node = Some((root_node_height, "hash_10".to_string()));
+        let actor_with_root = LedgerActor::new(Arc::clone(&shared_publisher), &root_node).await;
 
-    //     // Assert that the number of log entries matches the expected count
-    //     assert_eq!(log_rows.len(), 8, "Unexpected number of log entries in blockchain_ledger");
+        // Query the ledger after reinitialization
+        let rows_after_reinit = actor_with_root
+            .client
+            .query("SELECT * FROM blockchain_ledger ORDER BY height ASC", &[])
+            .await
+            .expect("Failed to query blockchain_ledger after reinitialization");
 
-    //     // Verify individual log entries
-    //     let expected_logs = vec![
-    //         ("address_1", "BlockchainAddress", -500, 10, "hash_1", 123456789),
-    //         ("address_2", "BlockchainAddress", 500, 10, "hash_1", 123456789),
-    //         ("address_1", "BlockchainAddress", -300, 20, "hash_2", 123456790),
-    //         ("address_2", "BlockchainAddress", 300, 20, "hash_2", 123456790),
-    //         ("address_1", "BlockchainAddress", -200, 10, "hash_1", 123456789),
-    //         ("address_2", "BlockchainAddress", 200, 10, "hash_1", 123456789),
-    //         ("address_1", "BlockchainAddress", -100, 10, "hash_3", 123456791),
-    //         ("address_2", "BlockchainAddress", 100, 10, "hash_3", 123456791),
-    //     ];
+        // Verify that entries at or above the root_node_height are discarded
+        assert_eq!(rows_after_reinit.len(), 1, "Only entries below the root node height should remain");
 
-    //     for (i, row) in log_rows.iter().enumerate() {
-    //         assert_eq!(row.get::<_, String>("address"), expected_logs[i].0);
-    //         assert_eq!(row.get::<_, String>("address_type"), expected_logs[i].1);
-    //         assert_eq!(row.get::<_, i64>("balance_delta"), expected_logs[i].2);
-    //         assert_eq!(row.get::<_, i64>("height"), expected_logs[i].3);
-    //         assert_eq!(row.get::<_, String>("state_hash"), expected_logs[i].4);
-    //         assert_eq!(row.get::<_, i64>("timestamp"), expected_logs[i].5);
-    //     }
-
-    //     Ok(())
-    // }
+        // Verify the remaining entry is below the root node height
+        let remaining_entry = &rows_after_reinit[0];
+        assert_eq!(
+            remaining_entry.get::<_, i64>("height"),
+            5,
+            "The only remaining entry should be below the root node height"
+        );
+        assert_eq!(
+            remaining_entry.get::<_, String>("state_hash"),
+            "hash_5",
+            "The only remaining entry should have the correct state_hash"
+        );
+    }
 }
