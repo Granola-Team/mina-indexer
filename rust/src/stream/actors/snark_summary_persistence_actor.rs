@@ -113,3 +113,113 @@ impl Actor for SnarkSummaryPersistenceActor {
         self.shared_publisher.publish(event);
     }
 }
+
+#[cfg(test)]
+mod snark_summary_persistence_actor_tests {
+    use super::*;
+    use crate::stream::payloads::{ActorHeightPayload, SnarkCanonicitySummaryPayload};
+    use std::sync::Arc;
+    use tokio::time::timeout;
+
+    async fn setup_actor() -> (SnarkSummaryPersistenceActor, tokio::sync::broadcast::Receiver<Event>) {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = SnarkSummaryPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
+        let receiver = shared_publisher.subscribe();
+        (actor, receiver)
+    }
+
+    #[tokio::test]
+    async fn test_snark_summary_persistence_actor_logs_summary() {
+        let (actor, mut receiver) = setup_actor().await;
+
+        let snark_summary = SnarkCanonicitySummaryPayload {
+            height: 10,
+            state_hash: "test_hash".to_string(),
+            timestamp: 123456,
+            prover: "test_prover".to_string(),
+            fee_nanomina: 250000000,
+            canonical: true,
+        };
+
+        let event = Event {
+            event_type: EventType::SnarkCanonicitySummary,
+            payload: sonic_rs::to_string(&snark_summary).unwrap(),
+        };
+
+        // Handle the event
+        actor.handle_event(event).await;
+
+        // Verify the ActorHeight event is published
+        if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+            let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
+            assert_eq!(published_event.actor, actor.id());
+            assert_eq!(published_event.height, snark_summary.height);
+        } else {
+            panic!("Expected ActorHeight event was not published.");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_snark_summary_persistence_actor_logs_to_database() {
+        let (actor, _) = setup_actor().await;
+
+        let snark_summary = SnarkCanonicitySummaryPayload {
+            height: 15,
+            state_hash: "test_hash_2".to_string(),
+            timestamp: 789012,
+            prover: "test_prover_2".to_string(),
+            fee_nanomina: 500000000,
+            canonical: false,
+        };
+
+        // Log the snark summary
+        let result = actor.log(&snark_summary).await;
+
+        // Verify successful database insertion
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_snark_summary_persistence_actor_handles_multiple_events() {
+        let (actor, mut receiver) = setup_actor().await;
+
+        let summaries = vec![
+            SnarkCanonicitySummaryPayload {
+                height: 20,
+                state_hash: "hash_1".to_string(),
+                timestamp: 111111,
+                prover: "prover_1".to_string(),
+                fee_nanomina: 1000000000,
+                canonical: true,
+            },
+            SnarkCanonicitySummaryPayload {
+                height: 21,
+                state_hash: "hash_2".to_string(),
+                timestamp: 222222,
+                prover: "prover_2".to_string(),
+                fee_nanomina: 2000000000,
+                canonical: false,
+            },
+        ];
+
+        for summary in &summaries {
+            let event = Event {
+                event_type: EventType::SnarkCanonicitySummary,
+                payload: sonic_rs::to_string(&summary).unwrap(),
+            };
+            actor.handle_event(event).await;
+        }
+
+        // Verify ActorHeight events for both summaries
+        for summary in summaries {
+            if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
+                let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
+                assert_eq!(published_event.actor, actor.id());
+                assert_eq!(published_event.height, summary.height);
+            } else {
+                panic!("Expected ActorHeight event was not published.");
+            }
+        }
+    }
+}
