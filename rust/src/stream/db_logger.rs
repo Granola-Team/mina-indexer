@@ -14,6 +14,7 @@ impl DbLogger {
             client,
             name: String::new(),
             columns: Vec::new(),
+            distinct_columns: Vec::new(),
         }
     }
 
@@ -41,11 +42,12 @@ pub struct DbLoggerBuilder {
     client: Client,
     name: String,
     columns: Vec<String>,
+    distinct_columns: Vec<String>,
 }
 
 impl DbLoggerBuilder {
     /// Set the name for the logger
-    /// The table will be `{name}_dirty` and the view will be `{name}`
+    /// The table will be `{name}_log` and the view will be `{name}`
     pub fn name(mut self, name: &str) -> Self {
         self.name = name.to_string();
         self
@@ -56,47 +58,49 @@ impl DbLoggerBuilder {
         self.columns.push(column_definition.to_string());
         self
     }
-    /// Build and initialize the table and view, dropping any existing table, view, and sequence first
+
+    /// Specify the distinct columns for the view
+    pub fn distinct_columns(mut self, columns: &[&str]) -> Self {
+        self.distinct_columns = columns.iter().map(|s| s.to_string()).collect();
+        self
+    }
+
+    /// Build and initialize the table and view, dropping any existing table and view first
     pub async fn build(self, drop: bool) -> Result<DbLogger> {
-        let table_name = format!("{}_dirty", self.name);
+        let table_name = format!("{}_log", self.name);
         let view_name = self.name.clone();
-        let sequence_name = format!("{}_entry_id_seq", table_name);
 
         if drop {
-            // Drop the existing table, view, and sequence
+            // Drop the existing table and view
             let drop_table_query = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
             let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
-            let drop_sequence_query = format!("DROP SEQUENCE IF EXISTS {} CASCADE;", sequence_name);
 
             self.client.execute(&drop_table_query, &[]).await?;
             self.client.execute(&drop_view_query, &[]).await?;
-            self.client.execute(&drop_sequence_query, &[]).await?;
         }
-
-        // Create the sequence
-        let create_sequence_query = format!("CREATE SEQUENCE IF NOT EXISTS {};", sequence_name);
-        self.client.execute(&create_sequence_query, &[]).await?;
 
         // Create the table
         let table_query = format!(
             "CREATE TABLE {} (
-                entry_id BIGINT DEFAULT nextval('{}') PRIMARY KEY,
+                entry_id BIGSERIAL PRIMARY KEY,
                 {}
             );",
             table_name,
-            sequence_name,
             self.columns.join(",\n")
         );
 
         self.client.execute(&table_query, &[]).await?;
 
         // Create the view
-        let distinct_columns = self
-            .columns
-            .iter()
-            .map(|col| col.split_whitespace().next().unwrap()) // Extract column names
-            .collect::<Vec<_>>()
-            .join(", ");
+        let distinct_columns = if self.distinct_columns.is_empty() {
+            self.columns
+                .iter()
+                .map(|col| col.split_whitespace().next().unwrap()) // Default to all column names
+                .collect::<Vec<_>>()
+                .join(", ")
+        } else {
+            self.distinct_columns.join(", ")
+        };
 
         let view_query = format!(
             "CREATE OR REPLACE VIEW {} AS
@@ -136,43 +140,37 @@ mod db_logger_tests {
             }
         });
 
-        // Setup the logger with fewer columns
+        // Setup the logger
         let logger = DbLogger::builder(client)
             .name("log")
             .add_column("height BIGINT")
             .add_column("state_hash TEXT")
             .add_column("timestamp BIGINT")
+            .distinct_columns(&["height", "state_hash"])
             .build(true)
             .await
             .expect("Failed to build logger");
 
         logger.insert(&[&1i64, &"state_hash_1", &1234567890i64]).await.expect("Failed to insert log");
+        logger.insert(&[&1i64, &"state_hash_1", &1234567891i64]).await.expect("Failed to insert log");
+        logger.insert(&[&1i64, &"state_hash_2", &1234567892i64]).await.expect("Failed to insert log");
 
-        logger.insert(&[&1i64, &"state_hash_1", &1234567890i64]).await.expect("Failed to insert log");
+        // Query the table
+        let log_query = "SELECT * FROM log_log WHERE height = $1";
+        let log_rows = logger.client.query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
 
-        logger.insert(&[&1i64, &"state_hash_1", &1234567890i64]).await.expect("Failed to insert log");
-
-        // Query the raw log table
-        let log_query = "SELECT * FROM log_dirty WHERE height = $1 AND state_hash = $2";
-        let log_rows = logger
-            .client
-            .query(log_query, &[&(1_i64), &"state_hash_1"])
-            .await
-            .expect("Failed to query log table");
-
-        // Assert all rows are present in the log
-        assert_eq!(log_rows.len(), 3, "Expected 3 rows in the log table");
+        // Assert all rows are present in the table
+        assert_eq!(log_rows.len(), 3, "Expected 3 rows in the table");
 
         // Query the view
         let view_query = "SELECT * FROM log WHERE height = $1";
         let view_rows = logger.client.query(view_query, &[&(1_i64)]).await.expect("Failed to query view");
 
-        // Assert only one row is present in the view
-        assert_eq!(view_rows.len(), 1, "Expected 1 row in the view");
-
-        // Assert the row in the view corresponds to the latest `entry_id`
-        let latest_row = &view_rows[0];
-        let latest_timestamp: i64 = latest_row.get("timestamp");
-        assert_eq!(latest_timestamp, 1234567890i64,);
+        // Assert only the latest row for each state_hash is present in the view
+        assert_eq!(view_rows.len(), 2, "Expected 2 rows in the view");
+        let earliest_row: i64 = view_rows.iter().map(|row| row.get("timestamp")).min().unwrap();
+        assert_eq!(earliest_row, 1234567891i64, "Expected the earliest timestamp in the view");
+        let latest_row: i64 = view_rows.iter().map(|row| row.get("timestamp")).max().unwrap();
+        assert_eq!(latest_row, 1234567892i64, "Expected the latest timestamp in the view");
     }
 }
