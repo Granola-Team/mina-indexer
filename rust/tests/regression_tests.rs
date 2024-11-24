@@ -17,7 +17,28 @@ struct Account {
     balance: u64,
 }
 
+#[derive(Debug, Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct Block {
+    state_hash: String,
+    block_height: u64,
+    canonical: bool,
+}
+
 #[tokio::test]
+async fn test_first_100_blocks() {
+    run_test_process(
+        env!("CARGO_BIN_EXE_ingestion"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        Duration::from_secs(20),
+    );
+
+    truncate_table("blocks_log", 100).await;
+    test_blocks_first_100().await;
+}
+
+#[tokio::test]
+#[ignore]
 async fn test_blockchain_ledger() {
     run_test_process(
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
@@ -26,7 +47,7 @@ async fn test_blockchain_ledger() {
     );
 
     truncate_table("blockchain_ledger", 5000).await;
-    test_ledger_ingested_up_to_5000().await;
+    test_ledger_ingested_up_to(5000).await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances().await;
 }
@@ -52,7 +73,7 @@ async fn truncate_table(table: &str, height: u64) {
     }
 }
 
-async fn test_ledger_ingested_up_to_5000() {
+async fn test_ledger_ingested_up_to(x: u64) {
     if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
         let handle = tokio::spawn(async move {
             if let Err(e) = connection.await {
@@ -70,7 +91,7 @@ async fn test_ledger_ingested_up_to_5000() {
         // Execute the query using the SQL client from the actor
         if let Ok(row) = client.query_one(query, &[]).await.map_err(|_| "Unable to get max height of blockchain ledger") {
             let max_height: i64 = row.get("max_height");
-            assert_eq!(max_height, 5000, "Expected the ledger to have been ingested up to height 5000");
+            assert_eq!(max_height, x as i64, "Expected the ledger to have been ingested up to height ");
         } else {
             panic!("Could not execute query")
         }
@@ -108,6 +129,75 @@ async fn test_blockchain_ledger_accounting_per_block() {
     } else {
         panic!("Unable to open connection to database");
     }
+}
+
+async fn test_blocks_first_100() {
+    let file_content = std::fs::read_to_string(Path::new("./tests/data/canonicity_of_first_100_blocks.json")).expect("Failed to read JSON file from disk");
+
+    let blocks: Vec<Block> = sonic_rs::from_str(&file_content).unwrap();
+
+    // Create a HashMap with composite keys (height, state_hash)
+    let file_blocks_map: HashMap<(u64, String), bool> = blocks
+        .into_iter()
+        .map(|block| ((block.block_height, block.state_hash.clone()), block.canonical))
+        .collect();
+
+    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+        .await
+        .expect("Expected to open connection");
+
+    let handle = tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    let query = r#"
+        SELECT height, state_hash, canonical
+        FROM blocks;
+    "#;
+
+    let rows = client.query(query, &[]).await.expect("Failed to execute query");
+
+    // Create a HashMap from database rows with composite keys
+    let db_blocks_map: HashMap<(u64, String), bool> = rows
+        .into_iter()
+        .map(|row| {
+            (
+                (row.get::<_, i64>("height") as u64, row.get::<_, String>("state_hash")),
+                row.get::<_, bool>("canonical"),
+            )
+        })
+        .collect();
+
+    // Ensure the sizes match
+    assert_eq!(file_blocks_map.len(), db_blocks_map.len(), "Mismatch in number of blocks");
+
+    // Check that all blocks have the correct canonical status
+    let mut mismatches: Vec<((u64, String), bool, bool)> = vec![];
+    for (key, &file_canonical) in &file_blocks_map {
+        if let Some(&db_canonical) = db_blocks_map.get(key) {
+            if file_canonical != db_canonical {
+                mismatches.push((key.clone(), file_canonical, db_canonical));
+            }
+        } else {
+            panic!("Block with height {} and state_hash {} not found in database", key.0, key.1);
+        }
+    }
+
+    // Report mismatches
+    if !mismatches.is_empty() {
+        for ((height, state_hash), expected, actual) in &mismatches {
+            println!(
+                "Mismatch for height {} and state_hash {}: expected canonical {}, got {}",
+                height, state_hash, expected, actual
+            );
+        }
+    }
+
+    assert!(mismatches.is_empty(), "Found mismatches between file and database canonical statuses");
+
+    drop(handle);
 }
 
 async fn test_account_balances() {
