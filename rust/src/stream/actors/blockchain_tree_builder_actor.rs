@@ -62,26 +62,26 @@ impl Actor for BlockchainTreeBuilderActor {
                     // we assume the first block we receive is carefully selected
                     // to be the best canonical tip,
                     blockchain_tree.set_root(next_node.clone()).unwrap();
-                }
-                if blockchain_tree.has_parent(&next_node) {
+                } else if blockchain_tree.has_parent(&next_node) {
                     blockchain_tree.add_node(next_node).unwrap();
-                    let added_payload = NewBlockPayload {
-                        height: block_payload.height,
-                        state_hash: block_payload.state_hash,
-                        previous_state_hash: block_payload.previous_state_hash,
-                        last_vrf_output: block_payload.last_vrf_output,
-                    };
-                    self.publish(Event {
-                        event_type: EventType::NewBlock,
-                        payload: sonic_rs::to_string(&added_payload).unwrap(),
-                    });
                 } else {
                     // try again later
                     self.publish(Event {
                         event_type: EventType::BlockAncestor,
                         payload: event.payload,
                     });
+                    return;
                 }
+                let added_payload = NewBlockPayload {
+                    height: block_payload.height,
+                    state_hash: block_payload.state_hash,
+                    previous_state_hash: block_payload.previous_state_hash,
+                    last_vrf_output: block_payload.last_vrf_output,
+                };
+                self.publish(Event {
+                    event_type: EventType::NewBlock,
+                    payload: sonic_rs::to_string(&added_payload).unwrap(),
+                });
                 blockchain_tree.prune_tree().unwrap();
             }
             EventType::GenesisBlock => {
@@ -320,5 +320,54 @@ async fn test_blockchain_tree_actor_adds_genesis_block() {
         actor.actor_outputs().load(std::sync::atomic::Ordering::SeqCst),
         1,
         "Expected the genesis block to be processed once"
+    );
+}
+
+#[tokio::test]
+async fn test_blockchain_tree_actor_publishes_root() {
+    use crate::stream::shared_publisher::SharedPublisher;
+    use std::sync::Arc;
+
+    // Initialize shared publisher and actor
+    let shared_publisher = Arc::new(SharedPublisher::new(100));
+    let actor = BlockchainTreeBuilderActor::new(Arc::clone(&shared_publisher));
+    let mut receiver = shared_publisher.subscribe();
+
+    // Create a block ancestor payload for an arbitrary block
+    let new_root_payload = BlockAncestorPayload {
+        height: 42, // Arbitrary height
+        state_hash: "NewRootBlockHash".to_string(),
+        previous_state_hash: "PreviousStateHash".to_string(),
+        last_vrf_output: "VRFOutputNewRoot".to_string(),
+    };
+
+    // Send the block ancestor event
+    let new_root_event = Event {
+        event_type: EventType::BlockAncestor,
+        payload: sonic_rs::to_string(&new_root_payload).unwrap(),
+    };
+    actor.handle_event(new_root_event).await;
+
+    // Verify that the new root block was published as a `NewBlock` event
+    if let Ok(event) = receiver.recv().await {
+        assert_eq!(event.event_type, EventType::NewBlock, "Expected a NewBlock event");
+
+        let payload: NewBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(payload.height, new_root_payload.height, "Unexpected block height");
+        assert_eq!(payload.state_hash, new_root_payload.state_hash, "Unexpected state hash");
+        assert_eq!(
+            payload.previous_state_hash, new_root_payload.previous_state_hash,
+            "Unexpected previous state hash"
+        );
+        assert_eq!(payload.last_vrf_output, new_root_payload.last_vrf_output, "Unexpected VRF output");
+    } else {
+        panic!("Expected the new root block to be published, but no event was received");
+    }
+
+    // Verify the number of events published
+    assert_eq!(
+        actor.actor_outputs().load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "Expected exactly one event to be published"
     );
 }
