@@ -26,6 +26,7 @@ pub mod events;
 pub mod genesis_ledger_models;
 pub mod mainnet_block_models;
 pub mod models;
+pub mod partitioned_table;
 pub mod payloads;
 pub mod shared_publisher;
 pub mod sourcing;
