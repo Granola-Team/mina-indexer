@@ -42,9 +42,7 @@ pub async fn subscribe_actors(
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
-    let snark_summary_persistence_actor_m0 = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 0).await;
-    let snark_summary_persistence_actor_m1 = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 1).await;
-    let snark_summary_persistence_actor_m2 = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 2).await;
+    let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
     let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -69,9 +67,7 @@ pub async fn subscribe_actors(
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher))),
         Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
-        Arc::new(snark_summary_persistence_actor_m0),
-        Arc::new(snark_summary_persistence_actor_m1),
-        Arc::new(snark_summary_persistence_actor_m2),
+        Arc::new(snark_summary_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),
