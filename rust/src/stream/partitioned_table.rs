@@ -243,4 +243,133 @@ mod partitioned_table_tests {
         let log_rows = partitioned_table.client.query(log_query, &[&(2_i64)]).await.expect("Failed to query log table");
         assert_eq!(log_rows.len(), 1, "Expected 1 row in the table");
     }
+
+    #[tokio::test]
+    async fn test_partitioned_table_root_deletion_with_3_heights() {
+        {
+            // Connect to the database
+            let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+                .await
+                .expect("Failed to connect to the database");
+
+            // Spawn the connection handler
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("Connection error: {}", e);
+                }
+            });
+
+            // Setup the PartitionedTable
+            let partitioned_table = PartitionedTable::builder(client)
+                .name("log")
+                .add_column("height BIGINT") // Explicitly adding the height column
+                .add_column("state_hash TEXT")
+                .add_column("timestamp BIGINT")
+                .build(&None) // No root initially, so no deletion
+                .await
+                .expect("Failed to build partitioned table");
+
+            // Insert 3 rows for each of 3 heights: 0, 1, and 2 (total of 9 rows)
+            // Ensure the height corresponds to 1, 2, or 3
+            partitioned_table
+                .insert(&[&1_i64, &"state_hash_1_1", &1234567890i64], 1)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&2_i64, &"state_hash_1_2", &1234567891i64], 2)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&3_i64, &"state_hash_1_3", &1234567892i64], 3)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&1_i64, &"state_hash_2_1", &1234567893i64], 1)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&2_i64, &"state_hash_2_2", &1234567894i64], 2)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&3_i64, &"state_hash_2_3", &1234567895i64], 3)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&1_i64, &"state_hash_3_1", &1234567896i64], 1)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&2_i64, &"state_hash_3_2", &1234567897i64], 2)
+                .await
+                .expect("Failed to insert log");
+
+            partitioned_table
+                .insert(&[&3_i64, &"state_hash_3_3", &1234567898i64], 3)
+                .await
+                .expect("Failed to insert log");
+        }
+
+        {
+            // Connect to the database
+            let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+                .await
+                .expect("Failed to connect to the database");
+
+            // Spawn the connection handler
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("Connection error: {}", e);
+                }
+            });
+            // Set the root node to height 2 (this will delete height 2 and its children)
+            let root = Some((2, "state_hash_2_2".to_string()));
+            let partitioned_table = PartitionedTable::builder(client)
+                .name("log")
+                .add_column("height BIGINT")
+                .add_column("state_hash TEXT")
+                .add_column("timestamp BIGINT")
+                .build(&root) // Set root for deletion
+                .await
+                .expect("Failed to rebuild partitioned table with root");
+            let log_query = "SELECT * FROM log_log WHERE height = $1";
+            // Query for height 1 and ensure that rows still exist for height 1
+            let log_rows = partitioned_table
+                .client
+                .query(log_query, &[&(1_i64)])
+                .await
+                .expect("Failed to query log table for height 1");
+
+            // Assert that rows for height 1 are still present
+            assert_eq!(log_rows.len(), 3, "Expected 3 rows in the table for height 1");
+
+            // Query for height 3 and ensure that rows still exist for height 3
+            let log_rows = partitioned_table
+                .client
+                .query(log_query, &[&(3_i64)])
+                .await
+                .expect("Failed to query log table for height 3");
+
+            // Assert that rows for height 3 are still present
+            assert_eq!(log_rows.len(), 0, "Expected 0 rows in the table for height 3");
+
+            // Query for height 2 and check that the state_hash rows are deleted
+            let log_query = "SELECT * FROM log_log WHERE height = $1";
+            let deleted_row = partitioned_table
+                .client
+                .query(log_query, &[&(2_i64)])
+                .await
+                .expect("Failed to query log table for specific state_hash");
+
+            // Ensure no rows exist for the deleted state_hash at height 2
+            assert_eq!(deleted_row.len(), 2, "Expected 2 rows at height 2");
+        }
+    }
 }
