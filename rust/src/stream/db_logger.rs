@@ -18,7 +18,7 @@ impl DbLogger {
     }
 
     pub fn get_client(&self) -> &Client {
-        &self.partitioned_table.get_client()
+        self.partitioned_table.get_client()
     }
 
     /// Insert a row into the table
@@ -62,11 +62,6 @@ impl DbLoggerBuilder {
     pub async fn build(self, root_node: &Option<(u64, String)>) -> Result<DbLogger> {
         let table_name = format!("{}_log", self.name);
         let view_name = self.name.clone();
-
-        // Ensure the `height` column is specified
-        if !self.columns.iter().any(|col| col.starts_with("height")) {
-            return Err(anyhow::anyhow!("The column 'height' is required but not found.").into());
-        }
 
         let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
         self.client.execute(&drop_view_query, &[]).await?;

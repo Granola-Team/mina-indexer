@@ -93,7 +93,7 @@ impl PartitionedTableBuilder {
 
         // Ensure the `height` column is specified
         if !self.columns.iter().any(|col| col.starts_with("height")) {
-            return Err(anyhow::anyhow!("The column 'height' is required but not found.").into());
+            panic!("The column 'height' is required but not found.");
         }
 
         // Drop the table and view if necessary
