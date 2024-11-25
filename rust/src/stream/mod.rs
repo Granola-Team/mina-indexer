@@ -36,7 +36,9 @@ pub async fn subscribe_actors(
 ) -> anyhow::Result<()> {
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
-    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let user_command_persistence_actor_m0 = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 0).await;
+    let user_command_persistence_actor_m1 = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 1).await;
+    let user_command_persistence_actor_m2 = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 2).await;
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
@@ -69,7 +71,9 @@ pub async fn subscribe_actors(
         Arc::new(snark_summary_persistence_actor_m0),
         Arc::new(snark_summary_persistence_actor_m1),
         Arc::new(snark_summary_persistence_actor_m2),
-        Arc::new(user_command_persistence_actor),
+        Arc::new(user_command_persistence_actor_m0),
+        Arc::new(user_command_persistence_actor_m1),
+        Arc::new(user_command_persistence_actor_m2),
         Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
