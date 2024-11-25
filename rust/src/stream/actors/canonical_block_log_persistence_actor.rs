@@ -45,7 +45,6 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("last_vrf_output TEXT")
             .add_column("is_berkeley_block BOOLEAN")
             .add_column("canonical BOOLEAN")
-            .partition_by("height")
             .distinct_columns(&["height", "state_hash"])
             .build(root_node)
             .await

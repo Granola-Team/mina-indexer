@@ -33,7 +33,7 @@ impl DbLogger {
         let placeholders = (1..=self.columns.len()).map(|i| format!("${}", i)).collect::<Vec<_>>().join(", ");
 
         // Create partition if necessary (based on the height)
-        if height % 10_000 == 0 {
+        if height > 0 && height % 10_000 == 0 {
             let statement = format!(
                 "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
                 self.table_name,
@@ -126,6 +126,14 @@ impl DbLoggerBuilder {
         );
 
         self.client.execute(&table_query, &[]).await?;
+
+        let statement = format!(
+            "CREATE TABLE IF NOT EXISTS {}_0 PARTITION OF {} FOR VALUES FROM (0) TO (9999);",
+            table_name, table_name,
+        );
+        if self.client.execute(&statement, &[]).await.is_err() {
+            eprintln!("Failed to create next partition");
+        }
 
         // Create the view with distinct columns
         let distinct_columns = if self.distinct_columns.is_empty() {

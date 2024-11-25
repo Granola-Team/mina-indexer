@@ -45,7 +45,6 @@ impl CanonicalUserCommandPersistenceActor {
             .add_column("fee_payer TEXT")
             .add_column("amount_nanomina BIGINT")
             .add_column("canonical BOOLEAN")
-            .partition_by("height")
             .distinct_columns(&["height", "txn_hash", "state_hash"])
             .build(root_node)
             .await

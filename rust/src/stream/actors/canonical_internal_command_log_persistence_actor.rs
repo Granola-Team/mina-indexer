@@ -43,7 +43,6 @@ impl CanonicalInternalCommandLogPersistenceActor {
             .add_column("amount_nanomina BIGINT NOT NULL")
             .add_column("recipient TEXT NOT NULL")
             .add_column("is_canonical BOOLEAN NOT NULL")
-            .partition_by("height")
             .distinct_columns(&["height", "internal_command_type", "state_hash", "recipient", "amount_nanomina"])
             .build(root_node)
             .await
