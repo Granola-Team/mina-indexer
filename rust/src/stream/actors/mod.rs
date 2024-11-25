@@ -13,7 +13,6 @@ pub(crate) mod canonical_internal_command_log_persistence_actor;
 pub(crate) mod canonical_user_command_log_actor;
 pub(crate) mod canonical_user_command_persistence_actor;
 pub(crate) mod coinbase_transfer_actor;
-// pub(crate) mod epoch_stake_delegation_actor;
 pub(crate) mod fee_transfer_actor;
 pub(crate) mod fee_transfer_via_coinbase_actor;
 pub(crate) mod ledger_actor;
@@ -24,6 +23,7 @@ pub(crate) mod pcb_path_actor;
 pub(crate) mod snark_canonicity_summary_actor;
 pub(crate) mod snark_summary_persistence_actor;
 pub(crate) mod snark_work_actor;
+pub(crate) mod staking_accounting_actor;
 pub(crate) mod transition_frontier_actor;
 pub(crate) mod user_command_log_actor;
 

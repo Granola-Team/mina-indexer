@@ -9,7 +9,8 @@ use actors::{
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
     ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
     pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
-    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, user_command_log_actor::UserCommandLogActor, Actor,
+    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_accounting_actor::StakingAccountingActor,
+    user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -68,6 +69,7 @@ pub async fn subscribe_actors(
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher))),
+        Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(snark_summary_persistence_actor_m0),
         Arc::new(snark_summary_persistence_actor_m1),
         Arc::new(snark_summary_persistence_actor_m2),
