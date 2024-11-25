@@ -63,7 +63,7 @@ impl StakingLedgerActor {
                     SELECT
                         address,
                         epoch,
-                        SUM(stake_delta) AS total_stake
+                        SUM(stake_delta)::BIGINT AS total_stake
                     FROM
                         staking_ledger
                     GROUP BY
@@ -299,5 +299,76 @@ mod staking_ledger_actor_tests {
 
         let payload: ActorHeightPayload = sonic_rs::from_str(&published_event.payload).expect("Failed to deserialize payload");
         assert_eq!(payload.height, staking_payload.height, "Published height should match the payload height");
+    }
+
+    #[tokio::test]
+    async fn test_staking_summary_view_correctness() {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = StakingLedgerActor::new(shared_publisher, &None).await;
+
+        // Insert entries for address1 over two epochs
+        let entries = vec![
+            ("address1", "counterparty1", 1000_i32, 1, 10, "state_hash_1"),
+            ("address1", "counterparty2", 2000_i32, 1, 11, "state_hash_2"),
+            ("address1", "counterparty3", -500_i32, 2, 12, "state_hash_3"),
+            ("address1", "counterparty4", 1500_i32, 2, 13, "state_hash_4"),
+            ("address2", "counterparty1", 3000_i32, 1, 14, "state_hash_5"),
+            ("address2", "counterparty2", 1000_i32, 1, 15, "state_hash_6"),
+            ("address2", "counterparty3", -2000_i32, 2, 16, "state_hash_7"),
+            ("address2", "counterparty4", 2500_i32, 2, 17, "state_hash_8"),
+        ];
+
+        for (address, counterparty, stake_delta, epoch, height, state_hash) in entries {
+            let accounting_entry = AccountingEntry {
+                entry_type: if stake_delta > 0 {
+                    AccountingEntryType::Credit
+                } else {
+                    AccountingEntryType::Debit
+                },
+                account: address.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: stake_delta.checked_abs().map(|v| v as u64).unwrap(),
+                timestamp: 123456789,
+                counterparty: counterparty.to_string(),
+                transfer_type: "StakeDelegation".to_string(),
+            };
+
+            actor
+                .log_staking_entry(&accounting_entry, &(height as i64), state_hash, &(epoch as i64))
+                .await
+                .expect("Failed to insert staking entry");
+        }
+
+        // Query the staking_summary view
+        let rows = actor
+            .client
+            .query("SELECT address, epoch, total_stake FROM staking_summary ORDER BY address, epoch", &[])
+            .await
+            .expect("Failed to query staking_summary view");
+
+        // Validate results
+        assert_eq!(rows.len(), 4, "Expected 4 rows in the summary view");
+
+        // Check address1 summary
+        let row = &rows[0];
+        assert_eq!(row.get::<_, String>("address"), "address1");
+        assert_eq!(row.get::<_, i64>("epoch"), 1);
+        assert_eq!(row.get::<_, i64>("total_stake"), 3000);
+
+        let row = &rows[1];
+        assert_eq!(row.get::<_, String>("address"), "address1");
+        assert_eq!(row.get::<_, i64>("epoch"), 2);
+        assert_eq!(row.get::<_, i64>("total_stake"), 1000);
+
+        // Check address2 summary
+        let row = &rows[2];
+        assert_eq!(row.get::<_, String>("address"), "address2");
+        assert_eq!(row.get::<_, i64>("epoch"), 1);
+        assert_eq!(row.get::<_, i64>("total_stake"), 4000);
+
+        let row = &rows[3];
+        assert_eq!(row.get::<_, String>("address"), "address2");
+        assert_eq!(row.get::<_, i64>("epoch"), 2);
+        assert_eq!(row.get::<_, i64>("total_stake"), 500);
     }
 }
