@@ -153,6 +153,7 @@ mod canonical_user_command_log_persistence_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 100,
+            global_slot: 0,
             txn_hash: "txn_hash_1".to_string(),
             state_hash: "state_hash_100".to_string(),
             timestamp: 1234567890,
@@ -196,6 +197,7 @@ mod canonical_user_command_log_persistence_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash_1".to_string(),
             state_hash: "state_hash_200".to_string(),
             timestamp: 987654321,
@@ -246,6 +248,7 @@ mod canonical_user_command_log_persistence_tests {
         // Insert multiple entries for the same (height, state_hash) with different statuses
         let payload1 = CanonicalUserCommandLogPayload {
             height: 1,
+            global_slot: 0,
             txn_hash: "txn_hash_1".to_string(),
             state_hash: "hash_1".to_string(),
             timestamp: 1234567890,
@@ -263,6 +266,7 @@ mod canonical_user_command_log_persistence_tests {
 
         let payload2 = CanonicalUserCommandLogPayload {
             height: 1,
+            global_slot: 0,
             txn_hash: "txn_hash_1".to_string(),
             state_hash: "hash_1".to_string(),
             timestamp: 1234567891, // Later timestamp
@@ -308,6 +312,7 @@ mod canonical_user_command_log_persistence_tests {
         // Create a payload for a canonical user command
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash_2".to_string(),
             state_hash: "state_hash_200".to_string(),
             timestamp: 987654321,

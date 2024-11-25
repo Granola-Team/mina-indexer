@@ -39,6 +39,7 @@ impl Actor for UserCommandLogActor {
                 for user_command in block_payload.user_commands.iter() {
                     let payload = UserCommandLogPayload {
                         height: block_payload.height,
+                        global_slot: block_payload.global_slot,
                         txn_hash: user_command.txn_hash(),
                         state_hash: block_payload.state_hash.to_string(),
                         timestamp: block_payload.timestamp,

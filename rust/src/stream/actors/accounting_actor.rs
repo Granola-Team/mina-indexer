@@ -314,6 +314,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -370,6 +371,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -438,6 +440,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -797,6 +800,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            global_slot: 0,
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,

@@ -34,6 +34,17 @@ pub struct BerkeleyBlockPayload {
     pub last_vrf_output: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct EpochStakeDelegationPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub epoch: u64,
+    pub stake_nanomina: u64,
+    pub source: String,
+    pub recipient: String,
+    pub canonical: bool,
+}
+
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct MainnetBlockPayload {
     pub height: u64,
@@ -52,6 +63,7 @@ pub struct MainnetBlockPayload {
     pub fee_transfer_via_coinbase: Option<Vec<FeeTransferViaCoinbase>>,
     pub fee_transfers: Vec<FeeTransfer>,
     pub excess_block_fees: u64,
+    pub global_slot: u64,
 }
 
 impl MainnetBlockPayload {
@@ -250,6 +262,7 @@ pub struct UserCommandLogPayload {
     pub fee_nanomina: u64,
     pub fee_payer: String,
     pub amount_nanomina: u64,
+    pub global_slot: u64,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
@@ -330,6 +343,7 @@ pub struct CanonicalUserCommandLogPayload {
     pub amount_nanomina: u64,
     pub canonical: bool,
     pub was_canonical: bool,
+    pub global_slot: u64,
 }
 
 impl CanonicalItem for CanonicalUserCommandLogPayload {

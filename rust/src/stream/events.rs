@@ -24,6 +24,7 @@ pub enum EventType {
     BlockConfirmation,
     PreExistingAccount,
     ActorHeight,
+    EpochStakeDelegation,
 }
 
 #[derive(Debug, Clone, PartialEq)]

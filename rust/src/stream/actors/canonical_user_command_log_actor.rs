@@ -91,6 +91,7 @@ impl Actor for CanonicalUserCommandLogActor {
                             fee_nanomina: event_payload.fee_nanomina,
                             fee_payer: event_payload.fee_payer.to_string(),
                             amount_nanomina: event_payload.amount_nanomina,
+                            global_slot: event_payload.global_slot,
                             canonical: false,     // use a default value
                             was_canonical: false, // use a default value
                         })
@@ -155,6 +156,7 @@ mod canonical_user_command_log_actor_tests {
         // Add two user command logs
         let user_command_1 = UserCommandLogPayload {
             height: 10,
+            global_slot: 0,
             state_hash: "state_hash_10".to_string(),
             txn_hash: "txn_hash_1".to_string(),
             timestamp: 123456,
@@ -169,6 +171,7 @@ mod canonical_user_command_log_actor_tests {
         };
         let user_command_2 = UserCommandLogPayload {
             height: 10,
+            global_slot: 0,
             state_hash: "state_hash_10".to_string(),
             txn_hash: "txn_hash_2".to_string(),
             timestamp: 123456,
@@ -244,6 +247,7 @@ mod canonical_user_command_log_actor_tests {
         // Add one user command log (not enough)
         let user_command = UserCommandLogPayload {
             height: 10,
+            global_slot: 0,
             state_hash: "state_hash_10".to_string(),
             txn_hash: "txn_hash_1".to_string(),
             timestamp: 123456,

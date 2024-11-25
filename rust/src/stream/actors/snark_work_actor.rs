@@ -97,6 +97,7 @@ async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<
     let block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Invalid JSON format in test data");
     let block_payload = MainnetBlockPayload {
         height: 185,
+        global_slot: 300,
         state_hash: "3NKQ3K2SNp58PEAb8UjpBe5uo3KQKxphURuE9Eq2J8JYBVCD7PSu".to_string(),
         previous_state_hash: block.get_previous_state_hash(),
         last_vrf_output: block.get_last_vrf_output(),

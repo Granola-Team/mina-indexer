@@ -45,6 +45,7 @@ impl Actor for MainnetBlockParserActor {
             let block: MainnetBlock = sonic_rs::from_str(&file_content).unwrap();
             let block_payload = MainnetBlockPayload {
                 height: height as u64,
+                global_slot: block.get_global_slot_since_genesis(),
                 state_hash: state_hash.to_string(),
                 previous_state_hash: block.get_previous_state_hash(),
                 last_vrf_output: block.get_last_vrf_output(),
