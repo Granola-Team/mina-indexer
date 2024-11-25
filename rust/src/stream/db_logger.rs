@@ -15,11 +15,12 @@ impl DbLogger {
             name: String::new(),
             columns: Vec::new(),
             distinct_columns: Vec::new(),
+            partiion_by: String::new(),
         }
     }
 
     /// Insert a row into the table
-    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)]) -> Result<u64> {
+    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], partition_value: u64) -> Result<u64> {
         let column_names = self
             .columns
             .iter()
@@ -27,6 +28,20 @@ impl DbLogger {
             .collect::<Vec<_>>()
             .join(", ");
         let placeholders = (1..=self.columns.len()).map(|i| format!("${}", i)).collect::<Vec<_>>().join(", ");
+
+        if partition_value % 10_000 == 0 {
+            let statement = format!(
+                "CREATE TABLE {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({})",
+                self.table_name,
+                partition_value,
+                self.table_name,
+                partition_value,
+                partition_value + 9999
+            );
+            if let Err(_) = self.client.execute(&statement, &[]).await {
+                eprintln!("Failed to create next partition")
+            }
+        }
 
         let query = format!("INSERT INTO {} ({}) VALUES ({})", self.table_name, column_names, placeholders);
 
@@ -42,6 +57,7 @@ pub struct DbLoggerBuilder {
     client: Client,
     name: String,
     columns: Vec<String>,
+    partiion_by: String,
     distinct_columns: Vec<String>,
 }
 
@@ -56,6 +72,11 @@ impl DbLoggerBuilder {
     /// Add a column to the table
     pub fn add_column(mut self, column_definition: &str) -> Self {
         self.columns.push(column_definition.to_string());
+        self
+    }
+
+    pub fn partition_by(mut self, column: &str) -> Self {
+        self.partiion_by = column.to_string();
         self
     }
 
@@ -88,9 +109,10 @@ impl DbLoggerBuilder {
             "CREATE TABLE IF NOT EXISTS {} (
                 entry_id BIGSERIAL PRIMARY KEY,
                 {}
-            );",
+            ) PARTITION BY RANGE ({});",
             table_name,
-            self.columns.join(",\n")
+            self.columns.join(",\n"),
+            self.partiion_by
         );
 
         self.client.execute(&table_query, &[]).await?;
@@ -155,9 +177,9 @@ mod db_logger_tests {
             .await
             .expect("Failed to build logger");
 
-        logger.insert(&[&1i64, &"state_hash_1", &1234567890i64]).await.expect("Failed to insert log");
-        logger.insert(&[&1i64, &"state_hash_1", &1234567891i64]).await.expect("Failed to insert log");
-        logger.insert(&[&1i64, &"state_hash_2", &1234567892i64]).await.expect("Failed to insert log");
+        logger.insert(&[&1i64, &"state_hash_1", &1234567890i64], 0).await.expect("Failed to insert log");
+        logger.insert(&[&1i64, &"state_hash_1", &1234567891i64], 0).await.expect("Failed to insert log");
+        logger.insert(&[&1i64, &"state_hash_2", &1234567892i64], 0).await.expect("Failed to insert log");
 
         // Query the table
         let log_query = "SELECT * FROM log_log WHERE height = $1";
@@ -208,25 +230,25 @@ mod db_logger_tests {
 
             // Insert three sibling nodes at height 2
             logger
-                .insert(&[&2i64, &"state_hash_a", &1234567890i64])
+                .insert(&[&2i64, &"state_hash_a", &1234567890i64], 0)
                 .await
                 .expect("Failed to insert sibling A");
             logger
-                .insert(&[&2i64, &"state_hash_b", &1234567891i64])
+                .insert(&[&2i64, &"state_hash_b", &1234567891i64], 0)
                 .await
                 .expect("Failed to insert sibling B");
             logger
-                .insert(&[&2i64, &"state_hash_c", &1234567892i64])
+                .insert(&[&2i64, &"state_hash_c", &1234567892i64], 0)
                 .await
                 .expect("Failed to insert sibling C");
 
             // Add children to state_hash_b
             logger
-                .insert(&[&3i64, &"state_hash_b_child_1", &1234567893i64])
+                .insert(&[&3i64, &"state_hash_b_child_1", &1234567893i64], 0)
                 .await
                 .expect("Failed to insert child 1 of state_hash_b");
             logger
-                .insert(&[&3i64, &"state_hash_b_child_2", &1234567894i64])
+                .insert(&[&3i64, &"state_hash_b_child_2", &1234567894i64], 0)
                 .await
                 .expect("Failed to insert child 2 of state_hash_b");
 

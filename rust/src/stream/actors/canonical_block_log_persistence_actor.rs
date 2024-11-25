@@ -45,6 +45,7 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("last_vrf_output TEXT")
             .add_column("is_berkeley_block BOOLEAN")
             .add_column("canonical BOOLEAN")
+            .partition_by("height")
             .distinct_columns(&["height", "state_hash"])
             .build(root_node)
             .await
@@ -74,20 +75,23 @@ impl CanonicalBlockLogPersistenceActor {
     async fn log(&self, payload: &CanonicalBlockLogPayload) -> Result<(), &'static str> {
         let logger = self.db_logger.lock().await;
         logger
-            .insert(&[
-                &(payload.height as i64),
-                &payload.state_hash,
-                &payload.previous_state_hash,
-                &(payload.user_command_count as i32),
-                &(payload.snark_work_count as i32),
-                &(payload.timestamp as i64),
-                &payload.coinbase_receiver,
-                &(payload.coinbase_reward_nanomina as i64),
-                &(payload.global_slot_since_genesis as i64),
-                &payload.last_vrf_output,
-                &payload.is_berkeley_block,
-                &payload.canonical,
-            ])
+            .insert(
+                &[
+                    &(payload.height as i64),
+                    &payload.state_hash,
+                    &payload.previous_state_hash,
+                    &(payload.user_command_count as i32),
+                    &(payload.snark_work_count as i32),
+                    &(payload.timestamp as i64),
+                    &payload.coinbase_receiver,
+                    &(payload.coinbase_reward_nanomina as i64),
+                    &(payload.global_slot_since_genesis as i64),
+                    &payload.last_vrf_output,
+                    &payload.is_berkeley_block,
+                    &payload.canonical,
+                ],
+                payload.height,
+            )
             .await
             .map_err(|_| "Unable to insert into canonical_block_log table")?;
 

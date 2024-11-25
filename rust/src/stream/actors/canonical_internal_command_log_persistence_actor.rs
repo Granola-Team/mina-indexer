@@ -43,6 +43,7 @@ impl CanonicalInternalCommandLogPersistenceActor {
             .add_column("amount_nanomina BIGINT NOT NULL")
             .add_column("recipient TEXT NOT NULL")
             .add_column("is_canonical BOOLEAN NOT NULL")
+            .partition_by("height")
             .distinct_columns(&["height", "internal_command_type", "state_hash", "recipient", "amount_nanomina"])
             .build(root_node)
             .await
@@ -59,15 +60,18 @@ impl CanonicalInternalCommandLogPersistenceActor {
     async fn log(&self, payload: &CanonicalInternalCommandLogPayload) -> Result<u64, &'static str> {
         let logger = self.db_logger.lock().await;
         match logger
-            .insert(&[
-                &payload.internal_command_type.to_string(),
-                &(payload.height as i64),
-                &payload.state_hash,
-                &(payload.timestamp as i64),
-                &(payload.amount_nanomina as i64),
-                &payload.recipient,
-                &payload.canonical,
-            ])
+            .insert(
+                &[
+                    &payload.internal_command_type.to_string(),
+                    &(payload.height as i64),
+                    &payload.state_hash,
+                    &(payload.timestamp as i64),
+                    &(payload.amount_nanomina as i64),
+                    &payload.recipient,
+                    &payload.canonical,
+                ],
+                payload.height,
+            )
             .await
         {
             Err(e) => {

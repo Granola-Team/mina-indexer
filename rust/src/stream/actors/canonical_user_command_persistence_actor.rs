@@ -46,6 +46,7 @@ impl CanonicalUserCommandPersistenceActor {
             .add_column("fee_payer TEXT")
             .add_column("amount_nanomina BIGINT")
             .add_column("canonical BOOLEAN")
+            .partition_by("height")
             .distinct_columns(&["height", "txn_hash", "state_hash"])
             .build(root_node)
             .await
@@ -63,21 +64,24 @@ impl CanonicalUserCommandPersistenceActor {
     async fn log(&self, payload: &CanonicalUserCommandLogPayload) -> Result<(), &'static str> {
         let logger = self.db_logger.lock().await;
         logger
-            .insert(&[
-                &(payload.height as i64),
-                &payload.txn_hash,
-                &payload.state_hash,
-                &(payload.timestamp as i64),
-                &format!("{:?}", payload.txn_type),
-                &format!("{:?}", payload.status),
-                &payload.sender,
-                &payload.receiver,
-                &(payload.nonce as i64),
-                &(payload.fee_nanomina as i64),
-                &payload.fee_payer,
-                &(payload.amount_nanomina as i64),
-                &payload.canonical,
-            ])
+            .insert(
+                &[
+                    &(payload.height as i64),
+                    &payload.txn_hash,
+                    &payload.state_hash,
+                    &(payload.timestamp as i64),
+                    &format!("{:?}", payload.txn_type),
+                    &format!("{:?}", payload.status),
+                    &payload.sender,
+                    &payload.receiver,
+                    &(payload.nonce as i64),
+                    &(payload.fee_nanomina as i64),
+                    &payload.fee_payer,
+                    &(payload.amount_nanomina as i64),
+                    &payload.canonical,
+                ],
+                payload.height,
+            )
             .await
             .map_err(|_| "Unable to insert into canonical_user_command_log table")?;
 

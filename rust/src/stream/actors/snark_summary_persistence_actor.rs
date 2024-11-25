@@ -39,6 +39,7 @@ impl SnarkSummaryPersistenceActor {
                 .add_column("fee_nanomina BIGINT NOT NULL")
                 .add_column("is_canonical BOOLEAN NOT NULL")
                 .distinct_columns(&["height", "state_hash", "timestamp", "prover", "fee_nanomina"])
+                .partition_by("height")
                 .build(root_node)
                 .await
                 .expect("Failed to build snarks_log and snarks view");
@@ -58,14 +59,17 @@ impl SnarkSummaryPersistenceActor {
     async fn log(&self, summary: &SnarkCanonicitySummaryPayload) -> Result<u64, &'static str> {
         let logger = self.db_logger.lock().await;
         match logger
-            .insert(&[
-                &(summary.height as i64),
-                &summary.state_hash,
-                &(summary.timestamp as i64),
-                &summary.prover,
-                &(summary.fee_nanomina as i64),
-                &summary.canonical,
-            ])
+            .insert(
+                &[
+                    &(summary.height as i64),
+                    &summary.state_hash,
+                    &(summary.timestamp as i64),
+                    &summary.prover,
+                    &(summary.fee_nanomina as i64),
+                    &summary.canonical,
+                ],
+                summary.height,
+            )
             .await
         {
             Err(e) => {
