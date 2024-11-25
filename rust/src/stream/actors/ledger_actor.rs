@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload},
+    stream::payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -138,6 +138,9 @@ impl Actor for LedgerActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::DoubleEntryTransaction {
             let event_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&event.payload).unwrap();
+            if event_payload.ledger_destination != LedgerDestination::BlockchainLedger {
+                return;
+            }
             for accounting_entry in event_payload.lhs.iter().chain(event_payload.rhs.iter()) {
                 match self
                     .log_accounting_entry(
@@ -180,7 +183,7 @@ mod blockchain_ledger_actor_tests {
     use super::*;
     use crate::stream::{
         events::{Event, EventType},
-        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload},
+        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
     };
     // use serial_test::serial;
     use std::sync::Arc;
@@ -316,6 +319,7 @@ mod blockchain_ledger_actor_tests {
         let double_entry_payload = DoubleEntryRecordPayload {
             height: 9, // Matches modulo 3
             state_hash: "test_state_hash".to_string(),
+            ledger_destination: LedgerDestination::BlockchainLedger,
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_account".to_string(),
@@ -381,6 +385,7 @@ mod blockchain_ledger_actor_tests {
         let double_entry_payload = DoubleEntryRecordPayload {
             height: 15,
             state_hash: "test_state_hash".to_string(),
+            ledger_destination: LedgerDestination::BlockchainLedger,
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_account".to_string(),

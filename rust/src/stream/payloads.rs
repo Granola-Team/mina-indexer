@@ -364,11 +364,27 @@ impl CanonicalItem for CanonicalUserCommandLogPayload {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LedgerDestination {
+    StakingLedger,
+    BlockchainLedger,
+}
+
+impl fmt::Display for LedgerDestination {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let display_text = match self {
+            LedgerDestination::BlockchainLedger => "BlockchainLedger",
+            LedgerDestination::StakingLedger => "StakingLedger",
+        };
+        write!(f, "{}", display_text)
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DoubleEntryRecordPayload {
     pub height: u64,
     pub state_hash: String,
-    // pub txn_hash: u64,
+    pub ledger_destination: LedgerDestination,
     pub lhs: Vec<AccountingEntry>, // Multiple debit entries
     pub rhs: Vec<AccountingEntry>, // Multiple credit entries
 }

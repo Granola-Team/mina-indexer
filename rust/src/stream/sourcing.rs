@@ -1,6 +1,6 @@
 use super::{
     genesis_ledger_models::GenesisLedger,
-    payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload},
+    payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
     shared_publisher::SharedPublisher,
 };
 use crate::{
@@ -28,6 +28,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
         payload: sonic_rs::to_string(&DoubleEntryRecordPayload {
             height: 1,
             state_hash: payload.state_hash,
+            ledger_destination: LedgerDestination::BlockchainLedger,
             lhs: vec![AccountingEntry {
                 counterparty: "MagicMinaForBlock0".to_string(),
                 transfer_type: "BlockReward".to_string(),

@@ -7,7 +7,7 @@ use crate::stream::{
     mainnet_block_models::{CommandStatus, CommandType},
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload,
-        DoubleEntryRecordPayload, InternalCommandType, NewAccountPayload,
+        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
     },
 };
 use async_trait::async_trait;
@@ -67,6 +67,7 @@ impl AccountingActor {
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
                     height: payload.height,
+                    ledger_destination: LedgerDestination::BlockchainLedger,
                     state_hash: payload.state_hash.to_string(),
                     lhs: vec![source],
                     rhs: vec![recipient],
@@ -101,6 +102,7 @@ impl AccountingActor {
                 let double_entry_record = DoubleEntryRecordPayload {
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
+                    ledger_destination: LedgerDestination::BlockchainLedger,
                     lhs: vec![source],
                     rhs: vec![recipient],
                 };
@@ -142,6 +144,7 @@ impl AccountingActor {
             let double_entry_record = DoubleEntryRecordPayload {
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
+                ledger_destination: LedgerDestination::BlockchainLedger,
                 lhs: vec![source],
                 rhs: vec![recipient],
             };
@@ -179,6 +182,7 @@ impl AccountingActor {
             let txn_1 = DoubleEntryRecordPayload {
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
+                ledger_destination: LedgerDestination::BlockchainLedger,
                 lhs: vec![sender_entry],   // Sender entry
                 rhs: vec![receiver_entry], // Receiver entry
             };
@@ -215,6 +219,7 @@ impl AccountingActor {
         let txn_2 = DoubleEntryRecordPayload {
             height: payload.height,
             state_hash: payload.state_hash.to_string(),
+            ledger_destination: LedgerDestination::BlockchainLedger,
             lhs: vec![fee_payer_entry],
             rhs: vec![block_reward_pool_entry],
         };
@@ -245,6 +250,7 @@ impl Actor for AccountingActor {
                 let double_entry_record = DoubleEntryRecordPayload {
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
+                    ledger_destination: LedgerDestination::BlockchainLedger,
                     lhs: vec![AccountingEntry {
                         counterparty: format!("AccountCreationFee#{}", payload.state_hash),
                         transfer_type: "AccountCreationFee".to_string(),

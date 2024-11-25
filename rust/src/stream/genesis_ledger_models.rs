@@ -1,4 +1,4 @@
-use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload};
+use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -47,6 +47,7 @@ impl GenesisLedger {
                 DoubleEntryRecordPayload {
                     height: 0,
                     state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
+                    ledger_destination: LedgerDestination::BlockchainLedger,
                     lhs: vec![AccountingEntry {
                         counterparty: account.pk.to_string(),
                         transfer_type: "InitialDistribution".to_string(),
