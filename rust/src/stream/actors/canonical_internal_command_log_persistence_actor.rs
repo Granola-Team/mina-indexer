@@ -167,7 +167,7 @@ mod canonical_internal_command_log_tests {
         let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
             .await
             .unwrap();
@@ -208,7 +208,7 @@ mod canonical_internal_command_log_tests {
         let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
             .await
             .unwrap();
@@ -260,7 +260,7 @@ mod canonical_internal_command_log_tests {
         let query = "SELECT * FROM internal_commands WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.recipient])
             .await
             .unwrap();

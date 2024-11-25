@@ -2,12 +2,16 @@ use anyhow::Result;
 use tokio_postgres::Client;
 
 pub struct PartitionedTable {
-    pub client: Client,
+    client: Client,
     table_name: String,
     columns: Vec<String>,
 }
 
 impl PartitionedTable {
+    pub fn get_client(&self) -> &Client {
+        &self.client
+    }
+
     /// Builder to start creating a PartitionedTable
     pub fn builder(client: Client) -> PartitionedTableBuilder {
         PartitionedTableBuilder {
@@ -61,6 +65,12 @@ pub struct PartitionedTableBuilder {
     client: Client,
     name: String,
     columns: Vec<String>,
+}
+
+impl PartitionedTableBuilder {
+    pub fn get_client(&self) -> &Client {
+        &self.client
+    }
 }
 
 impl PartitionedTableBuilder {

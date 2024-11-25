@@ -1,10 +1,9 @@
+use super::partitioned_table::PartitionedTable;
 use anyhow::Result;
 use tokio_postgres::Client;
 
 pub struct DbLogger {
-    pub client: Client,
-    table_name: String,
-    columns: Vec<String>,
+    partitioned_table: PartitionedTable,
 }
 
 impl DbLogger {
@@ -18,42 +17,17 @@ impl DbLogger {
         }
     }
 
+    pub fn get_client(&self) -> &Client {
+        &self.partitioned_table.get_client()
+    }
+
     /// Insert a row into the table
     pub async fn insert(
         &self,
         values: &[&(dyn tokio_postgres::types::ToSql + Sync)],
         height: u64, // Explicit height parameter
     ) -> Result<u64> {
-        let column_names = self
-            .columns
-            .iter()
-            .map(|col| col.split_whitespace().next().unwrap()) // Extract only the column names
-            .collect::<Vec<_>>()
-            .join(", ");
-        let placeholders = (1..=self.columns.len()).map(|i| format!("${}", i)).collect::<Vec<_>>().join(", ");
-
-        // Create partition if necessary (based on the height)
-        if height > 0 && height % 10_000 == 0 {
-            let statement = format!(
-                "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
-                self.table_name,
-                height,
-                self.table_name,
-                height,
-                height + 9999
-            );
-            if self.client.execute(&statement, &[]).await.is_err() {
-                eprintln!("Failed to create next partition");
-            }
-        }
-
-        // Insert query
-        let query = format!("INSERT INTO {} ({}) VALUES ({})", self.table_name, column_names, placeholders);
-
-        self.client.execute(&query, values).await.map_err(|e| {
-            eprintln!("Failed to insert row into {}: {:?}", self.table_name, e);
-            e.into()
-        })
+        self.partitioned_table.insert(values, height).await
     }
 }
 
@@ -94,46 +68,17 @@ impl DbLoggerBuilder {
             return Err(anyhow::anyhow!("The column 'height' is required but not found.").into());
         }
 
-        // If a root node is provided, truncate the table for height greater than or equal to root node's height
-        if let Some((height, state_hash)) = root_node {
-            let truncate_query = format!("DELETE FROM {} WHERE height > $1 OR (height = $1 AND state_hash = $2);", table_name);
+        let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
+        self.client.execute(&drop_view_query, &[]).await?;
 
-            self.client.execute(&truncate_query, &[&(height.to_owned() as i64), state_hash]).await?;
-        } else {
-            // Drop the existing table and view
-            let drop_table_query = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
-            let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
+        let partitioned_table_builder = self
+            .columns
+            .iter()
+            .fold(PartitionedTable::builder(self.client).name(&self.name), |builder, column| {
+                builder.add_column(column)
+            });
 
-            self.client.execute(&drop_table_query, &[]).await?;
-            self.client.execute(&drop_view_query, &[]).await?;
-        }
-
-        // Create the table with partitioning by height and primary key on (entry_id, height)
-        let table_query = format!(
-            "CREATE TABLE IF NOT EXISTS {} (
-                entry_id BIGSERIAL,
-                height BIGINT,
-                {},
-                PRIMARY KEY (entry_id, height)  -- Combine `entry_id` and `height` in the primary key
-            ) PARTITION BY RANGE (height);",
-            table_name,
-            self.columns
-                .iter()
-                .filter(|c| !c.starts_with("height"))
-                .map(|s| s.to_string()) // Convert to strings to join them
-                .collect::<Vec<String>>()
-                .join(",\n")
-        );
-
-        self.client.execute(&table_query, &[]).await?;
-
-        let statement = format!(
-            "CREATE TABLE IF NOT EXISTS {}_0 PARTITION OF {} FOR VALUES FROM (0) TO (9999);",
-            table_name, table_name,
-        );
-        if self.client.execute(&statement, &[]).await.is_err() {
-            eprintln!("Failed to create next partition");
-        }
+        let partitioned_table = partitioned_table_builder.build(root_node).await?;
 
         // Create the view with distinct columns
         let distinct_columns = if self.distinct_columns.is_empty() {
@@ -148,19 +93,15 @@ impl DbLoggerBuilder {
 
         let view_query = format!(
             "CREATE OR REPLACE VIEW {} AS
-            SELECT DISTINCT ON ({}) *
-            FROM {}
-            ORDER BY {}, entry_id DESC;",
+                SELECT DISTINCT ON ({}) *
+                FROM {}
+                ORDER BY {}, entry_id DESC;",
             view_name, distinct_columns, table_name, distinct_columns
         );
 
-        self.client.execute(&view_query, &[]).await?;
+        partitioned_table.get_client().execute(&view_query, &[]).await?;
 
-        Ok(DbLogger {
-            client: self.client,
-            table_name,
-            columns: self.columns,
-        })
+        Ok(DbLogger { partitioned_table })
     }
 }
 
@@ -211,14 +152,14 @@ mod db_logger_tests {
 
         // Query the table
         let log_query = "SELECT * FROM log_log WHERE height = $1";
-        let log_rows = logger.client.query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
+        let log_rows = logger.get_client().query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
 
         // Assert all rows are present in the table
         assert_eq!(log_rows.len(), 3, "Expected 3 rows in the table");
 
         // Query the view
         let view_query = "SELECT * FROM log WHERE height = $1";
-        let view_rows = logger.client.query(view_query, &[&(1_i64)]).await.expect("Failed to query view");
+        let view_rows = logger.get_client().query(view_query, &[&(1_i64)]).await.expect("Failed to query view");
 
         // Assert only the latest row for each state_hash is present in the view
         assert_eq!(view_rows.len(), 2, "Expected 2 rows in the view");
@@ -281,12 +222,12 @@ mod db_logger_tests {
                 .expect("Failed to insert child 2 of state_hash_b");
 
             // Verify all sibling nodes are in the table
-            let log_rows = logger.client.query(log_query, &[&(2_i64)]).await.expect("Failed to query log table");
+            let log_rows = logger.get_client().query(log_query, &[&(2_i64)]).await.expect("Failed to query log table");
             assert_eq!(log_rows.len(), 3, "Expected 3 sibling rows in the table");
 
             // Verify children of state_hash_b are in the table
             let child_rows = logger
-                .client
+                .get_client()
                 .query(child_query, &[&(3_i64)])
                 .await
                 .expect("Failed to query children of state_hash_b");
@@ -319,7 +260,7 @@ mod db_logger_tests {
 
             // Verify that "state_hash_b" (the root) and its children were deleted
             let log_rows = logger
-                .client
+                .get_client()
                 .query(log_query, &[&(2_i64)])
                 .await
                 .expect("Failed to query log table after rebuild");
@@ -346,7 +287,7 @@ mod db_logger_tests {
 
             // Verify children of state_hash_b were deleted
             let child_rows = logger
-                .client
+                .get_client()
                 .query(child_query, &[&(3_i64)])
                 .await
                 .expect("Failed to query children of state_hash_b after rebuild");

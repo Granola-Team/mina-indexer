@@ -52,7 +52,7 @@ impl CanonicalBlockLogPersistenceActor {
 
         if let Some((height, state_hash)) = root_node {
             if let Err(e) = logger
-                .client
+                .get_client()
                 .execute(
                     "DELETE FROM blocks_log WHERE height > $1 AND (height = $1 AND state_hash = $2)",
                     &[&(height.to_owned() as i64), state_hash],
@@ -170,7 +170,7 @@ mod canonical_block_log_persistence_tests {
         let query = "SELECT * FROM blocks_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
             .unwrap();
@@ -218,7 +218,7 @@ mod canonical_block_log_persistence_tests {
         let query = "SELECT * FROM blocks_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
             .unwrap();
@@ -270,7 +270,7 @@ mod canonical_block_log_persistence_tests {
         // Query the canonical_block_log view
         let query = "SELECT * FROM blocks WHERE height = $1";
         let db_logger = actor.db_logger.lock().await;
-        let rows = db_logger.client.query(query, &[&1_i64]).await.unwrap();
+        let rows = db_logger.get_client().query(query, &[&1_i64]).await.unwrap();
         assert_eq!(rows.len(), 1);
 
         let row_last = rows.last().unwrap();
@@ -322,7 +322,7 @@ mod canonical_block_log_persistence_tests {
         // Query the blocks view
         let query = "SELECT * FROM blocks WHERE height = $1";
         let db_logger = actor.db_logger.lock().await;
-        let row = db_logger.client.query_one(query, &[&1_i64]).await.unwrap();
+        let row = db_logger.get_client().query_one(query, &[&1_i64]).await.unwrap();
 
         // Validate the returned row matches the payload with the highest entry_id
         assert_eq!(row.get::<_, i64>("height"), payload2.height as i64);

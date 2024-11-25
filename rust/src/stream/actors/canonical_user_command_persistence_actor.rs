@@ -164,7 +164,7 @@ mod canonical_user_command_log_persistence_tests {
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
             .unwrap();
@@ -213,7 +213,7 @@ mod canonical_user_command_log_persistence_tests {
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger
-            .client
+            .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
             .await
             .unwrap();
@@ -281,7 +281,7 @@ mod canonical_user_command_log_persistence_tests {
         let query = "SELECT * FROM user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
         let db_logger = actor.db_logger.lock().await;
         let rows = db_logger
-            .client
+            .get_client()
             .query(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.txn_hash])
             .await
             .unwrap();
