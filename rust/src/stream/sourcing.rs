@@ -135,7 +135,7 @@ pub async fn publish_block_dir_paths(
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
         async move {
-            for entry in entries {
+            for (i, entry) in entries.iter().enumerate() {
                 let path = entry.as_path();
                 shared_publisher.publish(Event {
                     event_type: EventType::PrecomputedBlockPath,
@@ -153,8 +153,12 @@ pub async fn publish_block_dir_paths(
                     .unwrap(),
                 });
 
-                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await; // Adjust duration as needed
-                                                                                    // }
+                if i % 25_000 == 0 && i != 0 {
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    println!("Pausing for one minute...");
+                } else {
+                    tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
+                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
