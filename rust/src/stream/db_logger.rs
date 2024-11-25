@@ -15,12 +15,15 @@ impl DbLogger {
             name: String::new(),
             columns: Vec::new(),
             distinct_columns: Vec::new(),
-            partiion_by: String::new(),
         }
     }
 
     /// Insert a row into the table
-    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], partition_value: u64) -> Result<u64> {
+    pub async fn insert(
+        &self,
+        values: &[&(dyn tokio_postgres::types::ToSql + Sync)],
+        height: u64, // Explicit height parameter
+    ) -> Result<u64> {
         let column_names = self
             .columns
             .iter()
@@ -29,20 +32,22 @@ impl DbLogger {
             .join(", ");
         let placeholders = (1..=self.columns.len()).map(|i| format!("${}", i)).collect::<Vec<_>>().join(", ");
 
-        if partition_value % 10_000 == 0 {
+        // Create partition if necessary (based on the height)
+        if height % 10_000 == 0 {
             let statement = format!(
-                "CREATE TABLE {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({})",
+                "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
                 self.table_name,
-                partition_value,
+                height,
                 self.table_name,
-                partition_value,
-                partition_value + 9999
+                height,
+                height + 9999
             );
-            if let Err(_) = self.client.execute(&statement, &[]).await {
-                eprintln!("Failed to create next partition")
+            if self.client.execute(&statement, &[]).await.is_err() {
+                eprintln!("Failed to create next partition");
             }
         }
 
+        // Insert query
         let query = format!("INSERT INTO {} ({}) VALUES ({})", self.table_name, column_names, placeholders);
 
         self.client.execute(&query, values).await.map_err(|e| {
@@ -57,13 +62,11 @@ pub struct DbLoggerBuilder {
     client: Client,
     name: String,
     columns: Vec<String>,
-    partiion_by: String,
     distinct_columns: Vec<String>,
 }
 
 impl DbLoggerBuilder {
     /// Set the name for the logger
-    /// The table will be `{name}_log` and the view will be `{name}`
     pub fn name(mut self, name: &str) -> Self {
         self.name = name.to_string();
         self
@@ -72,11 +75,6 @@ impl DbLoggerBuilder {
     /// Add a column to the table
     pub fn add_column(mut self, column_definition: &str) -> Self {
         self.columns.push(column_definition.to_string());
-        self
-    }
-
-    pub fn partition_by(mut self, column: &str) -> Self {
-        self.partiion_by = column.to_string();
         self
     }
 
@@ -91,6 +89,12 @@ impl DbLoggerBuilder {
         let table_name = format!("{}_log", self.name);
         let view_name = self.name.clone();
 
+        // Ensure the `height` column is specified
+        if !self.columns.iter().any(|col| col.starts_with("height")) {
+            return Err(anyhow::anyhow!("The column 'height' is required but not found.").into());
+        }
+
+        // If a root node is provided, truncate the table for height greater than or equal to root node's height
         if let Some((height, state_hash)) = root_node {
             let truncate_query = format!("DELETE FROM {} WHERE height > $1 OR (height = $1 AND state_hash = $2);", table_name);
 
@@ -104,20 +108,26 @@ impl DbLoggerBuilder {
             self.client.execute(&drop_view_query, &[]).await?;
         }
 
-        // Create the table
+        // Create the table with partitioning by height and primary key on (entry_id, height)
         let table_query = format!(
             "CREATE TABLE IF NOT EXISTS {} (
-                entry_id BIGSERIAL PRIMARY KEY,
-                {}
-            ) PARTITION BY RANGE ({});",
+                entry_id BIGSERIAL,
+                height BIGINT,
+                {},
+                PRIMARY KEY (entry_id, height)  -- Combine `entry_id` and `height` in the primary key
+            ) PARTITION BY RANGE (height);",
             table_name,
-            self.columns.join(",\n"),
-            self.partiion_by
+            self.columns
+                .iter()
+                .filter(|c| !c.starts_with("height"))
+                .map(|s| s.to_string()) // Convert to strings to join them
+                .collect::<Vec<String>>()
+                .join(",\n")
         );
 
         self.client.execute(&table_query, &[]).await?;
 
-        // Create the view
+        // Create the view with distinct columns
         let distinct_columns = if self.distinct_columns.is_empty() {
             self.columns
                 .iter()
@@ -169,7 +179,7 @@ mod db_logger_tests {
         // Setup the logger
         let logger = DbLogger::builder(client)
             .name("log")
-            .add_column("height BIGINT")
+            .add_column("height BIGINT") // Explicitly adding the height column
             .add_column("state_hash TEXT")
             .add_column("timestamp BIGINT")
             .distinct_columns(&["height", "state_hash"])
@@ -177,9 +187,19 @@ mod db_logger_tests {
             .await
             .expect("Failed to build logger");
 
-        logger.insert(&[&1i64, &"state_hash_1", &1234567890i64], 0).await.expect("Failed to insert log");
-        logger.insert(&[&1i64, &"state_hash_1", &1234567891i64], 0).await.expect("Failed to insert log");
-        logger.insert(&[&1i64, &"state_hash_2", &1234567892i64], 0).await.expect("Failed to insert log");
+        // Insert data with explicit height parameter
+        logger
+            .insert(&[&1_i64, &"state_hash_1", &1234567890i64], 0)
+            .await
+            .expect("Failed to insert log");
+        logger
+            .insert(&[&1_i64, &"state_hash_1", &1234567891i64], 0)
+            .await
+            .expect("Failed to insert log");
+        logger
+            .insert(&[&1_i64, &"state_hash_2", &1234567892i64], 0)
+            .await
+            .expect("Failed to insert log");
 
         // Query the table
         let log_query = "SELECT * FROM log_log WHERE height = $1";
