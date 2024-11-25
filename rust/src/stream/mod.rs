@@ -10,7 +10,7 @@ use actors::{
     ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
     pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
     snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_accounting_actor::StakingAccountingActor,
-    user_command_log_actor::UserCommandLogActor, Actor,
+    staking_ledger_actor::StakingLedgerActor, user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -42,6 +42,7 @@ pub async fn subscribe_actors(
     let user_command_persistence_actor_m2 = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 2).await;
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
     let snark_summary_persistence_actor_m0 = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 0).await;
     let snark_summary_persistence_actor_m1 = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, 1).await;
@@ -80,6 +81,7 @@ pub async fn subscribe_actors(
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
         Arc::new(canonical_block_log_persistence_actor),
+        Arc::new(staking_ledger_actor),
     ];
 
     let monitor_actors = actors.clone();

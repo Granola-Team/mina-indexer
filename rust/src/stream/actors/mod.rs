@@ -24,6 +24,7 @@ pub(crate) mod snark_canonicity_summary_actor;
 pub(crate) mod snark_summary_persistence_actor;
 pub(crate) mod snark_work_actor;
 pub(crate) mod staking_accounting_actor;
+pub(crate) mod staking_ledger_actor;
 pub(crate) mod transition_frontier_actor;
 pub(crate) mod user_command_log_actor;
 
