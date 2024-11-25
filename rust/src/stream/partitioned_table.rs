@@ -38,8 +38,8 @@ impl PartitionedTable {
                 self.table_name,
                 height,
                 self.table_name,
-                height,
-                height + 9999
+                height,          // lower bound is inclusive
+                height + 10_000  // upper bound is exclusive
             );
             if self.client.execute(&statement, &[]).await.is_err() {
                 eprintln!("Failed to create partition for height: {}", height);
@@ -147,7 +147,7 @@ impl PartitionedTableBuilder {
     async fn create_first_partition(&self, table_name: &str) -> Result<()> {
         let first_partition_statement = format!(
             "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
-            table_name, 0, table_name, 0, 9999
+            table_name, 0, table_name, 0, 10000
         );
         self.client.execute(&first_partition_statement, &[]).await?;
         Ok(())
