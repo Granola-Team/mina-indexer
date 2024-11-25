@@ -18,11 +18,10 @@ pub struct CanonicalUserCommandPersistenceActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub db_logger: Arc<Mutex<DbLogger>>,
     pub database_inserts: AtomicUsize,
-    pub modulo_3: u64,
 }
 
 impl CanonicalUserCommandPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>, modulo_3: u64) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -55,7 +54,6 @@ impl CanonicalUserCommandPersistenceActor {
         Self {
             id: "CanonicalUserCommandPersistenceActor".to_string(),
             shared_publisher,
-            modulo_3,
             db_logger: Arc::new(Mutex::new(logger)),
             database_inserts: AtomicUsize::new(0),
         }
@@ -102,9 +100,6 @@ impl Actor for CanonicalUserCommandPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::CanonicalUserCommandLog {
             let log: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if log.height % 3 != self.modulo_3 {
-                return;
-            }
             self.log(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.publish(Event {
@@ -134,26 +129,18 @@ mod canonical_user_command_log_persistence_tests {
     use std::sync::Arc;
     use tokio::sync::broadcast;
 
-    async fn setup_actor() -> (
-        CanonicalUserCommandPersistenceActor,
-        CanonicalUserCommandPersistenceActor,
-        CanonicalUserCommandPersistenceActor,
-        Arc<SharedPublisher>,
-        broadcast::Receiver<Event>,
-    ) {
+    async fn setup_actor() -> (CanonicalUserCommandPersistenceActor, Arc<SharedPublisher>, broadcast::Receiver<Event>) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let actor_m0 = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, 0).await;
-        let actor_m1 = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, 1).await;
-        let actor_m2 = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, 2).await;
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
-        (actor_m0, actor_m1, actor_m2, shared_publisher, receiver)
+        (actor, shared_publisher, receiver)
     }
 
     #[tokio::test]
     async fn test_insert_canonical_user_command_log() {
-        let (_, actor_m1, _, _shared_publisher, _receiver) = setup_actor().await;
+        let (actor, _shared_publisher, _receiver) = setup_actor().await;
 
         let payload = CanonicalUserCommandLogPayload {
             height: 100,
@@ -173,10 +160,10 @@ mod canonical_user_command_log_persistence_tests {
             was_canonical: false,
         };
 
-        actor_m1.log(&payload).await.unwrap();
+        actor.log(&payload).await.unwrap();
 
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
-        let db_logger = actor_m1.db_logger.lock().await;
+        let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
@@ -197,7 +184,7 @@ mod canonical_user_command_log_persistence_tests {
 
     #[tokio::test]
     async fn test_handle_event_canonical_user_command_log() {
-        let (_, _, actor_m2, _shared_publisher, _receiver) = setup_actor().await;
+        let (actor, _, _) = setup_actor().await;
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
@@ -222,10 +209,10 @@ mod canonical_user_command_log_persistence_tests {
             payload: sonic_rs::to_string(&payload).unwrap(),
         };
 
-        actor_m2.handle_event(event).await;
+        actor.handle_event(event).await;
 
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
-        let db_logger = actor_m2.db_logger.lock().await;
+        let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .client
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
@@ -247,7 +234,8 @@ mod canonical_user_command_log_persistence_tests {
     #[tokio::test]
     async fn test_canonical_user_command_view() {
         // Set up the actor and database connection
-        let (_, _, actor_m2, _shared_publisher, _receiver) = setup_actor().await;
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
         // Insert multiple entries for the same (height, state_hash) with different statuses
         let payload1 = CanonicalUserCommandLogPayload {
@@ -287,12 +275,12 @@ mod canonical_user_command_log_persistence_tests {
         };
 
         // Insert the payloads into the database
-        actor_m2.log(&payload1).await.unwrap();
-        actor_m2.log(&payload2).await.unwrap();
+        actor.log(&payload1).await.unwrap();
+        actor.log(&payload2).await.unwrap();
 
         // Query the database to ensure the correct row is returned
         let query = "SELECT * FROM user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
-        let db_logger = actor_m2.db_logger.lock().await;
+        let db_logger = actor.db_logger.lock().await;
         let rows = db_logger
             .client
             .query(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.txn_hash])
@@ -311,7 +299,7 @@ mod canonical_user_command_log_persistence_tests {
 
     #[tokio::test]
     async fn test_actor_height_event_published() {
-        let (_, _, actor_m2, _shared_publisher, mut receiver) = setup_actor().await;
+        let (actor, _, mut receiver) = setup_actor().await;
 
         // Create a payload for a canonical user command
         let payload = CanonicalUserCommandLogPayload {
@@ -338,7 +326,7 @@ mod canonical_user_command_log_persistence_tests {
             payload: sonic_rs::to_string(&payload).unwrap(),
         };
 
-        actor_m2.handle_event(event).await;
+        actor.handle_event(event).await;
 
         // Listen for the `ActorHeight` event
         let received_event = receiver.recv().await.unwrap();
@@ -350,7 +338,7 @@ mod canonical_user_command_log_persistence_tests {
         let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
         // Validate the `ActorHeightPayload` content
-        assert_eq!(actor_height_payload.actor, actor_m2.id());
+        assert_eq!(actor_height_payload.actor, actor.id());
         assert_eq!(actor_height_payload.height, payload.height);
     }
 }
