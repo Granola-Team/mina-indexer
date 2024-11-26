@@ -1,4 +1,4 @@
-use crate::stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
+use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, stream::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
 use actors::{
     accounting_actor::AccountingActor, berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor,
     block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor, block_confirmations_actor::BlockConfirmationsActor,
@@ -66,7 +66,7 @@ pub async fn subscribe_actors(
         Arc::new(AccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
-        Arc::new(MonitorActor::new(Arc::clone(shared_publisher))),
+        Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
         Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(snark_summary_persistence_actor),
         Arc::new(user_command_persistence_actor),

@@ -15,16 +15,18 @@ pub struct MonitorActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub actor_heights: Arc<Mutex<HashMap<String, u64>>>,
-    pub modulo_10: AtomicUsize,
+    pub modulo: AtomicUsize,
+    pub update_throttle: usize,
 }
 
 impl MonitorActor {
-    pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
+    pub fn new(shared_publisher: Arc<SharedPublisher>, update_throttle: usize) -> Self {
         Self {
             id: "MonitorActor".to_string(),
             shared_publisher,
             actor_heights: Arc::new(Mutex::new(HashMap::new())),
-            modulo_10: AtomicUsize::new(1),
+            modulo: AtomicUsize::new(1),
+            update_throttle,
         }
     }
 }
@@ -60,14 +62,14 @@ impl Actor for MonitorActor {
             // Compute the absolute difference
             let height_spread = max - min;
 
-            if self.modulo_10.load(std::sync::atomic::Ordering::SeqCst) % 10 == 0 {
-                self.modulo_10.store(1, std::sync::atomic::Ordering::SeqCst);
+            if self.modulo.load(std::sync::atomic::Ordering::SeqCst) % self.update_throttle == 0 {
+                self.modulo.store(1, std::sync::atomic::Ordering::SeqCst);
                 self.publish(Event {
                     event_type: EventType::HeightSpread,
                     payload: height_spread.to_string(),
                 });
             } else {
-                self.modulo_10.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.modulo.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
         }
     }
@@ -89,7 +91,7 @@ mod monitor_actor_tests {
     #[tokio::test]
     async fn test_monitor_actor_height_spread() {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let monitor_actor = MonitorActor::new(Arc::clone(&shared_publisher));
+        let monitor_actor = MonitorActor::new(Arc::clone(&shared_publisher), 10);
 
         let mut receiver = shared_publisher.subscribe_high_priority();
 
