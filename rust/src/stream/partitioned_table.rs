@@ -63,7 +63,6 @@ impl PartitionedTable {
         match self.client.execute(&query, values).await {
             Ok(_) => Ok(1), // Successful insert
             Err(e) => {
-                println!("asdf {:?}", e.to_string().contains("partition"));
                 if e.to_string().contains("partition") {
                     self.create_partition((height / PARTITION_RANGE) * PARTITION_RANGE).await?;
 
