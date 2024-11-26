@@ -16,6 +16,7 @@ pub struct StakingAccountingActor {
     pub events_published: AtomicUsize,
 }
 
+#[allow(dead_code)]
 impl StakingAccountingActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
