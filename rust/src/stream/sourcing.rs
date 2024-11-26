@@ -121,11 +121,9 @@ pub async fn publish_block_dir_paths(
                 publish_block_path(&shared_publisher, path).await.unwrap();
                 publish_actor_height(&shared_publisher, path).await.unwrap();
 
-                if let Some(height_spread) = handle_height_spread_event(&mut high_priority_subcriber).await {
-                    if height_spread > 50 {
-                        println!("Height spread is greater than 50. Pausing for 10 seconds...");
-                        tokio::time::sleep(Duration::from_secs(10)).await;
-                    }
+                if handle_height_spread_event(&mut high_priority_subcriber).await > 50 {
+                    println!("Height spread is greater than 50. Pausing for 10 seconds...");
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 } else {
                     tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 }
@@ -195,17 +193,21 @@ async fn publish_root_file(shared_publisher: &Arc<SharedPublisher>, root_file: P
     Ok(())
 }
 
-async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> Option<u64> {
-    match tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
-        Ok(Ok(event)) => {
-            if event.event_type == EventType::HeightSpread {
-                Some(event.payload.parse().unwrap_or(0))
-            } else {
-                None
+async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> u64 {
+    let mut height_spread: u64 = 0; // Default to 0
+
+    // Drain events with a timeout and keep the highest HeightSpread value
+    while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(100), subscriber.recv()).await {
+        if event.event_type == EventType::HeightSpread {
+            let current_spread = event.payload.parse().unwrap_or(0);
+            // Keep the highest spread
+            if current_spread > height_spread {
+                height_spread = current_spread;
             }
         }
-        _ => None,
     }
+
+    height_spread
 }
 
 async fn publish_block_path(shared_publisher: &Arc<SharedPublisher>, path: &Path) -> Result<()> {
@@ -243,6 +245,7 @@ pub fn get_millisecond_pause_from_rate() -> u64 {
 mod sourcing_tests {
     use super::*;
     use crate::stream::events::EventType;
+    use futures::lock::Mutex;
     use tokio::sync::broadcast;
 
     fn setup_shared_publisher() -> Arc<SharedPublisher> {
@@ -317,5 +320,55 @@ mod sourcing_tests {
 
         // Clean up by sending the shutdown signal
         let _ = shutdown_sender.send(());
+    }
+
+    #[tokio::test]
+    async fn test_handle_height_spread_event_keeps_highest() {
+        // Create a broadcast channel and a subscriber
+        let (tx, rx) = broadcast::channel::<Event>(10);
+        let subscriber = Arc::new(Mutex::new(rx));
+
+        // Spawn a task to publish events to the channel
+        tokio::spawn(async move {
+            // Simulate sending HeightSpread events
+            tx.send(Event {
+                event_type: EventType::HeightSpread,
+                payload: "50".to_string(),
+            })
+            .unwrap();
+            tokio::time::sleep(Duration::from_millis(50)).await; // Simulate a delay
+            tx.send(Event {
+                event_type: EventType::HeightSpread,
+                payload: "30".to_string(),
+            })
+            .unwrap();
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            tx.send(Event {
+                event_type: EventType::HeightSpread,
+                payload: "80".to_string(),
+            })
+            .unwrap();
+        });
+
+        // Call the function to handle events and keep the highest spread
+        let mut sub = subscriber.lock().await;
+        let highest_spread = handle_height_spread_event(&mut sub).await;
+
+        // Assert that the highest spread retained is 80
+        assert_eq!(highest_spread, 80);
+    }
+
+    #[tokio::test]
+    async fn test_handle_height_spread_event_default_zero_if_no_events() {
+        // Create a broadcast channel and a subscriber
+        let (_, rx) = broadcast::channel::<Event>(10);
+        let subscriber = Arc::new(Mutex::new(rx));
+
+        // Call the function to handle events (no events sent)
+        let mut sub = subscriber.lock().await;
+        let highest_spread = handle_height_spread_event(&mut sub).await;
+
+        // Assert that the highest spread is 0, as no events were received
+        assert_eq!(highest_spread, 0);
     }
 }
