@@ -7,6 +7,8 @@ pub struct PartitionedTable {
     columns: Vec<String>,
 }
 
+const PARTITION_RANGE: u64 = 10_000;
+
 impl PartitionedTable {
     pub fn get_client(&self) -> &Client {
         &self.client
@@ -19,6 +21,26 @@ impl PartitionedTable {
             name: String::new(),
             columns: Vec::new(),
         }
+    }
+
+    pub async fn create_partition(&self, height: u64) -> Result<()> {
+        println!("Creating partition {}_{}", self.table_name, height);
+        // Define the range for the partition based on the height
+        let from = height;
+        let to = height + PARTITION_RANGE;
+
+        // Create the partition table query
+        let partition_query = format!(
+            "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
+            self.table_name, height, self.table_name, from, to
+        );
+
+        // Execute the query to create the partition
+        if let Err(e) = self.get_client().execute(&partition_query, &[]).await {
+            eprintln!("Failed to create partition for table '{}': {:?}", self.table_name, e);
+        }
+
+        Ok(())
     }
 
     /// Insert a row into the table, creating partitions as necessary based on the height
@@ -35,28 +57,25 @@ impl PartitionedTable {
             .join(", ");
         let placeholders = (1..=self.columns.len()).map(|i| format!("${}", i)).collect::<Vec<_>>().join(", ");
 
-        // Create partition if necessary (based on the height)
-        if height > 0 && height % 10_000 == 0 {
-            let statement = format!(
-                "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
-                self.table_name,
-                height,
-                self.table_name,
-                height,          // lower bound is inclusive
-                height + 10_000  // upper bound is exclusive
-            );
-            if self.client.execute(&statement, &[]).await.is_err() {
-                eprintln!("Failed to create partition for height: {}", height);
-            }
-        }
-
         // Insert query
         let query = format!("INSERT INTO {} ({}) VALUES ({})", self.table_name, column_names, placeholders);
 
-        self.client.execute(&query, values).await.map_err(|e| {
-            eprintln!("Failed to insert row into {}: {:?}", self.table_name, e);
-            e.into()
-        })
+        match self.client.execute(&query, values).await {
+            Ok(_) => Ok(1), // Successful insert
+            Err(e) => {
+                println!("asdf {:?}", e.to_string().contains("partition"));
+                if e.to_string().contains("partition") {
+                    self.create_partition((height / PARTITION_RANGE) * PARTITION_RANGE).await?;
+
+                    // Retry the insert after creating the partition
+                    self.client.execute(&query, values).await?;
+                    Ok(1)
+                } else {
+                    // Return the error if it's not related to the partition creation
+                    Err(e.into())
+                }
+            }
+        }
     }
 }
 
@@ -104,9 +123,6 @@ impl PartitionedTableBuilder {
         // Create the table with partitioning by height
         self.create_table(&table_name).await?;
 
-        // Create the first partition (for height = 0)
-        self.create_first_partition(&table_name).await?;
-
         // Handle root node deletion if provided
         if let Some((height, state_hash)) = root {
             self.handle_root_node_deletion(&table_name, height.to_owned(), state_hash).await?;
@@ -150,16 +166,6 @@ impl PartitionedTableBuilder {
                 .join(",\n")
         );
         self.client.execute(&table_query, &[]).await?;
-        Ok(())
-    }
-
-    // Create the first partition (for height = 0)
-    async fn create_first_partition(&self, table_name: &str) -> Result<()> {
-        let first_partition_statement = format!(
-            "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
-            table_name, 0, table_name, 0, 10000
-        );
-        self.client.execute(&first_partition_statement, &[]).await?;
         Ok(())
     }
 
@@ -381,5 +387,47 @@ mod partitioned_table_tests {
             // Ensure no rows exist for the deleted state_hash at height 2
             assert_eq!(deleted_row.len(), 2, "Expected 2 rows at height 2");
         }
+    }
+
+    #[tokio::test]
+    async fn test_partitioned_table_insert_10001() {
+        // Connect to the database
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to the database");
+
+        // Spawn the connection handler
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        // Setup the PartitionedTable
+        let partitioned_table = PartitionedTable::builder(client)
+            .name("log")
+            .add_column("height BIGINT") // Explicitly adding the height column
+            .add_column("state_hash TEXT")
+            .add_column("timestamp BIGINT")
+            .build(&None) // No root, so no deletion
+            .await
+            .expect("Failed to build partitioned table");
+
+        // Insert data at height 10001 (which should trigger partition creation)
+        partitioned_table
+            .insert(&[&10001_i64, &"state_hash_10001", &1234567890i64], 10001)
+            .await
+            .expect("Failed to insert log at height 10001");
+
+        // Query the table to verify that the row was inserted correctly
+        let log_query = "SELECT * FROM log_log WHERE height = $1";
+        let log_rows = partitioned_table
+            .client
+            .query(log_query, &[&(10001_i64)])
+            .await
+            .expect("Failed to query log table");
+
+        // Assert that the row was inserted
+        assert_eq!(log_rows.len(), 1, "Expected 1 row in the table for height 10001");
     }
 }
