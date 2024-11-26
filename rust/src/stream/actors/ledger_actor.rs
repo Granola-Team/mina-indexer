@@ -5,21 +5,18 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::{
-        partitioned_table::PartitionedTable,
-        payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
-    },
+    stream::payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
-use tokio_postgres::NoTls;
+use tokio_postgres::{Client, NoTls};
 
 pub struct LedgerActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub partitioned_table: PartitionedTable,
+    pub client: Client,
 }
 
 impl LedgerActor {
@@ -30,22 +27,36 @@ impl LedgerActor {
                     eprintln!("connection error: {}", e);
                 }
             });
-            let partitioned_table = PartitionedTable::builder(client)
-                .name("blockchain_ledger")
-                .add_column("address TEXT NOT NULL")
-                .add_column("address_type TEXT NOT NULL")
-                .add_column("balance_delta BIGINT NOT NULL")
-                .add_column("counterparty TEXT NOT NULL")
-                .add_column("transfer_type TEXT NOT NULL")
-                .add_column("height BIGINT NOT NULL")
-                .add_column("state_hash TEXT NOT NULL")
-                .add_column("timestamp BIGINT NOT NULL")
-                .build(root_node)
+            if let Some((height, _)) = root_node {
+                if let Err(e) = client
+                    .execute("DELETE FROM blockchain_ledger WHERE height >= $1;", &[&(height.to_owned() as i64)])
+                    .await
+                {
+                    println!("Unable to drop blockchain_ledger table {:?}", e);
+                }
+            } else if let Err(e) = client.execute("DROP TABLE IF EXISTS blockchain_ledger CASCADE;", &[]).await {
+                println!("Unable to drop blockchain_ledger table {:?}", e);
+            }
+            if let Err(e) = client
+                .execute(
+                    "CREATE TABLE IF NOT EXISTS blockchain_ledger (
+                        address TEXT NOT NULL,
+                        address_type TEXT NOT NULL,
+                        balance_delta BIGINT NOT NULL,
+                        counterparty TEXT NOT NULL,
+                        transfer_type TEXT NOT NULL,
+                        height BIGINT NOT NULL,
+                        state_hash TEXT NOT NULL,
+                        timestamp BIGINT NOT NULL,
+                        entry_id BIGSERIAL PRIMARY KEY
+                    );",
+                    &[],
+                )
                 .await
-                .expect("Failed to build blockchain_ledger partitioned table");
-
-            if let Err(e) = partitioned_table
-                .get_client()
+            {
+                println!("Unable to create blockchain_ledger table {:?}", e);
+            }
+            if let Err(e) = client
                 .execute(
                     "CREATE OR REPLACE VIEW account_summary AS
                     SELECT
@@ -68,7 +79,7 @@ impl LedgerActor {
             Self {
                 id: "LedgerActor".to_string(),
                 shared_publisher,
-                partitioned_table,
+                client,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -77,25 +88,30 @@ impl LedgerActor {
     }
 
     async fn log_accounting_entry(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
+        let upsert_query = r#"
+            INSERT INTO blockchain_ledger (address, address_type, balance_delta, height, state_hash, timestamp, counterparty, transfer_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+        "#;
+
         let balance_delta: i64 = match payload.entry_type {
             AccountingEntryType::Credit => payload.amount_nanomina as i64,
             AccountingEntryType::Debit => -(payload.amount_nanomina as i64),
         };
 
         match self
-            .partitioned_table
-            .insert(
+            .client
+            .execute(
+                upsert_query,
                 &[
                     &payload.account,
                     &payload.account_type.to_string(),
                     &balance_delta,
-                    &payload.counterparty.to_string(),
-                    &payload.transfer_type.to_string(),
                     height,
                     &state_hash,
                     timestamp,
+                    &payload.counterparty.to_string(),
+                    &payload.transfer_type.to_string(),
                 ],
-                height.to_owned() as u64,
             )
             .await
         {
@@ -203,8 +219,7 @@ mod blockchain_ledger_actor_tests {
 
         // Query the database directly to validate the record
         let rows = actor
-            .partitioned_table
-            .get_client()
+            .client
             .query("SELECT * FROM blockchain_ledger WHERE address = $1", &[&accounting_entry.account])
             .await
             .expect("Failed to query database");
@@ -268,8 +283,7 @@ mod blockchain_ledger_actor_tests {
 
         // Query the database to validate the appended records
         let rows = actor
-            .partitioned_table
-            .get_client()
+            .client
             .query(
                 "SELECT * FROM blockchain_ledger WHERE address = $1 ORDER BY timestamp ASC",
                 &[&updated_entry.account],
@@ -336,8 +350,7 @@ mod blockchain_ledger_actor_tests {
         // Query database to validate records
         for account in ["lhs_account", "rhs_account"] {
             let rows = actor
-                .partitioned_table
-                .get_client()
+                .client
                 .query("SELECT * FROM blockchain_ledger WHERE address = $1", &[&account])
                 .await
                 .expect("Failed to query database");
@@ -449,8 +462,7 @@ mod blockchain_ledger_actor_tests {
 
         // Verify that all entries were inserted
         let rows = actor_without_root
-            .partitioned_table
-            .get_client()
+            .client
             .query("SELECT * FROM blockchain_ledger ORDER BY height ASC", &[])
             .await
             .expect("Failed to query blockchain_ledger");
@@ -463,8 +475,7 @@ mod blockchain_ledger_actor_tests {
 
         // Query the ledger after reinitialization
         let rows_after_reinit = actor_with_root
-            .partitioned_table
-            .get_client()
+            .client
             .query("SELECT * FROM blockchain_ledger ORDER BY height ASC", &[])
             .await
             .expect("Failed to query blockchain_ledger after reinitialization");
