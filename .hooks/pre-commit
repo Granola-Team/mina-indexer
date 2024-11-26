@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+
+# md fmt
+if ! command -v mdformat &> /dev/null; then
+  printf "[pre_commit] \033[0;31merror\033[0m: \"mdformat\" not available. \n"
+  exit 1
+fi
+
+# sh fmt
+if ! command -v shfmt &> /dev/null; then
+  printf "[pre_commit] \033[0;31merror\033[0m: \"shfmt\" not available. \n"
+  exit 1
+fi
+
+# nix fmt
+if ! command -v nix fmt &> /dev/null; then
+  printf "[pre_commit] \033[0;31merror\033[0m: \"nix fmt\" not available. \n"
+  exit 1
+fi
+
+# just fmt
+if ! command -v just &> /dev/null; then
+  printf "[pre_commit] \033[0;31merror\033[0m: \"just\" not available. \n"
+  exit 1
+fi
+
+# rust fmt
+if ! command -v rustfmt &> /dev/null; then
+  printf "[pre_commit] \033[0;31merror\033[0m: \"rustfmt\" not available. \n"
+  exit 1
+fi
+
+# format ill-formatted md files
+problem_md_files=()
+
+for file in $(git diff --name-only --cached); do
+  if [ "${file: -3}" == ".md" ]; then
+    if mdformat "$file" &>/dev/null; then
+      problem_md_files+=("$file")
+    fi
+  fi
+done
+
+# format ill-formatted sh files
+problem_sh_files=()
+
+for file in $(git diff --name-only --cached); do
+  if [ "${file: -3}" == ".sh" ]; then
+    if shfmt -w "$file" &>/dev/null; then
+      problem_sh_files+=("$file")
+    fi
+  fi
+done
+
+# format ill-formatted nix files
+problem_nix_files=()
+
+for file in $(git diff --name-only --cached); do
+  if [ "${file: -3}" == ".nix" ]; then
+    if nix fmt &>/dev/null; then
+      problem_nix_files+=("$file")
+    fi
+  fi
+done
+
+# format ill-formatted just files
+problem_just_files=()
+
+for file in $(git diff --name-only --cached); do
+  if [ "${file}" == "Justfile" ]; then
+    if just --fmt &>/dev/null; then
+      problem_just_files+=("$file")
+    fi
+  fi
+done
+
+# format ill-formatted rust files
+problem_rust_files=()
+
+for file in $(git diff --name-only --cached); do
+  if [ "${file: -3}" == ".rs" ]; then
+    if rustfmt +stable "$file" &>/dev/null; then
+      problem_rust_files+=("$file")
+    fi
+  fi
+done
+
+if [ ${#problem_md_files[@]} == 0 ] && [ ${#problem_sh_files[@]} == 0 ] && [ ${#problem_nix_files[@]} == 0 ] && [ ${#problem_just_files[@]} == 0 ] && [ ${#problem_rust_files[@]} == 0 ]; then
+  # done
+  printf "[pre_commit] shfmt      \033[0;32mok\033[0m \n"
+  printf "[pre_commit] nix fmt    \033[0;32mok\033[0m \n"
+  printf "[pre_commit] rustfmt    \033[0;32mok\033[0m \n"
+  printf "[pre_commit] mdformat   \033[0;32mok\033[0m \n"
+  printf "[pre_commit] just --fmt \033[0;32mok\033[0m \n"
+else
+  # reformat the files that need it and re-stage them.
+
+  if [ ${#problem_md_files[@]} != 0 ]; then
+    printf "[pre_commit] the following files were mdformat'd before commit: \n"
+    for file in "${problem_md_files[@]}"; do
+      git add "$file"
+      printf "\033[0;32m  %s\033[0m \n" "$file"
+    done
+  fi
+
+  if [ ${#problem_sh_files[@]} != 0 ]; then
+    printf "[pre_commit] the following files were shfmt'd before commit: \n"
+    for file in "${problem_sh_files[@]}"; do
+      git add "$file"
+      printf "\033[0;32m  %s\033[0m \n" "$file"
+    done
+  fi
+
+  if [ ${#problem_nix_files[@]} != 0 ]; then
+    printf "[pre_commit] the following files were nix fmt'd before commit: \n"
+    for file in "${problem_nix_files[@]}"; do
+      git add "$file"
+      printf "\033[0;32m  %s\033[0m \n" "$file"
+    done
+  fi
+
+  if [ ${#problem_just_files[@]} != 0 ]; then
+    printf "[pre_commit] the following files were just --fmt'd before commit: \n"
+    for file in "${problem_just_files[@]}"; do
+      git add "$file"
+      printf "\033[0;32m  %s\033[0m \n" "$file"
+    done
+  fi
+
+  if [ ${#problem_rust_files[@]} != 0 ]; then
+    printf "[pre_commit] the following files were rustfmt'd before commit: \n"
+    for file in "${problem_rust_files[@]}"; do
+      git add "$file"
+      printf "\033[0;32m  %s\033[0m \n" "$file"
+    done
+  fi
+fi
+
+exit 0
