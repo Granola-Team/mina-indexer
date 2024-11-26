@@ -110,7 +110,7 @@ pub async fn publish_block_dir_paths(
         publish_root_file(shared_publisher, root_file).await?;
     }
 
-    let mut subscriber = shared_publisher.subscribe();
+    let mut high_priority_subcriber = shared_publisher.subscribe_high_priority();
 
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
@@ -121,7 +121,7 @@ pub async fn publish_block_dir_paths(
                 publish_block_path(&shared_publisher, path).await.unwrap();
                 publish_actor_height(&shared_publisher, path).await.unwrap();
 
-                if let Some(height_spread) = handle_height_spread_event(&mut subscriber).await {
+                if let Some(height_spread) = handle_height_spread_event(&mut high_priority_subcriber).await {
                     if height_spread > 50 {
                         println!("Height spread is greater than 50. Pausing for 10 seconds...");
                         tokio::time::sleep(Duration::from_secs(10)).await;
@@ -196,11 +196,15 @@ async fn publish_root_file(shared_publisher: &Arc<SharedPublisher>, root_file: P
 }
 
 async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> Option<u64> {
-    let event = subscriber.recv().await.unwrap();
-    if event.event_type == EventType::HeightSpread {
-        Some(event.payload.parse().unwrap_or(0))
-    } else {
-        None
+    match tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
+        Ok(Ok(event)) => {
+            if event.event_type == EventType::HeightSpread {
+                Some(event.payload.parse().unwrap_or(0))
+            } else {
+                None
+            }
+        }
+        _ => None,
     }
 }
 

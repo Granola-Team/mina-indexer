@@ -67,7 +67,7 @@ impl Actor for MonitorActor {
 
     fn publish(&self, event: Event) {
         self.incr_event_published();
-        self.shared_publisher.publish(event);
+        self.shared_publisher.publish_high_priority(event);
     }
 }
 
@@ -85,7 +85,7 @@ mod monitor_actor_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let monitor_actor = MonitorActor::new(Arc::clone(&shared_publisher));
 
-        let mut receiver = shared_publisher.subscribe();
+        let mut receiver = shared_publisher.subscribe_high_priority();
 
         // Add first ActorHeight event
         let actor_height_1 = ActorHeightPayload {
