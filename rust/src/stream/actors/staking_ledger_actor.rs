@@ -5,18 +5,21 @@ use super::super::{
 };
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
-    stream::payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
+    stream::{
+        partitioned_table::PartitionedTable,
+        payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
+    },
 };
 use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::NoTls;
 
 pub struct StakingLedgerActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub client: Client,
+    pub partitioned_table: PartitionedTable,
 }
 
 impl StakingLedgerActor {
@@ -28,36 +31,20 @@ impl StakingLedgerActor {
                 }
             });
 
-            if let Some((height, _)) = root_node {
-                if let Err(e) = client
-                    .execute("DELETE FROM staking_ledger WHERE height >= $1;", &[&(height.to_owned() as i64)])
-                    .await
-                {
-                    println!("Unable to drop staking_ledger table {:?}", e);
-                }
-            } else if let Err(e) = client.execute("DROP TABLE IF EXISTS staking_ledger CASCADE;", &[]).await {
-                println!("Unable to drop staking_ledger table {:?}", e);
-            }
-
-            if let Err(e) = client
-                .execute(
-                    "CREATE TABLE IF NOT EXISTS staking_ledger (
-                        address TEXT NOT NULL,
-                        counterparty TEXT NOT NULL,
-                        stake_delta BIGINT NOT NULL,
-                        epoch BIGINT NOT NULL,
-                        height BIGINT NOT NULL,
-                        state_hash TEXT NOT NULL,
-                        entry_id BIGSERIAL PRIMARY KEY
-                    );",
-                    &[],
-                )
+            let partitioned_table = PartitionedTable::builder(client)
+                .name("staking_ledger")
+                .add_column("address TEXT NOT NULL")
+                .add_column("counterparty TEXT NOT NULL")
+                .add_column("stake_delta BIGINT NOT NULL")
+                .add_column("epoch BIGINT NOT NULL")
+                .add_column("height BIGINT NOT NULL")
+                .add_column("state_hash TEXT NOT NULL")
+                .build(root_node)
                 .await
-            {
-                println!("Unable to create staking_ledger table {:?}", e);
-            }
+                .expect("Cannot build partitioned staking_ledger table");
 
-            if let Err(e) = client
+            if let Err(e) = partitioned_table
+                .get_client()
                 .execute(
                     "CREATE OR REPLACE VIEW staking_summary AS
                     SELECT
@@ -80,7 +67,7 @@ impl StakingLedgerActor {
             Self {
                 id: "StakingLedgerActor".to_string(),
                 shared_publisher,
-                client,
+                partitioned_table,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -89,21 +76,16 @@ impl StakingLedgerActor {
     }
 
     async fn log_staking_entry(&self, payload: &AccountingEntry, height: &i64, state_hash: &str, epoch: &i64) -> Result<u64, &'static str> {
-        let insert_query = r#"
-            INSERT INTO staking_ledger (address, counterparty, stake_delta, epoch, height, state_hash)
-            VALUES ($1, $2, $3, $4, $5, $6);
-        "#;
-
         let stake_delta: i64 = match payload.entry_type {
             AccountingEntryType::Credit => payload.amount_nanomina as i64,
             AccountingEntryType::Debit => -(payload.amount_nanomina as i64),
         };
 
         match self
-            .client
-            .execute(
-                insert_query,
+            .partitioned_table
+            .insert(
                 &[&payload.account, &payload.counterparty, &stake_delta, epoch, height, &state_hash.to_owned()],
+                height.to_owned() as u64,
             )
             .await
         {
@@ -200,7 +182,8 @@ mod staking_ledger_actor_tests {
         assert_eq!(result.unwrap(), 1);
 
         let rows = actor
-            .client
+            .partitioned_table
+            .get_client()
             .query("SELECT * FROM staking_ledger WHERE address = $1", &[&accounting_entry.account])
             .await
             .expect("Failed to query database");
@@ -247,7 +230,12 @@ mod staking_ledger_actor_tests {
         actor.handle_event(event).await;
 
         // Ensure no rows were inserted into the staking_ledger
-        let rows = actor.client.query("SELECT * FROM staking_ledger", &[]).await.expect("Failed to query database");
+        let rows = actor
+            .partitioned_table
+            .get_client()
+            .query("SELECT * FROM staking_ledger", &[])
+            .await
+            .expect("Failed to query database");
         assert!(rows.is_empty(), "Non-staking ledger entries should not be processed");
     }
 
@@ -341,7 +329,8 @@ mod staking_ledger_actor_tests {
 
         // Query the staking_summary view
         let rows = actor
-            .client
+            .partitioned_table
+            .get_client()
             .query("SELECT address, epoch, total_stake FROM staking_summary ORDER BY address, epoch", &[])
             .await
             .expect("Failed to query staking_summary view");
