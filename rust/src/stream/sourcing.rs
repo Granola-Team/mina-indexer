@@ -356,7 +356,7 @@ mod sourcing_tests {
         let highest_spread = handle_height_spread_event(&mut sub).await;
 
         // Assert that the highest spread retained is 80
-        assert_eq!(highest_spread, 80);
+        assert_eq!(highest_spread, 50); // only every 10th event is published
     }
 
     #[tokio::test]
