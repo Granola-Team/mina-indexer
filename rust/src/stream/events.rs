@@ -25,6 +25,7 @@ pub enum EventType {
     PreExistingAccount,
     ActorHeight,
     EpochStakeDelegation,
+    HeightSpread,
 }
 
 #[derive(Debug, Clone, PartialEq)]
