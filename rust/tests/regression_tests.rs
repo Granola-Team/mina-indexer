@@ -85,7 +85,7 @@ async fn truncate_table(table: &str, height: u64) {
             }
         });
 
-        let query = format!("DELETE FROM {} WHERE height > {};", table, height);
+        let query = format!("DELETE FROM {}_0 WHERE height > {};", table, height);
 
         // Execute the query using the SQL client from the actor
         if let Err(e) = client.execute(query.as_str(), &[]).await.map_err(|_| "Unable to trim the blockchain ledger") {

@@ -12,7 +12,13 @@ use crate::{
     utility::extract_height_and_hash,
 };
 use anyhow::Result;
-use std::{cmp::Ordering, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    cmp::Ordering,
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 use tokio::sync::broadcast;
 
 pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<()> {
@@ -92,68 +98,37 @@ pub async fn publish_block_dir_paths(
     root_node: Option<(u64, String)>, // height and state hash
 ) -> Result<()> {
     let millisecond_pause = get_millisecond_pause_from_rate();
-    let mut entries: Vec<PathBuf> = fs::read_dir(blocks_dir.clone())?
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-        .map(|e| e.path())
-        .collect();
+    let mut entries = get_block_entries(&blocks_dir).await?;
 
-    // Sort entries by the extracted number and hash
-    entries.sort_by(|a, b| {
-        let (a_num, a_hash) = extract_height_and_hash(a);
-        let (b_num, b_hash) = extract_height_and_hash(b);
+    // Sort entries by height and hash
+    sort_entries(&mut entries);
 
-        match a_num.cmp(&b_num) {
-            Ordering::Equal => a_hash.cmp(b_hash), // Fallback to hash comparison
-            other => other,
-        }
-    });
-
+    // Filter entries based on root node, if provided
     if let Some((root_height, root_state_hash)) = root_node {
-        entries = entries
-            .into_iter()
-            .filter(|f| {
-                let (height, _) = extract_height_and_hash(f);
-                height as u64 > root_height
-            })
-            .collect::<Vec<_>>();
-        let root_file: PathBuf = fs::read_dir(blocks_dir)?
-            .filter_map(|entry| entry.ok()) // Filter out invalid entries
-            .map(|entry| entry.path()) // Map to the entry's path
-            .find(|path| path.is_file() && extract_height_and_hash(path) == (root_height as u32, &root_state_hash))
-            .expect("Expected to find a root file");
-
-        println!("root file: {}", root_file.to_str().unwrap());
-
-        shared_publisher.publish(Event {
-            event_type: EventType::PrecomputedBlockPath,
-            payload: root_file.to_str().unwrap().to_string(),
-        });
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        entries = filter_entries_after_root(entries, root_height).await?;
+        let root_file = get_root_file(&blocks_dir, root_height, &root_state_hash).await?;
+        publish_root_file(shared_publisher, root_file).await?;
     }
+
+    let mut subscriber = shared_publisher.subscribe();
 
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
         async move {
             for entry in entries {
                 let path = entry.as_path();
-                shared_publisher.publish(Event {
-                    event_type: EventType::PrecomputedBlockPath,
-                    payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
-                });
 
-                let (height, _) = extract_height_and_hash(path);
+                publish_block_path(&shared_publisher, path).await.unwrap();
+                publish_actor_height(&shared_publisher, path).await.unwrap();
 
-                shared_publisher.publish(Event {
-                    event_type: EventType::ActorHeight,
-                    payload: sonic_rs::to_string(&ActorHeightPayload {
-                        actor: FILE_PUBLISHER_ACTOR_ID.to_string(),
-                        height: height as u64,
-                    })
-                    .unwrap(),
-                });
-
-                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
+                if let Some(height_spread) = handle_height_spread_event(&mut subscriber).await {
+                    if height_spread > 50 {
+                        println!("Height spread is greater than 50. Pausing for 10 seconds...");
+                        tokio::time::sleep(Duration::from_secs(10)).await;
+                    }
+                } else {
+                    tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
+                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
@@ -169,6 +144,84 @@ pub async fn publish_block_dir_paths(
         eprintln!("Error in publisher task: {:?}", e);
     }
 
+    Ok(())
+}
+
+async fn get_block_entries(blocks_dir: &Path) -> Result<Vec<PathBuf>> {
+    let entries: Vec<PathBuf> = fs::read_dir(blocks_dir)?
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_file())
+        .map(|e| e.path())
+        .collect();
+    Ok(entries)
+}
+
+fn sort_entries(entries: &mut [PathBuf]) {
+    entries.sort_by(|a, b| {
+        let (a_num, a_hash) = extract_height_and_hash(a);
+        let (b_num, b_hash) = extract_height_and_hash(b);
+
+        match a_num.cmp(&b_num) {
+            Ordering::Equal => a_hash.cmp(b_hash),
+            other => other,
+        }
+    });
+}
+
+async fn filter_entries_after_root(entries: Vec<PathBuf>, root_height: u64) -> Result<Vec<PathBuf>> {
+    Ok(entries
+        .into_iter()
+        .filter(|f| {
+            let (height, _) = extract_height_and_hash(f);
+            height as u64 > root_height
+        })
+        .collect())
+}
+
+async fn get_root_file(blocks_dir: &Path, root_height: u64, root_state_hash: &str) -> Result<PathBuf> {
+    fs::read_dir(blocks_dir)?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .find(|path| path.is_file() && extract_height_and_hash(path) == (root_height as u32, root_state_hash))
+        .ok_or_else(|| anyhow::anyhow!("Expected to find a root file"))
+}
+
+async fn publish_root_file(shared_publisher: &Arc<SharedPublisher>, root_file: PathBuf) -> Result<()> {
+    shared_publisher.publish(Event {
+        event_type: EventType::PrecomputedBlockPath,
+        payload: root_file.to_str().unwrap().to_string(),
+    });
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    Ok(())
+}
+
+async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> Option<u64> {
+    let event = subscriber.recv().await.unwrap();
+    if event.event_type == EventType::HeightSpread {
+        Some(event.payload.parse().unwrap_or(0))
+    } else {
+        None
+    }
+}
+
+async fn publish_block_path(shared_publisher: &Arc<SharedPublisher>, path: &Path) -> Result<()> {
+    shared_publisher.publish(Event {
+        event_type: EventType::PrecomputedBlockPath,
+        payload: path.to_str().map(ToString::to_string).unwrap_or_default(),
+    });
+    Ok(())
+}
+
+async fn publish_actor_height(shared_publisher: &Arc<SharedPublisher>, path: &Path) -> Result<()> {
+    let (height, _) = extract_height_and_hash(path);
+    shared_publisher.publish(Event {
+        event_type: EventType::ActorHeight,
+        payload: sonic_rs::to_string(&ActorHeightPayload {
+            actor: FILE_PUBLISHER_ACTOR_ID.to_string(),
+            height: height as u64,
+        })
+        .unwrap(),
+    });
     Ok(())
 }
 
