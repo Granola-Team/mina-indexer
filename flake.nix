@@ -75,6 +75,7 @@
           rust
           shellcheck
           shfmt
+          mdformat
         ]
         ++ buildDependencies;
 
