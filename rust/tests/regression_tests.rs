@@ -25,29 +25,29 @@ struct Block {
     canonical: bool,
 }
 
-// #[tokio::test]
-// async fn test_first_100_blocks() {
-//     run_test_process(
-//         env!("CARGO_BIN_EXE_ingestion"), // Binary path
-//         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-//         &[],
-//         Duration::from_secs(20),
-//     );
+#[tokio::test]
+async fn test_first_100_blocks() {
+    run_test_process(
+        env!("CARGO_BIN_EXE_ingestion"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &[],
+        Duration::from_secs(30),
+    );
 
-//     truncate_table("blocks_log_0", 100).await;
-//     test_blocks_first_100().await;
+    truncate_table("blocks_log", 100).await;
+    test_blocks_first_100().await;
 
-//     // restart ingestion from block 52
-//     run_test_process(
-//         env!("CARGO_BIN_EXE_ingestion"), // Binary path
-//         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-//         &["52", "3NLY4ci13GgX1GGkUrfTKr1Zt69U6Xj546d15nU9o1WrfHVnbosd"],
-//         Duration::from_secs(10),
-//     );
+    // restart ingestion from block 52
+    run_test_process(
+        env!("CARGO_BIN_EXE_ingestion"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        &["52", "3NLY4ci13GgX1GGkUrfTKr1Zt69U6Xj546d15nU9o1WrfHVnbosd"],
+        Duration::from_secs(10),
+    );
 
-//     truncate_table("blocks_log_0", 100).await;
-//     test_blocks_first_100().await;
-// }
+    truncate_table("blocks_log", 100).await;
+    test_blocks_first_100().await;
+}
 
 #[tokio::test]
 async fn test_blockchain_ledger() {
