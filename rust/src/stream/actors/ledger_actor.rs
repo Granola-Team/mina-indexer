@@ -272,7 +272,7 @@ mod blockchain_ledger_actor_tests {
         assert_eq!(result.unwrap(), 1);
 
         // Query the database to validate the appended records
-        let table = actor.table.lock().await;
+
         let rows = table
             .get_client()
             .query(
