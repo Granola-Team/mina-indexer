@@ -1,5 +1,5 @@
-use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, event_sourcing::actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
-use actors::{
+use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
+use block_ingestion_actors::{
     accounting_actor::AccountingActor, berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor,
     block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor, block_confirmations_actor::BlockConfirmationsActor,
     block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
@@ -18,8 +18,8 @@ use shared_publisher::SharedPublisher;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
-mod actors;
 pub mod berkeley_block_models;
+mod block_ingestion_actors;
 pub mod canonical_items_manager;
 pub mod db_logger;
 pub mod events;
