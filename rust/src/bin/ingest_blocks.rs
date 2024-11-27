@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use futures::future::try_join_all;
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
-    stream::{
+    event_sourcing::{
         shared_publisher::SharedPublisher,
         sourcing::{publish_block_dir_paths, publish_exempt_accounts, publish_genesis_block, publish_genesis_ledger_double_entries},
         subscribe_actors,
@@ -148,7 +148,7 @@ fn spawn_monitor(shared_publisher: Arc<SharedPublisher>, mut shutdown_receiver: 
 
 //     #[tokio::test]
 //     async fn test_ledger_at_height_5000() -> Result<()> {
-//         env::set_var("BLOCKS_DIR", "./src/stream/test_data/5000_mainnet_blocks");
+//         env::set_var("BLOCKS_DIR", "./src/event_sourcing/test_data/5000_mainnet_blocks");
 
 //         let client = setup_client().await;
 

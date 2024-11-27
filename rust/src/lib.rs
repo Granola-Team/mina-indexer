@@ -4,9 +4,9 @@ use duckdb::Connection;
 pub(crate) mod blockchain_tree;
 pub mod blocks;
 pub mod constants;
+pub mod event_sourcing;
 pub mod files;
 pub mod staking;
-pub mod stream;
 pub mod utility;
 
 const DB_FILE: &str = "mina.db";

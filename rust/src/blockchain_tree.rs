@@ -186,7 +186,7 @@ mod blockchain_tree_tests {
     use super::*;
     use crate::{
         constants::{GENESIS_STATE_HASH, TRANSITION_FRONTIER_DISTANCE},
-        stream::payloads::GenesisBlockPayload,
+        event_sourcing::payloads::GenesisBlockPayload,
     };
 
     #[test]
