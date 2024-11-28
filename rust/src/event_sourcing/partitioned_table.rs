@@ -106,7 +106,7 @@ impl PartitionedTableBuilder {
 
     /// Build and initialize the table and partitions, optionally deleting rows based on root node
     pub async fn build(self, root: &Option<(u64, String)>) -> Result<PartitionedTable> {
-        let table_name = format!("{}", self.name);
+        let table_name = self.name.to_string();
 
         // Ensure the `height` column is specified
         if !self.columns.iter().any(|col| col.starts_with("height")) {
