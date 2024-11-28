@@ -44,6 +44,13 @@ task ingest: [:build] do
   chdir root_dir
 end
 
+desc "Ingest staking ledgers"
+task staking: [:build] do
+  chdir "rust"
+  sh "cargo run --bin staking"
+  chdir root_dir
+end
+
 desc "Ingest From Root"
 task :ingest_from_root, [:height, :state_hash] => [:build] do |t, args|
   args.with_defaults(height: nil, state_hash: nil)

@@ -26,6 +26,7 @@ pub enum EventType {
     ActorHeight,
     EpochStakeDelegation,
     HeightSpread,
+    StakingLedgerFilePath,
 }
 
 #[derive(Debug, Clone, PartialEq)]

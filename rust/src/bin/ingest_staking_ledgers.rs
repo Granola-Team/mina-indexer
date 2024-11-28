@@ -1,14 +1,74 @@
 use anyhow::Result;
-use mina_indexer::{check_or_create_db_schema, staking};
-use tracing::Level;
-use tracing_subscriber::FmtSubscriber;
+use futures::future::try_join_all;
+use mina_indexer::{
+    constants::CHANNEL_MESSAGE_CAPACITY,
+    event_sourcing::{
+        events::{Event, EventType},
+        shared_publisher::SharedPublisher,
+        staking_ledger_actors::subscribe_staking_actors,
+    },
+    utility::extract_height_and_hash,
+};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
+use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let subscriber = FmtSubscriber::builder().with_max_level(Level::INFO).finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
-    check_or_create_db_schema()?;
+    let staking_ledger_dir = std::env::var("STAKING_LEDGER_DIR")
+        .map(PathBuf::from)
+        .expect("STAKING_LEDGER_DIR environment variable must be present and valid");
 
-    staking::run("/Users/jonathan/.mina-indexer/mina-indexer-dev/staking")
+    let shared_publisher = Arc::new(SharedPublisher::new(CHANNEL_MESSAGE_CAPACITY));
+
+    let mut staking_ledgers = get_staking_ledgers(&staking_ledger_dir)?;
+
+    sort_entries(&mut staking_ledgers);
+
+    let shared_publisher_clone = Arc::clone(&shared_publisher);
+
+    let actors_handle = tokio::spawn(async move {
+        if let Err(e) = subscribe_staking_actors(&shared_publisher, shutdown_receiver.resubscribe()).await {
+            eprintln!("Error in actor subscription: {:?}", e);
+        }
+    });
+
+    for staking_ledger in staking_ledgers {
+        println!("Publishing {:#?}", staking_ledger.to_str().unwrap());
+        shared_publisher_clone.publish(Event {
+            event_type: EventType::StakingLedgerFilePath,
+            payload: staking_ledger.to_str().unwrap().to_string(),
+        });
+    }
+
+    signal::ctrl_c().await?;
+    println!("SIGINT received, sending shutdown signal...");
+
+    // Send the shutdown signal
+    let _ = shutdown_sender.send(());
+    try_join_all([actors_handle]).await.unwrap();
+
+    Ok(())
+}
+
+fn get_staking_ledgers(staking_ledgers_dir: &Path) -> Result<Vec<PathBuf>> {
+    let entries: Vec<PathBuf> = std::fs::read_dir(staking_ledgers_dir)?
+        .filter_map(Result::ok)
+        .filter(|e| e.path().is_file())
+        .map(|e| e.path())
+        .collect();
+    Ok(entries)
+}
+
+fn sort_entries(entries: &mut [PathBuf]) {
+    entries.sort_by(|a, b| {
+        let (a_num, a_hash) = extract_height_and_hash(a);
+        let (b_num, b_hash) = extract_height_and_hash(b);
+
+        a_num.cmp(&b_num).then_with(|| a_hash.cmp(&b_hash))
+    });
 }
