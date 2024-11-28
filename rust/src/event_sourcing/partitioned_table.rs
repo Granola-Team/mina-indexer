@@ -194,7 +194,7 @@ mod partitioned_table_tests {
 
         // Setup the PartitionedTable
         let partitioned_table = PartitionedTable::builder(client)
-            .name("log")
+            .name("partitioned_table")
             .add_column("height BIGINT") // Explicitly adding the height column
             .add_column("state_hash TEXT")
             .add_column("timestamp BIGINT")
@@ -219,16 +219,28 @@ mod partitioned_table_tests {
             .expect("Failed to insert log");
 
         // Query the table to verify inserts
-        let log_query = "SELECT * FROM log WHERE height = $1";
-        let log_rows = partitioned_table.client.query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
+        let log_query = "SELECT * FROM partitioned_table WHERE height = $1";
+        let log_rows = partitioned_table
+            .client
+            .query(log_query, &[&(1_i64)])
+            .await
+            .expect("Failed to query partitioned_table table");
 
         // Assert the correct rows are present
         assert_eq!(log_rows.len(), 1, "Expected 1 row in the table");
 
-        let log_rows = partitioned_table.client.query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
+        let log_rows = partitioned_table
+            .client
+            .query(log_query, &[&(1_i64)])
+            .await
+            .expect("Failed to query partitioned_table table");
         assert_eq!(log_rows.len(), 1, "Expected 1 row in the table");
 
-        let log_rows = partitioned_table.client.query(log_query, &[&(2_i64)]).await.expect("Failed to query log table");
+        let log_rows = partitioned_table
+            .client
+            .query(log_query, &[&(2_i64)])
+            .await
+            .expect("Failed to query partitioned_table table");
         assert_eq!(log_rows.len(), 1, "Expected 1 row in the table");
     }
 
@@ -249,7 +261,7 @@ mod partitioned_table_tests {
 
             // Setup the PartitionedTable
             let partitioned_table = PartitionedTable::builder(client)
-                .name("log")
+                .name("partitioned_table")
                 .add_column("height BIGINT") // Explicitly adding the height column
                 .add_column("state_hash TEXT")
                 .add_column("timestamp BIGINT")
@@ -320,20 +332,20 @@ mod partitioned_table_tests {
             // Set the root node to height 2 (this will delete height 2 and its children)
             let root = Some((2, "state_hash_2_2".to_string()));
             let partitioned_table = PartitionedTable::builder(client)
-                .name("log")
+                .name("partitioned_table")
                 .add_column("height BIGINT")
                 .add_column("state_hash TEXT")
                 .add_column("timestamp BIGINT")
                 .build(&root) // Set root for deletion
                 .await
                 .expect("Failed to rebuild partitioned table with root");
-            let log_query = "SELECT * FROM log WHERE height = $1";
+            let log_query = "SELECT * FROM partitioned_table WHERE height = $1";
             // Query for height 1 and ensure that rows still exist for height 1
             let log_rows = partitioned_table
                 .client
                 .query(log_query, &[&(1_i64)])
                 .await
-                .expect("Failed to query log table for height 1");
+                .expect("Failed to query partitioned_table table for height 1");
 
             // Assert that rows for height 1 are still present
             assert_eq!(log_rows.len(), 3, "Expected 3 rows in the table for height 1");
@@ -343,18 +355,18 @@ mod partitioned_table_tests {
                 .client
                 .query(log_query, &[&(3_i64)])
                 .await
-                .expect("Failed to query log table for height 3");
+                .expect("Failed to query partitioned_table table for height 3");
 
             // Assert that rows for height 3 are still present
             assert_eq!(log_rows.len(), 0, "Expected 0 rows in the table for height 3");
 
             // Query for height 2 and check that the state_hash rows are deleted
-            let log_query = "SELECT * FROM log WHERE height = $1";
+            let log_query = "SELECT * FROM partitioned_table WHERE height = $1";
             let deleted_row = partitioned_table
                 .client
                 .query(log_query, &[&(2_i64)])
                 .await
-                .expect("Failed to query log table for specific state_hash");
+                .expect("Failed to query partitioned_table table for specific state_hash");
 
             // Ensure no rows exist for the deleted state_hash at height 2
             assert_eq!(deleted_row.len(), 2, "Expected 2 rows at height 2");
@@ -377,7 +389,7 @@ mod partitioned_table_tests {
 
         // Setup the PartitionedTable
         let partitioned_table = PartitionedTable::builder(client)
-            .name("log")
+            .name("partitioned_table")
             .add_column("height BIGINT") // Explicitly adding the height column
             .add_column("state_hash TEXT")
             .add_column("timestamp BIGINT")
@@ -389,15 +401,15 @@ mod partitioned_table_tests {
         partitioned_table
             .insert(&[&10001_i64, &"state_hash_10001", &1234567890i64], 10001)
             .await
-            .expect("Failed to insert log at height 10001");
+            .expect("Failed to insert partitioned_table at height 10001");
 
         // Query the table to verify that the row was inserted correctly
-        let log_query = "SELECT * FROM log WHERE height = $1";
+        let log_query = "SELECT * FROM partitioned_table WHERE height = $1";
         let log_rows = partitioned_table
             .client
             .query(log_query, &[&(10001_i64)])
             .await
-            .expect("Failed to query log table");
+            .expect("Failed to query partitioned_table table");
 
         // Assert that the row was inserted
         assert_eq!(log_rows.len(), 1, "Expected 1 row in the table for height 10001");
