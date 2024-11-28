@@ -69,7 +69,7 @@ impl DbLoggerBuilder {
         let partitioned_table_builder = self
             .columns
             .iter()
-            .fold(PartitionedTable::builder(self.client).name(&self.name), |builder, column| {
+            .fold(PartitionedTable::builder(self.client).name(&table_name), |builder, column| {
                 builder.add_column(column)
             });
 
