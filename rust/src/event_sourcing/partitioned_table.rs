@@ -106,17 +106,16 @@ impl PartitionedTableBuilder {
 
     /// Build and initialize the table and partitions, optionally deleting rows based on root node
     pub async fn build(self, root: &Option<(u64, String)>) -> Result<PartitionedTable> {
-        let table_name = format!("{}_log", self.name);
-        let view_name = self.name.clone();
+        let table_name = format!("{}", self.name);
 
         // Ensure the `height` column is specified
         if !self.columns.iter().any(|col| col.starts_with("height")) {
             panic!("The column 'height' is required but not found.");
         }
 
-        // Drop the table and view if necessary
+        // Drop the table
         if root.is_none() {
-            self.drop_table_and_view(&table_name, &view_name).await?;
+            self.drop_table(&table_name).await?;
         }
 
         // Create the table with partitioning by height
@@ -127,9 +126,6 @@ impl PartitionedTableBuilder {
             self.handle_root_node_deletion(&table_name, height.to_owned(), state_hash).await?;
         }
 
-        // Create the view with distinct columns
-        self.create_view(&table_name, &view_name).await?;
-
         // Return the PartitionedTable instance
         Ok(PartitionedTable {
             client: self.client,
@@ -138,12 +134,10 @@ impl PartitionedTableBuilder {
         })
     }
 
-    // Drop the table and view if necessary
-    async fn drop_table_and_view(&self, table_name: &str, view_name: &str) -> Result<()> {
+    // Drop the table
+    async fn drop_table(&self, table_name: &str) -> Result<()> {
         let drop_table = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
         self.client.execute(&drop_table, &[]).await?;
-        let drop_view = format!("DROP VIEW IF EXISTS {};", view_name);
-        self.client.execute(&drop_view, &[]).await?;
         Ok(())
     }
 
@@ -174,27 +168,6 @@ impl PartitionedTableBuilder {
 
         self.client.execute(&truncate_query, &[&(height as i64), &state_hash.to_string()]).await?;
 
-        Ok(())
-    }
-
-    // Create the view with distinct columns
-    async fn create_view(&self, table_name: &str, view_name: &str) -> Result<()> {
-        let distinct_columns = self
-            .columns
-            .iter()
-            .map(|col| col.split_whitespace().next().unwrap()) // Default to all column names
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let view_query = format!(
-            "CREATE OR REPLACE VIEW {} AS
-            SELECT DISTINCT ON ({}) *
-            FROM {}
-            ORDER BY {}, entry_id DESC;",
-            view_name, distinct_columns, table_name, distinct_columns
-        );
-
-        self.client.execute(&view_query, &[]).await?;
         Ok(())
     }
 }
@@ -246,7 +219,7 @@ mod partitioned_table_tests {
             .expect("Failed to insert log");
 
         // Query the table to verify inserts
-        let log_query = "SELECT * FROM log_log WHERE height = $1";
+        let log_query = "SELECT * FROM log WHERE height = $1";
         let log_rows = partitioned_table.client.query(log_query, &[&(1_i64)]).await.expect("Failed to query log table");
 
         // Assert the correct rows are present
@@ -354,7 +327,7 @@ mod partitioned_table_tests {
                 .build(&root) // Set root for deletion
                 .await
                 .expect("Failed to rebuild partitioned table with root");
-            let log_query = "SELECT * FROM log_log WHERE height = $1";
+            let log_query = "SELECT * FROM log WHERE height = $1";
             // Query for height 1 and ensure that rows still exist for height 1
             let log_rows = partitioned_table
                 .client
@@ -376,7 +349,7 @@ mod partitioned_table_tests {
             assert_eq!(log_rows.len(), 0, "Expected 0 rows in the table for height 3");
 
             // Query for height 2 and check that the state_hash rows are deleted
-            let log_query = "SELECT * FROM log_log WHERE height = $1";
+            let log_query = "SELECT * FROM log WHERE height = $1";
             let deleted_row = partitioned_table
                 .client
                 .query(log_query, &[&(2_i64)])
@@ -419,7 +392,7 @@ mod partitioned_table_tests {
             .expect("Failed to insert log at height 10001");
 
         // Query the table to verify that the row was inserted correctly
-        let log_query = "SELECT * FROM log_log WHERE height = $1";
+        let log_query = "SELECT * FROM log WHERE height = $1";
         let log_rows = partitioned_table
             .client
             .query(log_query, &[&(10001_i64)])
