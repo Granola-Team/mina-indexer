@@ -1,4 +1,9 @@
+use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct StakingEntry {
@@ -7,9 +12,66 @@ pub struct StakingEntry {
     pub delegate: String,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct StakingLedger {
+    entries: Vec<StakingEntry>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StakeSummary {
+    pub delegate: String,
+    pub stake: u64,
+    pub total_staked: u64,
+    pub delegators: HashSet<String>,
+}
+
+impl StakeSummary {
+    pub fn get_stake_percentage(&self) -> f32 {
+        let percentage = self.stake.to_f32().unwrap() / self.total_staked.to_f32().unwrap() * 100_f32;
+        format!("{:.2}", percentage).parse::<f32>().unwrap()
+    }
+}
+
+impl StakingLedger {
+    pub fn new(entries: Vec<StakingEntry>) -> Self {
+        Self { entries }
+    }
+
+    pub fn get_total_staked(&self) -> u64 {
+        self.entries.iter().fold(0_u64, |total_stake, staking_entry| {
+            let balance_nanomina = BigDecimal::from_str(&staking_entry.balance).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+            total_stake + balance_nanomina.to_u64().unwrap()
+        })
+    }
+
+    pub fn get_stakes(&self, total_staked: u64) -> HashMap<String, StakeSummary> {
+        let mut stakes: HashMap<String, StakeSummary> = HashMap::new();
+        for staking_entry in self.entries.iter() {
+            let key = staking_entry.delegate.to_string();
+            let balance_nanomina = BigDecimal::from_str(&staking_entry.balance).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+            if !stakes.contains_key(&key) {
+                stakes.insert(
+                    key.to_string(),
+                    StakeSummary {
+                        delegate: key.to_string(),
+                        stake: 0,
+                        total_staked,
+                        delegators: HashSet::new(),
+                    },
+                );
+            }
+            stakes.get_mut(&key).map(|entry| {
+                entry.delegators.insert(staking_entry.pk.to_string());
+                entry.stake += balance_nanomina.to_u64().unwrap()
+            });
+        }
+        stakes
+    }
+}
+
 #[cfg(test)]
 mod staking_ledger_parsing_tests {
-    use super::StakingEntry;
+    use super::{StakingEntry, StakingLedger};
     use std::path::Path;
 
     #[test]
@@ -20,5 +82,14 @@ mod staking_ledger_parsing_tests {
         let staking_entries: Vec<StakingEntry> = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
         assert_eq!(staking_entries.len(), 25_524);
+
+        let staking_ledger = StakingLedger::new(staking_entries);
+
+        let staking_summary = staking_ledger.get_stakes(staking_ledger.get_total_staked());
+
+        println!("{:#?}", staking_summary.get("B62qkRodi7nj6W1geB12UuW2XAx2yidWZCcDthJvkf9G4A6G5GFasVQ").unwrap());
+
+        let pan_summary = staking_summary.get("B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN").unwrap();
+        assert_eq!(pan_summary.get_stake_percentage(), 2.33);
     }
 }
