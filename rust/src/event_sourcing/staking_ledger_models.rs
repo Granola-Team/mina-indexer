@@ -71,10 +71,10 @@ impl StakingLedger {
 
 #[cfg(test)]
 mod staking_ledger_parsing_tests {
-    use super::{StakingEntry, StakingLedger};
+    use super::{StakeSummary, StakingEntry, StakingLedger};
     use bigdecimal::{BigDecimal, ToPrimitive};
     use serde::{Deserialize, Serialize};
-    use std::{collections::HashMap, path::Path, str::FromStr};
+    use std::{collections::HashMap, str::FromStr};
 
     #[derive(Serialize, Deserialize, Debug)]
     struct StakingEntryFixture {
@@ -101,30 +101,33 @@ mod staking_ledger_parsing_tests {
 
     #[test]
     fn test_parsing_staking_ledger() {
-        let mut staking_entries: Vec<StakingEntry> = vec![];
-        let mut expected_staking_entries: HashMap<String, StakingEntryFixture> = HashMap::new();
-        {
-            let path = Path::new("./src/event_sourcing/test_data/staking_ledgers/mainnet-9-jxVLvFcBbRCDSM8MHLam6UPVPo2KDegbzJN6MTZWyhTvDrPcjYk.json");
-            let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
-            staking_entries = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
-        }
-        {
-            let path = Path::new("./src/event_sourcing/test_data/staking_ledgers/mainnet-9-staking-data.json");
-            let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
-            expected_staking_entries = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
-        }
+        const STAKING_LEDGER_PATH: &str = "./src/event_sourcing/test_data/staking_ledgers/mainnet-9-jxVLvFcBbRCDSM8MHLam6UPVPo2KDegbzJN6MTZWyhTvDrPcjYk.json";
+        const EXPECTED_DATA_PATH: &str = "./src/event_sourcing/test_data/staking_ledgers/mainnet-9-staking-data.json";
+
+        let staking_entries: Vec<StakingEntry> = {
+            let file_content = std::fs::read_to_string(STAKING_LEDGER_PATH).expect("Failed to read staking ledger file");
+            sonic_rs::from_str(&file_content).expect("Failed to parse staking ledger JSON")
+        };
+
+        let expected_staking_entries: HashMap<String, StakingEntryFixture> = {
+            let file_content = std::fs::read_to_string(EXPECTED_DATA_PATH).expect("Failed to read expected data file");
+            sonic_rs::from_str(&file_content).expect("Failed to parse expected data JSON")
+        };
 
         assert_eq!(staking_entries.len(), 25_524);
 
         let staking_ledger = StakingLedger::new(staking_entries);
-
         let staking_summary = staking_ledger.get_stakes(staking_ledger.get_total_staked());
 
         for (key, expected_staking_entry) in expected_staking_entries.iter() {
-            let entry = staking_summary.get(key).unwrap();
-            assert_eq!(entry.get_stake_percentage(), expected_staking_entry.get_total_stake_percentage());
-            assert_eq!(entry.stake, expected_staking_entry.get_stake());
-            assert_eq!(entry.delegators.len() as u64, expected_staking_entry.get_delegators());
+            let entry = staking_summary.get(key).expect(&format!("Missing staking summary entry for key: {}", key));
+            assert_stake_summary_matches(entry, expected_staking_entry);
         }
+    }
+
+    fn assert_stake_summary_matches(actual: &StakeSummary, expected: &StakingEntryFixture) {
+        assert_eq!(actual.get_stake_percentage(), expected.get_total_stake_percentage());
+        assert_eq!(actual.stake, expected.get_stake());
+        assert_eq!(actual.delegators.len() as u64, expected.get_delegators());
     }
 }
