@@ -13,6 +13,15 @@ pub struct NewAccountPayload {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct StakingLedgerEntryPayload {
+    pub epoch: u64,
+    pub delegate: String,
+    pub stake: u64,
+    pub total_staked: u64,
+    pub delegators_count: u64,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct ActorHeightPayload {
     pub height: u64,
     pub actor: String,

@@ -27,6 +27,7 @@ pub enum EventType {
     EpochStakeDelegation,
     HeightSpread,
     StakingLedgerFilePath,
+    StakingLedgerEntry,
 }
 
 #[derive(Debug, Clone, PartialEq)]
