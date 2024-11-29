@@ -31,6 +31,7 @@ pub mod payloads;
 pub mod shared_publisher;
 pub mod sourcing;
 pub mod staking_ledger_actors;
+pub mod staking_ledger_models;
 
 pub async fn subscribe_actors(
     shared_publisher: &Arc<SharedPublisher>,
