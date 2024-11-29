@@ -1,11 +1,11 @@
 use super::shared_publisher::SharedPublisher;
 use crate::event_sourcing::{block_ingestion_actors::Actor, setup_actor};
 use futures::future::try_join_all;
-use staking_ledger_parser_actor::StakingLedgerEntryActor;
+use staking_ledger_entry_actor::StakingLedgerEntryActor;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
-pub(crate) mod staking_ledger_parser_actor;
+pub(crate) mod staking_ledger_entry_actor;
 
 pub async fn subscribe_staking_actors(
     shared_publisher: &Arc<SharedPublisher>,
