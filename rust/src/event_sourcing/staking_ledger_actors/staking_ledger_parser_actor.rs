@@ -16,16 +16,16 @@ use std::{
     sync::{atomic::AtomicUsize, Arc},
 };
 
-pub struct StakingLedgerParserActor {
+pub struct StakingLedgerEntryActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
 }
 
-impl StakingLedgerParserActor {
+impl StakingLedgerEntryActor {
     pub fn new(shared_publisher: Arc<SharedPublisher>) -> Self {
         Self {
-            id: "StakingLedgerParserActor".to_string(),
+            id: "StakingLedgerEntryActor".to_string(),
             shared_publisher,
             events_published: AtomicUsize::new(0),
         }
@@ -33,7 +33,7 @@ impl StakingLedgerParserActor {
 }
 
 #[async_trait]
-impl Actor for StakingLedgerParserActor {
+impl Actor for StakingLedgerEntryActor {
     fn id(&self) -> String {
         self.id.clone()
     }
@@ -99,7 +99,7 @@ mod staking_ledger_parser_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(CHANNEL_MESSAGE_CAPACITY));
 
         // Create the actor
-        let actor = StakingLedgerParserActor::new(shared_publisher.clone());
+        let actor = StakingLedgerEntryActor::new(shared_publisher.clone());
         let mut receiver = shared_publisher.subscribe();
 
         // Create a test event
