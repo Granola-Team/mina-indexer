@@ -15,10 +15,12 @@ pub struct StakingEntry {
 #[derive(Serialize, Deserialize)]
 pub struct StakingLedger {
     entries: Vec<StakingEntry>,
+    epoch: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StakeSummary {
+    pub epoch: u64,
     pub delegate: String,
     pub stake: u64,
     pub total_staked: u64,
@@ -33,8 +35,8 @@ impl StakeSummary {
 }
 
 impl StakingLedger {
-    pub fn new(entries: Vec<StakingEntry>) -> Self {
-        Self { entries }
+    pub fn new(entries: Vec<StakingEntry>, epoch: u64) -> Self {
+        Self { entries, epoch }
     }
 
     pub fn get_total_staked(&self) -> u64 {
@@ -46,26 +48,40 @@ impl StakingLedger {
 
     pub fn get_stakes(&self, total_staked: u64) -> HashMap<String, StakeSummary> {
         let mut stakes: HashMap<String, StakeSummary> = HashMap::new();
-        for staking_entry in self.entries.iter() {
-            let key = staking_entry.delegate.to_string();
+
+        for staking_entry in &self.entries {
+            let delegate_key = staking_entry.delegate.to_string();
+            let delegator_key = staking_entry.pk.to_string();
             let balance_nanomina = BigDecimal::from_str(&staking_entry.balance).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
-            if !stakes.contains_key(&key) {
-                stakes.insert(
-                    key.to_string(),
-                    StakeSummary {
-                        delegate: key.to_string(),
-                        stake: 0,
-                        total_staked,
-                        delegators: HashSet::new(),
-                    },
-                );
+
+            // Ensure entries exist for both the delegate and delegator
+            Self::ensure_stake_summary(&mut stakes, &delegate_key, total_staked, self.epoch);
+            Self::ensure_stake_summary(&mut stakes, &delegator_key, total_staked, self.epoch);
+
+            // Update the delegate's stake and delegators
+            if let Some(entry) = stakes.get_mut(&delegate_key) {
+                entry.delegators.insert(delegator_key.clone());
+                entry.stake += balance_nanomina.to_u64().unwrap();
             }
-            if let Some(entry) = stakes.get_mut(&key) {
-                entry.delegators.insert(staking_entry.pk.to_string());
-                entry.stake += balance_nanomina.to_u64().unwrap()
-            };
+
+            // Set the delegate for the delegator
+            if let Some(entry) = stakes.get_mut(&delegator_key) {
+                entry.delegate = delegate_key.clone();
+            }
         }
+
         stakes
+    }
+
+    /// Ensure a `StakeSummary` exists in the stakes map.
+    fn ensure_stake_summary(stakes: &mut HashMap<String, StakeSummary>, key: &str, total_staked: u64, epoch: u64) {
+        stakes.entry(key.to_string()).or_insert_with(|| StakeSummary {
+            epoch,
+            delegate: String::new(),
+            stake: 0,
+            total_staked,
+            delegators: HashSet::new(),
+        });
     }
 }
 
@@ -116,20 +132,21 @@ mod staking_ledger_parsing_tests {
 
         assert_eq!(staking_entries.len(), 25_524);
 
-        let staking_ledger = StakingLedger::new(staking_entries);
+        let staking_ledger = StakingLedger::new(staking_entries, 9);
         let staking_summary = staking_ledger.get_stakes(staking_ledger.get_total_staked());
 
         for (key, expected_staking_entry) in expected_staking_entries.iter() {
             let entry = staking_summary
                 .get(key)
                 .unwrap_or_else(|| panic!("Missing staking summary entry for key: {}", key));
-            assert_stake_summary_matches(entry, expected_staking_entry);
+            assert_stake_summary_matches(entry, expected_staking_entry, key);
         }
     }
 
-    fn assert_stake_summary_matches(actual: &StakeSummary, expected: &StakingEntryFixture) {
+    fn assert_stake_summary_matches(actual: &StakeSummary, expected: &StakingEntryFixture, expected_delegate: &str) {
         assert_eq!(actual.get_stake_percentage(), expected.get_total_stake_percentage());
         assert_eq!(actual.stake, expected.get_stake());
         assert_eq!(actual.delegators.len() as u64, expected.get_delegators());
+        assert_eq!(actual.delegate, expected_delegate);
     }
 }
