@@ -72,14 +72,47 @@ impl StakingLedger {
 #[cfg(test)]
 mod staking_ledger_parsing_tests {
     use super::{StakingEntry, StakingLedger};
-    use std::path::Path;
+    use bigdecimal::{BigDecimal, ToPrimitive};
+    use serde::{Deserialize, Serialize};
+    use std::{collections::HashMap, path::Path, str::FromStr};
+
+    #[derive(Serialize, Deserialize, Debug)]
+    struct StakingEntryFixture {
+        pub stake: String,
+        pub total_stake: String,
+        pub delegators: String,
+    }
+
+    impl StakingEntryFixture {
+        pub fn get_stake(&self) -> u64 {
+            let stake = self.stake.replace(",", "");
+            let stake = BigDecimal::from_str(&stake).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+            stake.to_u64().unwrap()
+        }
+
+        pub fn get_total_stake_percentage(&self) -> f32 {
+            self.total_stake.parse::<f32>().unwrap()
+        }
+
+        pub fn get_delegators(&self) -> u64 {
+            self.delegators.parse::<u64>().unwrap()
+        }
+    }
 
     #[test]
     fn test_parsing_staking_ledger() {
-        let path = Path::new("./src/event_sourcing/test_data/staking_ledgers/mainnet-9-jxVLvFcBbRCDSM8MHLam6UPVPo2KDegbzJN6MTZWyhTvDrPcjYk.json");
-        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
-
-        let staking_entries: Vec<StakingEntry> = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        let mut staking_entries: Vec<StakingEntry> = vec![];
+        let mut expected_staking_entries: HashMap<String, StakingEntryFixture> = HashMap::new();
+        {
+            let path = Path::new("./src/event_sourcing/test_data/staking_ledgers/mainnet-9-jxVLvFcBbRCDSM8MHLam6UPVPo2KDegbzJN6MTZWyhTvDrPcjYk.json");
+            let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+            staking_entries = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        }
+        {
+            let path = Path::new("./src/event_sourcing/test_data/staking_ledgers/mainnet-9-staking-data.json");
+            let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
+            expected_staking_entries = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        }
 
         assert_eq!(staking_entries.len(), 25_524);
 
@@ -87,9 +120,11 @@ mod staking_ledger_parsing_tests {
 
         let staking_summary = staking_ledger.get_stakes(staking_ledger.get_total_staked());
 
-        println!("{:#?}", staking_summary.get("B62qkRodi7nj6W1geB12UuW2XAx2yidWZCcDthJvkf9G4A6G5GFasVQ").unwrap());
-
-        let pan_summary = staking_summary.get("B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN").unwrap();
-        assert_eq!(pan_summary.get_stake_percentage(), 2.33);
+        for (key, expected_staking_entry) in expected_staking_entries.iter() {
+            let entry = staking_summary.get(key).unwrap();
+            assert_eq!(entry.get_stake_percentage(), expected_staking_entry.get_total_stake_percentage());
+            assert_eq!(entry.stake, expected_staking_entry.get_stake());
+            assert_eq!(entry.delegators.len() as u64, expected_staking_entry.get_delegators());
+        }
     }
 }
