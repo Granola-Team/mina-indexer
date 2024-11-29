@@ -69,6 +69,6 @@ fn sort_entries(entries: &mut [PathBuf]) {
         let (a_num, a_hash) = extract_height_and_hash(a);
         let (b_num, b_hash) = extract_height_and_hash(b);
 
-        a_num.cmp(&b_num).then_with(|| a_hash.cmp(&b_hash))
+        a_num.cmp(&b_num).then_with(|| a_hash.cmp(b_hash))
     });
 }

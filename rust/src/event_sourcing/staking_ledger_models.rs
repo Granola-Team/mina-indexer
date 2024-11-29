@@ -60,10 +60,10 @@ impl StakingLedger {
                     },
                 );
             }
-            stakes.get_mut(&key).map(|entry| {
+            if let Some(entry) = stakes.get_mut(&key) {
                 entry.delegators.insert(staking_entry.pk.to_string());
                 entry.stake += balance_nanomina.to_u64().unwrap()
-            });
+            };
         }
         stakes
     }
@@ -120,7 +120,9 @@ mod staking_ledger_parsing_tests {
         let staking_summary = staking_ledger.get_stakes(staking_ledger.get_total_staked());
 
         for (key, expected_staking_entry) in expected_staking_entries.iter() {
-            let entry = staking_summary.get(key).expect(&format!("Missing staking summary entry for key: {}", key));
+            let entry = staking_summary
+                .get(key)
+                .unwrap_or_else(|| panic!("Missing staking summary entry for key: {}", key));
             assert_stake_summary_matches(entry, expected_staking_entry);
         }
     }
