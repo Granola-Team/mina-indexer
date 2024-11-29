@@ -2,17 +2,23 @@ use super::shared_publisher::SharedPublisher;
 use crate::event_sourcing::{block_ingestion_actors::Actor, setup_actor};
 use futures::future::try_join_all;
 use staking_ledger_entry_actor::StakingLedgerEntryActor;
+use staking_ledger_entry_persistence_actor::StakingLedgerEntryPersistenceActor;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
 pub(crate) mod staking_ledger_entry_actor;
+pub(crate) mod staking_ledger_entry_persistence_actor;
 
 pub async fn subscribe_staking_actors(
     shared_publisher: &Arc<SharedPublisher>,
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
 ) -> anyhow::Result<()> {
     // Define actors
-    let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![Arc::new(StakingLedgerEntryActor::new(Arc::clone(shared_publisher)))];
+    let staking_ledger_persistence_actor = StakingLedgerEntryPersistenceActor::new(Arc::clone(shared_publisher)).await;
+    let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
+        Arc::new(StakingLedgerEntryActor::new(Arc::clone(shared_publisher))),
+        Arc::new(staking_ledger_persistence_actor),
+    ];
 
     let monitor_actors = actors.clone();
     let monitor_shutdown_rx = shutdown_receiver.resubscribe();

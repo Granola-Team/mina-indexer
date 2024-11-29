@@ -12,6 +12,7 @@ use mina_indexer::{
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 use tokio::{signal, sync::broadcast};
 
@@ -37,12 +38,16 @@ async fn main() -> Result<()> {
         }
     });
 
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
     for staking_ledger in staking_ledgers {
-        println!("Publishing {:#?}", staking_ledger.to_str().unwrap());
         shared_publisher_clone.publish(Event {
             event_type: EventType::StakingLedgerFilePath,
             payload: staking_ledger.to_str().unwrap().to_string(),
         });
+        let (height, _) = extract_height_and_hash(staking_ledger.as_path());
+        println!("Published Staking Ledger {height}");
+        tokio::time::sleep(Duration::from_secs(10)).await;
     }
 
     signal::ctrl_c().await?;

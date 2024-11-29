@@ -12,7 +12,7 @@ pub struct NewAccountPayload {
     pub account: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StakingLedgerEntryPayload {
     pub epoch: u64,
     pub delegate: String,
