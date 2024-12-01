@@ -1,4 +1,4 @@
-use super::partitioned_table::ManagedTable;
+use super::managed_table::ManagedTable;
 use anyhow::Result;
 use tokio_postgres::Client;
 

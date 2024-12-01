@@ -6,7 +6,7 @@ use super::super::{
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
-        partitioned_table::ManagedTable,
+        managed_table::ManagedTable,
         payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
     },
 };
