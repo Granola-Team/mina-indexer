@@ -3,7 +3,7 @@ use anyhow::Result;
 use tokio_postgres::Client;
 
 pub struct DbLogger {
-    partitioned_table: ManagedTable,
+    table: ManagedTable,
 }
 
 impl DbLogger {
@@ -18,7 +18,7 @@ impl DbLogger {
     }
 
     pub fn get_client(&self) -> &Client {
-        self.partitioned_table.get_client()
+        self.table.get_client()
     }
 
     /// Insert a row into the table
@@ -27,7 +27,7 @@ impl DbLogger {
         values: &[&(dyn tokio_postgres::types::ToSql + Sync)],
         height: u64, // Explicit height parameter
     ) -> Result<u64> {
-        self.partitioned_table.insert(values, height).await
+        self.table.insert(values, height).await
     }
 }
 
@@ -66,14 +66,14 @@ impl DbLoggerBuilder {
         let drop_view_query = format!("DROP VIEW IF EXISTS {};", view_name);
         self.client.execute(&drop_view_query, &[]).await?;
 
-        let partitioned_table_builder = self
+        let table_builder = self
             .columns
             .iter()
             .fold(ManagedTable::builder(self.client).name(&table_name), |builder, column| {
                 builder.add_column(column)
             });
 
-        let partitioned_table = partitioned_table_builder.build(root_node).await?;
+        let table = table_builder.build(root_node).await?;
 
         // Create the view with distinct columns
         let distinct_columns = if self.distinct_columns.is_empty() {
@@ -94,9 +94,9 @@ impl DbLoggerBuilder {
             view_name, distinct_columns, table_name, distinct_columns
         );
 
-        partitioned_table.get_client().execute(&view_query, &[]).await?;
+        table.get_client().execute(&view_query, &[]).await?;
 
-        Ok(DbLogger { partitioned_table })
+        Ok(DbLogger { table })
     }
 }
 
