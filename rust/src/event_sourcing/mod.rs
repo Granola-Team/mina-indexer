@@ -53,14 +53,19 @@ pub async fn subscribe_actors(
         ));
     }
 
+    let mut snark_persistence_actors = vec![];
+    for i in 0..=9 {
+        snark_persistence_actors.push(Arc::new(SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await));
+    }
+
     assert_eq!(user_command_persistence_actors.len(), 10, "10 CanonicalUserCommandPersistenceActor required");
     assert_eq!(internal_command_persistence_actors.len(), 10, "10 InternalUserCommandPersistenceActor required");
+    assert_eq!(snark_persistence_actors.len(), 10, "10 SnarkSummaryPersistenceActor required");
 
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
-    let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
     let mut actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
@@ -84,8 +89,6 @@ pub async fn subscribe_actors(
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
-        // Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
-        Arc::new(snark_summary_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
         Arc::new(canonical_block_log_persistence_actor),
@@ -96,6 +99,9 @@ pub async fn subscribe_actors(
     }
     for it in internal_command_persistence_actors {
         actors.push(it);
+    }
+    for s in snark_persistence_actors {
+        actors.push(s);
     }
 
     let monitor_actors = actors.clone();
