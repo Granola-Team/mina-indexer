@@ -40,7 +40,13 @@ pub async fn subscribe_actors(
 ) -> anyhow::Result<()> {
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
-    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let mut user_command_persistence_actors = vec![];
+    for i in 0..=9 {
+        user_command_persistence_actors.push(Arc::new(
+            CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await,
+        ));
+    }
+    assert_eq!(user_command_persistence_actors.len(), 10, "10 CanonicalUserCommandPersistenceActor required");
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
@@ -48,7 +54,7 @@ pub async fn subscribe_actors(
     let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
-    let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
+    let mut actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
         Arc::new(PCBBlockPathActor::new(Arc::clone(shared_publisher))),
         Arc::new(BerkeleyBlockParserActor::new(Arc::clone(shared_publisher))),
         Arc::new(MainnetBlockParserActor::new(Arc::clone(shared_publisher))),
@@ -71,13 +77,15 @@ pub async fn subscribe_actors(
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
         // Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(snark_summary_persistence_actor),
-        Arc::new(user_command_persistence_actor),
         Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
         Arc::new(canonical_block_log_persistence_actor),
         Arc::new(staking_ledger_actor),
     ];
+    for uc in user_command_persistence_actors {
+        actors.push(uc);
+    }
 
     let monitor_actors = actors.clone();
     let monitor_shutdown_rx = shutdown_receiver.resubscribe();
