@@ -22,7 +22,7 @@ impl ManagedTable {
     }
 
     /// Append a row into the table
-    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], _height: u64) -> Result<u64> {
+    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)]) -> Result<u64> {
         let column_names = self
             .columns
             .iter()
@@ -167,17 +167,17 @@ mod test_table_tests {
 
         // Insert data with explicit height parameter
         test_table
-            .insert(&[&1_i64, &"state_hash_1", &1234567890i64], 1)
+            .insert(&[&1_i64, &"state_hash_1", &1234567890i64])
             .await
             .expect("Failed to insert log");
 
         test_table
-            .insert(&[&2_i64, &"state_hash_2", &1234567891i64], 1)
+            .insert(&[&2_i64, &"state_hash_2", &1234567891i64])
             .await
             .expect("Failed to insert log");
 
         test_table
-            .insert(&[&3_i64, &"state_hash_3", &1234567892i64], 1)
+            .insert(&[&3_i64, &"state_hash_3", &1234567892i64])
             .await
             .expect("Failed to insert log");
 
@@ -223,47 +223,47 @@ mod test_table_tests {
             // Insert 3 rows for each of 3 heights: 0, 1, and 2 (total of 9 rows)
             // Ensure the height corresponds to 1, 2, or 3
             test_table
-                .insert(&[&1_i64, &"state_hash_1_1", &1234567890i64], 1)
+                .insert(&[&1_i64, &"state_hash_1_1", &1234567890i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&2_i64, &"state_hash_1_2", &1234567891i64], 2)
+                .insert(&[&2_i64, &"state_hash_1_2", &1234567891i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&3_i64, &"state_hash_1_3", &1234567892i64], 3)
+                .insert(&[&3_i64, &"state_hash_1_3", &1234567892i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&1_i64, &"state_hash_2_1", &1234567893i64], 1)
+                .insert(&[&1_i64, &"state_hash_2_1", &1234567893i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&2_i64, &"state_hash_2_2", &1234567894i64], 2)
+                .insert(&[&2_i64, &"state_hash_2_2", &1234567894i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&3_i64, &"state_hash_2_3", &1234567895i64], 3)
+                .insert(&[&3_i64, &"state_hash_2_3", &1234567895i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&1_i64, &"state_hash_3_1", &1234567896i64], 1)
+                .insert(&[&1_i64, &"state_hash_3_1", &1234567896i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&2_i64, &"state_hash_3_2", &1234567897i64], 2)
+                .insert(&[&2_i64, &"state_hash_3_2", &1234567897i64])
                 .await
                 .expect("Failed to insert log");
 
             test_table
-                .insert(&[&3_i64, &"state_hash_3_3", &1234567898i64], 3)
+                .insert(&[&3_i64, &"state_hash_3_3", &1234567898i64])
                 .await
                 .expect("Failed to insert log");
         }

@@ -84,19 +84,16 @@ impl LedgerActor {
         };
 
         match table
-            .insert(
-                &[
-                    &payload.account,
-                    &payload.account_type.to_string(),
-                    &balance_delta,
-                    &payload.counterparty.to_string(),
-                    &payload.transfer_type.to_string(),
-                    height,
-                    &state_hash,
-                    timestamp,
-                ],
-                height.to_owned() as u64,
-            )
+            .insert(&[
+                &payload.account,
+                &payload.account_type.to_string(),
+                &balance_delta,
+                &payload.counterparty.to_string(),
+                &payload.transfer_type.to_string(),
+                height,
+                &state_hash,
+                timestamp,
+            ])
             .await
         {
             Err(e) => {

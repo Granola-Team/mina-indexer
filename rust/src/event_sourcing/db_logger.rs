@@ -22,12 +22,8 @@ impl DbLogger {
     }
 
     /// Insert a row into the table
-    pub async fn insert(
-        &self,
-        values: &[&(dyn tokio_postgres::types::ToSql + Sync)],
-        height: u64, // Explicit height parameter
-    ) -> Result<u64> {
-        self.table.insert(values, height).await
+    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], _height: u64) -> Result<u64> {
+        self.table.insert(values).await
     }
 }
 

@@ -83,10 +83,7 @@ impl StakingLedgerActor {
 
         match self
             .table
-            .insert(
-                &[&payload.account, &payload.counterparty, &stake_delta, epoch, height, &state_hash.to_owned()],
-                height.to_owned() as u64,
-            )
+            .insert(&[&payload.account, &payload.counterparty, &stake_delta, epoch, height, &state_hash.to_owned()])
             .await
         {
             Err(e) => {
