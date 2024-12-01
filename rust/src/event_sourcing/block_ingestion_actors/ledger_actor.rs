@@ -6,7 +6,7 @@ use super::super::{
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
-        partitioned_table::PartitionedTable,
+        partitioned_table::ManagedTable,
         payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
     },
 };
@@ -20,7 +20,7 @@ pub struct LedgerActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub table: Arc<Mutex<PartitionedTable>>,
+    pub table: Arc<Mutex<ManagedTable>>,
 }
 
 impl LedgerActor {
@@ -34,7 +34,7 @@ impl LedgerActor {
             }
         });
 
-        let table = PartitionedTable::builder(client)
+        let table = ManagedTable::builder(client)
             .name("blockchain_ledger")
             .add_column("address TEXT NOT NULL")
             .add_column("address_type TEXT NOT NULL")
@@ -77,7 +77,7 @@ impl LedgerActor {
         }
     }
 
-    async fn log(&self, table: &PartitionedTable, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
+    async fn log(&self, table: &ManagedTable, payload: &AccountingEntry, height: &i64, state_hash: &str, timestamp: &i64) -> Result<u64, &'static str> {
         let balance_delta: i64 = match payload.entry_type {
             AccountingEntryType::Credit => payload.amount_nanomina as i64,
             AccountingEntryType::Debit => -(payload.amount_nanomina as i64),

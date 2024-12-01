@@ -1,9 +1,9 @@
-use super::partitioned_table::PartitionedTable;
+use super::partitioned_table::ManagedTable;
 use anyhow::Result;
 use tokio_postgres::Client;
 
 pub struct DbLogger {
-    partitioned_table: PartitionedTable,
+    partitioned_table: ManagedTable,
 }
 
 impl DbLogger {
@@ -69,7 +69,7 @@ impl DbLoggerBuilder {
         let partitioned_table_builder = self
             .columns
             .iter()
-            .fold(PartitionedTable::builder(self.client).name(&table_name), |builder, column| {
+            .fold(ManagedTable::builder(self.client).name(&table_name), |builder, column| {
                 builder.add_column(column)
             });
 

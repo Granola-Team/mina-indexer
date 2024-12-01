@@ -6,7 +6,7 @@ use super::super::{
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
-        partitioned_table::PartitionedTable,
+        partitioned_table::ManagedTable,
         payloads::{AccountingEntry, AccountingEntryType, ActorHeightPayload, DoubleEntryRecordPayload, LedgerDestination},
     },
 };
@@ -19,7 +19,7 @@ pub struct StakingLedgerActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
-    pub partitioned_table: PartitionedTable,
+    pub table: ManagedTable,
 }
 
 impl StakingLedgerActor {
@@ -31,7 +31,7 @@ impl StakingLedgerActor {
                 }
             });
 
-            let partitioned_table = PartitionedTable::builder(client)
+            let table = ManagedTable::builder(client)
                 .name("staking_ledger")
                 .add_column("address TEXT NOT NULL")
                 .add_column("counterparty TEXT NOT NULL")
@@ -43,7 +43,7 @@ impl StakingLedgerActor {
                 .await
                 .expect("Cannot build partitioned staking_ledger table");
 
-            if let Err(e) = partitioned_table
+            if let Err(e) = table
                 .get_client()
                 .execute(
                     "CREATE OR REPLACE VIEW staking_summary AS
@@ -67,7 +67,7 @@ impl StakingLedgerActor {
             Self {
                 id: "StakingLedgerActor".to_string(),
                 shared_publisher,
-                partitioned_table,
+                table,
                 database_inserts: AtomicUsize::new(0),
             }
         } else {
@@ -82,7 +82,7 @@ impl StakingLedgerActor {
         };
 
         match self
-            .partitioned_table
+            .table
             .insert(
                 &[&payload.account, &payload.counterparty, &stake_delta, epoch, height, &state_hash.to_owned()],
                 height.to_owned() as u64,
@@ -182,7 +182,7 @@ mod staking_ledger_actor_tests {
         assert_eq!(result.unwrap(), 1);
 
         let rows = actor
-            .partitioned_table
+            .table
             .get_client()
             .query("SELECT * FROM staking_ledger WHERE address = $1", &[&accounting_entry.account])
             .await
@@ -231,7 +231,7 @@ mod staking_ledger_actor_tests {
 
         // Ensure no rows were inserted into the staking_ledger
         let rows = actor
-            .partitioned_table
+            .table
             .get_client()
             .query("SELECT * FROM staking_ledger", &[])
             .await
@@ -329,7 +329,7 @@ mod staking_ledger_actor_tests {
 
         // Query the staking_summary view
         let rows = actor
-            .partitioned_table
+            .table
             .get_client()
             .query("SELECT address, epoch, total_stake FROM staking_summary ORDER BY address, epoch", &[])
             .await
