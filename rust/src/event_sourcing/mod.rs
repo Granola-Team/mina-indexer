@@ -39,15 +39,24 @@ pub async fn subscribe_actors(
     root_node: Option<(u64, String)>,
 ) -> anyhow::Result<()> {
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let mut user_command_persistence_actors = vec![];
     for i in 0..=9 {
         user_command_persistence_actors.push(Arc::new(
             CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await,
         ));
     }
+
+    let mut internal_command_persistence_actors = vec![];
+    for i in 0..=9 {
+        internal_command_persistence_actors.push(Arc::new(
+            CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await,
+        ));
+    }
+
     assert_eq!(user_command_persistence_actors.len(), 10, "10 CanonicalUserCommandPersistenceActor required");
-    let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    assert_eq!(internal_command_persistence_actors.len(), 10, "10 InternalUserCommandPersistenceActor required");
+
+    let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
@@ -77,7 +86,6 @@ pub async fn subscribe_actors(
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
         // Arc::new(StakingAccountingActor::new(Arc::clone(shared_publisher))),
         Arc::new(snark_summary_persistence_actor),
-        Arc::new(internal_command_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
         Arc::new(canonical_block_log_persistence_actor),
@@ -85,6 +93,9 @@ pub async fn subscribe_actors(
     ];
     for uc in user_command_persistence_actors {
         actors.push(uc);
+    }
+    for it in internal_command_persistence_actors {
+        actors.push(it);
     }
 
     let monitor_actors = actors.clone();

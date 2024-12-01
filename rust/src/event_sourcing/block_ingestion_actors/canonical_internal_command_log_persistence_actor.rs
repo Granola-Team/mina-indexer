@@ -21,10 +21,11 @@ pub struct CanonicalInternalCommandLogPersistenceActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub db_logger: Arc<Mutex<DbLogger>>,
+    pub modulo_10: u64,
 }
 
 impl CanonicalInternalCommandLogPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>, modulo_10: u64) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -53,6 +54,7 @@ impl CanonicalInternalCommandLogPersistenceActor {
             shared_publisher,
             db_logger: Arc::new(Mutex::new(logger)),
             database_inserts: AtomicUsize::new(0),
+            modulo_10,
         }
     }
 
@@ -96,6 +98,9 @@ impl Actor for CanonicalInternalCommandLogPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::CanonicalInternalCommandLog {
             let event_payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+            if event_payload.height % 10 != self.modulo_10 {
+                return;
+            }
             match self.log(&event_payload).await {
                 Ok(affected_rows) => {
                     assert_eq!(affected_rows, 1);
@@ -133,18 +138,25 @@ mod canonical_internal_command_log_tests {
     use std::sync::Arc;
     use tokio::sync::broadcast;
 
-    async fn setup_actor() -> (CanonicalInternalCommandLogPersistenceActor, Arc<SharedPublisher>, broadcast::Receiver<Event>) {
+    async fn setup_actor() -> (
+        Vec<CanonicalInternalCommandLogPersistenceActor>,
+        Arc<SharedPublisher>,
+        broadcast::Receiver<Event>,
+    ) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
+        let mut actors = vec![];
+        for i in 0..=9 {
+            actors.push(CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None, i).await);
+        }
 
-        (actor, shared_publisher, receiver)
+        (actors, shared_publisher, receiver)
     }
 
     #[tokio::test]
     async fn test_insert_canonical_internal_command_log() {
-        let (actor, _shared_publisher, _receiver) = setup_actor().await;
+        let (actors, _shared_publisher, _receiver) = setup_actor().await;
 
         let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::FeeTransfer,
@@ -158,14 +170,14 @@ mod canonical_internal_command_log_tests {
             was_canonical: false,
         };
 
-        let affected_rows = actor.log(&payload).await.unwrap();
+        let affected_rows = actors[0].log(&payload).await.unwrap();
 
         // Validate that exactly one row was affected
         assert_eq!(affected_rows, 1);
 
         // Validate the data was correctly inserted into the table
         let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
-        let logger = actor.db_logger.lock().await;
+        let logger = actors[0].db_logger.lock().await;
         let row = logger
             .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
@@ -183,7 +195,7 @@ mod canonical_internal_command_log_tests {
 
     #[tokio::test]
     async fn test_handle_event_canonical_internal_command_log() {
-        let (actor, _, _) = setup_actor().await;
+        let (actors, _, _) = setup_actor().await;
 
         let payload = CanonicalInternalCommandLogPayload {
             internal_command_type: InternalCommandType::Coinbase,
@@ -202,11 +214,11 @@ mod canonical_internal_command_log_tests {
             payload: sonic_rs::to_string(&payload).unwrap(),
         };
 
-        actor.handle_event(event).await;
+        actors[0].handle_event(event).await;
 
         // Validate the data was correctly inserted into the table
         let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
-        let logger = actor.db_logger.lock().await;
+        let logger = actors[0].db_logger.lock().await;
         let row = logger
             .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
@@ -226,7 +238,7 @@ mod canonical_internal_command_log_tests {
     async fn test_canonical_internal_commands_view() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
+        let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None, 1).await;
 
         // Insert multiple entries for the same (height, state_hash, recipient, amount) with different timestamps and canonicalities
         let payload1 = CanonicalInternalCommandLogPayload {
@@ -277,7 +289,7 @@ mod canonical_internal_command_log_tests {
 
     #[tokio::test]
     async fn test_actor_height_event_published() {
-        let (actor, _, mut receiver) = setup_actor().await;
+        let (actors, _, mut receiver) = setup_actor().await;
 
         // Create a payload for a canonical internal command
         let payload = CanonicalInternalCommandLogPayload {
@@ -298,7 +310,7 @@ mod canonical_internal_command_log_tests {
             payload: sonic_rs::to_string(&payload).unwrap(),
         };
 
-        actor.handle_event(event).await;
+        actors[0].handle_event(event).await;
 
         // Listen for the `ActorHeight` event
         let received_event = receiver.recv().await.unwrap();
@@ -310,7 +322,7 @@ mod canonical_internal_command_log_tests {
         let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
         // Validate the `ActorHeightPayload` content
-        assert_eq!(actor_height_payload.actor, actor.id());
+        assert_eq!(actor_height_payload.actor, actors[0].id());
         assert_eq!(actor_height_payload.height, payload.height);
 
         println!(
