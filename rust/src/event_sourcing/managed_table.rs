@@ -7,14 +7,12 @@ pub struct ManagedTable {
     columns: Vec<String>,
 }
 
-const PARTITION_RANGE: u64 = 10_000;
-
 impl ManagedTable {
     pub fn get_client(&self) -> &Client {
         &self.client
     }
 
-    /// Builder to start creating a PartitionedTable
+    /// Builder to start creating a table
     pub fn builder(client: Client) -> ManagedTableBuilder {
         ManagedTableBuilder {
             client,
@@ -23,32 +21,8 @@ impl ManagedTable {
         }
     }
 
-    pub async fn create_partition(&self, height: u64) -> Result<()> {
-        println!("Creating partition {}_{}", self.table_name, height);
-        // Define the range for the partition based on the height
-        let from = height;
-        let to = height + PARTITION_RANGE;
-
-        // Create the partition table query
-        let partition_query = format!(
-            "CREATE TABLE IF NOT EXISTS {}_{} PARTITION OF {} FOR VALUES FROM ({}) TO ({});",
-            self.table_name, height, self.table_name, from, to
-        );
-
-        // Execute the query to create the partition
-        if let Err(e) = self.get_client().execute(&partition_query, &[]).await {
-            eprintln!("Failed to create partition for table '{}': {:?}", self.table_name, e);
-        }
-
-        Ok(())
-    }
-
-    /// Insert a row into the table, creating partitions as necessary based on the height
-    pub async fn insert(
-        &self,
-        values: &[&(dyn tokio_postgres::types::ToSql + Sync)],
-        height: u64, // Explicit height parameter
-    ) -> Result<u64> {
+    /// Append a row into the table
+    pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], _height: u64) -> Result<u64> {
         let column_names = self
             .columns
             .iter()
@@ -62,23 +36,12 @@ impl ManagedTable {
 
         match self.client.execute(&query, values).await {
             Ok(_) => Ok(1), // Successful insert
-            Err(e) => {
-                if e.to_string().contains("partition") {
-                    self.create_partition((height / PARTITION_RANGE) * PARTITION_RANGE).await?;
-
-                    // Retry the insert after creating the partition
-                    self.client.execute(&query, values).await?;
-                    Ok(1)
-                } else {
-                    // Return the error if it's not related to the partition creation
-                    Err(e.into())
-                }
-            }
+            Err(e) => Err(e.into()),
         }
     }
 }
 
-/// Builder for the PartitionedTable
+/// Builder for the ManagedTable
 pub struct ManagedTableBuilder {
     client: Client,
     name: String,
@@ -104,7 +67,7 @@ impl ManagedTableBuilder {
         self
     }
 
-    /// Build and initialize the table and partitions, optionally deleting rows based on root node
+    /// Build and initialize the table, optionally deleting rows based on root node
     pub async fn build(self, root: &Option<(u64, String)>) -> Result<ManagedTable> {
         let table_name = self.name.to_string();
 
@@ -118,7 +81,7 @@ impl ManagedTableBuilder {
             self.drop_table(&table_name).await?;
         }
 
-        // Create the table with partitioning by height
+        // Create the table
         self.create_table(&table_name).await?;
 
         // Handle root node deletion if provided
@@ -126,7 +89,7 @@ impl ManagedTableBuilder {
             self.handle_root_node_deletion(&table_name, height.to_owned(), state_hash).await?;
         }
 
-        // Return the PartitionedTable instance
+        // Return the ManagedTable instance
         Ok(ManagedTable {
             client: self.client,
             table_name,
@@ -141,15 +104,15 @@ impl ManagedTableBuilder {
         Ok(())
     }
 
-    // Create the table with partitioning by height
+    // Create the table
     async fn create_table(&self, table_name: &str) -> Result<()> {
         let table_query = format!(
             "CREATE TABLE IF NOT EXISTS {} (
                 entry_id BIGSERIAL,
                 height BIGINT,
                 {},
-                PRIMARY KEY (entry_id, height)
-            ) PARTITION BY RANGE (height);",
+                PRIMARY KEY (entry_id)
+            );",
             table_name,
             self.columns
                 .iter()
@@ -192,7 +155,7 @@ mod test_table_tests {
             }
         });
 
-        // Setup the PartitionedTable
+        // Setup the ManagedTable
         let test_table = ManagedTable::builder(client)
             .name("test_table")
             .add_column("height BIGINT") // Explicitly adding the height column
@@ -200,7 +163,7 @@ mod test_table_tests {
             .add_column("timestamp BIGINT")
             .build(&None) // No root, so no deletion
             .await
-            .expect("Failed to build partitioned table");
+            .expect("Failed to buildtable");
 
         // Insert data with explicit height parameter
         test_table
@@ -247,7 +210,7 @@ mod test_table_tests {
                 }
             });
 
-            // Setup the PartitionedTable
+            // Setup the ManagedTable
             let test_table = ManagedTable::builder(client)
                 .name("test_table")
                 .add_column("height BIGINT") // Explicitly adding the height column
@@ -255,7 +218,7 @@ mod test_table_tests {
                 .add_column("timestamp BIGINT")
                 .build(&None) // No root initially, so no deletion
                 .await
-                .expect("Failed to build partitioned table");
+                .expect("Failed to buildtable");
 
             // Insert 3 rows for each of 3 heights: 0, 1, and 2 (total of 9 rows)
             // Ensure the height corresponds to 1, 2, or 3
@@ -326,7 +289,7 @@ mod test_table_tests {
                 .add_column("timestamp BIGINT")
                 .build(&root) // Set root for deletion
                 .await
-                .expect("Failed to rebuild partitioned table with root");
+                .expect("Failed to rebuildtable with root");
             let log_query = "SELECT * FROM test_table WHERE height = $1";
             // Query for height 1 and ensure that rows still exist for height 1
             let log_rows = test_table
@@ -359,47 +322,5 @@ mod test_table_tests {
             // Ensure no rows exist for the deleted state_hash at height 2
             assert_eq!(deleted_row.len(), 2, "Expected 2 rows at height 2");
         }
-    }
-
-    #[tokio::test]
-    async fn test_test_table_insert_10001() {
-        // Connect to the database
-        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-            .await
-            .expect("Failed to connect to the database");
-
-        // Spawn the connection handler
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("Connection error: {}", e);
-            }
-        });
-
-        // Setup the PartitionedTable
-        let test_table = ManagedTable::builder(client)
-            .name("test_table")
-            .add_column("height BIGINT") // Explicitly adding the height column
-            .add_column("state_hash TEXT")
-            .add_column("timestamp BIGINT")
-            .build(&None) // No root, so no deletion
-            .await
-            .expect("Failed to build partitioned table");
-
-        // Insert data at height 10001 (which should trigger partition creation)
-        test_table
-            .insert(&[&10001_i64, &"state_hash_10001", &1234567890i64], 10001)
-            .await
-            .expect("Failed to insert test_table at height 10001");
-
-        // Query the table to verify that the row was inserted correctly
-        let log_query = "SELECT * FROM test_table WHERE height = $1";
-        let log_rows = test_table
-            .client
-            .query(log_query, &[&(10001_i64)])
-            .await
-            .expect("Failed to query test_table table");
-
-        // Assert that the row was inserted
-        assert_eq!(log_rows.len(), 1, "Expected 1 row in the table for height 10001");
     }
 }
