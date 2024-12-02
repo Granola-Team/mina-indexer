@@ -208,6 +208,39 @@ impl CanonicalItem for SnarkCanonicitySummaryPayload {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Snark {
+    pub prover: String,
+    pub fee_nanomina: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BulkSnarkCanonicityPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub canonical: bool,
+    pub snarks: Vec<Snark>,
+}
+
+impl CanonicalItem for BulkSnarkCanonicityPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, _was_canonical: bool) {
+        // noop
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct BlockLogPayload {
     pub height: u64,

@@ -55,29 +55,44 @@ impl SnarkSummaryPersistenceActor {
         }
     }
 
-    async fn log(&self, summary: &SnarkCanonicitySummaryPayload) -> Result<u64, &'static str> {
-        let logger = self.db_logger.lock().await;
-        match logger
-            .insert(
-                &[
-                    &(summary.height as i64),
-                    &summary.state_hash,
-                    &(summary.timestamp as i64),
-                    &summary.prover,
-                    &(summary.fee_nanomina as i64),
-                    &summary.canonical,
-                ],
-                summary.height,
-            )
-            .await
-        {
-            Err(e) => {
-                let msg = e.to_string();
-                println!("{}", msg);
-                Err("unable to upsert into snark_work_summary table")
-            }
-            Ok(affected_rows) => Ok(affected_rows),
+    async fn log_batch(&self, payload: &BulkSnarkCanonicityPayload) -> Result<(), &'static str> {
+        let mut values = Vec::new();
+
+        // Pre-allocate values for all rows
+        for command in &payload.snarks {
+            values.push((
+                payload.height as i64,
+                payload.state_hash.to_string(),
+                payload.timestamp as i64,
+                command.prover.to_string(),
+                command.fee_nanomina as i64,
+                payload.canonical,
+            ));
         }
+
+        // Create the rows referencing pre-allocated values
+        let rows: Vec<Vec<&(dyn tokio_postgres::types::ToSql + Sync)>> = values
+            .iter()
+            .map(|(height, state_hash, timestamp, prover, fee_nanomina, canonical)| {
+                vec![
+                    height as &(dyn tokio_postgres::types::ToSql + Sync),
+                    state_hash as &(dyn tokio_postgres::types::ToSql + Sync),
+                    timestamp as &(dyn tokio_postgres::types::ToSql + Sync),
+                    prover as &(dyn tokio_postgres::types::ToSql + Sync),
+                    fee_nanomina as &(dyn tokio_postgres::types::ToSql + Sync),
+                    canonical as &(dyn tokio_postgres::types::ToSql + Sync),
+                ]
+            })
+            .collect();
+
+        // Perform the bulk insert
+        let logger = self.db_logger.lock().await;
+        logger
+            .bulk_insert(&rows)
+            .await
+            .map_err(|_| "Unable to bulk insert into canonical_user_command_log table")?;
+
+        Ok(())
     }
 }
 
@@ -91,14 +106,13 @@ impl Actor for SnarkSummaryPersistenceActor {
         &self.database_inserts
     }
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::SnarkCanonicitySummary {
-            let event_payload: SnarkCanonicitySummaryPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::BulkSnarkCanonicity {
+            let event_payload: BulkSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
             if event_payload.height % 10 != self.modulo_10 {
                 return;
             }
-            match self.log(&event_payload).await {
-                Ok(affected_rows) => {
-                    assert_eq!(affected_rows, 1);
+            match self.log_batch(&event_payload).await {
+                Ok(_) => {
                     self.shared_publisher.incr_database_insert();
                     self.publish(Event {
                         event_type: EventType::ActorHeight,
@@ -125,7 +139,7 @@ impl Actor for SnarkSummaryPersistenceActor {
 #[cfg(test)]
 mod snark_summary_persistence_actor_tests {
     use super::*;
-    use crate::event_sourcing::payloads::{ActorHeightPayload, SnarkCanonicitySummaryPayload};
+    use crate::event_sourcing::payloads::ActorHeightPayload;
     use std::sync::Arc;
     use tokio::time::timeout;
 
@@ -142,21 +156,29 @@ mod snark_summary_persistence_actor_tests {
     }
 
     #[tokio::test]
-    async fn test_snark_summary_persistence_actor_logs_summary() {
+    async fn test_snark_summary_persistence_actor_logs_bulk_summary() {
         let (actors, mut receiver) = setup_actor().await;
 
-        let snark_summary = SnarkCanonicitySummaryPayload {
+        let bulk_snark_summary = BulkSnarkCanonicityPayload {
             height: 10,
             state_hash: "test_hash".to_string(),
             timestamp: 123456,
-            prover: "test_prover".to_string(),
-            fee_nanomina: 250000000,
             canonical: true,
+            snarks: vec![
+                Snark {
+                    prover: "test_prover_1".to_string(),
+                    fee_nanomina: 250000000,
+                },
+                Snark {
+                    prover: "test_prover_2".to_string(),
+                    fee_nanomina: 300000000,
+                },
+            ],
         };
 
         let event = Event {
-            event_type: EventType::SnarkCanonicitySummary,
-            payload: sonic_rs::to_string(&snark_summary).unwrap(),
+            event_type: EventType::BulkSnarkCanonicity,
+            payload: sonic_rs::to_string(&bulk_snark_summary).unwrap(),
         };
 
         // Handle the event
@@ -166,79 +188,89 @@ mod snark_summary_persistence_actor_tests {
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
             assert_eq!(published_event.actor, actors[0].id());
-            assert_eq!(published_event.height, snark_summary.height);
+            assert_eq!(published_event.height, bulk_snark_summary.height);
         } else {
             panic!("Expected ActorHeight event was not published.");
+        }
+
+        // Validate the data was logged into the database
+        let query = "SELECT * FROM snarks WHERE height = $1 AND state_hash = $2";
+        let logger = actors[0].db_logger.lock().await;
+        let rows = logger
+            .get_client()
+            .query(query, &[&(bulk_snark_summary.height as i64), &bulk_snark_summary.state_hash])
+            .await
+            .unwrap();
+
+        // Ensure all snarks are present
+        assert_eq!(rows.len(), bulk_snark_summary.snarks.len());
+
+        // Validate the details of each snark
+        for (row, snark) in rows.iter().zip(&bulk_snark_summary.snarks) {
+            assert_eq!(row.get::<_, String>("prover"), snark.prover);
+            assert_eq!(row.get::<_, i64>("fee_nanomina"), snark.fee_nanomina as i64);
+            assert_eq!(row.get::<_, bool>("is_canonical"), bulk_snark_summary.canonical);
         }
     }
 
     #[tokio::test]
-    async fn test_snark_summary_persistence_actor_logs_to_database() {
-        let (actors, _) = setup_actor().await;
-
-        let snark_summary = SnarkCanonicitySummaryPayload {
-            height: 15,
-            state_hash: "test_hash_2".to_string(),
-            timestamp: 789012,
-            prover: "test_prover_2".to_string(),
-            fee_nanomina: 500000000,
-            canonical: false,
-        };
-
-        // Log the snark summary
-        let result = actors[5].log(&snark_summary).await;
-
-        // Verify successful database insertion
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_snark_summary_persistence_actor_handles_multiple_events() {
+    async fn test_snark_summary_persistence_actor_handles_two_batch_events() {
         let (actors, mut receiver) = setup_actor().await;
 
-        let summary1 = SnarkCanonicitySummaryPayload {
+        // Create the first batch payload
+        let batch_summary1 = BulkSnarkCanonicityPayload {
             height: 20,
             state_hash: "hash_1".to_string(),
             timestamp: 111111,
-            prover: "prover_1".to_string(),
-            fee_nanomina: 1000000000,
             canonical: true,
+            snarks: vec![Snark {
+                prover: "prover_1".to_string(),
+                fee_nanomina: 1000000000,
+            }],
         };
-        let summary2 = SnarkCanonicitySummaryPayload {
+
+        // Create the second batch payload
+        let batch_summary2 = BulkSnarkCanonicityPayload {
             height: 21,
             state_hash: "hash_2".to_string(),
             timestamp: 222222,
-            prover: "prover_2".to_string(),
-            fee_nanomina: 2000000000,
             canonical: false,
+            snarks: vec![Snark {
+                prover: "prover_2".to_string(),
+                fee_nanomina: 2000000000,
+            }],
         };
 
-        let event = Event {
-            event_type: EventType::SnarkCanonicitySummary,
-            payload: sonic_rs::to_string(&summary1).unwrap(),
+        // Send the first batch event
+        let event1 = Event {
+            event_type: EventType::BulkSnarkCanonicity,
+            payload: sonic_rs::to_string(&batch_summary1).unwrap(),
         };
-        actors[0].handle_event(event).await;
-        let event = Event {
-            event_type: EventType::SnarkCanonicitySummary,
-            payload: sonic_rs::to_string(&summary2).unwrap(),
-        };
-        actors[1].handle_event(event).await;
+        actors[0].handle_event(event1).await;
 
-        // Verify ActorHeight events for both summaries
+        // Send the second batch event
+        let event2 = Event {
+            event_type: EventType::BulkSnarkCanonicity,
+            payload: sonic_rs::to_string(&batch_summary2).unwrap(),
+        };
+        actors[1].handle_event(event2).await;
+
+        // Verify ActorHeight events for the first batch
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
             assert_eq!(published_event.actor, actors[0].id());
-            assert_eq!(published_event.height, summary1.height);
+            assert_eq!(published_event.height, batch_summary1.height);
         } else {
-            panic!("Expected ActorHeight event was not published.");
+            panic!("Expected ActorHeight event for the first batch was not published.");
         }
+
+        // Verify ActorHeight events for the second batch
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
             assert_eq!(published_event.actor, actors[1].id());
-            assert_eq!(published_event.height, summary2.height);
+            assert_eq!(published_event.height, batch_summary2.height);
         } else {
-            panic!("Expected ActorHeight event was not published.");
+            panic!("Expected ActorHeight event for the second batch was not published.");
         }
     }
 }

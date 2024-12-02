@@ -1,10 +1,10 @@
 use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
 use block_ingestion_actors::{
-    accounting_actor::AccountingActor, batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor,
-    berkeley_block_parser_actor::BerkeleyBlockParserActor, best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor,
-    block_canonicity_actor::BlockCanonicityActor, block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor,
-    canonical_block_log_actor::CanonicalBlockLogActor, canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor,
-    canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
+    accounting_actor::AccountingActor, batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
+    batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
+    block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
     canonical_internal_command_log_persistence_actor::CanonicalInternalCommandLogPersistenceActor,
     canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
     coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
@@ -90,6 +90,7 @@ pub async fn subscribe_actors(
         Arc::new(BlockConfirmationsActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(BatchCanonicalUserCommandLogActor::new(Arc::clone(shared_publisher))),
+        Arc::new(BulkSnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),

@@ -14,6 +14,7 @@ pub enum EventType {
     CanonicalBlockLog,
     SnarkWorkSummary,
     SnarkCanonicitySummary,
+    BulkSnarkCanonicity,
     TransitionFrontier,
     UserCommandLog,
     CanonicalUserCommandLog,
