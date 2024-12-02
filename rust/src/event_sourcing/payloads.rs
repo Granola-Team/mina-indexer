@@ -336,6 +336,23 @@ impl CanonicalItem for CanonicalInternalCommandLogPayload {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct InternalCommandSubPayload {
+    pub timestamp: u64,
+    pub amount_nanomina: u64,
+    pub recipient: String,
+    pub internal_command_type: InternalCommandType,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BulkCanonicalInternalCommandLogPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub canonical: bool,
+    pub was_canonical: bool,
+    pub commands: Vec<InternalCommandSubPayload>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct CanonicalUserCommandLogPayload {
     pub height: u64,

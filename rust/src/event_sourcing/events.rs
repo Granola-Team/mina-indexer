@@ -20,6 +20,7 @@ pub enum EventType {
     BatchCanonicalUserCommandLog,
     InternalCommandLog,
     CanonicalInternalCommandLog,
+    BulkCanonicalInternalCommandLog,
     DoubleEntryTransaction,
     NewAccount,
     BlockConfirmation,

@@ -54,10 +54,32 @@ impl Actor for CanonicalInternalCommandLogActor {
                 }
                 {
                     let manager = self.canonical_items_manager.lock().await;
-                    for payload in manager.get_updates(payload.height).await.iter() {
+                    let updates = manager.get_updates(payload.height).await;
+                    for payload in updates.iter() {
                         self.publish(Event {
                             event_type: EventType::CanonicalInternalCommandLog,
                             payload: sonic_rs::to_string(&payload).unwrap(),
+                        });
+                    }
+                    if let Some(first_update) = updates.first() {
+                        let bulk_payload = BulkCanonicalInternalCommandLogPayload {
+                            height: first_update.height,
+                            state_hash: first_update.state_hash.to_string(),
+                            canonical: first_update.canonical,
+                            was_canonical: first_update.was_canonical,
+                            commands: updates
+                                .iter()
+                                .map(|u| InternalCommandSubPayload {
+                                    timestamp: u.timestamp,
+                                    amount_nanomina: u.amount_nanomina,
+                                    recipient: u.recipient.to_string(),
+                                    internal_command_type: u.internal_command_type.clone(),
+                                })
+                                .collect(),
+                        };
+                        self.publish(Event {
+                            event_type: EventType::BulkCanonicalInternalCommandLog,
+                            payload: sonic_rs::to_string(&bulk_payload).unwrap(),
                         });
                     }
                     if let Err(e) = manager.prune().await {
@@ -92,13 +114,34 @@ impl Actor for CanonicalInternalCommandLogActor {
                 }
                 {
                     let manager = self.canonical_items_manager.lock().await;
-                    for payload in manager.get_updates(event_payload.height).await.iter() {
+                    let updates = manager.get_updates(event_payload.height).await;
+                    for payload in updates.iter() {
                         self.publish(Event {
                             event_type: EventType::CanonicalInternalCommandLog,
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
-
+                    if let Some(first_update) = updates.first() {
+                        let bulk_payload = BulkCanonicalInternalCommandLogPayload {
+                            height: first_update.height,
+                            state_hash: first_update.state_hash.to_string(),
+                            canonical: first_update.canonical,
+                            was_canonical: first_update.was_canonical,
+                            commands: updates
+                                .iter()
+                                .map(|u| InternalCommandSubPayload {
+                                    timestamp: u.timestamp,
+                                    amount_nanomina: u.amount_nanomina,
+                                    recipient: u.recipient.to_string(),
+                                    internal_command_type: u.internal_command_type.clone(),
+                                })
+                                .collect(),
+                        };
+                        self.publish(Event {
+                            event_type: EventType::BulkCanonicalInternalCommandLog,
+                            payload: sonic_rs::to_string(&bulk_payload).unwrap(),
+                        });
+                    }
                     if let Err(e) = manager.prune().await {
                         eprintln!("{}", e);
                     }
@@ -192,10 +235,17 @@ mod canonical_internal_command_log_actor_tests {
             .await;
 
         // Expect the event to be published
-        let event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
-            .await
-            .expect("Expected a published event")
-            .expect("Event received");
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Ok(e) = receiver.recv().await {
+                if e.event_type == EventType::CanonicalInternalCommandLog {
+                    return Ok(e);
+                }
+            }
+            Err("No matching event found")
+        })
+        .await
+        .expect("Expected a published CanonicalInternalCommandLog event")
+        .expect("Event received");
 
         let payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
         assert_eq!(payload.height, 10);
@@ -355,20 +405,139 @@ mod canonical_internal_command_log_actor_tests {
             .await;
 
         // Verify both events are published
-        let first_event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
-            .await
-            .expect("Expected a published event")
-            .expect("Event received");
+        let first_event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Ok(e) = receiver.recv().await {
+                if e.event_type == EventType::CanonicalInternalCommandLog {
+                    return Ok(e);
+                }
+            }
+            Err("No matching event found")
+        })
+        .await
+        .expect("Expected a published CanonicalInternalCommandLog event")
+        .expect("Event received");
 
-        let second_event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
-            .await
-            .expect("Expected a published event")
-            .expect("Event received");
+        let second_event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Ok(e) = receiver.recv().await {
+                if e.event_type == EventType::CanonicalInternalCommandLog {
+                    return Ok(e);
+                }
+            }
+            Err("No matching event found")
+        })
+        .await
+        .expect("Expected a published CanonicalInternalCommandLog event")
+        .expect("Event received");
 
         let payload_1: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&first_event.payload).unwrap();
         let payload_2: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&second_event.payload).unwrap();
 
         assert!(payload_1.state_hash == "state_hash_10" || payload_2.state_hash == "state_hash_10");
         assert!(payload_1.state_hash == "state_hash_10_other" || payload_2.state_hash == "state_hash_10_other");
+    }
+
+    #[tokio::test]
+    async fn test_bulk_publishes_after_all_conditions_met() {
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = CanonicalInternalCommandLogActor::new(Arc::clone(&shared_publisher));
+
+        let mut receiver = shared_publisher.subscribe();
+
+        // Add a mainnet block with internal command count
+        let mainnet_block = MainnetBlockPayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            internal_command_count: 2,
+            ..Default::default()
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&mainnet_block).unwrap(),
+            })
+            .await;
+
+        // Add two internal command logs
+        let internal_command_1 = InternalCommandLogPayload {
+            internal_command_type: InternalCommandType::Coinbase,
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            timestamp: 123456,
+            amount_nanomina: 1_000_000,
+            recipient: "recipient_1".to_string(),
+            source: Some("source_1".to_string()),
+        };
+        let internal_command_2 = InternalCommandLogPayload {
+            internal_command_type: InternalCommandType::FeeTransfer,
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            timestamp: 123457,
+            amount_nanomina: 2_000_000,
+            recipient: "recipient_2".to_string(),
+            source: None,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::InternalCommandLog,
+                payload: sonic_rs::to_string(&internal_command_1).unwrap(),
+            })
+            .await;
+        actor
+            .handle_event(Event {
+                event_type: EventType::InternalCommandLog,
+                payload: sonic_rs::to_string(&internal_command_2).unwrap(),
+            })
+            .await;
+
+        // Add a block canonicity update for the same height
+        let update = BlockCanonicityUpdatePayload {
+            height: 10,
+            state_hash: "state_hash_10".to_string(),
+            canonical: true,
+            was_canonical: false,
+        };
+        actor
+            .handle_event(Event {
+                event_type: EventType::BlockCanonicityUpdate,
+                payload: sonic_rs::to_string(&update).unwrap(),
+            })
+            .await;
+
+        // Expect the bulk event to be published
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while let Ok(e) = receiver.recv().await {
+                if e.event_type == EventType::BulkCanonicalInternalCommandLog {
+                    return Ok(e);
+                }
+            }
+            Err("No matching event found")
+        })
+        .await
+        .expect("Expected a published BulkCanonicalInternalCommandLog event")
+        .expect("Event received");
+
+        assert_eq!(event.event_type, EventType::BulkCanonicalInternalCommandLog);
+
+        // Validate the bulk payload
+        let bulk_payload: BulkCanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+        assert_eq!(bulk_payload.height, 10);
+        assert_eq!(bulk_payload.state_hash, "state_hash_10");
+        assert!(bulk_payload.canonical);
+
+        // Validate commands in the bulk payload
+        let commands: Vec<_> = bulk_payload.commands;
+        assert_eq!(commands.len(), 2);
+
+        let command_1 = &commands[0];
+        let command_2 = &commands[1];
+        assert_eq!(command_1.timestamp, 123456);
+        assert_eq!(command_1.amount_nanomina, 1_000_000);
+        assert_eq!(command_1.recipient, "recipient_1");
+        assert_eq!(command_1.internal_command_type, InternalCommandType::Coinbase);
+
+        assert_eq!(command_2.timestamp, 123457);
+        assert_eq!(command_2.amount_nanomina, 2_000_000);
+        assert_eq!(command_2.recipient, "recipient_2");
+        assert_eq!(command_2.internal_command_type, InternalCommandType::FeeTransfer);
     }
 }
