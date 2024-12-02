@@ -123,8 +123,8 @@ pub async fn publish_block_dir_paths(
 
                 let spread = handle_height_spread_event(&mut high_priority_subcriber).await;
                 if spread > 500 {
-                    println!("Height spread is {}. Pausing for 90 seconds...", spread);
-                    tokio::time::sleep(Duration::from_secs(90)).await;
+                    println!("Height spread is {}. Pausing for 10 seconds...", spread);
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 } else {
                     tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 }
