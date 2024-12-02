@@ -7,7 +7,7 @@ use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
         db_logger::DbLogger,
-        payloads::{ActorHeightPayload, CanonicalInternalCommandLogPayload},
+        payloads::{ActorHeightPayload, BulkCanonicalInternalCommandLogPayload},
     },
 };
 use anyhow::Result;
@@ -58,30 +58,50 @@ impl CanonicalInternalCommandLogPersistenceActor {
         }
     }
 
-    async fn log(&self, payload: &CanonicalInternalCommandLogPayload) -> Result<u64, &'static str> {
-        let logger = self.db_logger.lock().await;
-        match logger
-            .insert(
-                &[
-                    &payload.internal_command_type.to_string(),
-                    &(payload.height as i64),
-                    &payload.state_hash,
-                    &(payload.timestamp as i64),
-                    &(payload.amount_nanomina as i64),
-                    &payload.recipient,
-                    &payload.canonical,
-                ],
-                payload.height,
-            )
-            .await
-        {
-            Err(e) => {
-                let msg = e.to_string();
-                println!("{}", msg);
-                Err("unable to upsert into canonical_internal_commands_log table")
-            }
-            Ok(affected_rows) => Ok(affected_rows),
+    async fn log_batch(&self, payload: &BulkCanonicalInternalCommandLogPayload) -> Result<(), &'static str> {
+        let mut values = Vec::new();
+
+        // Pre-allocate values for all rows
+        for command in &payload.commands {
+            let internal_command_type_str = command.internal_command_type.to_string();
+
+            values.push((
+                internal_command_type_str,
+                payload.height as i64,
+                payload.state_hash.clone(),
+                command.timestamp as i64,
+                command.amount_nanomina as i64,
+                command.recipient.clone(),
+                payload.canonical,
+            ));
         }
+
+        // Create rows referencing pre-allocated values
+        let rows: Vec<Vec<&(dyn tokio_postgres::types::ToSql + Sync)>> = values
+            .iter()
+            .map(
+                |(internal_command_type, height, state_hash, timestamp, amount_nanomina, recipient, canonical)| {
+                    vec![
+                        internal_command_type as &(dyn tokio_postgres::types::ToSql + Sync),
+                        height as &(dyn tokio_postgres::types::ToSql + Sync),
+                        state_hash as &(dyn tokio_postgres::types::ToSql + Sync),
+                        timestamp as &(dyn tokio_postgres::types::ToSql + Sync),
+                        amount_nanomina as &(dyn tokio_postgres::types::ToSql + Sync),
+                        recipient as &(dyn tokio_postgres::types::ToSql + Sync),
+                        canonical as &(dyn tokio_postgres::types::ToSql + Sync),
+                    ]
+                },
+            )
+            .collect();
+
+        // Perform the bulk insert
+        let logger = self.db_logger.lock().await;
+        logger
+            .bulk_insert(&rows)
+            .await
+            .map_err(|_| "Unable to bulk insert into canonical_user_command_log table")?;
+
+        Ok(())
     }
 }
 
@@ -96,14 +116,13 @@ impl Actor for CanonicalInternalCommandLogPersistenceActor {
     }
 
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::CanonicalInternalCommandLog {
-            let event_payload: CanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::BulkCanonicalInternalCommandLog {
+            let event_payload: BulkCanonicalInternalCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
             if event_payload.height % 10 != self.modulo_10 {
                 return;
             }
-            match self.log(&event_payload).await {
-                Ok(affected_rows) => {
-                    assert_eq!(affected_rows, 1);
+            match self.log_batch(&event_payload).await {
+                Ok(_) => {
                     self.shared_publisher.incr_database_insert();
                     self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     self.publish(Event {
@@ -133,7 +152,7 @@ mod canonical_internal_command_log_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        payloads::InternalCommandType,
+        payloads::{InternalCommandSubPayload, InternalCommandType},
     };
     use std::sync::Arc;
     use tokio::sync::broadcast;
@@ -158,38 +177,40 @@ mod canonical_internal_command_log_tests {
     async fn test_insert_canonical_internal_command_log() {
         let (actors, _shared_publisher, _receiver) = setup_actor().await;
 
-        let payload = CanonicalInternalCommandLogPayload {
-            internal_command_type: InternalCommandType::FeeTransfer,
+        // Prepare the payload
+        let payload = BulkCanonicalInternalCommandLogPayload {
             height: 100,
             state_hash: "state_hash_100".to_string(),
-            timestamp: 1234567890,
-            amount_nanomina: 500,
-            recipient: "recipient_1".to_string(),
             canonical: true,
-            source: None,
             was_canonical: false,
+            commands: vec![InternalCommandSubPayload {
+                internal_command_type: InternalCommandType::FeeTransfer,
+                timestamp: 1234567890,
+                amount_nanomina: 500,
+                recipient: "recipient_1".to_string(),
+            }],
         };
 
-        let affected_rows = actors[0].log(&payload).await.unwrap();
-
-        // Validate that exactly one row was affected
-        assert_eq!(affected_rows, 1);
+        // Log the batch
+        let result = actors[0].log_batch(&payload).await;
+        assert!(result.is_ok(), "log_batch should succeed");
 
         // Validate the data was correctly inserted into the table
         let query = "SELECT * FROM internal_commands_log WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actors[0].db_logger.lock().await;
         let row = logger
             .get_client()
-            .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
+            .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.commands[0].recipient])
             .await
             .unwrap();
 
-        assert_eq!(row.get::<_, String>("internal_command_type"), payload.internal_command_type.to_string());
+        let command = &payload.commands[0];
+        assert_eq!(row.get::<_, String>("internal_command_type"), command.internal_command_type.to_string());
         assert_eq!(row.get::<_, i64>("height"), payload.height as i64);
         assert_eq!(row.get::<_, String>("state_hash"), payload.state_hash);
-        assert_eq!(row.get::<_, i64>("timestamp"), payload.timestamp as i64);
-        assert_eq!(row.get::<_, i64>("amount_nanomina"), payload.amount_nanomina as i64);
-        assert_eq!(row.get::<_, String>("recipient"), payload.recipient);
+        assert_eq!(row.get::<_, i64>("timestamp"), command.timestamp as i64);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), command.amount_nanomina as i64);
+        assert_eq!(row.get::<_, String>("recipient"), command.recipient);
         assert_eq!(row.get::<_, bool>("is_canonical"), payload.canonical);
     }
 
@@ -197,23 +218,27 @@ mod canonical_internal_command_log_tests {
     async fn test_handle_event_canonical_internal_command_log() {
         let (actors, _, _) = setup_actor().await;
 
-        let payload = CanonicalInternalCommandLogPayload {
-            internal_command_type: InternalCommandType::Coinbase,
+        // Prepare the payload
+        let bulk_payload = BulkCanonicalInternalCommandLogPayload {
             height: 200,
             state_hash: "state_hash_200".to_string(),
-            timestamp: 987654321,
-            amount_nanomina: 1000,
-            recipient: "recipient_2".to_string(),
             canonical: false,
             was_canonical: false,
-            source: None,
+            commands: vec![InternalCommandSubPayload {
+                internal_command_type: InternalCommandType::Coinbase,
+                timestamp: 987654321,
+                amount_nanomina: 1000,
+                recipient: "recipient_2".to_string(),
+            }],
         };
 
+        // Convert the payload into an event
         let event = Event {
-            event_type: EventType::CanonicalInternalCommandLog,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::BulkCanonicalInternalCommandLog,
+            payload: sonic_rs::to_string(&bulk_payload).unwrap(),
         };
 
+        // Handle the event
         actors[0].handle_event(event).await;
 
         // Validate the data was correctly inserted into the table
@@ -221,17 +246,22 @@ mod canonical_internal_command_log_tests {
         let logger = actors[0].db_logger.lock().await;
         let row = logger
             .get_client()
-            .query_one(query, &[&(payload.height as i64), &payload.state_hash, &payload.recipient])
+            .query_one(
+                query,
+                &[&(bulk_payload.height as i64), &bulk_payload.state_hash, &bulk_payload.commands[0].recipient],
+            )
             .await
             .unwrap();
 
-        assert_eq!(row.get::<_, String>("internal_command_type"), payload.internal_command_type.to_string());
-        assert_eq!(row.get::<_, i64>("height"), payload.height as i64);
-        assert_eq!(row.get::<_, String>("state_hash"), payload.state_hash);
-        assert_eq!(row.get::<_, i64>("timestamp"), payload.timestamp as i64);
-        assert_eq!(row.get::<_, i64>("amount_nanomina"), payload.amount_nanomina as i64);
-        assert_eq!(row.get::<_, String>("recipient"), payload.recipient);
-        assert_eq!(row.get::<_, bool>("is_canonical"), payload.canonical);
+        // Extract the command for validation
+        let command = &bulk_payload.commands[0];
+        assert_eq!(row.get::<_, String>("internal_command_type"), command.internal_command_type.to_string());
+        assert_eq!(row.get::<_, i64>("height"), bulk_payload.height as i64);
+        assert_eq!(row.get::<_, String>("state_hash"), bulk_payload.state_hash);
+        assert_eq!(row.get::<_, i64>("timestamp"), command.timestamp as i64);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), command.amount_nanomina as i64);
+        assert_eq!(row.get::<_, String>("recipient"), command.recipient);
+        assert_eq!(row.get::<_, bool>("is_canonical"), bulk_payload.canonical);
     }
 
     #[tokio::test]
@@ -240,80 +270,90 @@ mod canonical_internal_command_log_tests {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(&shared_publisher), &None, 1).await;
 
-        // Insert multiple entries for the same (height, state_hash, recipient, amount) with different timestamps and canonicalities
-        let payload1 = CanonicalInternalCommandLogPayload {
-            internal_command_type: InternalCommandType::FeeTransfer,
+        // First batch payload
+        let bulk_payload1 = BulkCanonicalInternalCommandLogPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
-            timestamp: 1234567890,
-            amount_nanomina: 1000,
-            recipient: "recipient_1".to_string(),
             canonical: false,
             was_canonical: false,
-            source: None,
+            commands: vec![InternalCommandSubPayload {
+                internal_command_type: InternalCommandType::FeeTransfer,
+                timestamp: 1234567890,
+                amount_nanomina: 1000,
+                recipient: "recipient_1".to_string(),
+            }],
         };
 
-        let payload2 = CanonicalInternalCommandLogPayload {
-            internal_command_type: InternalCommandType::FeeTransfer,
+        // Second batch payload
+        let bulk_payload2 = BulkCanonicalInternalCommandLogPayload {
             height: 1,
             state_hash: "hash_1".to_string(),
-            timestamp: 1234567891, // Later timestamp
-            amount_nanomina: 1000,
-            recipient: "recipient_1".to_string(),
             canonical: true,
             was_canonical: false,
-            source: None,
+            commands: vec![InternalCommandSubPayload {
+                internal_command_type: InternalCommandType::FeeTransfer,
+                timestamp: 1234567891, // Later timestamp
+                amount_nanomina: 1000,
+                recipient: "recipient_1".to_string(),
+            }],
         };
 
-        actor.log(&payload1).await.unwrap();
-        actor.log(&payload2).await.unwrap();
+        // Insert each batch separately
+        actor.log_batch(&bulk_payload1).await.unwrap();
+        actor.log_batch(&bulk_payload2).await.unwrap();
 
         // Query the internal_commands view
         let query = "SELECT * FROM internal_commands WHERE height = $1 AND state_hash = $2 AND recipient = $3";
         let logger = actor.db_logger.lock().await;
         let row = logger
             .get_client()
-            .query_one(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.recipient])
+            .query_one(
+                query,
+                &[&(bulk_payload1.height as i64), &bulk_payload1.state_hash, &bulk_payload1.commands[0].recipient],
+            )
             .await
             .unwrap();
 
         // Validate that the row returned matches the payload with the highest timestamp
-        assert_eq!(row.get::<_, String>("internal_command_type"), payload2.internal_command_type.to_string());
-        assert_eq!(row.get::<_, i64>("height"), payload2.height as i64);
-        assert_eq!(row.get::<_, String>("state_hash"), payload2.state_hash);
-        assert_eq!(row.get::<_, i64>("timestamp"), payload2.timestamp as i64);
-        assert_eq!(row.get::<_, i64>("amount_nanomina"), payload2.amount_nanomina as i64);
-        assert_eq!(row.get::<_, String>("recipient"), payload2.recipient);
-        assert_eq!(row.get::<_, bool>("is_canonical"), payload2.canonical);
+        let command2 = &bulk_payload2.commands[0];
+        assert_eq!(row.get::<_, String>("internal_command_type"), command2.internal_command_type.to_string());
+        assert_eq!(row.get::<_, i64>("height"), bulk_payload2.height as i64);
+        assert_eq!(row.get::<_, String>("state_hash"), bulk_payload2.state_hash);
+        assert_eq!(row.get::<_, i64>("timestamp"), command2.timestamp as i64);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), command2.amount_nanomina as i64);
+        assert_eq!(row.get::<_, String>("recipient"), command2.recipient);
+        assert_eq!(row.get::<_, bool>("is_canonical"), bulk_payload2.canonical);
     }
 
     #[tokio::test]
     async fn test_actor_height_event_published() {
         let (actors, _, mut receiver) = setup_actor().await;
 
-        // Create a payload for a canonical internal command
-        let payload = CanonicalInternalCommandLogPayload {
-            internal_command_type: InternalCommandType::Coinbase,
+        // Create a bulk payload for a canonical internal command
+        let bulk_payload = BulkCanonicalInternalCommandLogPayload {
             height: 150,
             state_hash: "state_hash_150".to_string(),
-            timestamp: 1234567890,
-            amount_nanomina: 10000,
-            recipient: "recipient_150".to_string(),
             canonical: true,
-            source: None,
             was_canonical: false,
+            commands: vec![InternalCommandSubPayload {
+                internal_command_type: InternalCommandType::Coinbase,
+                timestamp: 1234567890,
+                amount_nanomina: 10000,
+                recipient: "recipient_150".to_string(),
+            }],
         };
 
-        // Create and publish the event
         let event = Event {
-            event_type: EventType::CanonicalInternalCommandLog,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::BulkCanonicalInternalCommandLog,
+            payload: sonic_rs::to_string(&bulk_payload).unwrap(),
         };
-
         actors[0].handle_event(event).await;
 
         // Listen for the `ActorHeight` event
-        let received_event = receiver.recv().await.unwrap();
+        let received_event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+            .await
+            .expect("Expected a published event")
+            .expect("Event received");
 
         // Verify the event type is `ActorHeight`
         assert_eq!(received_event.event_type, EventType::ActorHeight);
@@ -323,7 +363,7 @@ mod canonical_internal_command_log_tests {
 
         // Validate the `ActorHeightPayload` content
         assert_eq!(actor_height_payload.actor, actors[0].id());
-        assert_eq!(actor_height_payload.height, payload.height);
+        assert_eq!(actor_height_payload.height, bulk_payload.height);
 
         println!(
             "ActorHeight event published: actor = {}, height = {}",
