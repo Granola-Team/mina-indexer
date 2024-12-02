@@ -31,11 +31,12 @@ async fn test_first_100_blocks() {
         env!("CARGO_BIN_EXE_ingestion"), // Binary path
         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
         &[],
-        Duration::from_secs(30),
+        Duration::from_secs(20),
     );
 
     truncate_table("blocks_log", 100).await;
     test_blocks_first_100().await;
+    test_commands_first_100().await;
 
     // restart ingestion from block 52
     run_test_process(
@@ -47,6 +48,7 @@ async fn test_first_100_blocks() {
 
     truncate_table("blocks_log", 100).await;
     test_blocks_first_100().await;
+    test_commands_first_100().await;
 }
 
 #[tokio::test]
@@ -154,6 +156,40 @@ async fn test_blockchain_ledger_accounting_per_block() {
     } else {
         panic!("Unable to open connection to database");
     }
+}
+
+async fn test_commands_first_100() {
+    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+        .await
+        .expect("Expected to open connection");
+
+    let handle = tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    {
+        let query = r#"
+        SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=true;
+        "#;
+
+        let row = client.query_one(query, &[]).await.expect("Failed to execute query");
+        let count: i64 = row.get(0);
+        assert_eq!(count, 152);
+    }
+
+    {
+        let query = r#"
+        SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=false;
+        "#;
+
+        let row = client.query_one(query, &[]).await.expect("Failed to execute query");
+        let count: i64 = row.get(0);
+        assert_eq!(count, 95);
+    }
+
+    drop(handle);
 }
 
 async fn test_blocks_first_100() {
