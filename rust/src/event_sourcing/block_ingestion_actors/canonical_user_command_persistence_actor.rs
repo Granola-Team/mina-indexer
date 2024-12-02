@@ -60,29 +60,58 @@ impl CanonicalUserCommandPersistenceActor {
         }
     }
 
-    async fn log(&self, payload: &CanonicalUserCommandLogPayload) -> Result<(), &'static str> {
+    async fn log_batch(&self, payload: &BatchCanonicalUserCommandLogPayload) -> Result<(), &'static str> {
+        let mut values = Vec::new();
+
+        // Pre-allocate values for all rows
+        for command in &payload.commands {
+            values.push((
+                payload.height as i64,
+                command.txn_hash(),
+                &payload.state_hash,
+                payload.timestamp as i64,
+                format!("{:?}", command.txn_type),
+                format!("{:?}", command.status),
+                &command.sender,
+                &command.receiver,
+                command.nonce as i64,
+                command.fee_nanomina as i64,
+                &command.fee_payer,
+                command.amount_nanomina as i64,
+                payload.canonical,
+            ));
+        }
+
+        // Create the rows referencing pre-allocated values
+        let rows: Vec<Vec<&(dyn tokio_postgres::types::ToSql + Sync)>> = values
+            .iter()
+            .map(
+                |(height, txn_hash, state_hash, timestamp, txn_type, status, sender, receiver, nonce, fee_nanomina, fee_payer, amount_nanomina, canonical)| {
+                    vec![
+                        height as &(dyn tokio_postgres::types::ToSql + Sync),
+                        txn_hash as &(dyn tokio_postgres::types::ToSql + Sync),
+                        state_hash as &(dyn tokio_postgres::types::ToSql + Sync),
+                        timestamp as &(dyn tokio_postgres::types::ToSql + Sync),
+                        txn_type as &(dyn tokio_postgres::types::ToSql + Sync),
+                        status as &(dyn tokio_postgres::types::ToSql + Sync),
+                        sender as &(dyn tokio_postgres::types::ToSql + Sync),
+                        receiver as &(dyn tokio_postgres::types::ToSql + Sync),
+                        nonce as &(dyn tokio_postgres::types::ToSql + Sync),
+                        fee_nanomina as &(dyn tokio_postgres::types::ToSql + Sync),
+                        fee_payer as &(dyn tokio_postgres::types::ToSql + Sync),
+                        amount_nanomina as &(dyn tokio_postgres::types::ToSql + Sync),
+                        canonical as &(dyn tokio_postgres::types::ToSql + Sync),
+                    ]
+                },
+            )
+            .collect();
+
+        // Perform the bulk insert
         let logger = self.db_logger.lock().await;
         logger
-            .insert(
-                &[
-                    &(payload.height as i64),
-                    &payload.txn_hash,
-                    &payload.state_hash,
-                    &(payload.timestamp as i64),
-                    &format!("{:?}", payload.txn_type),
-                    &format!("{:?}", payload.status),
-                    &payload.sender,
-                    &payload.receiver,
-                    &(payload.nonce as i64),
-                    &(payload.fee_nanomina as i64),
-                    &payload.fee_payer,
-                    &(payload.amount_nanomina as i64),
-                    &payload.canonical,
-                ],
-                payload.height,
-            )
+            .bulk_insert(&rows)
             .await
-            .map_err(|_| "Unable to insert into canonical_user_command_log table")?;
+            .map_err(|_| "Unable to bulk insert into canonical_user_command_log table")?;
 
         Ok(())
     }
@@ -99,12 +128,12 @@ impl Actor for CanonicalUserCommandPersistenceActor {
     }
 
     async fn handle_event(&self, event: Event) {
-        if event.event_type == EventType::CanonicalUserCommandLog {
-            let log: CanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+        if event.event_type == EventType::BatchCanonicalUserCommandLog {
+            let log: BatchCanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
             if log.height % 10 != self.modulo_10 {
                 return;
             }
-            self.log(&log).await.unwrap();
+            self.log_batch(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.publish(Event {
                 event_type: EventType::ActorHeight,
@@ -128,7 +157,7 @@ mod canonical_user_command_log_persistence_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::{CommandStatus, CommandType},
+        mainnet_block_models::{CommandStatus, CommandSummary, CommandType},
     };
     use std::sync::Arc;
     use tokio::sync::broadcast;
@@ -146,206 +175,227 @@ mod canonical_user_command_log_persistence_tests {
     }
 
     #[tokio::test]
-    async fn test_insert_canonical_user_command_log() {
+    async fn test_insert_canonical_user_command_log_batch() {
         let (actors, _shared_publisher, _receiver) = setup_actor().await;
 
-        let payload = CanonicalUserCommandLogPayload {
+        // Prepare batch payload
+        let payload = BatchCanonicalUserCommandLogPayload {
             height: 100,
-            global_slot: 0,
-            txn_hash: "txn_hash_1".to_string(),
             state_hash: "state_hash_100".to_string(),
-            timestamp: 1234567890,
-            txn_type: CommandType::Payment,
-            status: CommandStatus::Applied,
-            sender: "sender_1".to_string(),
-            receiver: "receiver_1".to_string(),
-            nonce: 42,
-            fee_nanomina: 1000,
-            fee_payer: "fee_payer_1".to_string(),
-            amount_nanomina: 5000,
             canonical: true,
             was_canonical: false,
+            global_slot: 0,
+            timestamp: 124312342142,
+            commands: vec![CommandSummary {
+                memo: "Test Memo 1".to_string(),
+                fee_payer: "fee_payer_1".to_string(),
+                sender: "sender_1".to_string(),
+                receiver: "receiver_1".to_string(),
+                status: CommandStatus::Applied,
+                txn_type: CommandType::Payment,
+                nonce: 42,
+                fee_nanomina: 1000,
+                amount_nanomina: 5000,
+            }],
         };
 
-        actors[0].log(&payload).await.unwrap();
+        // Log the batch
+        actors[0].log_batch(&payload).await.unwrap();
 
-        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        // Query the database to verify the inserted command
+        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2";
         let db_logger = actors[0].db_logger.lock().await;
         let row = db_logger
             .get_client()
-            .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
+            .query_one(query, &[&(payload.height as i64), &payload.state_hash])
             .await
             .unwrap();
 
+        // Assert that the row matches the payload's command
+        let command = &payload.commands[0];
         assert_eq!(row.get::<_, i64>("height"), payload.height as i64);
         assert_eq!(row.get::<_, String>("state_hash"), payload.state_hash);
-        assert_eq!(row.get::<_, i64>("timestamp"), payload.timestamp as i64);
-        assert_eq!(row.get::<_, String>("sender"), payload.sender);
-        assert_eq!(row.get::<_, String>("receiver"), payload.receiver);
-        assert_eq!(row.get::<_, i64>("nonce"), payload.nonce as i64);
-        assert_eq!(row.get::<_, i64>("fee_nanomina"), payload.fee_nanomina as i64);
-        assert_eq!(row.get::<_, String>("fee_payer"), payload.fee_payer);
-        assert_eq!(row.get::<_, i64>("amount_nanomina"), payload.amount_nanomina as i64);
+        assert_eq!(row.get::<_, String>("sender"), command.sender);
+        assert_eq!(row.get::<_, String>("receiver"), command.receiver);
+        assert_eq!(row.get::<_, i64>("nonce"), command.nonce as i64);
+        assert_eq!(row.get::<_, i64>("fee_nanomina"), command.fee_nanomina as i64);
+        assert_eq!(row.get::<_, String>("fee_payer"), command.fee_payer);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), command.amount_nanomina as i64);
         assert_eq!(row.get::<_, bool>("canonical"), payload.canonical);
     }
 
     #[tokio::test]
-    async fn test_handle_event_canonical_user_command_log() {
+    async fn test_handle_event_canonical_user_command_log_batch() {
         let (actors, _, _) = setup_actor().await;
 
-        let payload = CanonicalUserCommandLogPayload {
+        // Prepare batch payload
+        let batch_payload = BatchCanonicalUserCommandLogPayload {
             height: 200,
-            global_slot: 0,
-            txn_hash: "txn_hash_1".to_string(),
             state_hash: "state_hash_200".to_string(),
-            timestamp: 987654321,
-            txn_type: CommandType::Payment,
-            status: CommandStatus::Failed,
-            sender: "sender_2".to_string(),
-            receiver: "receiver_2".to_string(),
-            nonce: 99,
-            fee_nanomina: 2000,
-            fee_payer: "fee_payer_2".to_string(),
-            amount_nanomina: 10000,
             canonical: false,
             was_canonical: true,
+            global_slot: 0,
+            timestamp: 124312342142,
+            commands: vec![CommandSummary {
+                memo: "Test Memo".to_string(),
+                fee_payer: "fee_payer_2".to_string(),
+                sender: "sender_2".to_string(),
+                receiver: "receiver_2".to_string(),
+                status: CommandStatus::Failed,
+                txn_type: CommandType::Payment,
+                nonce: 99,
+                fee_nanomina: 2000,
+                amount_nanomina: 10000,
+            }],
         };
 
+        // Serialize the batch payload into an event
         let event = Event {
-            event_type: EventType::CanonicalUserCommandLog,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::BatchCanonicalUserCommandLog,
+            payload: sonic_rs::to_string(&batch_payload).unwrap(),
         };
 
+        // Handle the event with the actor
         actors[0].handle_event(event).await;
 
-        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2 AND timestamp = $3";
+        // Query the database to verify the inserted commands
+        let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2";
         let db_logger = actors[0].db_logger.lock().await;
         let row = db_logger
             .get_client()
-            .query_one(query, &[&(payload.height as i64), &payload.state_hash, &(payload.timestamp as i64)])
+            .query_one(query, &[&(batch_payload.height as i64), &batch_payload.state_hash])
             .await
             .unwrap();
 
-        assert_eq!(row.get::<_, i64>("height"), payload.height as i64);
-        assert_eq!(row.get::<_, String>("state_hash"), payload.state_hash);
-        assert_eq!(row.get::<_, i64>("timestamp"), payload.timestamp as i64);
-        assert_eq!(row.get::<_, String>("sender"), payload.sender);
-        assert_eq!(row.get::<_, String>("receiver"), payload.receiver);
-        assert_eq!(row.get::<_, i64>("nonce"), payload.nonce as i64);
-        assert_eq!(row.get::<_, i64>("fee_nanomina"), payload.fee_nanomina as i64);
-        assert_eq!(row.get::<_, String>("fee_payer"), payload.fee_payer);
-        assert_eq!(row.get::<_, i64>("amount_nanomina"), payload.amount_nanomina as i64);
-        assert_eq!(row.get::<_, bool>("canonical"), payload.canonical);
+        // Assert that the row matches the payload's command
+        let command = &batch_payload.commands[0];
+        assert_eq!(row.get::<_, i64>("height"), batch_payload.height as i64);
+        assert_eq!(row.get::<_, String>("state_hash"), batch_payload.state_hash);
+        assert_eq!(row.get::<_, String>("sender"), command.sender);
+        assert_eq!(row.get::<_, String>("receiver"), command.receiver);
+        assert_eq!(row.get::<_, i64>("nonce"), command.nonce as i64);
+        assert_eq!(row.get::<_, i64>("fee_nanomina"), command.fee_nanomina as i64);
+        assert_eq!(row.get::<_, String>("fee_payer"), command.fee_payer);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), command.amount_nanomina as i64);
+        assert_eq!(row.get::<_, bool>("canonical"), batch_payload.canonical);
     }
 
     #[tokio::test]
-    async fn test_canonical_user_command_view() {
+    async fn test_canonical_user_command_view_with_separate_batches() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, 1).await;
-
-        // Insert multiple entries for the same (height, state_hash) with different statuses
-        let payload1 = CanonicalUserCommandLogPayload {
-            height: 1,
-            global_slot: 0,
-            txn_hash: "txn_hash_1".to_string(),
-            state_hash: "hash_1".to_string(),
-            timestamp: 1234567890,
-            txn_type: CommandType::Payment,
-            status: CommandStatus::Applied,
+        let command = CommandSummary {
+            memo: "Command 1".to_string(),
+            fee_payer: "payer_1".to_string(),
             sender: "sender_1".to_string(),
             receiver: "receiver_1".to_string(),
+            status: CommandStatus::Applied,
+            txn_type: CommandType::Payment,
             nonce: 1,
             fee_nanomina: 500,
-            fee_payer: "payer_1".to_string(),
             amount_nanomina: 10000,
+        };
+
+        // First batch payload with the initial command
+        let batch_payload_1 = BatchCanonicalUserCommandLogPayload {
+            height: 1,
+            state_hash: "hash_1".to_string(),
             canonical: false,
             was_canonical: false,
+            global_slot: 0,
+            timestamp: 124312342142,
+            commands: vec![command.clone()],
         };
 
-        let payload2 = CanonicalUserCommandLogPayload {
+        // Second batch payload with the updated command
+        let batch_payload_2 = BatchCanonicalUserCommandLogPayload {
             height: 1,
-            global_slot: 0,
-            txn_hash: "txn_hash_1".to_string(),
             state_hash: "hash_1".to_string(),
-            timestamp: 1234567891, // Later timestamp
-            txn_type: CommandType::Payment,
-            status: CommandStatus::Applied,
-            sender: "sender_1".to_string(),
-            receiver: "receiver_1".to_string(),
-            nonce: 1,
-            fee_nanomina: 700,
-            fee_payer: "payer_1".to_string(),
-            amount_nanomina: 12000,
             canonical: true,
             was_canonical: true,
+            global_slot: 0,
+            timestamp: 124312342142,
+            commands: vec![command],
         };
 
-        // Insert the payloads into the database
-        actor.log(&payload1).await.unwrap();
-        actor.log(&payload2).await.unwrap();
+        // Insert the first batch into the database
+        actor.log_batch(&batch_payload_1).await.unwrap();
 
-        // Query the database to ensure the correct row is returned
-        let query = "SELECT * FROM user_commands WHERE height = $1 AND state_hash = $2 and txn_hash = $3 ORDER BY timestamp DESC";
+        // Insert the second batch into the database
+        actor.log_batch(&batch_payload_2).await.unwrap();
+
+        // Query the database to ensure only the latest command is returned
+        let query = "SELECT * FROM user_commands WHERE height = $1 AND state_hash = $2 ORDER BY timestamp DESC";
         let db_logger = actor.db_logger.lock().await;
         let rows = db_logger
             .get_client()
-            .query(query, &[&(payload1.height as i64), &payload1.state_hash, &payload1.txn_hash])
+            .query(query, &[&(batch_payload_1.height as i64), &batch_payload_1.state_hash])
             .await
             .unwrap();
 
-        // Ensure only the latest entry with the correct canonical state is returned
+        // Ensure only the latest entry is returned
         assert_eq!(rows.len(), 1);
 
         let row = &rows[0];
-        assert_eq!(row.get::<_, i64>("height"), payload2.height as i64);
-        assert_eq!(row.get::<_, String>("state_hash"), payload2.state_hash);
-        assert_eq!(row.get::<_, String>("txn_hash"), payload2.txn_hash);
-        assert_eq!(row.get::<_, bool>("canonical"), payload2.canonical);
+        let latest_command = &batch_payload_2.commands[0]; // The latest command from the second batch
+
+        // Verify the row matches the latest command
+        assert_eq!(row.get::<_, i64>("height"), batch_payload_2.height as i64);
+        assert_eq!(row.get::<_, String>("state_hash"), batch_payload_2.state_hash);
+        assert_eq!(row.get::<_, String>("sender"), latest_command.sender);
+        assert_eq!(row.get::<_, String>("receiver"), latest_command.receiver);
+        assert_eq!(row.get::<_, i64>("nonce"), latest_command.nonce as i64);
+        assert_eq!(row.get::<_, i64>("fee_nanomina"), latest_command.fee_nanomina as i64);
+        assert_eq!(row.get::<_, String>("fee_payer"), latest_command.fee_payer);
+        assert_eq!(row.get::<_, i64>("amount_nanomina"), latest_command.amount_nanomina as i64);
+        assert_eq!(row.get::<_, bool>("canonical"), batch_payload_2.canonical);
     }
 
     #[tokio::test]
-    async fn test_actor_height_event_published() {
+    async fn test_actor_height_event_published_with_batch() {
+        // Set up the actor and shared publisher
         let (actors, _, mut receiver) = setup_actor().await;
 
-        // Create a payload for a canonical user command
-        let payload = CanonicalUserCommandLogPayload {
+        // Create a batch payload for canonical user commands
+        let batch_payload = BatchCanonicalUserCommandLogPayload {
             height: 200,
-            global_slot: 0,
-            txn_hash: "txn_hash_2".to_string(),
             state_hash: "state_hash_200".to_string(),
-            timestamp: 987654321,
-            txn_type: CommandType::Payment,
-            status: CommandStatus::Applied,
-            sender: "sender_2".to_string(),
-            receiver: "receiver_2".to_string(),
-            nonce: 43,
-            fee_nanomina: 1500,
-            fee_payer: "fee_payer_2".to_string(),
-            amount_nanomina: 7500,
             canonical: true,
             was_canonical: false,
+            global_slot: 0,
+            timestamp: 124312342142,
+            commands: vec![CommandSummary {
+                memo: "Test Memo".to_string(),
+                fee_payer: "fee_payer_2".to_string(),
+                sender: "sender_2".to_string(),
+                receiver: "receiver_2".to_string(),
+                status: CommandStatus::Applied,
+                txn_type: CommandType::Payment,
+                nonce: 43,
+                fee_nanomina: 1500,
+                amount_nanomina: 7500,
+            }],
         };
 
-        // Create and publish the event
+        // Serialize the batch payload into an event
         let event = Event {
-            event_type: EventType::CanonicalUserCommandLog,
-            payload: sonic_rs::to_string(&payload).unwrap(),
+            event_type: EventType::BatchCanonicalUserCommandLog,
+            payload: sonic_rs::to_string(&batch_payload).unwrap(),
         };
 
+        // Handle the batch event
         actors[0].handle_event(event).await;
 
         // Listen for the `ActorHeight` event
-        let received_event = receiver.recv().await.unwrap();
+        let received_event = receiver.recv().await.expect("Did not receive ActorHeight event");
 
         // Verify the event type is `ActorHeight`
         assert_eq!(received_event.event_type, EventType::ActorHeight);
 
-        // Deserialize the payload
-        let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-
-        // Validate the `ActorHeightPayload` content
+        // Deserialize and validate the `ActorHeightPayload` content
+        let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).expect("Failed to deserialize ActorHeightPayload");
         assert_eq!(actor_height_payload.actor, actors[0].id());
-        assert_eq!(actor_height_payload.height, payload.height);
+        assert_eq!(actor_height_payload.height, batch_payload.height);
     }
 }

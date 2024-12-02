@@ -381,6 +381,7 @@ pub struct BatchCanonicalUserCommandLogPayload {
     pub was_canonical: bool,
     pub global_slot: u64,
     pub commands: Vec<CommandSummary>,
+    pub timestamp: u64,
 }
 
 impl CanonicalItem for BatchCanonicalUserCommandLogPayload {

@@ -17,6 +17,7 @@ pub enum EventType {
     TransitionFrontier,
     UserCommandLog,
     CanonicalUserCommandLog,
+    BatchCanonicalUserCommandLog,
     InternalCommandLog,
     CanonicalInternalCommandLog,
     DoubleEntryTransaction,

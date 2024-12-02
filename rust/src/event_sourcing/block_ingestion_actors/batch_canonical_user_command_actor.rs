@@ -56,7 +56,7 @@ impl Actor for BatchCanonicalUserCommandLogActor {
                     let manager = self.canonical_items_manager.lock().await;
                     for payload in manager.get_updates(payload.height).await.iter() {
                         self.publish(Event {
-                            event_type: EventType::CanonicalUserCommandLog,
+                            event_type: EventType::BatchCanonicalUserCommandLog,
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
@@ -76,6 +76,7 @@ impl Actor for BatchCanonicalUserCommandLogActor {
                         state_hash: event_payload.state_hash.to_string(),
                         global_slot: event_payload.global_slot,
                         commands: event_payload.user_commands,
+                        timestamp: event_payload.timestamp,
                         canonical: true,     // some default value
                         was_canonical: true, // some default value
                     };
@@ -85,7 +86,7 @@ impl Actor for BatchCanonicalUserCommandLogActor {
                     let manager = self.canonical_items_manager.lock().await;
                     for payload in manager.get_updates(event_payload.height).await.iter() {
                         self.publish(Event {
-                            event_type: EventType::CanonicalUserCommandLog,
+                            event_type: EventType::BatchCanonicalUserCommandLog,
                             payload: sonic_rs::to_string(&payload).unwrap(),
                         });
                     }
@@ -187,7 +188,7 @@ mod batch_canonical_user_command_tests {
 
         // Capture the published event
         if let Ok(published_event) = receiver.recv().await {
-            assert_eq!(published_event.event_type, EventType::CanonicalUserCommandLog);
+            assert_eq!(published_event.event_type, EventType::BatchCanonicalUserCommandLog);
 
             // Verify the published payload
             let published_payload: BatchCanonicalUserCommandLogPayload = sonic_rs::from_str(&published_event.payload).expect("Failed to deserialize payload");
