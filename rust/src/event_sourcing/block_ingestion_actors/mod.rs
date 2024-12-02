@@ -1,4 +1,5 @@
 pub(crate) mod accounting_actor;
+pub(crate) mod batch_canonical_user_command_actor;
 pub(crate) mod berkeley_block_parser_actor;
 pub(crate) mod best_block_actor;
 pub(crate) mod block_ancestor_actor;
