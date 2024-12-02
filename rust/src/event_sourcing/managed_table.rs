@@ -12,6 +12,14 @@ impl ManagedTable {
         &self.client
     }
 
+    pub fn get_name(&self) -> &str {
+        &self.table_name
+    }
+
+    pub fn get_column_count(&self) -> usize {
+        self.columns.len()
+    }
+
     /// Builder to start creating a table
     pub fn builder(client: Client) -> ManagedTableBuilder {
         ManagedTableBuilder {
@@ -38,6 +46,39 @@ impl ManagedTable {
             Ok(_) => Ok(1), // Successful insert
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// Bulk insert rows into the table with a single SQL call
+    pub async fn bulk_insert(&self, rows: &[Vec<&(dyn tokio_postgres::types::ToSql + Sync)>]) -> Result<u64> {
+        if rows.is_empty() {
+            return Ok(0);
+        }
+
+        // Generate column names and placeholders
+        let column_names = self
+            .columns
+            .iter()
+            .map(|col| col.split_whitespace().next().unwrap()) // Extract column names
+            .collect::<Vec<_>>()
+            .join(", ");
+        let column_count = self.columns.len();
+        let placeholder_sets: Vec<String> = (0..rows.len())
+            .map(|row_index| {
+                let start = row_index * column_count + 1;
+                let end = start + column_count - 1;
+                let placeholders = (start..=end).map(|i| format!("${}", i)).collect::<Vec<_>>();
+                format!("({})", placeholders.join(", "))
+            })
+            .collect();
+
+        let query = format!("INSERT INTO {} ({}) VALUES {}", self.table_name, column_names, placeholder_sets.join(", "));
+
+        // Flatten rows into a single list of parameters
+        let flattened_values: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> = rows.iter().flat_map(|row| row.iter().copied()).collect();
+
+        // Execute the query
+        let result = self.client.execute(&query, &flattened_values).await?;
+        Ok(result)
     }
 }
 
@@ -322,5 +363,51 @@ mod test_table_tests {
             // Ensure no rows exist for the deleted state_hash at height 2
             assert_eq!(deleted_row.len(), 2, "Expected 2 rows at height 2");
         }
+    }
+
+    #[tokio::test]
+    async fn test_managed_table_bulk_insert() {
+        // Connect to the database
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to the database");
+
+        // Spawn the connection handler
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        // Setup the ManagedTable
+        let test_table = ManagedTable::builder(client)
+            .name("test_table")
+            .add_column("height BIGINT")
+            .add_column("state_hash TEXT")
+            .add_column("timestamp BIGINT")
+            .build(&None)
+            .await
+            .expect("Failed to build table");
+
+        // Prepare bulk values
+        let bulk_values = vec![
+            vec![&1_i64 as &(dyn tokio_postgres::types::ToSql + Sync), &"state_hash_1", &1234567890_i64],
+            vec![&2_i64, &"state_hash_2", &1234567891_i64],
+            vec![&3_i64, &"state_hash_3", &1234567892_i64],
+        ];
+
+        // Execute bulk insert
+        let rows_inserted = test_table.bulk_insert(&bulk_values).await.expect("Failed to bulk insert logs");
+
+        // Verify the number of rows inserted
+        assert_eq!(rows_inserted, 3, "Expected 3 rows to be inserted");
+
+        // Query the table to verify the inserted rows
+        let query = "SELECT * FROM test_table ORDER BY height";
+        let rows = test_table.client.query(query, &[]).await.expect("Failed to query test_table");
+
+        assert_eq!(rows.len(), 3, "Expected 3 rows in the table");
+        let heights: Vec<i64> = rows.iter().map(|row| row.get("height")).collect();
+        assert_eq!(heights, vec![1, 2, 3], "Heights do not match expected values");
     }
 }

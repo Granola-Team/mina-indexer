@@ -25,6 +25,10 @@ impl DbLogger {
     pub async fn insert(&self, values: &[&(dyn tokio_postgres::types::ToSql + Sync)], _height: u64) -> Result<u64> {
         self.table.insert(values).await
     }
+
+    pub async fn bulk_insert(&self, rows: &[Vec<&(dyn tokio_postgres::types::ToSql + Sync)>]) -> Result<u64> {
+        self.table.bulk_insert(rows).await
+    }
 }
 
 /// Builder for the DbLogger
