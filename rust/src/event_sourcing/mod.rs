@@ -1,4 +1,7 @@
-use crate::{constants::RUNNING_AVG_MINIMUM_DATA_POINTS, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
+use crate::{
+    constants::{PUBLISH_THROTTLE, SLIDING_WINDOW_SIZE},
+    event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor,
+};
 use block_ingestion_actors::{
     accounting_actor::AccountingActor, batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
     batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
@@ -70,7 +73,7 @@ pub async fn subscribe_actors(
         Arc::new(CanonicalBlockLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(BatchCanonicalUserCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(BulkSnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
-        Arc::new(MonitorActor::new(Arc::clone(shared_publisher), RUNNING_AVG_MINIMUM_DATA_POINTS, Some(1_000))),
+        Arc::new(MonitorActor::new(Arc::clone(shared_publisher), SLIDING_WINDOW_SIZE, Some(PUBLISH_THROTTLE))),
         Arc::new(internal_command_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(snark_summary_persistence_actor),

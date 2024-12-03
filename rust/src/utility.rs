@@ -124,3 +124,103 @@ mod get_top_level_keys_from_json_file_tests {
         Ok(())
     }
 }
+
+pub struct Throttler {
+    count: usize,
+    interval: usize,
+}
+
+impl Throttler {
+    pub fn new(interval: usize) -> Self {
+        Throttler { count: 0, interval }
+    }
+
+    pub fn should_invoke(&mut self) -> bool {
+        self.count += 1;
+        if self.count % self.interval == 0 {
+            self.count = 0;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[cfg(test)]
+mod throttler_tests {
+    use super::Throttler;
+
+    #[test]
+    fn test_throttler_initial_state() {
+        let mut throttler = Throttler::new(3);
+
+        // Throttler should not invoke on the first call
+        assert!(!throttler.should_invoke(), "Throttler should not invoke on first call");
+    }
+
+    #[test]
+    fn test_throttler_invocation() {
+        let mut throttler = Throttler::new(3);
+
+        // Call should not invoke until the third one
+        assert!(!throttler.should_invoke(), "First call should not invoke");
+        assert!(!throttler.should_invoke(), "Second call should not invoke");
+        assert!(throttler.should_invoke(), "Third call should invoke");
+    }
+
+    #[test]
+    fn test_throttler_resets_after_invocation() {
+        let mut throttler = Throttler::new(3);
+
+        // Invoke the throttler until it resets
+        assert!(!throttler.should_invoke(), "First call should not invoke");
+        assert!(!throttler.should_invoke(), "Second call should not invoke");
+        assert!(throttler.should_invoke(), "Third call should invoke");
+
+        // Ensure it resets after the interval
+        assert!(!throttler.should_invoke(), "Fourth call should not invoke");
+        assert!(!throttler.should_invoke(), "Fifth call should not invoke");
+        assert!(throttler.should_invoke(), "Sixth call should invoke");
+    }
+
+    #[test]
+    fn test_throttler_handles_large_intervals() {
+        let mut throttler = Throttler::new(10);
+
+        for i in 1..10 {
+            assert!(!throttler.should_invoke(), "Call {} should not invoke for interval 10", i);
+        }
+
+        assert!(throttler.should_invoke(), "Tenth call should invoke for interval 10");
+    }
+
+    #[test]
+    fn test_throttler_interval_of_one() {
+        let mut throttler = Throttler::new(1);
+
+        // Every call should invoke for an interval of 1
+        assert!(throttler.should_invoke(), "First call should invoke for interval 1");
+        assert!(throttler.should_invoke(), "Second call should invoke for interval 1");
+        assert!(throttler.should_invoke(), "Third call should invoke for interval 1");
+    }
+
+    #[test]
+    fn test_throttler_multiple_invocations() {
+        let mut throttler = Throttler::new(3);
+
+        // First cycle
+        assert!(!throttler.should_invoke(), "First call should not invoke in first cycle");
+        assert!(!throttler.should_invoke(), "Second call should not invoke in first cycle");
+        assert!(throttler.should_invoke(), "Third call should invoke in first cycle");
+
+        // Second cycle
+        assert!(!throttler.should_invoke(), "First call should not invoke in second cycle");
+        assert!(!throttler.should_invoke(), "Second call should not invoke in second cycle");
+        assert!(throttler.should_invoke(), "Third call should invoke in second cycle");
+
+        // Third cycle
+        assert!(!throttler.should_invoke(), "First call should not invoke in third cycle");
+        assert!(!throttler.should_invoke(), "Second call should not invoke in third cycle");
+        assert!(throttler.should_invoke(), "Third call should invoke in third cycle");
+    }
+}
