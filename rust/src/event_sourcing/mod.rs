@@ -1,34 +1,17 @@
 use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
 use block_ingestion_actors::{
-    accounting_actor::AccountingActor,
-    batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
-    batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor,
-    berkeley_block_parser_actor::BerkeleyBlockParserActor,
-    best_block_actor::BestBlockActor,
-    block_ancestor_actor::BlockAncestorActor,
-    block_canonicity_actor::BlockCanonicityActor,
-    block_confirmations_actor::BlockConfirmationsActor,
-    block_log_actor::BlockLogActor,
-    canonical_block_log_actor::CanonicalBlockLogActor,
-    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor,
-    canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
+    accounting_actor::AccountingActor, batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
+    batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
+    block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
     canonical_internal_command_log_persistence_actor::CanonicalInternalCommandLogPersistenceActor,
-    canonical_user_command_log_actor::CanonicalUserCommandLogActor,
-    canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
-    coinbase_transfer_actor::CoinbaseTransferActor,
-    fee_transfer_actor::FeeTransferActor,
-    fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
-    ledger_actor::LedgerActor,
-    mainnet_block_parser_actor::MainnetBlockParserActor,
-    monitor_actor::MonitorActor,
-    new_account_actor::NewAccountActor,
-    pcb_path_actor::PCBBlockPathActor,
-    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
-    snark_summary_persistence_actor::{self, SnarkSummaryPersistenceActor},
-    snark_work_actor::SnarkWorkSummaryActor,
-    staking_ledger_actor::StakingLedgerActor,
-    user_command_log_actor::UserCommandLogActor,
-    Actor,
+    canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
+    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
+    pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_ledger_actor::StakingLedgerActor,
+    user_command_log_actor::UserCommandLogActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -56,7 +39,6 @@ pub async fn subscribe_actors(
     mut shutdown_receiver: broadcast::Receiver<()>, // Accept shutdown_receiver as a parameter
     root_node: Option<(u64, String)>,
 ) -> anyhow::Result<()> {
-    // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
     let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
@@ -66,7 +48,7 @@ pub async fn subscribe_actors(
     let new_account_actor = NewAccountActor::new(Arc::clone(shared_publisher), &root_node).await;
 
     // Define actors
-    let mut actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
+    let actors: Vec<Arc<dyn Actor + Send + Sync>> = vec![
         Arc::new(PCBBlockPathActor::new(Arc::clone(shared_publisher))),
         Arc::new(BerkeleyBlockParserActor::new(Arc::clone(shared_publisher))),
         Arc::new(MainnetBlockParserActor::new(Arc::clone(shared_publisher))),
