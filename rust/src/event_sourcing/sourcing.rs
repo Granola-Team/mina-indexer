@@ -121,8 +121,10 @@ pub async fn publish_block_dir_paths(
                 publish_block_path(&shared_publisher, path).await.unwrap();
                 publish_actor_height(&shared_publisher, path).await.unwrap();
 
-                let spread = handle_height_spread_event(&mut high_priority_subcriber).await;
-                if spread > 500 {
+                let running_avg_height_spread = handle_height_spread_event(&mut high_priority_subcriber).await;
+                // Actors should keep pace with each other, on average. If more than 10 block height differ between
+                // actors (actors that report their height), then we should slow down the ingestion
+                if running_avg_height_spread > 5 {
                     millisecond_pause += 10; // increment pause
                     println!("Incrementing pause by 10 milliseconds. Pause is now {millisecond_pause}");
                 }
@@ -198,12 +200,8 @@ async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>)
 
     // Drain events with a timeout and keep the highest HeightSpread value
     while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
-        if event.event_type == EventType::HeightSpread {
-            let current_spread = event.payload.parse().unwrap_or(0);
-            // Keep the highest spread
-            if current_spread > height_spread {
-                height_spread = current_spread;
-            }
+        if event.event_type == EventType::RunningAvgHeightSpread {
+            height_spread = event.payload.parse().unwrap_or(0);
         }
     }
 
@@ -332,19 +330,19 @@ mod sourcing_tests {
         tokio::spawn(async move {
             // Simulate sending HeightSpread events
             tx.send(Event {
-                event_type: EventType::HeightSpread,
+                event_type: EventType::RunningAvgHeightSpread,
                 payload: "50".to_string(),
             })
             .unwrap();
             tokio::time::sleep(Duration::from_millis(50)).await; // Simulate a delay
             tx.send(Event {
-                event_type: EventType::HeightSpread,
+                event_type: EventType::RunningAvgHeightSpread,
                 payload: "30".to_string(),
             })
             .unwrap();
             tokio::time::sleep(Duration::from_millis(50)).await;
             tx.send(Event {
-                event_type: EventType::HeightSpread,
+                event_type: EventType::RunningAvgHeightSpread,
                 payload: "80".to_string(),
             })
             .unwrap();

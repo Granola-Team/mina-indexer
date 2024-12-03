@@ -27,7 +27,7 @@ pub enum EventType {
     PreExistingAccount,
     ActorHeight,
     EpochStakeDelegation,
-    HeightSpread,
+    RunningAvgHeightSpread,
     StakingLedgerFilePath,
     StakingLedgerEntry,
 }
