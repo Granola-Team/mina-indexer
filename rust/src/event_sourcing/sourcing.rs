@@ -97,7 +97,7 @@ pub async fn publish_block_dir_paths(
     mut shutdown_receiver: broadcast::Receiver<()>,
     root_node: Option<(u64, String)>, // height and state hash
 ) -> Result<()> {
-    let millisecond_pause = get_millisecond_pause_from_rate();
+    let mut millisecond_pause = get_millisecond_pause_from_rate();
     let mut entries = get_block_entries(&blocks_dir).await?;
 
     // Sort entries by height and hash
@@ -123,11 +123,10 @@ pub async fn publish_block_dir_paths(
 
                 let spread = handle_height_spread_event(&mut high_priority_subcriber).await;
                 if spread > 500 {
-                    println!("Height spread is {}. Pausing for 10 seconds...", spread);
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                } else {
-                    tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
+                    millisecond_pause += 10; // increment pause
+                    println!("Incrementing pause by 10 milliseconds. Pause is now {millisecond_pause}");
                 }
+                tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
