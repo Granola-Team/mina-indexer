@@ -18,11 +18,10 @@ pub struct CanonicalUserCommandPersistenceActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub db_logger: Arc<Mutex<DbLogger>>,
     pub database_inserts: AtomicUsize,
-    pub modulo_10: u64,
 }
 
 impl CanonicalUserCommandPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>, modulo_10: u64) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -56,7 +55,6 @@ impl CanonicalUserCommandPersistenceActor {
             shared_publisher,
             db_logger: Arc::new(Mutex::new(logger)),
             database_inserts: AtomicUsize::new(0),
-            modulo_10,
         }
     }
 
@@ -130,9 +128,6 @@ impl Actor for CanonicalUserCommandPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::BatchCanonicalUserCommandLog {
             let log: BatchCanonicalUserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if log.height % 10 != self.modulo_10 {
-                return;
-            }
             self.log_batch(&log).await.unwrap();
             self.database_inserts.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             self.publish(Event {
@@ -162,21 +157,18 @@ mod canonical_user_command_log_persistence_tests {
     use std::sync::Arc;
     use tokio::sync::broadcast;
 
-    async fn setup_actor() -> (Vec<CanonicalUserCommandPersistenceActor>, Arc<SharedPublisher>, broadcast::Receiver<Event>) {
+    async fn setup_actor() -> (CanonicalUserCommandPersistenceActor, Arc<SharedPublisher>, broadcast::Receiver<Event>) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
         let receiver = shared_publisher.subscribe();
 
-        let mut actors = vec![];
-        for i in 0..=9 {
-            actors.push(CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, i).await);
-        }
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
 
-        (actors, shared_publisher, receiver)
+        (actor, shared_publisher, receiver)
     }
 
     #[tokio::test]
     async fn test_insert_canonical_user_command_log_batch() {
-        let (actors, _shared_publisher, _receiver) = setup_actor().await;
+        let (actor, _shared_publisher, _receiver) = setup_actor().await;
 
         // Prepare batch payload
         let payload = BatchCanonicalUserCommandLogPayload {
@@ -200,11 +192,11 @@ mod canonical_user_command_log_persistence_tests {
         };
 
         // Log the batch
-        actors[0].log_batch(&payload).await.unwrap();
+        actor.log_batch(&payload).await.unwrap();
 
         // Query the database to verify the inserted command
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2";
-        let db_logger = actors[0].db_logger.lock().await;
+        let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .get_client()
             .query_one(query, &[&(payload.height as i64), &payload.state_hash])
@@ -226,7 +218,7 @@ mod canonical_user_command_log_persistence_tests {
 
     #[tokio::test]
     async fn test_handle_event_canonical_user_command_log_batch() {
-        let (actors, _, _) = setup_actor().await;
+        let (actor, _, _) = setup_actor().await;
 
         // Prepare batch payload
         let batch_payload = BatchCanonicalUserCommandLogPayload {
@@ -256,11 +248,11 @@ mod canonical_user_command_log_persistence_tests {
         };
 
         // Handle the event with the actor
-        actors[0].handle_event(event).await;
+        actor.handle_event(event).await;
 
         // Query the database to verify the inserted commands
         let query = "SELECT * FROM user_commands_log WHERE height = $1 AND state_hash = $2";
-        let db_logger = actors[0].db_logger.lock().await;
+        let db_logger = actor.db_logger.lock().await;
         let row = db_logger
             .get_client()
             .query_one(query, &[&(batch_payload.height as i64), &batch_payload.state_hash])
@@ -284,7 +276,7 @@ mod canonical_user_command_log_persistence_tests {
     async fn test_canonical_user_command_view_with_separate_batches() {
         // Set up the actor and database connection
         let shared_publisher = Arc::new(SharedPublisher::new(100));
-        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None, 1).await;
+        let actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
         let command = CommandSummary {
             memo: "Command 1".to_string(),
             fee_payer: "payer_1".to_string(),
@@ -355,7 +347,7 @@ mod canonical_user_command_log_persistence_tests {
     #[tokio::test]
     async fn test_actor_height_event_published_with_batch() {
         // Set up the actor and shared publisher
-        let (actors, _, mut receiver) = setup_actor().await;
+        let (actor, _, mut receiver) = setup_actor().await;
 
         // Create a batch payload for canonical user commands
         let batch_payload = BatchCanonicalUserCommandLogPayload {
@@ -385,7 +377,7 @@ mod canonical_user_command_log_persistence_tests {
         };
 
         // Handle the batch event
-        actors[0].handle_event(event).await;
+        actor.handle_event(event).await;
 
         // Listen for the `ActorHeight` event
         let received_event = receiver.recv().await.expect("Did not receive ActorHeight event");
@@ -395,7 +387,7 @@ mod canonical_user_command_log_persistence_tests {
 
         // Deserialize and validate the `ActorHeightPayload` content
         let actor_height_payload: ActorHeightPayload = sonic_rs::from_str(&received_event.payload).expect("Failed to deserialize ActorHeightPayload");
-        assert_eq!(actor_height_payload.actor, actors[0].id());
+        assert_eq!(actor_height_payload.actor, actor.id());
         assert_eq!(actor_height_payload.height, batch_payload.height);
     }
 }

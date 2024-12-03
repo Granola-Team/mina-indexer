@@ -18,11 +18,10 @@ pub struct SnarkSummaryPersistenceActor {
     pub shared_publisher: Arc<SharedPublisher>,
     pub database_inserts: AtomicUsize,
     pub db_logger: Arc<Mutex<DbLogger>>,
-    pub modulo_10: u64,
 }
 
 impl SnarkSummaryPersistenceActor {
-    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>, modulo_10: u64) -> Self {
+    pub async fn new(shared_publisher: Arc<SharedPublisher>, root_node: &Option<(u64, String)>) -> Self {
         if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
             tokio::spawn(async move {
                 if let Err(e) = connection.await {
@@ -48,7 +47,6 @@ impl SnarkSummaryPersistenceActor {
                 shared_publisher,
                 db_logger: Arc::new(Mutex::new(logger)),
                 database_inserts: AtomicUsize::new(0),
-                modulo_10,
             }
         } else {
             panic!("Unable to establish connection to database")
@@ -108,9 +106,6 @@ impl Actor for SnarkSummaryPersistenceActor {
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::BulkSnarkCanonicity {
             let event_payload: BulkSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
-            if event_payload.height % 10 != self.modulo_10 {
-                return;
-            }
             match self.log_batch(&event_payload).await {
                 Ok(_) => {
                     self.shared_publisher.incr_database_insert();
@@ -143,21 +138,18 @@ mod snark_summary_persistence_actor_tests {
     use std::sync::Arc;
     use tokio::time::timeout;
 
-    async fn setup_actor() -> (Vec<SnarkSummaryPersistenceActor>, tokio::sync::broadcast::Receiver<Event>) {
+    async fn setup_actor() -> (SnarkSummaryPersistenceActor, tokio::sync::broadcast::Receiver<Event>) {
         let shared_publisher = Arc::new(SharedPublisher::new(100));
 
         let receiver = shared_publisher.subscribe();
 
-        let mut actors = vec![];
-        for i in 0..=9 {
-            actors.push(SnarkSummaryPersistenceActor::new(Arc::clone(&shared_publisher), &None, i).await);
-        }
-        (actors, receiver)
+        let actor = SnarkSummaryPersistenceActor::new(Arc::clone(&shared_publisher), &None).await;
+        (actor, receiver)
     }
 
     #[tokio::test]
     async fn test_snark_summary_persistence_actor_logs_bulk_summary() {
-        let (actors, mut receiver) = setup_actor().await;
+        let (actor, mut receiver) = setup_actor().await;
 
         let bulk_snark_summary = BulkSnarkCanonicityPayload {
             height: 10,
@@ -182,12 +174,12 @@ mod snark_summary_persistence_actor_tests {
         };
 
         // Handle the event
-        actors[0].handle_event(event).await;
+        actor.handle_event(event).await;
 
         // Verify the ActorHeight event is published
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
-            assert_eq!(published_event.actor, actors[0].id());
+            assert_eq!(published_event.actor, actor.id());
             assert_eq!(published_event.height, bulk_snark_summary.height);
         } else {
             panic!("Expected ActorHeight event was not published.");
@@ -195,7 +187,7 @@ mod snark_summary_persistence_actor_tests {
 
         // Validate the data was logged into the database
         let query = "SELECT * FROM snarks WHERE height = $1 AND state_hash = $2";
-        let logger = actors[0].db_logger.lock().await;
+        let logger = actor.db_logger.lock().await;
         let rows = logger
             .get_client()
             .query(query, &[&(bulk_snark_summary.height as i64), &bulk_snark_summary.state_hash])
@@ -246,19 +238,19 @@ mod snark_summary_persistence_actor_tests {
             event_type: EventType::BulkSnarkCanonicity,
             payload: sonic_rs::to_string(&batch_summary1).unwrap(),
         };
-        actors[0].handle_event(event1).await;
+        actors.handle_event(event1).await;
 
         // Send the second batch event
         let event2 = Event {
             event_type: EventType::BulkSnarkCanonicity,
             payload: sonic_rs::to_string(&batch_summary2).unwrap(),
         };
-        actors[1].handle_event(event2).await;
+        actors.handle_event(event2).await;
 
         // Verify ActorHeight events for the first batch
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
-            assert_eq!(published_event.actor, actors[0].id());
+            assert_eq!(published_event.actor, actors.id());
             assert_eq!(published_event.height, batch_summary1.height);
         } else {
             panic!("Expected ActorHeight event for the first batch was not published.");
@@ -267,7 +259,7 @@ mod snark_summary_persistence_actor_tests {
         // Verify ActorHeight events for the second batch
         if let Ok(event) = timeout(std::time::Duration::from_secs(1), receiver.recv()).await {
             let published_event: ActorHeightPayload = sonic_rs::from_str(&event.unwrap().payload).unwrap();
-            assert_eq!(published_event.actor, actors[1].id());
+            assert_eq!(published_event.actor, actors.id());
             assert_eq!(published_event.height, batch_summary2.height);
         } else {
             panic!("Expected ActorHeight event for the second batch was not published.");

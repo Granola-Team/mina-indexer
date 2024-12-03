@@ -1,17 +1,34 @@
 use crate::{constants::HEIGHT_SPREAD_MSG_THROTTLE, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
 use block_ingestion_actors::{
-    accounting_actor::AccountingActor, batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
-    batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
-    best_block_actor::BestBlockActor, block_ancestor_actor::BlockAncestorActor, block_canonicity_actor::BlockCanonicityActor,
-    block_confirmations_actor::BlockConfirmationsActor, block_log_actor::BlockLogActor, canonical_block_log_actor::CanonicalBlockLogActor,
-    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor, canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
+    accounting_actor::AccountingActor,
+    batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
+    batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor,
+    berkeley_block_parser_actor::BerkeleyBlockParserActor,
+    best_block_actor::BestBlockActor,
+    block_ancestor_actor::BlockAncestorActor,
+    block_canonicity_actor::BlockCanonicityActor,
+    block_confirmations_actor::BlockConfirmationsActor,
+    block_log_actor::BlockLogActor,
+    canonical_block_log_actor::CanonicalBlockLogActor,
+    canonical_block_log_persistence_actor::CanonicalBlockLogPersistenceActor,
+    canonical_internal_command_log_actor::CanonicalInternalCommandLogActor,
     canonical_internal_command_log_persistence_actor::CanonicalInternalCommandLogPersistenceActor,
-    canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
-    coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor, fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
-    ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
-    pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
-    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_ledger_actor::StakingLedgerActor,
-    user_command_log_actor::UserCommandLogActor, Actor,
+    canonical_user_command_log_actor::CanonicalUserCommandLogActor,
+    canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
+    coinbase_transfer_actor::CoinbaseTransferActor,
+    fee_transfer_actor::FeeTransferActor,
+    fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor,
+    ledger_actor::LedgerActor,
+    mainnet_block_parser_actor::MainnetBlockParserActor,
+    monitor_actor::MonitorActor,
+    new_account_actor::NewAccountActor,
+    pcb_path_actor::PCBBlockPathActor,
+    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    snark_summary_persistence_actor::{self, SnarkSummaryPersistenceActor},
+    snark_work_actor::SnarkWorkSummaryActor,
+    staking_ledger_actor::StakingLedgerActor,
+    user_command_log_actor::UserCommandLogActor,
+    Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -40,29 +57,9 @@ pub async fn subscribe_actors(
     root_node: Option<(u64, String)>,
 ) -> anyhow::Result<()> {
     // let snark_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher)).await;
-    let mut user_command_persistence_actors = vec![];
-    for i in 0..=9 {
-        user_command_persistence_actors.push(Arc::new(
-            CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await,
-        ));
-    }
-
-    let mut internal_command_persistence_actors = vec![];
-    for i in 0..=9 {
-        internal_command_persistence_actors.push(Arc::new(
-            CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await,
-        ));
-    }
-
-    let mut snark_persistence_actors = vec![];
-    for i in 0..=9 {
-        snark_persistence_actors.push(Arc::new(SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node, i).await));
-    }
-
-    assert_eq!(user_command_persistence_actors.len(), 10, "10 CanonicalUserCommandPersistenceActor required");
-    assert_eq!(internal_command_persistence_actors.len(), 10, "10 InternalUserCommandPersistenceActor required");
-    assert_eq!(snark_persistence_actors.len(), 10, "10 SnarkSummaryPersistenceActor required");
-
+    let user_command_persistence_actor = CanonicalUserCommandPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let internal_command_persistence_actor = CanonicalInternalCommandLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
+    let snark_summary_persistence_actor = SnarkSummaryPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let canonical_block_log_persistence_actor = CanonicalBlockLogPersistenceActor::new(Arc::clone(shared_publisher), &root_node).await;
     let account_summary_persistence_actor = LedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
     let staking_ledger_actor = StakingLedgerActor::new(Arc::clone(shared_publisher), &root_node).await;
@@ -92,20 +89,14 @@ pub async fn subscribe_actors(
         Arc::new(BatchCanonicalUserCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(BulkSnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), HEIGHT_SPREAD_MSG_THROTTLE)),
+        Arc::new(internal_command_persistence_actor),
+        Arc::new(user_command_persistence_actor),
+        Arc::new(snark_summary_persistence_actor),
         Arc::new(account_summary_persistence_actor),
         Arc::new(new_account_actor),
         Arc::new(canonical_block_log_persistence_actor),
         Arc::new(staking_ledger_actor),
     ];
-    for uc in user_command_persistence_actors {
-        actors.push(uc);
-    }
-    for it in internal_command_persistence_actors {
-        actors.push(it);
-    }
-    for s in snark_persistence_actors {
-        actors.push(s);
-    }
 
     let monitor_actors = actors.clone();
     let monitor_shutdown_rx = shutdown_receiver.resubscribe();
