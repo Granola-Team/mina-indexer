@@ -129,8 +129,10 @@ pub async fn publish_block_dir_paths(
                     println!("Incrementing pause by 10 milliseconds. Pause is now {millisecond_pause}");
                 }
                 if running_avg_height_spread < 1 {
+                    if millisecond_pause != 10 {
+                        println!("Decrementing pause by 10 milliseconds. Pause is now {millisecond_pause}");
+                    }
                     millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
-                    println!("Decrementing pause by 10 milliseconds. Pause is now {millisecond_pause}");
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
 
