@@ -203,7 +203,10 @@ async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>)
     // Drain events with a timeout and keep the highest HeightSpread value
     while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
         if event.event_type == EventType::RunningAvgHeightSpread {
-            height_spread = event.payload.parse().unwrap_or(0);
+            let spread = event.payload.parse().unwrap_or(0);
+            if spread > height_spread {
+                height_spread = spread;
+            }
         }
     }
 
