@@ -115,7 +115,7 @@ pub async fn publish_block_dir_paths(
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
         async move {
-            for entry in entries {
+            for (i, entry) in entries.iter().enumerate() {
                 let path = entry.as_path();
 
                 publish_block_path(&shared_publisher, path).await.unwrap();
@@ -124,13 +124,16 @@ pub async fn publish_block_dir_paths(
                 let running_avg_height_spread = handle_height_spread_event(&mut high_priority_subcriber).await;
                 // Actors should keep pace with each other, on average. If their processing height differs to much,
                 // the pause should increase
-                if running_avg_height_spread > 5 {
-                    millisecond_pause = (millisecond_pause + 10).min(1000); // increment pause, to slow down ingestion to 1 per second min
+                if running_avg_height_spread > 5.0 {
+                    millisecond_pause = (millisecond_pause + 10).min(10000); // increment pause, to slow down ingestion to 1 per second min
                 }
-                if running_avg_height_spread < 1 {
+                if running_avg_height_spread < 1.0 {
                     millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
+                if i % 1_000 == 0 {
+                    println!("Pause is currently {millisecond_pause}ms for spread {running_avg_height_spread}");
+                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     println!("Shutdown signal received. Stopping publishing...");
@@ -197,13 +200,13 @@ async fn publish_root_file(shared_publisher: &Arc<SharedPublisher>, root_file: P
     Ok(())
 }
 
-async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> u64 {
-    let mut height_spread: u64 = 0; // Default to 0
+async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> f64 {
+    let mut height_spread: f64 = 0.0; // Default to 0
 
     // Drain events with a timeout and keep the highest HeightSpread value
     while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
         if event.event_type == EventType::RunningAvgHeightSpread {
-            let spread = event.payload.parse().unwrap_or(0);
+            let spread = event.payload.parse::<f64>().unwrap_or(0.0);
             if spread > height_spread {
                 height_spread = spread;
             }
@@ -358,7 +361,7 @@ mod sourcing_tests {
         let highest_spread = handle_height_spread_event(&mut sub).await;
 
         // Assert that the highest spread retained is 80
-        assert_eq!(highest_spread, 50); // only every 10th event is published
+        assert_eq!(highest_spread, 50.0); // only every 10th event is published
     }
 
     #[tokio::test]
@@ -372,6 +375,6 @@ mod sourcing_tests {
         let highest_spread = handle_height_spread_event(&mut sub).await;
 
         // Assert that the highest spread is 0, as no events were received
-        assert_eq!(highest_spread, 0);
+        assert_eq!(highest_spread, 0.0);
     }
 }
