@@ -5,4 +5,4 @@ pub const CHANNEL_MESSAGE_CAPACITY: usize = 10_000_000;
 pub const POSTGRES_CONNECTION_STRING: &str = "host=localhost port=9002 user=mina_indexer password=mina_indexer dbname=mina_indexer";
 pub const FILE_PUBLISHER_ACTOR_ID: &str = "FilePublisher";
 pub const MAINNET_EPOCH_SLOT_COUNT: u64 = 7140;
-pub const SLIDING_WINDOW_SIZE: usize = 10_000;
+pub const SLIDING_WINDOW_SIZE: usize = 100;
