@@ -5,11 +5,10 @@ use super::super::{
 };
 use crate::{
     event_sourcing::{mainnet_block_models::MainnetBlock, payloads::MainnetBlockPayload},
-    utility::extract_height_and_hash,
+    utility::{extract_height_and_hash, get_cleaned_pcb},
 };
 use async_trait::async_trait;
 use std::{
-    fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
 };
@@ -41,7 +40,7 @@ impl Actor for MainnetBlockParserActor {
     async fn handle_event(&self, event: Event) {
         if let EventType::MainnetBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
-            let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
+            let file_content = get_cleaned_pcb(&event.payload).unwrap();
             let block: MainnetBlock = sonic_rs::from_str(&file_content).unwrap();
             let block_payload = MainnetBlockPayload {
                 height: height as u64,

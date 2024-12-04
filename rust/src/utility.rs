@@ -1,5 +1,5 @@
-use anyhow::anyhow;
-use sonic_rs::Value;
+use anyhow::{anyhow, Result};
+use sonic_rs::{JsonValueMutTrait, Value};
 use std::{fs::File, io::Read, path::Path};
 
 pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
@@ -52,10 +52,123 @@ mod extract_height_and_hash_tests {
     }
 }
 
-pub fn get_top_level_keys_from_json_file(file: &str) -> anyhow::Result<Vec<String>> {
+pub fn get_cleaned_pcb(file: &str) -> Result<String> {
     let mut file = File::open(file)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    let mut contents = Vec::new();
+    file.read_to_end(&mut contents)?;
+
+    unsafe {
+        match sonic_rs::from_slice_unchecked::<Value>(&contents) {
+            Ok(mut json_value) => {
+                remove_proofs(&mut json_value);
+
+                // Serialize back to JSON
+                let cleaned_json = sonic_rs::to_string_pretty(&json_value).expect("Serialization failed");
+                Ok(cleaned_json)
+            }
+            Err(e) => Err(anyhow::Error::new(e)),
+        }
+    }
+}
+
+/// Recursively removes all "proofs" keys from a `sonic_rs::Value`.
+fn remove_proofs(value: &mut Value) {
+    if let Some(map) = value.as_object_mut() {
+        let proofs = "proofs".to_string();
+        map.remove(&proofs);
+
+        for (_, v) in map.iter_mut() {
+            remove_proofs(v);
+        }
+    } else if let Some(array) = value.as_array_mut() {
+        for v in array.iter_mut() {
+            remove_proofs(v);
+        }
+    }
+}
+#[cfg(test)]
+mod remove_proofs_invalid_utf8_tests {
+    use super::*;
+    use sonic_rs::{json, to_value};
+
+    #[test]
+    fn test_invalid_utf8_proofs_key() {
+        // Simulate a JSON structure containing invalid UTF-8 bytes
+        let raw_json_bytes = b"{
+            \"proofs\": \"\xFF\xFE\xFD\",
+            \"key1\": \"value2\"
+        }";
+
+        // Parse the JSON bytes into a `Value`
+        unsafe {
+            let mut value = sonic_rs::from_slice_unchecked(raw_json_bytes).expect("Failed to parse JSON");
+
+            // Remove "proofs" key
+            remove_proofs(&mut value);
+
+            // Construct the expected value
+            let expected = to_value(&json!({
+                "key1": "value2",
+            }))
+            .unwrap();
+
+            assert_eq!(value, expected);
+        }
+    }
+
+    #[test]
+    fn test_invalid_utf8_nested_proofs() {
+        // Simulate a JSON structure with invalid UTF-8 in a nested object
+        let raw_json_bytes = b"{
+            \"key1\": {
+                \"proofs\": \"\xFF\",
+                \"nested\": {
+                    \"proofs\": \"\xFF\"
+                }
+            }
+        }";
+
+        // Parse the JSON bytes into a `Value`
+        unsafe {
+            let mut value = sonic_rs::from_slice_unchecked(raw_json_bytes).expect("Failed to parse JSON");
+
+            // Remove "proofs" keys
+            remove_proofs(&mut value);
+
+            // Construct the expected value
+            let expected = to_value(&json!({
+                "key1": {
+                    "nested": {}
+                }
+            }))
+            .unwrap();
+
+            assert_eq!(value, expected);
+        }
+    }
+
+    #[test]
+    fn test_get_cleaned_pcb_with_invalid_utf8() {
+        // Path to the test file with invalid UTF-8
+        let test_file = "./src/event_sourcing/test_data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json";
+
+        // Ensure the file exists
+        assert!(Path::new(test_file).exists(), "Test file does not exist");
+
+        // Call the function to clean the JSON
+        match get_cleaned_pcb(test_file) {
+            Ok(cleaned_json) => {
+                println!("Cleaned JSON:\n{}", cleaned_json);
+
+                assert!(!cleaned_json.contains("\"proofs\""), "JSON still contains 'proofs'");
+            }
+            Err(e) => panic!("Failed to process file: {}", e),
+        }
+    }
+}
+
+pub fn get_top_level_keys_from_json_file(file: &str) -> anyhow::Result<Vec<String>> {
+    let contents = get_cleaned_pcb(file)?;
 
     // Parse the JSON file using sonic-rs
     let json_value: Value = sonic_rs::from_str(&contents)?;
