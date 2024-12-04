@@ -125,7 +125,7 @@ pub async fn publish_block_dir_paths(
                 // Actors should keep pace with each other, on average. If their processing height differs to much,
                 // the pause should increase
                 if running_avg_height_spread > 5 {
-                    millisecond_pause += 10; // increment pause, to slow down ingestion
+                    millisecond_pause = (millisecond_pause + 10).min(1000); // increment pause, to slow down ingestion to 1 per second min
                 }
                 if running_avg_height_spread < 1 {
                     millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
