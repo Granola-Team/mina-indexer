@@ -124,11 +124,10 @@ pub async fn publish_block_dir_paths(
                 let running_avg_height_spread = handle_height_spread_event(&mut high_priority_subcriber).await;
                 // Actors should keep pace with each other, on average. If their processing height differs to much,
                 // the pause should increase
-                if running_avg_height_spread > 5.0 {
-                    millisecond_pause = (millisecond_pause + 100).min(1_000); // increment pause, to slow down ingestion
-                }
                 if running_avg_height_spread < 1.0 {
-                    millisecond_pause = millisecond_pause.saturating_sub(10).max(50); // decrement pause, to speed up ingestion
+                    millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
+                } else {
+                    millisecond_pause = (millisecond_pause + 10).min(1_000); // increment pause, to slow down ingestion
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 if i % 100 == 0 {
