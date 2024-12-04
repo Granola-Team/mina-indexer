@@ -1,5 +1,6 @@
 use super::payloads::BlockCanonicityUpdatePayload;
 use futures::lock::Mutex;
+use log::debug;
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
@@ -55,7 +56,7 @@ where
         async fn log_collection<T>(prefix: &str, name: &str, collection: &Mutex<HashMap<CompositeKey, T>>) {
             let map = collection.lock().await;
             if let (Some(lowest_height), Some(max_height)) = (map.keys().map(|k| k.height).min(), map.keys().map(|k| k.height).max()) {
-                println!(
+                debug!(
                     "{}: Collection {} is of size {} and key range is ({},{})",
                     prefix,
                     name,

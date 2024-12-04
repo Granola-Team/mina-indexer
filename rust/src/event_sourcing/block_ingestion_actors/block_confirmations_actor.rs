@@ -9,6 +9,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::warn;
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct BlockConfirmationsActor {
@@ -86,7 +87,7 @@ impl Actor for BlockConfirmationsActor {
 
                 blockchain_tree.prune_tree().unwrap();
             } else {
-                println!(
+                warn!(
                     "Attempted to add block and height {} and state_hash {} but found no parent",
                     next_node.height.0, next_node.state_hash.0
                 )

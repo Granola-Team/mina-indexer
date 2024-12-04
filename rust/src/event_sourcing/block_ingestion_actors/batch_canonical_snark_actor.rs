@@ -9,6 +9,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct BulkSnarkCanonicitySummaryActor {
@@ -77,7 +78,7 @@ impl Actor for BulkSnarkCanonicitySummaryActor {
                 }
 
                 if let Err(e) = manager.prune().await {
-                    eprintln!("{}", e);
+                    error!("{}", e);
                 }
             }
             EventType::BlockCanonicityUpdate => {
@@ -95,7 +96,7 @@ impl Actor for BulkSnarkCanonicitySummaryActor {
                 }
 
                 if let Err(e) = manager.prune().await {
-                    eprintln!("{}", e);
+                    error!("{}", e);
                 }
             }
             _ => return,

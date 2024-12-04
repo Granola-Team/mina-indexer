@@ -10,6 +10,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::{
     collections::HashMap,
     sync::{atomic::AtomicUsize, Arc},
@@ -38,10 +39,10 @@ impl NewAccountActor {
                     .execute("DELETE FROM discovered_accounts WHERE height >= $1;", &[&(height.to_owned() as i64)])
                     .await
                 {
-                    println!("Unable to drop user_commands table {:?}", e);
+                    error!("Unable to drop user_commands table {:?}", e);
                 }
             } else if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
-                println!("Unable to drop user_commands table {:?}", e);
+                error!("Unable to drop user_commands table {:?}", e);
             }
             if let Err(e) = client
                 .execute(
@@ -54,7 +55,7 @@ impl NewAccountActor {
                 )
                 .await
             {
-                println!("Unable to create discovered_accounts table {:?}", e);
+                error!("Unable to create discovered_accounts table {:?}", e);
             }
             Self {
                 id: "NewAccountActor".to_string(),

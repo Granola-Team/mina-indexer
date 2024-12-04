@@ -6,6 +6,7 @@ use super::super::{
 use crate::{event_sourcing::payloads::ActorHeightPayload, utility::Throttler};
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::{debug, info};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{atomic::AtomicUsize, Arc},
@@ -53,9 +54,9 @@ impl Actor for MonitorActor {
         let actor_heights = self.actor_heights.lock().await;
         let running_avg = self.get_running_average().await;
         for (actor, height) in actor_heights.iter() {
-            println!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
+            debug!("{}: Actor {} has processed up to height {}", self.id(), actor, height);
         }
-        println!("{}: On average, actors are within {:.2} heights of each other", self.id(), running_avg);
+        info!("{}: On average, actors are within {:.2} heights of each other", self.id(), running_avg);
     }
 
     async fn handle_event(&self, event: Event) {

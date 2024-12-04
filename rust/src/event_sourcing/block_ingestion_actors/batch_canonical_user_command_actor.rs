@@ -9,6 +9,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct BatchCanonicalUserCommandLogActor {
@@ -62,7 +63,7 @@ impl Actor for BatchCanonicalUserCommandLogActor {
                     }
 
                     if let Err(e) = manager.prune().await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }
@@ -92,7 +93,7 @@ impl Actor for BatchCanonicalUserCommandLogActor {
                     }
 
                     if let Err(e) = manager.prune().await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }

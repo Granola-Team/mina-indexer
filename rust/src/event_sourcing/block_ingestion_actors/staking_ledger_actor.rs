@@ -12,6 +12,7 @@ use crate::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::NoTls;
 
@@ -61,7 +62,7 @@ impl StakingLedgerActor {
                 )
                 .await
             {
-                println!("Unable to create staking_summary view {:?}", e);
+                error!("Unable to create staking_summary view {:?}", e);
             }
 
             Self {
@@ -88,7 +89,7 @@ impl StakingLedgerActor {
         {
             Err(e) => {
                 let msg = e.to_string();
-                println!("{}", msg);
+                error!("{}", msg);
                 Err("unable to insert into staking_ledger table")
             }
             Ok(affected_rows) => Ok(affected_rows),

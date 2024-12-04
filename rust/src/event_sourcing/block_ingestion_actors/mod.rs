@@ -32,6 +32,7 @@ pub(crate) mod user_command_log_actor;
 
 use super::events::Event;
 use async_trait::async_trait;
+use log::{debug, info};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[async_trait]
@@ -42,11 +43,11 @@ pub trait Actor: Send + Sync {
     // Default implementation of `shutdown` to log the count
     fn shutdown(&self) {
         let count = self.actor_outputs().load(Ordering::SeqCst);
-        println!("Actor {} output {} events/inserts before shutdown.", self.id(), count);
+        info!("Actor {} output {} events/inserts before shutdown.", self.id(), count);
     }
 
     fn print_report(&self, description: &'static str, size: usize) {
-        println!("{}: {} has size {}", self.id(), description, size);
+        debug!("{}: {} has size {}", self.id(), description, size);
     }
 
     async fn report(&self) {}

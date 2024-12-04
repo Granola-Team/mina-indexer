@@ -13,6 +13,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::NoTls;
 
@@ -30,7 +31,7 @@ impl LedgerActor {
             .expect("Unable to connect to database");
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
+                error!("connection error: {}", e);
             }
         });
 
@@ -67,7 +68,7 @@ impl LedgerActor {
             )
             .await
         {
-            println!("Unable to create account_summary table {:?}", e);
+            error!("Unable to create account_summary table {:?}", e);
         }
         Self {
             id: "LedgerActor".to_string(),
@@ -98,7 +99,7 @@ impl LedgerActor {
         {
             Err(e) => {
                 let msg = e.to_string();
-                println!("{}", msg);
+                error!("{}", msg);
                 Err("unable to upsert into blockchain_ledger table")
             }
             Ok(affected_rows) => Ok(affected_rows),
@@ -344,8 +345,6 @@ mod blockchain_ledger_actor_tests {
                 .await
                 .expect("Failed to query database");
             assert!(!rows.is_empty(), "No records found for account: {}", account);
-
-            println!("{:#?}", rows);
 
             for row in rows {
                 // Validate that records were inserted as expected

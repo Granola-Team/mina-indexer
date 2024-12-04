@@ -15,6 +15,7 @@ use block_ingestion_actors::{
 };
 use events::Event;
 use futures::future::try_join_all;
+use log::{debug, error, info};
 use shared_publisher::SharedPublisher;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
@@ -96,11 +97,11 @@ pub async fn subscribe_actors(
         loop {
             tokio::select! {
                 _ = monitor_shutdown_rx.recv() => {
-                    println!("Shutdown signal received, terminating monitor task.");
+                    info!("Shutdown signal received, terminating monitor task.");
                     break;
                 }
                 _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                    println!("Actor reports:");
+                    debug!("Actor reports:");
                     for actor in monitor_actors.clone() {
                         actor.report().await;
                     }
@@ -113,10 +114,10 @@ pub async fn subscribe_actors(
     let _ = shutdown_receiver.recv().await;
 
     // Await all actor handles to ensure they shut down gracefully
-    println!("Waiting for all actors to shut down...");
+    info!("Waiting for all actors to shut down...");
     try_join_all(actor_handles).await?;
     monitor_handle.await?;
-    println!("All actors have been shut down.");
+    info!("All actors have been shut down.");
     Ok(())
 }
 
@@ -132,10 +133,10 @@ where
                         actor.on_event(event).await;
                     }
                     Err(broadcast::error::RecvError::Lagged(count)) => {
-                        println!("Actor {} lagged behind, missed {} messages",actor.id(), count);
+                        error!("Actor {} lagged behind, missed {} messages",actor.id(), count);
                     }
                     Err(e) => {
-                        println!("{:?}",e)
+                        error!("{:?}",e)
                     }
                 }
 

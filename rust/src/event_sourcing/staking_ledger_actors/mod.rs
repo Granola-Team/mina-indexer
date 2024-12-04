@@ -1,6 +1,7 @@
 use super::shared_publisher::SharedPublisher;
 use crate::event_sourcing::{block_ingestion_actors::Actor, setup_actor};
 use futures::future::try_join_all;
+use log::{debug, info};
 use staking_ledger_entry_actor::StakingLedgerEntryActor;
 use staking_ledger_entry_persistence_actor::StakingLedgerEntryPersistenceActor;
 use std::{sync::Arc, time::Duration};
@@ -36,11 +37,11 @@ pub async fn subscribe_staking_actors(
         loop {
             tokio::select! {
                 _ = monitor_shutdown_rx.recv() => {
-                    println!("Shutdown signal received, terminating monitor task.");
+                    info!("Shutdown signal received, terminating monitor task.");
                     break;
                 }
                 _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                    println!("Actor reports:");
+                    debug!("Actor reports:");
                     for actor in monitor_actors.clone() {
                         actor.report().await;
                     }
@@ -53,9 +54,9 @@ pub async fn subscribe_staking_actors(
     let _ = shutdown_receiver.recv().await;
 
     // Await all actor handles to ensure they shut down gracefully
-    println!("Waiting for all actors to shut down...");
+    info!("Waiting for all actors to shut down...");
     try_join_all(actor_handles).await?;
     monitor_handle.await?;
-    println!("All actors have been shut down.");
+    info!("All actors have been shut down.");
     Ok(())
 }

@@ -1,5 +1,6 @@
 use anyhow::Result;
 use futures::future::try_join_all;
+use log::{error, info};
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
     event_sourcing::{
@@ -18,6 +19,7 @@ use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
     let (shutdown_sender, shutdown_receiver) = broadcast::channel(1);
 
     let staking_ledger_dir = std::env::var("STAKING_LEDGER_DIR")
@@ -34,7 +36,7 @@ async fn main() -> Result<()> {
 
     let actors_handle = tokio::spawn(async move {
         if let Err(e) = subscribe_staking_actors(&shared_publisher, shutdown_receiver.resubscribe()).await {
-            eprintln!("Error in actor subscription: {:?}", e);
+            error!("Error in actor subscription: {:?}", e);
         }
     });
 
@@ -46,12 +48,12 @@ async fn main() -> Result<()> {
             payload: staking_ledger.to_str().unwrap().to_string(),
         });
         let (height, _) = extract_height_and_hash(staking_ledger.as_path());
-        println!("Published Staking Ledger {height}");
+        info!("Published Staking Ledger {height}");
         tokio::time::sleep(Duration::from_secs(10)).await;
     }
 
     signal::ctrl_c().await?;
-    println!("SIGINT received, sending shutdown signal...");
+    info!("SIGINT received, sending shutdown signal...");
 
     // Send the shutdown signal
     let _ = shutdown_sender.send(());

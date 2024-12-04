@@ -5,6 +5,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 
 pub struct CanonicalBlockLogActor {
@@ -57,7 +58,7 @@ impl Actor for CanonicalBlockLogActor {
                         });
                     }
                     if let Err(e) = manager.prune().await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }
@@ -93,7 +94,7 @@ impl Actor for CanonicalBlockLogActor {
                     }
 
                     if let Err(e) = manager.prune().await {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }

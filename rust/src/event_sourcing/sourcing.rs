@@ -12,6 +12,7 @@ use crate::{
     utility::extract_height_and_hash,
 };
 use anyhow::Result;
+use log::{debug, info};
 use std::{
     cmp::Ordering,
     fs,
@@ -131,16 +132,16 @@ pub async fn publish_block_dir_paths(
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 if i % 100 == 0 {
-                    println!("Pause is currently {millisecond_pause}ms for spread {:.2}", running_avg_height_spread);
+                    debug!("Pause is currently {millisecond_pause}ms for spread {:.2}", running_avg_height_spread);
                 }
 
                 if shutdown_receiver.try_recv().is_ok() {
-                    println!("Shutdown signal received. Stopping publishing...");
+                    info!("Shutdown signal received. Stopping publishing...");
                     break;
                 }
             }
 
-            println!("Finished publishing files. Waiting for shutdown signal...");
+            info!("Finished publishing files. Waiting for shutdown signal...");
         }
     });
 

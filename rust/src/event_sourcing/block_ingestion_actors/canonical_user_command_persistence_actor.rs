@@ -10,6 +10,7 @@ use crate::{
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::error;
 use std::sync::{atomic::AtomicUsize, Arc};
 use tokio_postgres::NoTls;
 
@@ -27,7 +28,7 @@ impl CanonicalUserCommandPersistenceActor {
             .expect("Unable to connect to database");
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
+                error!("connection error: {}", e);
             }
         });
         let logger = DbLogger::builder(client)

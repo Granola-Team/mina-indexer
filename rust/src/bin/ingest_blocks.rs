@@ -1,6 +1,8 @@
 use anyhow::Result;
 use chrono::{DateTime, Utc};
+use env_logger::Builder;
 use futures::future::try_join_all;
+use log::{error, info};
 use mina_indexer::{
     constants::CHANNEL_MESSAGE_CAPACITY,
     event_sourcing::{
@@ -14,14 +16,17 @@ use tokio::{signal, sync::broadcast};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .filter_module("tokio_postgres", log::LevelFilter::Warn)
+        .init();
     let args: Vec<String> = env::args().collect();
 
     let mut root_node = None;
     if args.len() == 3 {
         root_node = Some((args[1].parse::<u64>().unwrap(), args[2].to_string()));
-        println!("Starting from canonical root at height {} and state hash {}", &args[1], &args[2]);
+        info!("Starting from canonical root at height {} and state hash {}", &args[1], &args[2]);
     } else {
-        println!("Starting from genesis root");
+        info!("Starting from genesis root");
     }
     async_main(root_node).await
 }
@@ -58,7 +63,7 @@ async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
 
     // Wait for SIGINT to trigger shutdown
     signal::ctrl_c().await?;
-    println!("SIGINT received, sending shutdown signal...");
+    info!("SIGINT received, sending shutdown signal...");
 
     // Send the shutdown signal
     let _ = shutdown_sender.send(());
@@ -77,7 +82,7 @@ fn spawn_actor_subscribers(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         if let Err(e) = subscribe_actors(&shared_publisher, shutdown_receiver, root_node).await {
-            eprintln!("Error in actor subscription: {:?}", e);
+            error!("Error in actor subscription: {:?}", e);
         }
     })
 }
@@ -91,7 +96,7 @@ fn spawn_block_publisher(
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         if let Err(e) = publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver, root_node).await {
-            eprintln!("Error publishing block paths: {:?}", e);
+            error!("Error publishing block paths: {:?}", e);
         }
     })
 }
@@ -102,12 +107,12 @@ fn spawn_monitor(shared_publisher: Arc<SharedPublisher>, mut shutdown_receiver: 
         loop {
             tokio::select! {
                 _ = shutdown_receiver.recv() => {
-                    println!("Shutdown signal received, terminating monitor task.");
+                    info!("Shutdown signal received, terminating monitor task.");
                     break;
                 }
                 _ = tokio::time::sleep(Duration::from_secs(60)) => {
                     let now: DateTime<Utc> = Utc::now();
-                    println!(
+                    info!(
                         "{} Messages published: {}. Database inserts: {}. Ratio: {}",
                         now.to_rfc3339(),
                         shared_publisher.buffer_size(),
