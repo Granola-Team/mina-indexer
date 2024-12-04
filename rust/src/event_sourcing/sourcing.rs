@@ -128,11 +128,11 @@ pub async fn publish_block_dir_paths(
                     millisecond_pause = (millisecond_pause + 100).min(1_000); // increment pause, to slow down ingestion
                 }
                 if running_avg_height_spread < 1.0 {
-                    millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
+                    millisecond_pause = millisecond_pause.saturating_sub(10).max(50); // decrement pause, to speed up ingestion
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 if i % 100 == 0 {
-                    println!("Pause is currently {millisecond_pause}ms for spread {running_avg_height_spread:.2}");
+                    println!("Pause is currently {millisecond_pause}ms for spread {:.2}", running_avg_height_spread);
                 }
 
                 if shutdown_receiver.try_recv().is_ok() {
@@ -207,9 +207,7 @@ async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>)
     while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
         if event.event_type == EventType::RunningAvgHeightSpread {
             let spread = event.payload.parse::<f64>().unwrap_or(0.0);
-            if spread > height_spread {
-                height_spread = spread;
-            }
+            height_spread = spread;
         }
     }
 
@@ -326,42 +324,6 @@ mod sourcing_tests {
 
         // Clean up by sending the shutdown signal
         let _ = shutdown_sender.send(());
-    }
-
-    #[tokio::test]
-    async fn test_handle_height_spread_event_keeps_highest() {
-        // Create a broadcast channel and a subscriber
-        let (tx, rx) = broadcast::channel::<Event>(10);
-        let subscriber = Arc::new(Mutex::new(rx));
-
-        // Spawn a task to publish events to the channel
-        tokio::spawn(async move {
-            // Simulate sending HeightSpread events
-            tx.send(Event {
-                event_type: EventType::RunningAvgHeightSpread,
-                payload: "50".to_string(),
-            })
-            .unwrap();
-            tokio::time::sleep(Duration::from_millis(50)).await; // Simulate a delay
-            tx.send(Event {
-                event_type: EventType::RunningAvgHeightSpread,
-                payload: "30".to_string(),
-            })
-            .unwrap();
-            tokio::time::sleep(Duration::from_millis(50)).await;
-            tx.send(Event {
-                event_type: EventType::RunningAvgHeightSpread,
-                payload: "80".to_string(),
-            })
-            .unwrap();
-        });
-
-        // Call the function to handle events and keep the highest spread
-        let mut sub = subscriber.lock().await;
-        let highest_spread = handle_height_spread_event(&mut sub).await;
-
-        // Assert that the highest spread retained is 80
-        assert_eq!(highest_spread, 50.0); // only every 10th event is published
     }
 
     #[tokio::test]
