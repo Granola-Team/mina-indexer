@@ -125,10 +125,10 @@ pub async fn publish_block_dir_paths(
                 // Actors should keep pace with each other, on average. If their processing height differs to much,
                 // the pause should increase
                 if running_avg_height_spread > 5.0 {
-                    millisecond_pause = 1_000; // slow down to 1 fps
+                    millisecond_pause = (millisecond_pause + 100).min(1_000); // increment pause, to slow down ingestion
                 }
                 if running_avg_height_spread < 1.0 {
-                    millisecond_pause = millisecond_pause.saturating_sub(10).max(50); // decrement pause, to speed up ingestion up to 20 fps
+                    millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
                 }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
                 if i % 100 == 0 {
