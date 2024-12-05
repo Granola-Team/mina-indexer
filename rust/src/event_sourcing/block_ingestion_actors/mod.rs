@@ -29,6 +29,7 @@ pub(crate) mod staking_accounting_actor;
 pub(crate) mod staking_ledger_actor;
 pub(crate) mod transition_frontier_actor;
 pub(crate) mod user_command_log_actor;
+pub(crate) mod username_actor;
 
 use super::events::Event;
 use async_trait::async_trait;
