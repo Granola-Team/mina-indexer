@@ -337,3 +337,51 @@ mod throttler_tests {
         assert!(throttler.should_invoke(), "Third call should invoke in third cycle");
     }
 }
+
+fn decode_base58check_to_string(input: &str) -> Result<String, String> {
+    let decoded_bytes = bs58::decode(input)
+        .with_check(None) // Verifies the checksum
+        .into_vec()
+        .map_err(|e| format!("Decoding error: {:?}", e))?;
+
+    String::from_utf8(decoded_bytes).map_err(|e| format!("Invalid UTF-8 sequence: {:?}", e))
+}
+
+#[cfg(test)]
+mod decode_base58check_to_string_tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+
+    fn base58check_encode(input: &str) -> String {
+        // Convert the input string to bytes
+        let input_bytes = input.as_bytes();
+
+        // First SHA-256 hash
+        let mut hasher = Sha256::new();
+        hasher.update(input_bytes);
+        let first_hash = hasher.finalize();
+
+        // Second SHA-256 hash
+        let mut hasher = Sha256::new();
+        hasher.update(first_hash);
+        let double_hash = hasher.finalize();
+
+        // Take the first 4 bytes of the second hash as the checksum
+        let checksum_bytes = &double_hash[0..4];
+
+        // Append the checksum to the original input
+        let mut input_with_checksum = input_bytes.to_vec();
+        input_with_checksum.extend_from_slice(checksum_bytes);
+
+        // Encode the result in Base58
+        bs58::encode(input_with_checksum).into_string()
+    }
+
+    #[test]
+    fn test_valid_base58check_string() -> Result<()> {
+        let encode = base58check_encode("hello");
+        let result = decode_base58check_to_string(&encode).unwrap();
+        assert_eq!(result, "hello");
+        Ok(())
+    }
+}
