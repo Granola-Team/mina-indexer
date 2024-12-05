@@ -330,6 +330,7 @@ mod accounting_actor_tests {
             receiver: "B62qreceiver1".to_string(),
             fee_payer: "B62qsender1".to_string(),
             nonce: 1,
+            memo: "halp".to_string(),
             fee_nanomina: 1_000_000,
             amount_nanomina: 100_000_000,
             canonical: true,
@@ -377,6 +378,7 @@ mod accounting_actor_tests {
 
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
+            memo: "halp".to_string(),
             global_slot: 0,
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
@@ -447,6 +449,7 @@ mod accounting_actor_tests {
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
             global_slot: 0,
+            memo: "halp".to_string(),
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
@@ -807,6 +810,7 @@ mod accounting_actor_tests {
         let payload = CanonicalUserCommandLogPayload {
             height: 200,
             global_slot: 0,
+            memo: "halp".to_string(),
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,

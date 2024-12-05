@@ -4,6 +4,15 @@ use super::{
 };
 use sonic_rs::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct UsernamePayload {
+    pub username: String,
+    pub address: String,
+    pub height: u64,
+    pub state_hash: String,
+    pub canonical: bool,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct NewAccountPayload {
     pub height: u64,
@@ -305,6 +314,7 @@ pub struct UserCommandLogPayload {
     pub fee_payer: String,
     pub amount_nanomina: u64,
     pub global_slot: u64,
+    pub memo: String,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
@@ -379,6 +389,7 @@ pub struct CanonicalUserCommandLogPayload {
     pub status: CommandStatus,
     pub sender: String,
     pub receiver: String,
+    pub memo: String,
     pub nonce: usize,
     pub fee_nanomina: u64,
     pub fee_payer: String,

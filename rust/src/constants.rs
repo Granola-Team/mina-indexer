@@ -6,3 +6,5 @@ pub const POSTGRES_CONNECTION_STRING: &str = "host=localhost port=9002 user=mina
 pub const FILE_PUBLISHER_ACTOR_ID: &str = "FilePublisher";
 pub const MAINNET_EPOCH_SLOT_COUNT: u64 = 7140;
 pub const SLIDING_WINDOW_SIZE: usize = 100;
+pub const MINA_NAME_SERVICE_ADDRESS: &str = "B62qjzJvc59DdG9ahht9rwxkEz7GedKuUMsnaVTuXFUeANKqfBeWpRE";
+pub const MEMO_PREFIX: &str = "Name: ";

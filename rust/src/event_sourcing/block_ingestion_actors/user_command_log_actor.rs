@@ -51,6 +51,7 @@ impl Actor for UserCommandLogActor {
                         fee_nanomina: user_command.fee_nanomina,
                         fee_payer: user_command.fee_payer.to_string(),
                         amount_nanomina: user_command.amount_nanomina,
+                        memo: user_command.memo.to_string(),
                     };
                     self.publish(Event {
                         event_type: EventType::UserCommandLog,

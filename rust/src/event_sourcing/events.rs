@@ -31,6 +31,7 @@ pub enum EventType {
     PreForkStakingLedgerFilePath,
     PostForkStakingLedgerFilePath,
     StakingLedgerEntry,
+    Username,
 }
 
 #[derive(Debug, Clone, PartialEq)]

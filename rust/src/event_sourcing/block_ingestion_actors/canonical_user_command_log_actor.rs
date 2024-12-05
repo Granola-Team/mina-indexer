@@ -93,6 +93,7 @@ impl Actor for CanonicalUserCommandLogActor {
                             fee_payer: event_payload.fee_payer.to_string(),
                             amount_nanomina: event_payload.amount_nanomina,
                             global_slot: event_payload.global_slot,
+                            memo: event_payload.memo,
                             canonical: false,     // use a default value
                             was_canonical: false, // use a default value
                         })
@@ -169,6 +170,7 @@ mod canonical_user_command_log_actor_tests {
             fee_nanomina: 1000,
             fee_payer: "payer_1".to_string(),
             amount_nanomina: 5000,
+            memo: "halp".to_string(),
         };
         let user_command_2 = UserCommandLogPayload {
             height: 10,
@@ -184,6 +186,7 @@ mod canonical_user_command_log_actor_tests {
             fee_nanomina: 2000,
             fee_payer: "payer_2".to_string(),
             amount_nanomina: 7000,
+            memo: "halp".to_string(),
         };
         actor
             .handle_event(Event {
@@ -260,6 +263,7 @@ mod canonical_user_command_log_actor_tests {
             fee_nanomina: 1000,
             fee_payer: "payer_1".to_string(),
             amount_nanomina: 5000,
+            memo: "halp".to_string(),
         };
         actor
             .handle_event(Event {
