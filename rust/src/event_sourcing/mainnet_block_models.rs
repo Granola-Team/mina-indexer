@@ -1,4 +1,4 @@
-use crate::constants::MAINNET_COINBASE_REWARD;
+use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
 use serde::{
@@ -366,7 +366,7 @@ impl Command {
     }
 
     fn get_memo(&self) -> String {
-        self.signed_command.as_ref().unwrap().payload.common.memo.to_string()
+        decode_base58check_to_string(&self.signed_command.as_ref().unwrap().payload.common.memo.to_string()).unwrap()
     }
 
     fn get_fee_payer(&self) -> String {
@@ -586,7 +586,7 @@ mod mainnet_block_parsing_tests {
         assert_eq!(first_user_command.fee_nanomina, 10_000_000);
 
         // Test memo
-        assert_eq!(&first_user_command.memo, "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+        assert_eq!(&first_user_command.memo, "");
 
         // Test memo
         assert_eq!(first_user_command.nonce, 265);
@@ -617,10 +617,14 @@ mod mainnet_block_parsing_tests {
 
         let user_commands = mainnet_block.get_user_commands();
         let fifth_user_command = user_commands.get(4).unwrap();
+        let second_user_command = user_commands.get(1).unwrap();
+        let eleventh_user_command = user_commands.get(10).unwrap();
+        assert_eq!(&second_user_command.memo, "memo");
+        assert_eq!(&eleventh_user_command.memo, "save_genesis_grant");
 
         // Test fields of the fifth user command
         assert_eq!(fifth_user_command.fee_nanomina, 10_100_000);
-        assert_eq!(&fifth_user_command.memo, "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH");
+        assert_eq!(&fifth_user_command.memo, "");
         assert_eq!(fifth_user_command.nonce, 0);
         assert_eq!(&fifth_user_command.sender, "B62qj2PMFaL2bmZQsWMfr2eiMxNErwUrZYKvt8JHgany2G3CvF6RGoc");
         assert_eq!(&fifth_user_command.receiver, "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6");
