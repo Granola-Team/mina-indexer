@@ -136,4 +136,6 @@ else
   fi
 fi
 
+just lint
+
 exit 0
