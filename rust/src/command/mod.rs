@@ -242,7 +242,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                             })
                         }
                         StakeDelegation(v1) => {
-                            let mina_rs::StakeDelegation::SetDelegate {
+                            let mina_rs::StakeDelegation1::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = v1.t.to_owned();
@@ -273,12 +273,10 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                             })
                         }
                         StakeDelegation(v2) => {
-                            let mina_rs::StakeDelegation::SetDelegate {
-                                delegator,
-                                new_delegate,
-                            } = v2.t.to_owned();
+                            let mina_rs::StakeDelegation2::SetDelegate { new_delegate } =
+                                v2.t.to_owned();
                             Command::Delegation(Delegation {
-                                delegator: delegator.into(),
+                                delegator: self.sender(),
                                 delegate: new_delegate.into(),
                                 nonce: self.nonce(),
                             })
@@ -300,7 +298,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         source_pk.to_owned().into()
                     }
                     SignedCommandPayloadBody1::StakeDelegation(stake_delegation_v1) => {
-                        let StakeDelegation::SetDelegate { ref delegator, .. } =
+                        let StakeDelegation1::SetDelegate { ref delegator, .. } =
                             stake_delegation_v1.t;
                         delegator.to_owned().into()
                     }
@@ -327,7 +325,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         vec![body.t.t.receiver_pk.to_owned().into()]
                     }
                     SignedCommandPayloadBody1::StakeDelegation(body) => {
-                        let StakeDelegation::SetDelegate { new_delegate, .. } = &body.t;
+                        let StakeDelegation1::SetDelegate { new_delegate, .. } = &body.t;
                         vec![new_delegate.to_owned().into()]
                     }
                 }
@@ -338,7 +336,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         vec![body.t.t.receiver_pk.to_owned().into()]
                     }
                     SignedCommandPayloadBody2::StakeDelegation(body) => {
-                        let StakeDelegation::SetDelegate { new_delegate, .. } = &body.t;
+                        let StakeDelegation2::SetDelegate { new_delegate } = &body.t;
                         vec![new_delegate.to_owned().into()]
                     }
                 },
@@ -479,13 +477,23 @@ impl From<String> for mina_rs::SignedCommandMemo {
     }
 }
 
-// TODO enum V1/V2
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct PaymentPayload(pub mina_rs::PaymentPayloadV1);
+pub enum PaymentPayload {
+    V1(mina_rs::PaymentPayloadV1),
+    V2 {
+        payment: mina_rs::PaymentPayloadV2,
+        sender: PublicKey,
+    },
+}
 
-// TODO enum V1/V2
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct StakeDelegation(pub mina_rs::StakeDelegationV1);
+pub enum StakeDelegation {
+    V1(mina_rs::StakeDelegationV1),
+    V2 {
+        delegation: mina_rs::StakeDelegationV2,
+        sender: PublicKey,
+    },
+}
 
 impl Command {
     /// Get the list of commands from the precomputed block
@@ -515,7 +523,7 @@ impl Command {
                                 })
                             }
                             SignedCommandPayloadBody1::StakeDelegation(v1) => {
-                                let StakeDelegation::SetDelegate { delegator, new_delegate } = v1.t.to_owned();
+                                let StakeDelegation1::SetDelegate { delegator, new_delegate } = v1.t.to_owned();
                                 let delegator: PublicKey = delegator.into();
                                 let new_delegate: PublicKey = new_delegate.into();
                                 let nonce = command.nonce();
@@ -546,8 +554,8 @@ impl Command {
                                 })
                             }
                             SignedCommandPayloadBody2::StakeDelegation(v2) => {
-                                let StakeDelegation::SetDelegate { delegator, new_delegate } = v2.t.to_owned();
-                                let delegator: PublicKey = delegator.into();
+                                let StakeDelegation2::SetDelegate { new_delegate } = v2.t.to_owned();
+                                let delegator: PublicKey = command.sender();
                                 let new_delegate: PublicKey = new_delegate.into();
                                 let nonce = command.nonce();
 
@@ -575,25 +583,42 @@ impl Command {
 
 impl PaymentPayload {
     pub fn source_pk(&self) -> PublicKey {
-        self.0.t.t.source_pk.to_owned().into()
+        match self {
+            Self::V1(v1) => v1.t.t.source_pk.to_owned().into(),
+            Self::V2 { sender, .. } => sender.to_owned(),
+        }
     }
 
     pub fn receiver_pk(&self) -> PublicKey {
-        self.0.t.t.receiver_pk.to_owned().into()
+        match self {
+            Self::V1(v1) => v1.t.t.receiver_pk.to_owned().into(),
+            Self::V2 { payment, .. } => payment.t.t.receiver_pk.to_owned().into(),
+        }
     }
 }
 
 impl StakeDelegation {
     pub fn delegator(&self) -> PublicKey {
-        let mina_rs::StakeDelegation::SetDelegate { ref delegator, .. } = self.0.t;
-        delegator.to_owned().into()
+        match self {
+            Self::V1(v1) => {
+                let mina_rs::StakeDelegation1::SetDelegate { delegator, .. } = &v1.t;
+                delegator.to_owned().into()
+            }
+            Self::V2 { sender, .. } => sender.to_owned(),
+        }
     }
 
     pub fn new_delegate(&self) -> PublicKey {
-        let mina_rs::StakeDelegation::SetDelegate {
-            ref new_delegate, ..
-        } = self.0.t;
-        new_delegate.to_owned().into()
+        match self {
+            Self::V1(v1) => {
+                let mina_rs::StakeDelegation1::SetDelegate { new_delegate, .. } = &v1.t;
+                new_delegate.to_owned().into()
+            }
+            Self::V2 { delegation, .. } => {
+                let mina_rs::StakeDelegation2::SetDelegate { new_delegate, .. } = &delegation.t;
+                new_delegate.to_owned().into()
+            }
+        }
     }
 }
 

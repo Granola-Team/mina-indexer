@@ -154,7 +154,7 @@ impl SignedCommand {
                 match &v1.t.t.payload.t.t.body.t.t {
                     PaymentPayload(v1) => v1.t.t.receiver_pk.to_owned().into(),
                     StakeDelegation(v1) => match v1.t {
-                        mina_rs::StakeDelegation::SetDelegate {
+                        mina_rs::StakeDelegation1::SetDelegate {
                             ref new_delegate, ..
                         } => new_delegate.to_owned().into(),
                     },
@@ -165,9 +165,9 @@ impl SignedCommand {
                 match &v2.t.t.payload.t.t.body.t.t {
                     PaymentPayload(v2) => v2.t.t.receiver_pk.to_owned().into(),
                     StakeDelegation(v2) => match v2.t {
-                        mina_rs::StakeDelegation::SetDelegate {
-                            ref new_delegate, ..
-                        } => new_delegate.to_owned().into(),
+                        mina_rs::StakeDelegation2::SetDelegate { ref new_delegate } => {
+                            new_delegate.to_owned().into()
+                        }
                     },
                 }
             }
@@ -183,7 +183,7 @@ impl SignedCommand {
                         payment_payload.t.t.source_pk.to_owned().into()
                     }
                     StakeDelegation(delegation_payload) => match delegation_payload.t {
-                        mina_rs::StakeDelegation::SetDelegate {
+                        mina_rs::StakeDelegation1::SetDelegate {
                             ref delegator,
                             new_delegate: _,
                         } => delegator.to_owned().into(),
@@ -270,19 +270,24 @@ impl SignedCommand {
     pub fn hash_signed_command(&self) -> anyhow::Result<TxnHash> {
         match self {
             Self::V1(v1) => {
+                // convert versioned signed command to bin_prot bytes
                 let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
                 bin_prot::to_writer(&mut binprot_bytes, v1)?;
 
+                // base58 encode + Blake2b hash
                 let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
                     .with_check_version(USER_COMMAND)
                     .into_string();
                 let mut hasher = blake2::Blake2bVar::new(32)?;
                 hasher.write_all(binprot_bytes_bs58.as_bytes())?;
 
+                // add length + version bytes
                 let mut hash = hasher.finalize_boxed().to_vec();
+                const VERSION_BYTE: u8 = 1;
                 hash.insert(0, hash.len() as u8);
-                hash.insert(0, 1); //version byte
+                hash.insert(0, VERSION_BYTE);
 
+                // base58 encode txn hash
                 Ok(TxnHash::V1(
                     bs58::encode(hash)
                         .with_check_version(V1_TXN_HASH)
@@ -290,18 +295,22 @@ impl SignedCommand {
                 ))
             }
             Self::V2(v2) => {
+                // convert versioned signed command to bin_prot bytes
                 let mut binprot_bytes = Vec::with_capacity(TxnHash::V2_LEN * 8); // max number of bits
                 bin_prot::to_writer(&mut binprot_bytes, v2)?;
 
+                // base58 encode + Blake2b hash
                 let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
                     .with_check_version(USER_COMMAND)
                     .into_string();
                 let mut hasher = blake2::Blake2bVar::new(32)?;
                 hasher.write_all(binprot_bytes_bs58.as_bytes())?;
 
+                // add length byte
                 let mut hash = hasher.finalize_boxed().to_vec();
                 hash.insert(0, hash.len() as u8);
 
+                // base58 encode txn hash
                 Ok(TxnHash::V2(
                     bs58::encode(hash)
                         .with_check_version(V2_TXN_HASH)
@@ -438,8 +447,7 @@ impl From<(v2::staged_ledger_diff::UserCommandPayloadBody, PublicKey)>
                 })))
             }
             v2::staged_ledger_diff::UserCommandPayloadBody::StakeDelegation(payload) => {
-                Self::StakeDelegation(Versioned::new(mina_rs::StakeDelegation::SetDelegate {
-                    delegator: value.1.into(),
+                Self::StakeDelegation(Versioned::new(mina_rs::StakeDelegation2::SetDelegate {
                     new_delegate: payload.new_delegate.into(),
                 }))
             }
@@ -503,7 +511,7 @@ impl From<SignedCommandWithCreationData> for Command {
                         })
                     }
                     StakeDelegation(stake_delegation_v1) => {
-                        let mina_rs::StakeDelegation::SetDelegate {
+                        let mina_rs::StakeDelegation1::SetDelegate {
                             delegator,
                             new_delegate,
                         } = stake_delegation_v1.t.to_owned();
@@ -532,13 +540,11 @@ impl From<SignedCommandWithCreationData> for Command {
                         })
                     }
                     StakeDelegation(stake_delegation_v2) => {
-                        let mina_rs::StakeDelegation::SetDelegate {
-                            delegator,
-                            new_delegate,
-                        } = stake_delegation_v2.t.to_owned();
+                        let mina_rs::StakeDelegation2::SetDelegate { new_delegate } =
+                            stake_delegation_v2.t.to_owned();
                         Command::Delegation(Delegation {
                             delegate: new_delegate.into(),
-                            delegator: delegator.into(),
+                            delegator: signed.source_pk(),
                             nonce: signed.nonce(),
                         })
                     }
@@ -785,7 +791,7 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
         }
         StakeDelegation(stake_delegation) => {
             let mut body_obj = Map::new();
-            let mina_rs::StakeDelegation::SetDelegate {
+            let mina_rs::StakeDelegation1::SetDelegate {
                 delegator,
                 new_delegate,
             } = stake_delegation.t.to_owned();
@@ -856,14 +862,12 @@ fn payload_json_v2(value: &mina_rs::SignedCommand2) -> serde_json::Value {
         }
         StakeDelegation(stake_delegation) => {
             let mut body_obj = Map::new();
-            let mina_rs::StakeDelegation::SetDelegate {
-                delegator,
-                new_delegate,
-            } = stake_delegation.t.to_owned();
+            let mina_rs::StakeDelegation2::SetDelegate { new_delegate } =
+                stake_delegation.t.to_owned();
 
             body_obj.insert(
                 "delegator".into(),
-                Value::String(PublicKey::from(delegator).to_address()),
+                Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_address()),
             );
             body_obj.insert(
                 "new_delegate".into(),
@@ -915,7 +919,7 @@ mod tests {
         Ok(())
     }
 
-    #[ignore]
+    #[ignore = "not yet implemented"]
     #[test]
     fn transaction_hash_v2() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
@@ -951,17 +955,17 @@ mod tests {
             assert_eq!(signature.t.version, 1);
 
             let payload = versioned.t.t.payload.clone();
-            assert_eq!(payload.version, 1);
+            assert_eq!(payload.version, 2);
             assert_eq!(payload.t.version, 1);
-
-            let body = payload.t.t.body.clone();
-            assert_eq!(body.version, 2);
-            assert_eq!(body.t.version, 1);
 
             let common = payload.t.t.common.clone();
             assert_eq!(common.version, 2);
-            assert_eq!(common.t.version, 1);
-            assert_eq!(common.t.t.version, 1);
+            assert_eq!(common.t.version, 2);
+            assert_eq!(common.t.t.version, 2);
+
+            let body = payload.t.t.body.clone();
+            assert_eq!(body.version, 2);
+            assert_eq!(body.t.version, 2);
 
             let fee = common.t.t.t.fee.clone();
             assert_eq!(fee.version, 1);
@@ -984,7 +988,7 @@ mod tests {
             let versioned_str = format!("{:?}", versioned);
             assert_eq!(
                 versioned_str,
-                "Versioned { version: 2, t: Versioned { version: 1, t: SignedCommand2 { payload: Versioned { version: 1, t: Versioned { version: 1, t: SignedCommandPayload2 { common: Versioned { version: 2, t: Versioned { version: 1, t: Versioned { version: 1, t: SignedCommandPayloadCommon2 { fee: Versioned { version: 1, t: Versioned { version: 1, t: 1100000 } }, fee_payer_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), nonce: Versioned { version: 1, t: Versioned { version: 1, t: 765 } }, valid_until: Versioned { version: 1, t: Versioned { version: 1, t: -1 } }, memo: Versioned { version: 1, t: SignedCommandMemo([1, 53, 69, 52, 89, 77, 50, 118, 84, 72, 104, 87, 69, 103, 54, 54, 120, 112, 106, 53, 50, 74, 69, 114, 72, 85, 66, 85, 52, 112, 90, 49, 121, 97, 103, 101, 76, 52, 84, 86, 68, 68, 112, 84, 84, 83, 115, 118, 56, 109, 75, 54, 89, 97, 72]) } } } } }, body: Versioned { version: 2, t: Versioned { version: 1, t: PaymentPayload(Versioned { version: 2, t: Versioned { version: 1, t: PaymentPayload2 { receiver_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), amount: Versioned { version: 1, t: Versioned { version: 1, t: 1000000000 } } } } }) } } } } }, signer: PublicKey2V1(Versioned { version: 1, t: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }) }), signature: SignatureV1(Versioned { version: 1, t: Versioned { version: 1, t: ([50, 230, 56, 233, 69, 213, 105, 146, 35, 138, 45, 69, 176, 58, 205, 6, 84, 110, 65, 189, 34, 210, 223, 250, 80, 165, 39, 2, 161, 161, 234, 23], [3, 38, 54, 31, 45, 216, 234, 5, 22, 233, 115, 128, 229, 232, 105, 216, 241, 41, 146, 248, 232, 121, 84, 126, 205, 228, 171, 37, 147, 131, 37, 60]) } }) } } }"
+                "Versioned { version: 2, t: Versioned { version: 1, t: SignedCommand2 { payload: Versioned { version: 2, t: Versioned { version: 1, t: SignedCommandPayload2 { common: Versioned { version: 2, t: Versioned { version: 2, t: Versioned { version: 2, t: SignedCommandPayloadCommon2 { fee: Versioned { version: 1, t: Versioned { version: 1, t: 1100000 } }, fee_payer_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), nonce: Versioned { version: 1, t: Versioned { version: 1, t: 765 } }, valid_until: Versioned { version: 1, t: Versioned { version: 1, t: -1 } }, memo: Versioned { version: 1, t: SignedCommandMemo([1, 53, 69, 52, 89, 77, 50, 118, 84, 72, 104, 87, 69, 103, 54, 54, 120, 112, 106, 53, 50, 74, 69, 114, 72, 85, 66, 85, 52, 112, 90, 49, 121, 97, 103, 101, 76, 52, 84, 86, 68, 68, 112, 84, 84, 83, 115, 118, 56, 109, 75, 54, 89, 97, 72]) } } } } }, body: Versioned { version: 2, t: Versioned { version: 2, t: PaymentPayload(Versioned { version: 2, t: Versioned { version: 2, t: PaymentPayload2 { receiver_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), amount: Versioned { version: 1, t: Versioned { version: 1, t: 1000000000 } } } } }) } } } } }, signer: PublicKey2V1(Versioned { version: 1, t: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }) }), signature: SignatureV1(Versioned { version: 1, t: Versioned { version: 1, t: ([50, 230, 56, 233, 69, 213, 105, 146, 35, 138, 45, 69, 176, 58, 205, 6, 84, 110, 65, 189, 34, 210, 223, 250, 80, 165, 39, 2, 161, 161, 234, 23], [3, 38, 54, 31, 45, 216, 234, 5, 22, 233, 115, 128, 229, 232, 105, 216, 241, 41, 146, 248, 232, 121, 84, 126, 205, 228, 171, 37, 147, 131, 37, 60]) } }) } } }"
             );
 
             return Ok(());
