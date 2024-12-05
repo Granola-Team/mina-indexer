@@ -100,7 +100,7 @@ mod username_actor_tests {
         // Prepare a valid CanonicalUserCommandLogPayload
         let payload = CanonicalUserCommandLogPayload {
             receiver: MINA_NAME_SERVICE_ADDRESS.to_string(),
-            memo: format!("Name: testuser"),
+            memo: "Name: testuser".to_string(),
             sender: "B62qtestsender".to_string(),
             height: 100,
             state_hash: "testhash".to_string(),
@@ -142,7 +142,7 @@ mod username_actor_tests {
         // Prepare a payload with an invalid recipient
         let payload = CanonicalUserCommandLogPayload {
             receiver: "B62qInvalidRecipient".to_string(),
-            memo: format!("Name: testuser"),
+            memo: "Name: testuser".to_string(),
             sender: "B62qtestsender".to_string(),
             height: 101,
             state_hash: "testhash".to_string(),
@@ -200,7 +200,7 @@ mod username_actor_tests {
         // Prepare a payload that is non-canonical
         let payload = CanonicalUserCommandLogPayload {
             receiver: MINA_NAME_SERVICE_ADDRESS.to_string(),
-            memo: format!("Name: ignoreduser"),
+            memo: "Name: ignoreduser".to_string(),
             sender: "B62qignoredsender".to_string(),
             height: 101,
             state_hash: "ignoredhash".to_string(),
