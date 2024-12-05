@@ -41,7 +41,7 @@ impl Actor for StakingLedgerEntryActor {
         &self.events_published
     }
     async fn handle_event(&self, event: Event) {
-        if let EventType::StakingLedgerFilePath = event.event_type {
+        if let EventType::PreForkStakingLedgerFilePath = event.event_type {
             let file_path = event.payload.clone();
             let file_content = std::fs::read_to_string(event.payload).expect("Failed to read staking ledger file");
             let staking_ledger_entries: Vec<StakingEntry> = sonic_rs::from_str(&file_content).expect("Failed to parse staking ledger JSON");
@@ -104,7 +104,7 @@ mod staking_ledger_parser_tests {
 
         // Create a test event
         let event = Event {
-            event_type: EventType::StakingLedgerFilePath,
+            event_type: EventType::PreForkStakingLedgerFilePath,
             payload: file_path.to_str().unwrap().to_string(),
         };
 

@@ -28,7 +28,8 @@ pub enum EventType {
     ActorHeight,
     EpochStakeDelegation,
     RunningAvgHeightSpread,
-    StakingLedgerFilePath,
+    PreForkStakingLedgerFilePath,
+    PostForkStakingLedgerFilePath,
     StakingLedgerEntry,
 }
 
