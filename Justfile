@@ -170,6 +170,10 @@ clean-test rev=GIT_COMMIT_HASH:
 # Dev
 #
 
+# Download a mainnet PCB from the mina_network_block_data Google bucket
+download-mina-block height state_hash dir='.':
+  gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-{{state_hash}}.json" {{dir}}
+
 # Debug build and run regression tests
 dev subtest='': debug-build
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} {{subtest}}
