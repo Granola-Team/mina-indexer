@@ -16,7 +16,7 @@ pub struct BulkSnarkCanonicitySummaryActor {
     pub id: String,
     pub shared_publisher: Arc<SharedPublisher>,
     pub events_published: AtomicUsize,
-    pub canonical_items_manager: Arc<Mutex<CanonicalItemsManager<BulkSnarkCanonicityPayload>>>,
+    pub canonical_items_manager: Arc<Mutex<CanonicalItemsManager<BatchSnarkCanonicityPayload>>>,
 }
 
 impl BulkSnarkCanonicitySummaryActor {
@@ -51,7 +51,7 @@ impl Actor for BulkSnarkCanonicitySummaryActor {
                 let event_payload: MainnetBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
                 let manager = self.canonical_items_manager.lock().await;
 
-                let bulk_payload = BulkSnarkCanonicityPayload {
+                let bulk_payload = BatchSnarkCanonicityPayload {
                     height: event_payload.height,
                     state_hash: event_payload.state_hash.to_string(),
                     canonical: true, // Default value
@@ -115,7 +115,7 @@ mod bulk_snark_canonicity_summary_actor_tests {
     use crate::event_sourcing::{
         events::{Event, EventType},
         mainnet_block_models::CompletedWorksNanomina,
-        payloads::{BlockCanonicityUpdatePayload, BulkSnarkCanonicityPayload, MainnetBlockPayload},
+        payloads::{BatchSnarkCanonicityPayload, BlockCanonicityUpdatePayload, MainnetBlockPayload},
     };
     use std::sync::Arc;
 
@@ -172,7 +172,7 @@ mod bulk_snark_canonicity_summary_actor_tests {
         assert_eq!(event.event_type, EventType::BulkSnarkCanonicity);
 
         // Validate the payload
-        let bulk_payload: BulkSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+        let bulk_payload: BatchSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
         assert_eq!(bulk_payload.height, 10);
         assert_eq!(bulk_payload.state_hash, "state_hash_10");
         assert!(bulk_payload.canonical);
@@ -291,7 +291,7 @@ mod bulk_snark_canonicity_summary_actor_tests {
 
             assert_eq!(event.event_type, EventType::BulkSnarkCanonicity);
 
-            let bulk_payload: BulkSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+            let bulk_payload: BatchSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
             assert_eq!(bulk_payload.height, i);
             assert_eq!(bulk_payload.state_hash, format!("state_hash_{}", i));
         }

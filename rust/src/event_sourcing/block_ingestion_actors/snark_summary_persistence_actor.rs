@@ -53,7 +53,7 @@ impl SnarkSummaryPersistenceActor {
         }
     }
 
-    async fn log_batch(&self, payload: &BulkSnarkCanonicityPayload) -> Result<(), &'static str> {
+    async fn log_batch(&self, payload: &BatchSnarkCanonicityPayload) -> Result<(), &'static str> {
         let mut values = Vec::new();
 
         // Pre-allocate values for all rows
@@ -105,7 +105,7 @@ impl Actor for SnarkSummaryPersistenceActor {
     }
     async fn handle_event(&self, event: Event) {
         if event.event_type == EventType::BulkSnarkCanonicity {
-            let event_payload: BulkSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
+            let event_payload: BatchSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
             match self.log_batch(&event_payload).await {
                 Ok(_) => {
                     self.shared_publisher.incr_database_insert();
@@ -151,7 +151,7 @@ mod snark_summary_persistence_actor_tests {
     async fn test_snark_summary_persistence_actor_logs_bulk_summary() {
         let (actor, mut receiver) = setup_actor().await;
 
-        let bulk_snark_summary = BulkSnarkCanonicityPayload {
+        let bulk_snark_summary = BatchSnarkCanonicityPayload {
             height: 10,
             state_hash: "test_hash".to_string(),
             timestamp: 123456,
@@ -210,7 +210,7 @@ mod snark_summary_persistence_actor_tests {
         let (actors, mut receiver) = setup_actor().await;
 
         // Create the first batch payload
-        let batch_summary1 = BulkSnarkCanonicityPayload {
+        let batch_summary1 = BatchSnarkCanonicityPayload {
             height: 20,
             state_hash: "hash_1".to_string(),
             timestamp: 111111,
@@ -222,7 +222,7 @@ mod snark_summary_persistence_actor_tests {
         };
 
         // Create the second batch payload
-        let batch_summary2 = BulkSnarkCanonicityPayload {
+        let batch_summary2 = BatchSnarkCanonicityPayload {
             height: 21,
             state_hash: "hash_2".to_string(),
             timestamp: 222222,

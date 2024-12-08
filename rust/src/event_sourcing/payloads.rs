@@ -224,7 +224,7 @@ pub struct Snark {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct BulkSnarkCanonicityPayload {
+pub struct BatchSnarkCanonicityPayload {
     pub height: u64,
     pub state_hash: String,
     pub timestamp: u64,
@@ -232,7 +232,7 @@ pub struct BulkSnarkCanonicityPayload {
     pub snarks: Vec<Snark>,
 }
 
-impl CanonicalItem for BulkSnarkCanonicityPayload {
+impl CanonicalItem for BatchSnarkCanonicityPayload {
     fn set_canonical(&mut self, canonical: bool) {
         self.canonical = canonical;
     }
