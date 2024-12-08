@@ -80,7 +80,6 @@ pub struct MainnetBlockPayload {
     pub global_slot_since_genesis: u64,
     pub fee_transfer_via_coinbase: Option<Vec<FeeTransferViaCoinbase>>,
     pub fee_transfers: Vec<FeeTransfer>,
-    pub excess_block_fees: u64,
     pub global_slot: u64,
 }
 

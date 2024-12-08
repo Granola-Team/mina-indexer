@@ -22,13 +22,25 @@ impl MainnetBlock {
     }
 
     pub fn get_excess_block_fees(&self) -> u64 {
-        let total_snark_fees = self.get_fee_transfers().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
-        let total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
+        let total_snark_fees = self
+            .get_snark_work()
+            .iter()
+            .map(|ft| (ft.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64)
+            .sum::<u64>();
+
+        let mut total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
+        for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
+            total_fees_paid_into_block_pool += (ftvc.fee * 1_000_000_000f64) as u64;
+        }
         total_fees_paid_into_block_pool.saturating_sub(total_snark_fees)
     }
 
     pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
+        let excess_block_fees = self.get_excess_block_fees();
         let mut fee_transfers: HashMap<String, u64> = HashMap::new();
+        if excess_block_fees > 0 {
+            fee_transfers.insert(self.get_coinbase_receiver(), excess_block_fees);
+        }
         for completed_work in self.get_snark_work() {
             let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
             *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
@@ -59,19 +71,15 @@ impl MainnetBlock {
     }
 
     pub fn get_internal_command_count(&self) -> usize {
-        let excess_block_fees = self.get_excess_block_fees();
-
         // Get fee transfers and remove those also in fee transfers via coinbase
         let fee_transfers = self.get_fee_transfers();
         let fee_transfers_via_coinbase = self.get_fee_transfers_via_coinbase().unwrap_or_default();
 
-        // Calculate total internal commands
-        let mut total_internal_commands = fee_transfers.len() + fee_transfers_via_coinbase.len() + 1; // +1 for coinbase
-        if excess_block_fees > 0 {
-            total_internal_commands += 1; // additional transfer for remainder fees
-        }
+        fee_transfers.len() + fee_transfers_via_coinbase.len() + 1 // +1 for coinbase
+    }
 
-        total_internal_commands
+    pub fn get_total_command_count(&self) -> usize {
+        self.get_internal_command_count() + self.get_user_commands_count()
     }
 
     pub fn get_fee_transfers_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
@@ -564,6 +572,10 @@ mod mainnet_block_parsing_tests {
         // Test user commands count
         assert_eq!(mainnet_block.get_user_commands_count(), 2);
 
+        assert_eq!(mainnet_block.get_internal_command_count(), 2);
+
+        assert_eq!(mainnet_block.get_total_command_count(), 4);
+
         // Test snark work count
         assert_eq!(mainnet_block.get_snark_work_count(), 64);
 
@@ -614,6 +626,8 @@ mod mainnet_block_parsing_tests {
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
         assert_eq!(mainnet_block.get_user_commands_count(), 23);
+        assert_eq!(mainnet_block.get_total_command_count(), 35);
+        assert_eq!(mainnet_block.get_internal_command_count(), 12);
 
         let user_commands = mainnet_block.get_user_commands();
         let fifth_user_command = user_commands.get(4).unwrap();
@@ -644,6 +658,7 @@ mod mainnet_block_parsing_tests {
             ("B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp", 3000000),
             ("B62qp5dXkkj3TkkfPos35rNYxVTKTbm5CqigfgKppA5E7GQHK7H3nNd", 1777776),
             ("B62qkBqSkXgkirtU3n8HJ9YgwHh3vUD6kGJ5ZRkQYGNPeL5xYL2tL1L", 3000000),
+            ("B62qmJZD44acynLzxERnhUkbVjFXSqphiRfT6tUwfACYCaCw1xhqoBH", 395151714),
         ];
 
         println!("{:#?}", fee_transfers);
@@ -672,10 +687,21 @@ mod mainnet_block_parsing_tests {
         // Deserialize JSON into MainnetBlock struct
         let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
 
+        assert_eq!(mainnet_block.get_user_commands_count(), 30);
+        assert_eq!(mainnet_block.get_internal_command_count(), 3);
+        assert_eq!(mainnet_block.get_total_command_count(), 33);
+
         let fee_transfer_via_coinbase = mainnet_block.get_fee_transfers_via_coinbase().unwrap();
         let first_ftva = fee_transfer_via_coinbase.first().unwrap();
         assert_eq!(first_ftva.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
         assert_eq!(first_ftva.fee, 0.00005f64);
+
+        // Excess block fees are returned to coinbase receiver in the form of internal command
+        let internal_commands = mainnet_block.get_fee_transfers();
+        assert_eq!(internal_commands.len(), 1);
+        let first_internal_command = internal_commands.first().unwrap();
+        assert_eq!(first_internal_command.recipient, mainnet_block.get_coinbase_receiver());
+        assert_eq!(first_internal_command.fee_nanomina, 1346000001);
     }
 
     #[test]
@@ -709,6 +735,8 @@ mod mainnet_block_parsing_tests {
         // 3. 3 internal commands
         // 4. A payment to the coinbase receiver out of the excess of fees
         assert_eq!(mainnet_block.get_internal_command_count(), 6);
+        assert_eq!(mainnet_block.get_user_commands_count(), 2);
+        assert_eq!(mainnet_block.get_total_command_count(), 8);
 
         assert!(mainnet_block
             .get_fee_transfers_via_coinbase()
