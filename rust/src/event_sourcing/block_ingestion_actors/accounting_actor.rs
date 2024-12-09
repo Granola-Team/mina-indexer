@@ -153,7 +153,7 @@ impl AccountingActor {
         }
     }
 
-    async fn process_user_command(&self, payload: &CanonicalUserCommandLogPayload) {
+    async fn process_user_commands(&self, payload: &CanonicalUserCommandLogPayload) {
         let mut sender_entry = AccountingEntry {
             transfer_type: payload.txn_type.to_string(),
             counterparty: payload.receiver.to_string(),
@@ -287,7 +287,7 @@ impl Actor for AccountingActor {
                 if !payload.canonical && !payload.was_canonical {
                     return;
                 }
-                self.process_user_command(&payload).await;
+                self.process_user_commands(&payload).await;
             }
             _ => {}
         }
@@ -337,7 +337,7 @@ mod accounting_actor_tests {
             was_canonical: false,
         };
 
-        actor.process_user_command(&payload).await;
+        actor.process_user_commands(&payload).await;
 
         // Verify the first published transaction (fee payer to block reward pool)
         let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
@@ -395,7 +395,7 @@ mod accounting_actor_tests {
             was_canonical: false,
         };
 
-        actor.process_user_command(&payload).await;
+        actor.process_user_commands(&payload).await;
 
         // Verify the first published transaction (sender to receiver)
         let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
@@ -465,7 +465,7 @@ mod accounting_actor_tests {
             was_canonical: true,
         };
 
-        actor.process_user_command(&payload).await;
+        actor.process_user_commands(&payload).await;
 
         // Verify the first published transaction (receiver to sender due to non-canonical status)
         let published_event_1 = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
@@ -826,7 +826,7 @@ mod accounting_actor_tests {
             was_canonical: false,
         };
 
-        actor.process_user_command(&payload).await;
+        actor.process_user_commands(&payload).await;
 
         // Verify the fee transaction (fee payer to block reward pool)
         let published_event = timeout(std::time::Duration::from_secs(1), receiver.recv()).await;
