@@ -65,6 +65,18 @@ impl BerkeleyBlock {
             .sum()
     }
 
+    pub fn get_snark_work_count(&self) -> usize {
+        self.get_snark_work().len()
+    }
+
+    pub fn get_snark_work(&self) -> Vec<CompletedWorks> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
+            .flat_map(|works| works.into_iter())
+            .collect()
+    }
+
     pub fn get_timestamp(&self) -> u64 {
         self.data.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
     }
@@ -117,8 +129,15 @@ pub struct StagedLedgerDiff {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diff {
+    pub completed_works: Vec<CompletedWorks>,
     pub commands: Vec<Command>,
     pub coinbase: Vec<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompletedWorks {
+    pub fee: String,
+    pub prover: String,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -205,6 +224,8 @@ mod berkeley_block_tests {
 
         assert_eq!(berkeley_block.get_coinbase_reward_nanomina(), 1_440_000_000_000, "Coinbase reward should match");
 
-        assert_eq!(berkeley_block.get_global_slot_since_genesis(), 8612, "Global slot since genesis should match")
+        assert_eq!(berkeley_block.get_global_slot_since_genesis(), 8612, "Global slot since genesis should match");
+
+        assert_eq!(berkeley_block.get_snark_work_count(), 0, "snark work count should match");
     }
 }
