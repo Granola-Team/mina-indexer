@@ -44,12 +44,19 @@ pub struct BlockAncestorPayload {
     pub last_vrf_output: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct BerkeleyBlockPayload {
     pub height: u64,
     pub state_hash: String,
     pub previous_state_hash: String,
     pub last_vrf_output: String,
+    pub user_command_count: usize,
+    pub zk_app_command_count: usize,
+    pub snark_work_count: usize,
+    pub timestamp: u64,
+    pub coinbase_receiver: String,
+    pub coinbase_reward_nanomina: u64,
+    pub global_slot_since_genesis: u64,
 }
 
 #[derive(Serialize, Deserialize)]

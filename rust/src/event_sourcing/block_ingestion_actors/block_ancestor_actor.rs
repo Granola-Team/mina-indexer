@@ -87,6 +87,7 @@ async fn test_block_ancestor_actor_with_berkeley_block() -> anyhow::Result<()> {
         state_hash: "3NKVkEwELHY9CmPYxf25pwsKZpPf161QVCiC3JwdsyQwCYyE3wNCrRjWON".to_string(),
         previous_state_hash: "3NKJarZEsMAHkcPfhGA72eyjWBXGHergBZEoTuGXWS7vWeq8D5wu".to_string(),
         last_vrf_output: "hu0nffAHwdL0CYQNAlabyiUlwNWhlbj0MwynpKLtAAA=".to_string(),
+        ..Default::default()
     };
 
     // Create an Event with serialized BerkeleyBlockPayload

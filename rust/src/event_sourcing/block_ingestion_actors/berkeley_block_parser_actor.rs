@@ -50,6 +50,13 @@ impl Actor for BerkeleyBlockParserActor {
                 state_hash: state_hash.to_string(),
                 previous_state_hash: berkeley_block.get_previous_state_hash(),
                 last_vrf_output: berkeley_block.get_last_vrf_output(),
+                user_command_count: berkeley_block.get_user_commands_count(),
+                zk_app_command_count: berkeley_block.get_zk_app_commands_count(),
+                snark_work_count: berkeley_block.get_snark_work_count(),
+                timestamp: berkeley_block.get_timestamp(),
+                coinbase_receiver: berkeley_block.get_coinbase_receiver(),
+                coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
+                global_slot_since_genesis: berkeley_block.get_global_slot_since_genesis(),
             };
             self.publish(Event {
                 event_type: EventType::BerkeleyBlock,
