@@ -39,6 +39,7 @@ impl CanonicalBlockLogPersistenceActor {
             .add_column("previous_state_hash TEXT")
             .add_column("user_command_count INTEGER")
             .add_column("snark_work_count INTEGER")
+            .add_column("zk_app_command_count INTEGER")
             .add_column("timestamp BIGINT")
             .add_column("coinbase_receiver TEXT")
             .add_column("coinbase_reward_nanomina BIGINT")
@@ -82,6 +83,7 @@ impl CanonicalBlockLogPersistenceActor {
                     &payload.previous_state_hash,
                     &(payload.user_command_count as i32),
                     &(payload.snark_work_count as i32),
+                    &(payload.zk_app_command_count as i32),
                     &(payload.timestamp as i64),
                     &payload.coinbase_receiver,
                     &(payload.coinbase_reward_nanomina as i64),
@@ -157,6 +159,7 @@ mod canonical_block_log_persistence_tests {
             previous_state_hash: "state_hash_99".to_string(),
             user_command_count: 5,
             snark_work_count: 3,
+            zk_app_command_count: 0,
             timestamp: 1234567890,
             coinbase_receiver: "coinbase_receiver".to_string(),
             coinbase_reward_nanomina: 1000,
@@ -200,6 +203,7 @@ mod canonical_block_log_persistence_tests {
             previous_state_hash: "state_hash_199".to_string(),
             user_command_count: 7,
             snark_work_count: 2,
+            zk_app_command_count: 0,
             timestamp: 987654321,
             coinbase_receiver: "another_receiver".to_string(),
             coinbase_reward_nanomina: 2000,
@@ -251,6 +255,7 @@ mod canonical_block_log_persistence_tests {
             previous_state_hash: "prev_hash".to_string(),
             user_command_count: 10,
             snark_work_count: 2,
+            zk_app_command_count: 0,
             timestamp: 1234567890,
             coinbase_receiver: "receiver_1".to_string(),
             coinbase_reward_nanomina: 1000,
@@ -282,6 +287,7 @@ mod canonical_block_log_persistence_tests {
         assert_eq!(row_last.get::<_, String>("previous_state_hash"), payload2.previous_state_hash);
         assert_eq!(row_last.get::<_, i32>("user_command_count"), payload2.user_command_count as i32);
         assert_eq!(row_last.get::<_, i32>("snark_work_count"), payload2.snark_work_count as i32);
+        assert_eq!(row_last.get::<_, i32>("zk_app_command_count"), payload2.zk_app_command_count as i32);
         assert_eq!(row_last.get::<_, i64>("timestamp"), payload2.timestamp as i64);
         assert_eq!(row_last.get::<_, String>("coinbase_receiver"), payload2.coinbase_receiver);
         assert_eq!(row_last.get::<_, i64>("coinbase_reward_nanomina"), payload2.coinbase_reward_nanomina as i64);
@@ -304,6 +310,7 @@ mod canonical_block_log_persistence_tests {
             previous_state_hash: "prev_hash".to_string(),
             user_command_count: 10,
             snark_work_count: 2,
+            zk_app_command_count: 0,
             timestamp: 1234567890,
             coinbase_receiver: "receiver_1".to_string(),
             coinbase_reward_nanomina: 1000,
@@ -331,6 +338,7 @@ mod canonical_block_log_persistence_tests {
         assert_eq!(row.get::<_, String>("previous_state_hash"), payload2.previous_state_hash);
         assert_eq!(row.get::<_, i32>("user_command_count"), payload2.user_command_count as i32);
         assert_eq!(row.get::<_, i32>("snark_work_count"), payload2.snark_work_count as i32);
+        assert_eq!(row.get::<_, i32>("zk_app_command_count"), payload2.zk_app_command_count as i32);
         assert_eq!(row.get::<_, i64>("timestamp"), payload2.timestamp as i64);
         assert_eq!(row.get::<_, String>("coinbase_receiver"), payload2.coinbase_receiver);
         assert_eq!(row.get::<_, i64>("coinbase_reward_nanomina"), payload2.coinbase_reward_nanomina as i64);
@@ -351,6 +359,7 @@ mod canonical_block_log_persistence_tests {
             previous_state_hash: "state_hash_299".to_string(),
             user_command_count: 15,
             snark_work_count: 5,
+            zk_app_command_count: 0,
             timestamp: 1627891234,
             coinbase_receiver: "receiver_300".to_string(),
             coinbase_reward_nanomina: 3000,
