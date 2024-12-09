@@ -72,6 +72,10 @@ impl BerkeleyBlock {
     pub fn get_coinbase_receiver(&self) -> String {
         self.data.protocol_state.body.consensus_state.coinbase_receiver.to_string()
     }
+
+    pub fn get_global_slot_since_genesis(&self) -> u64 {
+        self.data.protocol_state.body.consensus_state.global_slot_since_genesis.parse::<u64>().unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -103,6 +107,7 @@ pub struct ConsensusState {
     pub last_vrf_output: String,
     pub coinbase_receiver: String,
     pub supercharge_coinbase: bool,
+    pub global_slot_since_genesis: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -199,5 +204,7 @@ mod berkeley_block_tests {
         );
 
         assert_eq!(berkeley_block.get_coinbase_reward_nanomina(), 1_440_000_000_000, "Coinbase reward should match");
+
+        assert_eq!(berkeley_block.get_global_slot_since_genesis(), 8612, "Global slot since genesis should match")
     }
 }
