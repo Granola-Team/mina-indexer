@@ -49,6 +49,10 @@ impl BerkeleyBlock {
     pub fn get_timestamp(&self) -> u64 {
         self.data.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
     }
+
+    pub fn get_coinbase_receiver(&self) -> String {
+        self.data.protocol_state.body.consensus_state.coinbase_receiver.to_string()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -78,6 +82,7 @@ pub struct Body {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ConsensusState {
     pub last_vrf_output: String,
+    pub coinbase_receiver: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -165,5 +170,11 @@ mod berkeley_block_tests {
         assert_eq!(berkeley_block.get_zk_app_commands_count(), 1, "zkApp commands count should match");
 
         assert_eq!(berkeley_block.get_timestamp(), 1708432621000);
+
+        assert_eq!(
+            berkeley_block.get_coinbase_receiver(),
+            "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
+            "Coinbase receiver should match"
+        );
     }
 }
