@@ -1,3 +1,4 @@
+use crate::constants::MAINNET_COINBASE_REWARD;
 use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
 
@@ -46,6 +47,24 @@ impl BerkeleyBlock {
             .sum()
     }
 
+    pub fn get_coinbase_reward_nanomina(&self) -> u64 {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| {
+                opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
+                    Some(v) if v == "Zero" => None,
+                    _ => {
+                        let multiplier = match self.data.protocol_state.body.consensus_state.supercharge_coinbase {
+                            true => 2,
+                            false => 1,
+                        };
+                        Some(multiplier * MAINNET_COINBASE_REWARD)
+                    }
+                })
+            })
+            .sum()
+    }
+
     pub fn get_timestamp(&self) -> u64 {
         self.data.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
     }
@@ -83,6 +102,7 @@ pub struct Body {
 pub struct ConsensusState {
     pub last_vrf_output: String,
     pub coinbase_receiver: String,
+    pub supercharge_coinbase: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -93,6 +113,7 @@ pub struct StagedLedgerDiff {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diff {
     pub commands: Vec<Command>,
+    pub coinbase: Vec<Value>,
 }
 
 #[derive(Serialize, Debug, Clone)]
@@ -176,5 +197,7 @@ mod berkeley_block_tests {
             "B62qpfgnUm7zVqi8MJHNB2m37rtgMNDbFNhC2DpMmmVpQt8x6gKv9Ww",
             "Coinbase receiver should match"
         );
+
+        assert_eq!(berkeley_block.get_coinbase_reward_nanomina(), 1_440_000_000_000, "Coinbase reward should match");
     }
 }
