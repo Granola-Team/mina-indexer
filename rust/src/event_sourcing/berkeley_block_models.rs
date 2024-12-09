@@ -45,6 +45,10 @@ impl BerkeleyBlock {
             })
             .sum()
     }
+
+    pub fn get_timestamp(&self) -> u64 {
+        self.data.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,8 +65,14 @@ pub struct ProtocolState {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct BlockchainState {
+    pub timestamp: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Body {
     pub consensus_state: ConsensusState,
+    pub blockchain_state: BlockchainState,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -140,7 +150,7 @@ mod berkeley_block_tests {
     use std::path::Path;
 
     #[test]
-    fn test_berkeley_block_command_counts() {
+    fn test_berkeley_block_summary_info() {
         // Path to your test JSON file
         let path = Path::new("./src/event_sourcing/test_data/berkeley_blocks/berkeley-4969-3NL8QoLQMtsBH8vUnccQw3vt8PgYuZRMApq1yZT1jwhZjbBLMRJU.json");
         let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
@@ -153,5 +163,7 @@ mod berkeley_block_tests {
 
         // Test zkApp commands count
         assert_eq!(berkeley_block.get_zk_app_commands_count(), 1, "zkApp commands count should match");
+
+        assert_eq!(berkeley_block.get_timestamp(), 1708432621000);
     }
 }
