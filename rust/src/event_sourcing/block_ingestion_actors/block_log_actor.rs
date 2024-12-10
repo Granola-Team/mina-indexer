@@ -195,6 +195,7 @@ mod block_log_actor_tests {
             coinbase_receiver: "berkeley_receiver_public_key".to_string(),
             coinbase_reward_nanomina: 900_000_000_000,
             global_slot_since_genesis: 54321,
+            ..Default::default()
         };
 
         // Serialize the BerkeleyBlockPayload to JSON for the event payload

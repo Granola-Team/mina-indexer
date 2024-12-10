@@ -53,6 +53,7 @@ impl Actor for BerkeleyBlockParserActor {
                 user_command_count: berkeley_block.get_user_commands_count(),
                 zk_app_command_count: berkeley_block.get_zk_app_commands_count(),
                 snark_work_count: berkeley_block.get_snark_work_count(),
+                snark_work: berkeley_block.get_snark_work(),
                 timestamp: berkeley_block.get_timestamp(),
                 coinbase_receiver: berkeley_block.get_coinbase_receiver(),
                 coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),

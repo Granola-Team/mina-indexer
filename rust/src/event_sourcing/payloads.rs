@@ -54,6 +54,7 @@ pub struct BerkeleyBlockPayload {
     pub user_command_count: usize,
     pub zk_app_command_count: usize,
     pub snark_work_count: usize,
+    pub snark_work: Vec<CompletedWorksNanomina>,
     pub timestamp: u64,
     pub coinbase_receiver: String,
     pub coinbase_reward_nanomina: u64,
