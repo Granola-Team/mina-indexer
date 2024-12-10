@@ -3,7 +3,7 @@ use crate::constants::MAINNET_COINBASE_REWARD;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BerkeleyBlock {
@@ -84,6 +84,22 @@ impl BerkeleyBlock {
                         prover: work.prover.to_string(),
                     }
                 })
+            })
+            .collect()
+    }
+
+    pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorksNanomina> {
+        let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
+
+        for completed_work in self.get_snark_work() {
+            *aggregated_snark_work.entry(completed_work.prover.clone()).or_insert(0) += completed_work.fee_nanomina;
+        }
+
+        aggregated_snark_work
+            .into_iter()
+            .map(|(prover, fee_nanomina)| CompletedWorksNanomina {
+                prover: prover.to_string(),
+                fee_nanomina,
             })
             .collect()
     }
@@ -254,6 +270,13 @@ mod berkeley_block_tests {
 
         assert!(berkeley_block
             .get_snark_work()
+            .iter()
+            .any(|work| { work.fee_nanomina == 10_000_000 && &work.prover == "B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P" }));
+
+        assert_eq!(berkeley_block.get_aggregated_snark_work().len(), 8, "Aggregated snark work count should match");
+
+        assert!(berkeley_block
+            .get_aggregated_snark_work()
             .iter()
             .any(|work| { work.fee_nanomina == 10_000_000 && &work.prover == "B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P" }))
     }
