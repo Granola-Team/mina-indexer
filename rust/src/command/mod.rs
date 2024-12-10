@@ -914,14 +914,123 @@ fn to_balance_json(
     Value::Object(balance_obj)
 }
 
+use serde_json::{json, Value};
+
+fn convert(test: bool, value: Value) -> Value {
+    match value {
+        Value::Number(n) => Value::String(n.to_string()),
+        Value::Object(mut obj) => {
+            obj.iter_mut().for_each(|(key, x)| {
+                if test && (*key == json!("memo") || *key == json!("signature")) {
+                    *x = Value::Null
+                } else {
+                    *x = convert(test, x.clone())
+                }
+            });
+            Value::Object(obj)
+        }
+        Value::Array(arr) => {
+            Value::Array(arr.into_iter().map(|json| convert(test, json)).collect())
+        }
+        x => x,
+    }
+}
+
+fn fee_convert(value: Value) -> Value {
+    match value {
+        Value::Object(mut obj) => {
+            obj.iter_mut().for_each(|(key, x)| {
+                if *key == json!("fee") {
+                    *x = {
+                        let nanomina = x.clone().to_string().parse::<u64>().unwrap();
+                        Value::String(nanomina_to_mina(nanomina))
+                    }
+                } else {
+                    *x = fee_convert(x.clone())
+                }
+            });
+            Value::Object(obj)
+        }
+        Value::Array(arr) => Value::Array(arr.into_iter().map(fee_convert).collect()),
+        x => x,
+    }
+}
+
+/// Convert to Mina precomputed block json format
+pub fn to_mina_format(json: Value) -> Value {
+    match json {
+        Value::Object(mut obj) => {
+            let keys: Vec<String> = obj.keys().cloned().collect();
+            if keys.contains(&"data".into()) {
+                // signed command
+                if let Value::Object(mut data) = obj["data"].clone() {
+                    let kind = obj["data"]["kind"].clone();
+                    if kind == Value::String("Signed_command".into()) {
+                        data.remove("kind");
+                        obj["data"] = Value::Array(vec![kind, Value::Object(data)]);
+                    }
+                }
+
+                obj.iter_mut()
+                    .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                Value::Object(obj)
+            } else if keys.contains(&"body".into()) {
+                // payment/delegation
+                if let Value::Object(mut body) = obj["body"].clone() {
+                    let kind = obj["body"]["kind"].clone();
+                    if kind == Value::String("Payment".into())
+                        || kind == Value::String("Stake_delegation".into())
+                    {
+                        body.remove("kind");
+                        obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                    }
+                }
+
+                obj.iter_mut()
+                    .for_each(|(_, v)| *v = to_mina_format(v.clone()));
+                Value::Object(obj)
+            } else if keys.contains(&"kind".into())
+                && keys.contains(&"auxiliary_data".into())
+                && keys.contains(&"balance_data".into())
+            {
+                // applied status
+                Value::Array(vec![
+                    obj["kind"].clone(),
+                    obj["auxiliary_data"].clone(),
+                    obj["balance_data"].clone(),
+                ])
+            } else if keys.contains(&"kind".into())
+                && keys.contains(&"reason".into())
+                && keys.contains(&"balance_data".into())
+            {
+                // failed status
+                Value::Array(vec![
+                    obj["kind"].clone(),
+                    obj["reason"].clone(),
+                    obj["balance_data"].clone(),
+                ])
+            } else {
+                obj.iter_mut()
+                    .for_each(|(_, val)| *val = to_mina_format(val.clone()));
+                Value::Object(obj)
+            }
+        }
+        Value::Array(arr) => Value::Array(arr.into_iter().map(to_mina_format).collect()),
+        x => x,
+    }
+}
+
+pub fn to_mina_json(json: Value) -> Value {
+    to_mina_format(convert(false, fee_convert(json)))
+}
+
 #[cfg(test)]
 mod test {
-    use super::{Command, Delegation, Payment};
+    use super::*;
     use crate::{
         block::{parser::BlockParser, precomputed::PcbVersion},
         command::decode_memo,
         constants::*,
-        utility::functions::nanomina_to_mina,
     };
     use std::path::PathBuf;
 
@@ -1104,107 +1213,14 @@ mod test {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
+        fn to_mina_json(json: Value) -> Value {
+            to_mina_format(super::convert(true, fee_convert(json)))
+        }
+
         fn convert(value: Value) -> Value {
-            match value {
-                Value::Number(n) => Value::String(n.to_string()),
-                Value::Object(mut obj) => {
-                    obj.iter_mut().for_each(|(key, x)| {
-                        if *key == json!("memo") || *key == json!("signature") {
-                            *x = Value::Null
-                        } else {
-                            *x = convert(x.clone())
-                        }
-                    });
-                    Value::Object(obj)
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(convert).collect()),
-                x => x,
-            }
-        }
-        fn fee_convert(value: Value) -> Value {
-            match value {
-                Value::Object(mut obj) => {
-                    obj.iter_mut().for_each(|(key, x)| {
-                        if *key == json!("fee") {
-                            *x = {
-                                let nanomina = x.clone().to_string().parse::<u64>().unwrap();
-                                Value::String(nanomina_to_mina(nanomina))
-                            }
-                        } else {
-                            *x = fee_convert(x.clone())
-                        }
-                    });
-                    Value::Object(obj)
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(fee_convert).collect()),
-                x => x,
-            }
-        }
-        /// Convert to Mina precomputed block json format
-        fn to_mina_format(json: Value) -> Value {
-            match json {
-                Value::Object(mut obj) => {
-                    let keys: Vec<String> = obj.keys().cloned().collect();
-                    if keys.contains(&"data".into()) {
-                        // signed command
-                        if let Value::Object(mut data) = obj["data"].clone() {
-                            let kind = obj["data"]["kind"].clone();
-                            if kind == Value::String("Signed_command".into()) {
-                                data.remove("kind");
-                                obj["data"] = Value::Array(vec![kind, Value::Object(data)]);
-                            }
-                        }
-
-                        obj.iter_mut()
-                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
-                        Value::Object(obj)
-                    } else if keys.contains(&"body".into()) {
-                        // payment/delegation
-                        if let Value::Object(mut body) = obj["body"].clone() {
-                            let kind = obj["body"]["kind"].clone();
-                            if kind == Value::String("Payment".into())
-                                || kind == Value::String("Stake_delegation".into())
-                            {
-                                body.remove("kind");
-                                obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
-                            }
-                        }
-
-                        obj.iter_mut()
-                            .for_each(|(_, v)| *v = to_mina_format(v.clone()));
-                        Value::Object(obj)
-                    } else if keys.contains(&"kind".into())
-                        && keys.contains(&"auxiliary_data".into())
-                        && keys.contains(&"balance_data".into())
-                    {
-                        // applied status
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            obj["auxiliary_data"].clone(),
-                            obj["balance_data"].clone(),
-                        ])
-                    } else if keys.contains(&"kind".into())
-                        && keys.contains(&"reason".into())
-                        && keys.contains(&"balance_data".into())
-                    {
-                        // failed status
-                        Value::Array(vec![
-                            obj["kind"].clone(),
-                            obj["reason"].clone(),
-                            obj["balance_data"].clone(),
-                        ])
-                    } else {
-                        obj.iter_mut()
-                            .for_each(|(_, val)| *val = to_mina_format(val.clone()));
-                        Value::Object(obj)
-                    }
-                }
-                Value::Array(arr) => Value::Array(arr.into_iter().map(to_mina_format).collect()),
-                x => x,
-            }
+            super::convert(true, value)
         }
 
-        #[allow(dead_code)]
         fn convert_v1_to_v2(json: Value) -> Value {
             match json {
                 Value::Object(mut obj) => {
@@ -1233,10 +1249,6 @@ mod test {
                 Value::Array(arr) => Value::Array(arr.into_iter().map(convert_v1_to_v2).collect()),
                 x => x,
             }
-        }
-
-        fn to_mina_json(json: Value) -> Value {
-            to_mina_format(convert(fee_convert(json)))
         }
 
         // v1
@@ -1299,56 +1311,52 @@ mod test {
 
         // v2
 
-        //         let path: PathBuf =
-        // "./tests/data/hardfork/
-        // mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json".
-        // into();         let contents = std::fs::read(path.clone())?;
-        //         let mina_json: Value =
-        // from_slice::<Value>(&contents)?["data"]["staged_ledger_diff"]
-        //             ["diff"][0]["commands"][0]
-        //             .clone();
-        //         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
-        //         let user_cmd_with_status = block.commands()[0].clone();
-        //         let user_cmd_with_status: Value = user_cmd_with_status.into();
+        let path: PathBuf = "./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json".into();
+        let contents = std::fs::read(path.clone())?;
+        let mina_json: Value = from_slice::<Value>(&contents)?["data"]["staged_ledger_diff"]
+            ["diff"][0]["commands"][0]
+            .clone();
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let user_cmd_with_status = block.commands()[0].clone();
+        let user_cmd_with_status: Value = user_cmd_with_status.into();
 
-        //         assert_eq!(
-        //             convert(mina_json),
-        //             convert_v1_to_v2(to_mina_json(user_cmd_with_status.clone()))
-        //         );
-        //         assert_eq!(
-        //
-        // serde_json::to_string_pretty(&
-        // convert_v1_to_v2(to_mina_json(user_cmd_with_status)))
-        // .unwrap(),             r#"{
-        //   "data": [
-        //     "Signed_command",
-        //     {
-        //       "payload": {
-        //         "body": [
-        //           "Payment",
-        //           {
-        //             "amount": "1000000000",
-        //             "receiver_pk":
-        // "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"           }
-        //         ],
-        //         "common": {
-        //           "fee": "0.0011",
-        //           "fee_payer_pk":
-        // "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
-        //           "memo": null,
-        //           "nonce": "765",
-        //           "valid_until": "4294967295"
-        //         }
-        //       },
-        //       "signature": null,
-        //       "signer": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
-        //     }
-        //   ],
-        //   "status": [
-        //     "Applied"
-        //   ]
-        // }"#
-        //         );
+        assert_eq!(
+            convert(mina_json),
+            convert_v1_to_v2(to_mina_json(user_cmd_with_status.clone()))
+        );
+
+        assert_eq!(
+            serde_json::to_string_pretty(&convert_v1_to_v2(to_mina_json(user_cmd_with_status)))
+                .unwrap(),
+            r#"{
+  "data": [
+    "Signed_command",
+    {
+      "payload": {
+        "body": [
+          "Payment",
+          {
+            "amount": "1000000000",
+            "receiver_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+          }
+        ],
+        "common": {
+          "fee": "0.0011",
+          "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
+          "memo": null,
+          "nonce": "765",
+          "valid_until": "4294967295"
+        }
+      },
+      "signature": null,
+      "signer": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+    }
+  ],
+  "status": [
+    "Applied"
+  ]
+}"#
+        );
 
         Ok(())
     }
