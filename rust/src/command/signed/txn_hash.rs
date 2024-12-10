@@ -39,7 +39,7 @@ impl TxnHash {
             return Ok(Self::V2(txn_hash.to_string()));
         }
 
-        bail!("Invalid txn hash {txn_hash}")
+        bail!("Invalid txn hash: '{txn_hash}'")
     }
 
     pub fn is_valid(&self) -> bool {

@@ -15,7 +15,10 @@ use crate::{
 use anyhow::bail;
 use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
-use std::{io::Write, path::PathBuf};
+use std::{
+    io::{ErrorKind, Write},
+    path::PathBuf,
+};
 
 // re-export [txn_hash::TxnHash]
 pub type TxnHash = txn_hash::TxnHash;
@@ -320,22 +323,56 @@ impl SignedCommand {
             }
             Self::V2(data) => {
                 let json: serde_json::Value = data.to_owned().to_mina_json();
-                if let Ok(cmd_str) = serde_json::to_string(&json) {
-                    let pgm = PathBuf::from("../ops/mina/mina_txn_hasher.exe")
-                        .canonicalize()?
-                        .display()
-                        .to_string();
 
-                    let mut proc = std::process::Command::new(pgm);
-                    proc.arg(cmd_str);
+                match serde_json::to_string(&json) {
+                    Ok(cmd_str) => {
+                        let path = PathBuf::from("../ops/mina/mina_txn_hasher.exe");
 
-                    if let Ok(output) = proc.output() {
-                        let txn_hash = String::from_utf8(output.stdout).expect("hash read success");
-                        return TxnHash::new(txn_hash.trim().to_string());
+                        // Check if file exists and is executable
+                        if let Ok(metadata) = std::fs::metadata(&path) {
+                            #[cfg(unix)]
+                            use std::os::unix::fs::PermissionsExt;
+                            if metadata.permissions().mode() & 0o111 == 0 {
+                                bail!("Error: File exists but is not executable");
+                            }
+                        } else {
+                            bail!("Error: File does not exist");
+                        }
+
+                        let pgm = path.display().to_string();
+                        let mut proc = std::process::Command::new(pgm);
+                        proc.arg(cmd_str);
+
+                        match proc.output() {
+                            Ok(output) => {
+                                if !output.status.success() {
+                                    let err = String::from_utf8_lossy(&output.stderr);
+                                    bail!("Process failed: {}\ndata: {:?}", err, data);
+                                }
+                                let txn_hash = String::from_utf8(output.stdout).map_err(|e| {
+                                    anyhow::anyhow!("Invalid UTF-8 in output: {}", e)
+                                })?;
+                                TxnHash::new(txn_hash.trim().to_string())
+                            }
+                            Err(e) => {
+                                // More specific error handling
+                                let err_msg = match e.kind() {
+                                    ErrorKind::NotFound => "Executable not found",
+                                    ErrorKind::PermissionDenied => "Permission denied",
+                                    ErrorKind::InvalidInput => "Invalid input",
+                                    _ => "Unknown error occurred",
+                                };
+                                bail!(
+                                    "Error executing command: {} ({})\ndata: {:?}",
+                                    err_msg,
+                                    e,
+                                    data
+                                )
+                            }
+                        }
                     }
+                    Err(e) => bail!("Error serializing JSON: {}\ndata: {:?}", e, data),
                 }
-
-                bail!("Error hashing {data:?}")
             }
         }
     }
