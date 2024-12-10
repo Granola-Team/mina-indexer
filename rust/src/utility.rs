@@ -60,7 +60,7 @@ pub fn get_cleaned_pcb(file: &str) -> Result<String> {
     unsafe {
         match sonic_rs::from_slice_unchecked::<Value>(&contents) {
             Ok(mut json_value) => {
-                remove_proofs(&mut json_value);
+                remove_non_utf8_keys(&mut json_value);
 
                 // Serialize back to JSON
                 let cleaned_json = sonic_rs::to_string(&json_value).expect("Serialization failed");
@@ -72,17 +72,19 @@ pub fn get_cleaned_pcb(file: &str) -> Result<String> {
 }
 
 /// Recursively removes all "proofs" keys from a `sonic_rs::Value`.
-fn remove_proofs(value: &mut Value) {
+fn remove_non_utf8_keys(value: &mut Value) {
     if let Some(map) = value.as_object_mut() {
         let proofs = "proofs".to_string();
+        let sok_digest = "sok_digest".to_string();
         map.remove(&proofs);
+        map.remove(&sok_digest);
 
         for (_, v) in map.iter_mut() {
-            remove_proofs(v);
+            remove_non_utf8_keys(v);
         }
     } else if let Some(array) = value.as_array_mut() {
         for v in array.iter_mut() {
-            remove_proofs(v);
+            remove_non_utf8_keys(v);
         }
     }
 }
@@ -96,6 +98,7 @@ mod remove_proofs_invalid_utf8_tests {
         // Simulate a JSON structure containing invalid UTF-8 bytes
         let raw_json_bytes = b"{
             \"proofs\": \"\xFF\xFE\xFD\",
+            \"sok_digest\": \"\xFF\xFE\xFD\",
             \"key1\": \"value2\"
         }";
 
@@ -104,7 +107,7 @@ mod remove_proofs_invalid_utf8_tests {
             let mut value = sonic_rs::from_slice_unchecked(raw_json_bytes).expect("Failed to parse JSON");
 
             // Remove "proofs" key
-            remove_proofs(&mut value);
+            remove_non_utf8_keys(&mut value);
 
             // Construct the expected value
             let expected = to_value(&json!({
@@ -123,7 +126,8 @@ mod remove_proofs_invalid_utf8_tests {
             \"key1\": {
                 \"proofs\": \"\xFF\",
                 \"nested\": {
-                    \"proofs\": \"\xFF\"
+                    \"proofs\": \"\xFF\",
+                    \"sok_digest\": \"\xFF\"
                 }
             }
         }";
@@ -133,7 +137,7 @@ mod remove_proofs_invalid_utf8_tests {
             let mut value = sonic_rs::from_slice_unchecked(raw_json_bytes).expect("Failed to parse JSON");
 
             // Remove "proofs" keys
-            remove_proofs(&mut value);
+            remove_non_utf8_keys(&mut value);
 
             // Construct the expected value
             let expected = to_value(&json!({
