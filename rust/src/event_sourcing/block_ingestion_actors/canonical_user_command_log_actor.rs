@@ -74,6 +74,13 @@ impl Actor for CanonicalUserCommandLogActor {
                     .add_items_count(event_payload.height, &event_payload.state_hash, event_payload.user_command_count as u64)
                     .await;
             }
+            EventType::BerkeleyBlock => {
+                let event_payload: BerkeleyBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                let manager = self.canonical_items_manager.lock().await;
+                manager
+                    .add_items_count(event_payload.height, &event_payload.state_hash, event_payload.user_command_count as u64)
+                    .await;
+            }
             EventType::UserCommandLog => {
                 let event_payload: UserCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
                 {
@@ -129,7 +136,7 @@ mod canonical_user_command_log_actor_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::{CommandStatus, CommandType},
+        models::{CommandStatus, CommandType},
         payloads::{CanonicalUserCommandLogPayload, MainnetBlockPayload, UserCommandLogPayload},
     };
     use std::sync::Arc;

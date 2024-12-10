@@ -165,7 +165,7 @@ mod new_account_actor_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::{CommandStatus, CommandSummary},
+        models::{CommandStatus, CommandSummary},
         payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
     };
     use std::sync::Arc;

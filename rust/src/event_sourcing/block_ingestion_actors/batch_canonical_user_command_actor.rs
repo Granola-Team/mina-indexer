@@ -112,7 +112,7 @@ mod batch_canonical_user_command_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::{CommandStatus, CommandSummary, CommandType},
+        models::{CommandStatus, CommandSummary, CommandType},
         payloads::{BatchCanonicalUserCommandLogPayload, BlockCanonicityUpdatePayload, MainnetBlockPayload},
     };
     use std::sync::{atomic::Ordering, Arc};

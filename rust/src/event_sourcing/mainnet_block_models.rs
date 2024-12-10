@@ -1,4 +1,4 @@
-use super::models::CompletedWorksNanomina;
+use super::models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina};
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
@@ -6,7 +6,6 @@ use serde::{
     de::{SeqAccess, Visitor},
     Deserializer,
 };
-use sha2::{Digest, Sha256};
 use sonic_rs::{Deserialize, JsonValueTrait, Serialize, Value};
 use std::{collections::HashMap, str::FromStr};
 
@@ -290,40 +289,6 @@ pub struct Command {
     pub status: Vec<Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub enum CommandStatus {
-    Applied,
-    #[default]
-    Failed,
-}
-
-impl fmt::Display for CommandStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let display_text = match self {
-            CommandStatus::Applied => "Applied",
-            CommandStatus::Failed => "Failed",
-        };
-        write!(f, "{}", display_text)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub enum CommandType {
-    #[default]
-    Payment,
-    StakeDelegation,
-}
-
-impl fmt::Display for CommandType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let display_text = match self {
-            CommandType::Payment => "Payment",
-            CommandType::StakeDelegation => "StakeDelegation",
-        };
-        write!(f, "{}", display_text)
-    }
-}
-
 impl Command {
     fn get_status(&self) -> String {
         self.status.first().unwrap().as_str().unwrap().to_string()
@@ -391,32 +356,6 @@ impl Command {
             fee_nanomina: (self.get_fee() * 1_000_000_000f64) as u64,
             amount_nanomina: self.get_amount_nanomina(),
         }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default, Hash, Debug)]
-pub struct CommandSummary {
-    pub memo: String,
-    pub fee_payer: String,
-    pub sender: String,
-    pub receiver: String,
-    pub status: CommandStatus,
-    pub txn_type: CommandType,
-    pub nonce: usize,
-    pub fee_nanomina: u64,
-    pub amount_nanomina: u64,
-}
-
-impl CommandSummary {
-    // TODO: this needs to use bin_prot
-    // but for now we'll make up a hash
-    pub fn txn_hash(&self) -> String {
-        let serialized = sonic_rs::to_string(self).unwrap();
-        // Use a SHA-256 hasher
-        let mut hasher = Sha256::new();
-        hasher.update(serialized);
-        // Return the hash as a hexadecimal string
-        format!("{:x}", hasher.finalize())
     }
 }
 

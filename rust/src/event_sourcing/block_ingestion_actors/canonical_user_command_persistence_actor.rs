@@ -153,7 +153,7 @@ mod canonical_user_command_log_persistence_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::{CommandStatus, CommandSummary, CommandType},
+        models::{CommandStatus, CommandSummary, CommandType},
     };
     use std::sync::Arc;
     use tokio::sync::broadcast;

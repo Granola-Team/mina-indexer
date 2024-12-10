@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::{
     constants::MAINNET_EPOCH_SLOT_COUNT,
-    event_sourcing::{mainnet_block_models::CommandType, payloads::*},
+    event_sourcing::{models::CommandType, payloads::*},
 };
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};

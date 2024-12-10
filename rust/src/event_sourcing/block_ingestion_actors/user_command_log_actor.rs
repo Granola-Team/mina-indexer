@@ -77,7 +77,7 @@ async fn test_user_command_actor_handle_event() {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::*,
+        models::*,
         payloads::{MainnetBlockPayload, UserCommandLogPayload},
     };
     use std::sync::Arc;

@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::event_sourcing::{
-    mainnet_block_models::{CommandStatus, CommandType},
+    models::{CommandStatus, CommandType},
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload,
         DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
@@ -324,7 +324,7 @@ mod accounting_actor_tests {
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: crate::event_sourcing::mainnet_block_models::CommandType::Payment,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
             status: CommandStatus::Failed,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
@@ -383,7 +383,7 @@ mod accounting_actor_tests {
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: crate::event_sourcing::mainnet_block_models::CommandType::Payment,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
             status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
@@ -453,7 +453,7 @@ mod accounting_actor_tests {
             txn_hash: "txn_hash".to_string(),
             state_hash: "state_hash_3".to_string(),
             timestamp: 1620000200,
-            txn_type: crate::event_sourcing::mainnet_block_models::CommandType::Payment,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
             status: CommandStatus::Applied,
             sender: "B62qsender1".to_string(),
             receiver: "B62qreceiver1".to_string(),
