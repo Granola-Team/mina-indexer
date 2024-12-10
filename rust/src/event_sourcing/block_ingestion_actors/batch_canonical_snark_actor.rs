@@ -114,7 +114,7 @@ mod bulk_snark_canonicity_summary_actor_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::CompletedWorksNanomina,
+        models::CompletedWorksNanomina,
         payloads::{BatchSnarkCanonicityPayload, BlockCanonicityUpdatePayload, MainnetBlockPayload},
     };
     use std::sync::Arc;

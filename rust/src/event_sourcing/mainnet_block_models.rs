@@ -1,3 +1,4 @@
+use super::models::CompletedWorksNanomina;
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
@@ -279,12 +280,6 @@ pub struct CoinbaseData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompletedWorks {
     pub fee: String,
-    pub prover: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CompletedWorksNanomina {
-    pub fee_nanomina: u64,
     pub prover: String,
 }
 
