@@ -1,6 +1,9 @@
+use super::models::CompletedWorksNanomina;
 use crate::constants::MAINNET_COINBASE_REWARD;
+use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
+use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BerkeleyBlock {
@@ -69,11 +72,19 @@ impl BerkeleyBlock {
         self.get_snark_work().len()
     }
 
-    pub fn get_snark_work(&self) -> Vec<CompletedWorks> {
+    pub fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
-            .flat_map(|works| works.into_iter())
+            .flat_map(|works| {
+                works.into_iter().map(|work| {
+                    let fee_nanomina = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                    CompletedWorksNanomina {
+                        fee_nanomina: fee_nanomina.to_u64().unwrap(),
+                        prover: work.prover.to_string(),
+                    }
+                })
+            })
             .collect()
     }
 
@@ -197,6 +208,7 @@ pub struct ZkappCommand {}
 #[cfg(test)]
 mod berkeley_block_tests {
     use super::*;
+    use crate::utility::get_cleaned_pcb;
     use std::path::Path;
 
     #[test]
@@ -227,5 +239,22 @@ mod berkeley_block_tests {
         assert_eq!(berkeley_block.get_global_slot_since_genesis(), 8612, "Global slot since genesis should match");
 
         assert_eq!(berkeley_block.get_snark_work_count(), 0, "snark work count should match");
+    }
+
+    #[test]
+    fn test_berkeley_block_409021() {
+        // Path to your test JSON file
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-409021-3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk.json").unwrap();
+
+        // Deserialize JSON into BerkeleyBlock struct
+        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+
+        assert_eq!(berkeley_block.get_snark_work_count(), 37, "snark work count should match");
+
+        assert!(berkeley_block
+            .get_snark_work()
+            .iter()
+            .any(|work| { work.fee_nanomina == 10_000_000 && &work.prover == "B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P" }))
     }
 }
