@@ -1,9 +1,12 @@
-use super::models::CompletedWorksNanomina;
-use crate::constants::MAINNET_COINBASE_REWARD;
+use super::models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina};
+use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, SeqAccess, Visitor},
+    Deserialize, Deserializer, Serialize,
+};
 use sonic_rs::{JsonValueTrait, Value};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BerkeleyBlock {
@@ -37,6 +40,19 @@ impl BerkeleyBlock {
                     .map(|diff| diff.commands.iter().filter(|command| matches!(command, Command::SignedCommand(_))).count())
             })
             .sum()
+    }
+
+    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| {
+                opt_diff
+                    .as_ref()
+                    .map(|diff| diff.commands.iter().filter(|command| matches!(command, Command::SignedCommand(_))))
+            })
+            .flat_map(|user_commands| user_commands.into_iter())
+            .map(|uc| uc.to_command_summary())
+            .collect()
     }
 
     pub fn get_zk_app_commands_count(&self) -> usize {
@@ -127,7 +143,7 @@ pub struct Data {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ProtocolState {
     pub previous_state_hash: String,
-    pub body: Body,
+    pub body: ProtocolStateBody,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -136,7 +152,7 @@ pub struct BlockchainState {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Body {
+pub struct ProtocolStateBody {
     pub consensus_state: ConsensusState,
     pub blockchain_state: BlockchainState,
 }
@@ -173,6 +189,94 @@ pub enum Command {
     ZkappCommand(ZkappCommand),
 }
 
+impl Command {
+    fn get_status(&self) -> String {
+        todo!("")
+    }
+
+    fn get_nonce(&self) -> usize {
+        match self {
+            Command::SignedCommand(signed_command) => signed_command.payload.common.nonce.parse::<usize>().unwrap(),
+            Command::ZkappCommand(_) => todo!("get_nonce not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_sender(&self) -> String {
+        String::from("Unknown")
+    }
+
+    fn get_type(&self) -> CommandType {
+        match self {
+            Command::SignedCommand(signed_command) => match &signed_command.payload.body {
+                Body::Payment(_) => CommandType::Payment,
+                Body::StakeDelegation(_) => CommandType::StakeDelegation,
+            },
+            Command::ZkappCommand(_) => todo!("get_type not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_receiver(&self) -> String {
+        match self {
+            Command::SignedCommand(signed_command) => match &signed_command.payload.body {
+                Body::Payment(payment) => payment.receiver_pk.clone(),
+                Body::StakeDelegation(StakeDelegationType::SetDelegate(delegate)) => delegate.new_delegate.clone(),
+            },
+            Command::ZkappCommand(_) => todo!("get_receiver not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_fee(&self) -> f64 {
+        match self {
+            Command::SignedCommand(signed_command) => signed_command.payload.common.fee.parse::<f64>().unwrap(),
+            Command::ZkappCommand(_) => todo!("get_fee not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_amount_nanomina(&self) -> u64 {
+        match self {
+            Command::SignedCommand(signed_command) => match &signed_command.payload.body {
+                Body::Payment(payment) => payment.amount.parse::<u64>().unwrap(),
+                Body::StakeDelegation(_) => 0,
+            },
+            Command::ZkappCommand(_) => todo!("get_amount_nanomina not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_memo(&self) -> String {
+        match self {
+            Command::SignedCommand(signed_command) => decode_base58check_to_string(&signed_command.payload.common.memo).unwrap(),
+            Command::ZkappCommand(_) => todo!("get_memo not implemented for ZkappCommand"),
+        }
+    }
+
+    fn get_fee_payer(&self) -> String {
+        match self {
+            Command::SignedCommand(signed_command) => signed_command.payload.common.fee_payer_pk.clone(),
+            Command::ZkappCommand(_) => todo!("get_fee_payer not implemented for ZkappCommand"),
+        }
+    }
+
+    pub fn to_command_summary(&self) -> CommandSummary {
+        match self {
+            Command::SignedCommand(_) => CommandSummary {
+                memo: self.get_memo(),
+                fee_payer: self.get_fee_payer(),
+                sender: self.get_sender(),
+                receiver: self.get_receiver(),
+                status: match self.get_status().as_str() {
+                    "Applied" => CommandStatus::Applied,
+                    _ => CommandStatus::Failed,
+                },
+                txn_type: self.get_type(),
+                nonce: self.get_nonce(),
+                fee_nanomina: (self.get_fee() * 1_000_000_000f64) as u64,
+                amount_nanomina: self.get_amount_nanomina(),
+            },
+            Command::ZkappCommand(_) => todo!("to_command_summary not implemented for ZkappCommand"),
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for Command {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -190,6 +294,12 @@ impl<'de> Deserialize<'de> for Command {
             .and_then(|v| v.clone().into_array())
             .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'data' field"))?;
 
+        let status_val = value
+            .get("status")
+            .and_then(|v| v.clone().into_array())
+            .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'status' field"))?;
+        let status = status_val.first().unwrap();
+
         if data.len() != 2 {
             return Err(serde::de::Error::custom("Expected 'data' field to have exactly 2 elements"));
         }
@@ -203,7 +313,8 @@ impl<'de> Deserialize<'de> for Command {
         // Match on the command type and deserialize appropriately
         match command_type {
             "Signed_command" => {
-                let signed_command = sonic_rs::from_value::<SignedCommand>(details).map_err(serde::de::Error::custom)?;
+                let mut signed_command = sonic_rs::from_value::<SignedCommand>(details).map_err(serde::de::Error::custom)?;
+                signed_command.status = status.clone().as_str().unwrap().to_string();
                 Ok(Command::SignedCommand(signed_command))
             }
             "Zkapp_command" => {
@@ -216,7 +327,95 @@ impl<'de> Deserialize<'de> for Command {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignedCommand {}
+pub struct SignedCommand {
+    pub payload: Payload,
+    #[serde(skip)]
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payload {
+    pub common: Common,
+    #[serde(deserialize_with = "deserialize_body")]
+    pub body: Body,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Common {
+    pub fee: String,
+    pub fee_payer_pk: String,
+    pub nonce: String,
+    pub valid_until: String,
+    pub memo: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Body {
+    StakeDelegation(StakeDelegationType),
+    Payment(Payment),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum StakeDelegationType {
+    SetDelegate(DelegateInfo),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DelegateInfo {
+    pub new_delegate: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payment {
+    pub receiver_pk: String,
+    pub amount: String,
+}
+
+fn deserialize_body<'de, D>(deserializer: D) -> Result<Body, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BodyVisitor;
+
+    impl<'de> Visitor<'de> for BodyVisitor {
+        type Value = Body;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("an array with a command type string and a nested structure")
+        }
+
+        fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+        where
+            V: SeqAccess<'de>,
+        {
+            // Parse the command type as a string
+            let command_type: String = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+            // Handle specific command types
+            match command_type.as_str() {
+                "Stake_delegation" => {
+                    let nested: Vec<Value> = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+
+                    // Assume structure ["Set_delegate", { "new_delegate": ... }]
+                    if let Some(set_delegate_array) = nested.get(1) {
+                        let delegate_info: DelegateInfo = sonic_rs::from_value(set_delegate_array).map_err(de::Error::custom)?;
+                        Ok(Body::StakeDelegation(StakeDelegationType::SetDelegate(delegate_info)))
+                    } else {
+                        Err(de::Error::invalid_value(de::Unexpected::Seq, &"Expected nested Set_delegate structure"))
+                    }
+                }
+                "Payment" => {
+                    // Parse Payment structure
+                    let payment: Payment = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                    Ok(Body::Payment(payment))
+                }
+                _ => Err(de::Error::unknown_variant(&command_type, &["Stake_delegation", "Payment"])),
+            }
+        }
+    }
+
+    deserializer.deserialize_seq(BodyVisitor)
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkappCommand {}
