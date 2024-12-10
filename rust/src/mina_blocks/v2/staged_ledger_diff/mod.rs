@@ -3,11 +3,9 @@ pub mod completed_work;
 
 use super::protocol_state::SupplyAdjustment;
 use crate::{
-    ledger::public_key::PublicKey,
-    mina_blocks::common::*,
-    protocol::serialization_types::{
-        signatures::SignatureJson, staged_ledger_diff::TransactionStatusFailedType,
-    },
+    command::to_mina_format, ledger::public_key::PublicKey, mina_blocks::common::*,
+    protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
+    utility::functions::nanomina_to_mina,
 };
 use completed_work::CompletedWork;
 use serde::{Deserialize, Serialize};
@@ -20,7 +18,7 @@ pub struct StagedLedgerDiff {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Diff {
     pub completed_works: Vec<CompletedWork>,
-    pub commands: Vec<Command>,
+    pub commands: Vec<UserCommand>,
     pub coinbase: Coinbase,
     pub internal_command_statuses: Vec<InternalCommandStatus>,
 }
@@ -56,13 +54,15 @@ pub struct CoinbasePayload {
     pub fee: u64,
 }
 
+/// User command
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Command {
-    pub data: (CommandKind, CommandData),
+pub struct UserCommand {
+    pub data: (UserCommandKind, UserCommandData),
     pub status: Status,
 }
 
-impl Eq for Command {}
+impl Eq for UserCommand {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -71,8 +71,10 @@ pub enum Status {
     StatusAndFailure(StatusKind, (((TransactionStatusFailedType,),),)),
 }
 
+/// User command
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum CommandKind {
+pub enum UserCommandKind {
     #[serde(rename = "Signed_command")]
     SignedCommand,
 
@@ -82,30 +84,34 @@ pub enum CommandKind {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum CommandData {
-    UserCommandData(Box<UserCommandData>),
+pub enum UserCommandData {
+    SignedCommandData(Box<SignedCommandData>),
     ZkappCommandData(ZkappCommandData),
 }
 
-/// User command
+impl std::cmp::Eq for UserCommandData {}
+
+/// Signed command
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UserCommandData {
+pub struct SignedCommandData {
     #[serde(deserialize_with = "from_str")]
     pub signer: PublicKey,
 
-    pub payload: UserCommandPayload,
-    pub signature: SignatureJson,
+    pub payload: SignedCommandPayload,
+    pub signature: String,
+}
+
+impl std::cmp::Eq for SignedCommandData {}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SignedCommandPayload {
+    pub common: SignedCommandPayloadCommon,
+    pub body: (SignedCommandPayloadKind, SignedCommandPayloadBody),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UserCommandPayload {
-    pub common: UserCommandPayloadCommon,
-    pub body: (UserCommandPayloadKind, UserCommandPayloadBody),
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum UserCommandPayloadKind {
+pub enum SignedCommandPayloadKind {
     Payment,
 
     #[serde(rename = "Stake_delegation")]
@@ -114,7 +120,7 @@ pub enum UserCommandPayloadKind {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum UserCommandPayloadBody {
+pub enum SignedCommandPayloadBody {
     Payment(PaymentPayload),
     StakeDelegation(StakeDelegationPayload),
 }
@@ -318,7 +324,7 @@ pub struct Call {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct UserCommandPayloadCommon {
+pub struct SignedCommandPayloadCommon {
     #[serde(deserialize_with = "from_decimal_str")]
     pub fee: u64,
 
