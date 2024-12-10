@@ -854,9 +854,8 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "not yet implemented"]
     #[test]
-    fn transaction_hash_v2() -> anyhow::Result<()> {
+    fn txn_hash_signed_command_v2() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block.command_hashes();
@@ -871,72 +870,23 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "not yet implemented"]
     #[test]
-    fn transaction_versioned_v2() -> anyhow::Result<()> {
-        let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
+    fn txn_hash_zkapp_command_v2() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
-        let cmd = precomputed_block.commands().first().cloned().unwrap();
+        let hashes = precomputed_block.command_hashes();
 
-        if let SignedCommand::V2(versioned) = cmd.into() {
-            // versions
-            assert_eq!(versioned.version, 2);
-            assert_eq!(versioned.t.version, 1);
-
-            let signer = versioned.t.t.signer.0.clone();
-            assert_eq!(signer.version, 1);
-
-            let signature = versioned.t.t.signature.0.clone();
-            assert_eq!(signature.version, 1);
-            assert_eq!(signature.t.version, 1);
-
-            let payload = versioned.t.t.payload.clone();
-            assert_eq!(payload.version, 2);
-            assert_eq!(payload.t.version, 1);
-
-            let common = payload.t.t.common.clone();
-            assert_eq!(common.version, 2);
-            assert_eq!(common.t.version, 2);
-            assert_eq!(common.t.t.version, 2);
-
-            let body = payload.t.t.body.clone();
-            assert_eq!(body.version, 2);
-            assert_eq!(body.t.version, 2);
-
-            let fee = common.t.t.t.fee.clone();
-            assert_eq!(fee.version, 1);
-            assert_eq!(fee.t.version, 1);
-
-            let fee_payer_pk = common.t.t.t.fee_payer_pk.0.clone();
-            assert_eq!(fee_payer_pk.version, 1);
-            assert_eq!(fee_payer_pk.t.version, 1);
-
-            let memo = common.t.t.t.memo.clone();
-            assert_eq!(memo.version, 1);
-
-            let nonce = common.t.t.t.nonce.clone();
-            assert_eq!(nonce.version, 1);
-
-            let valid_until = common.t.t.t.valid_until.clone();
-            assert_eq!(valid_until.version, 1);
-            assert_eq!(valid_until.t.version, 1);
-
-            let versioned_str = format!("{:?}", versioned);
-            assert_eq!(
-                versioned_str,
-                "Versioned { version: 2, t: Versioned { version: 1, t: SignedCommand2 { payload: Versioned { version: 2, t: Versioned { version: 1, t: SignedCommandPayload2 { common: Versioned { version: 2, t: Versioned { version: 2, t: Versioned { version: 2, t: SignedCommandPayloadCommon2 { fee: Versioned { version: 1, t: Versioned { version: 1, t: 1100000 } }, fee_payer_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), nonce: Versioned { version: 1, t: Versioned { version: 1, t: 765 } }, valid_until: Versioned { version: 1, t: Versioned { version: 1, t: -1 } }, memo: Versioned { version: 1, t: SignedCommandMemo([1, 53, 69, 52, 89, 77, 50, 118, 84, 72, 104, 87, 69, 103, 54, 54, 120, 112, 106, 53, 50, 74, 69, 114, 72, 85, 66, 85, 52, 112, 90, 49, 121, 97, 103, 101, 76, 52, 84, 86, 68, 68, 112, 84, 84, 83, 115, 118, 56, 109, 75, 54, 89, 97, 72]) } } } } }, body: Versioned { version: 2, t: Versioned { version: 2, t: PaymentPayload(Versioned { version: 2, t: Versioned { version: 2, t: PaymentPayload2 { receiver_pk: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }), amount: Versioned { version: 1, t: Versioned { version: 1, t: 1000000000 } } } } }) } } } } }, signer: PublicKey2V1(Versioned { version: 1, t: PublicKeyV1(Versioned { version: 1, t: Versioned { version: 1, t: CompressedCurvePoint { x: [187, 148, 161, 195, 209, 6, 189, 108, 205, 10, 198, 190, 150, 245, 112, 204, 4, 41, 48, 129, 36, 159, 55, 45, 198, 222, 78, 254, 217, 85, 117, 26], is_odd: true } } }) }), signature: SignatureV1(Versioned { version: 1, t: Versioned { version: 1, t: ([50, 230, 56, 233, 69, 213, 105, 146, 35, 138, 45, 69, 176, 58, 205, 6, 84, 110, 65, 189, 34, 210, 223, 250, 80, 165, 39, 2, 161, 161, 234, 23], [3, 38, 54, 31, 45, 216, 234, 5, 22, 233, 115, 128, 229, 232, 105, 216, 241, 41, 146, 248, 232, 121, 84, 126, 205, 228, 171, 37, 147, 131, 37, 60]) } }) } } }"
-            );
-
-            return Ok(());
-        }
-
-        panic!("should be v2 signed command")
+        // see https://minaexplorer.com/block/3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK
+        assert_eq!(hashes, vec![]);
+        Ok(())
     }
 
     #[test]
-    fn signed_command_json() -> anyhow::Result<()> {
+    fn signed_command_json_v1() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
-        let signed_commands = precomputed_block
+        let signed_cmds = precomputed_block
             .commands()
             .into_iter()
             .map(|c| format!("{:?}", SignedCommand::from(c)))
