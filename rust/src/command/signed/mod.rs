@@ -2,28 +2,28 @@ mod txn_hash;
 
 use crate::{
     command::*,
-    mina_blocks::v2::{self, staged_ledger_diff::CommandData},
+    mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
         serialization_types::{
-            signatures::PublicKey2V1,
             staged_ledger_diff as mina_rs,
-            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
+            version_bytes::{USER_COMMAND, V1_TXN_HASH},
         },
     },
 };
+use anyhow::bail;
 use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 
 // re-export [txn_hash::TxnHash]
 pub type TxnHash = txn_hash::TxnHash;
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum SignedCommand {
-    V1(mina_rs::SignedCommandV1),
-    V2(mina_rs::SignedCommandV2),
+    V1(Box<mina_rs::SignedCommandV1>),
+    V2(UserCommandData),
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -59,7 +59,10 @@ impl SignedCommand {
     pub fn fee(&self) -> u64 {
         match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.fee.t.t,
-            Self::V2(v2) => v2.t.t.payload.t.t.common.t.t.t.fee.t.t,
+            Self::V2(v2) => match &v2 {
+                UserCommandData::SignedCommandData(data) => data.payload.common.fee,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee,
+            },
         }
     }
 
@@ -78,26 +81,24 @@ impl SignedCommand {
                     .to_owned()
                     .into()
             }
-            Self::V2(v2) => {
-                v2.t.t
-                    .payload
-                    .t
-                    .t
-                    .common
-                    .t
-                    .t
-                    .t
-                    .fee_payer_pk
-                    .to_owned()
-                    .into()
-            }
+            Self::V2(v2) => match &v2 {
+                UserCommandData::SignedCommandData(data) => {
+                    data.payload.common.fee_payer_pk.to_owned()
+                }
+                UserCommandData::ZkappCommandData(data) => {
+                    data.fee_payer.body.public_key.to_owned()
+                }
+            },
         }
     }
 
     pub fn nonce(&self) -> Nonce {
         let nonce = match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32,
-            Self::V2(v2) => v2.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32,
+            Self::V2(v2) => match &v2 {
+                UserCommandData::SignedCommandData(data) => data.payload.common.nonce,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce,
+            },
         };
         Nonce(nonce)
     }
@@ -105,14 +106,23 @@ impl SignedCommand {
     pub fn valid_until(&self) -> i32 {
         match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.valid_until.t.t,
-            Self::V2(v2) => v2.t.t.payload.t.t.common.t.t.t.valid_until.t.t,
+            Self::V2(v2) => match &v2 {
+                UserCommandData::SignedCommandData(data) => data.payload.common.valid_until as i32,
+                UserCommandData::ZkappCommandData(data) => {
+                    data.fee_payer.body.valid_until.unwrap_or(u64::MAX) as i32
+                }
+            },
         }
     }
 
+    /// Decoded memo
     pub fn memo(&self) -> String {
         let encoded = match self {
-            Self::V1(v1) => &v1.t.t.payload.t.t.common.t.t.t.memo.t.0,
-            Self::V2(v2) => &v2.t.t.payload.t.t.common.t.t.t.memo.t.0,
+            Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.memo.t.0.as_slice(),
+            Self::V2(v2) => match &v2 {
+                UserCommandData::SignedCommandData(data) => data.payload.common.memo.as_bytes(),
+                UserCommandData::ZkappCommandData(data) => data.memo.as_bytes(),
+            },
         };
         decode_memo(encoded)
     }
@@ -137,11 +147,16 @@ impl SignedCommand {
                     StakeDelegation(_) => 0,
                 }
             }
-            Self::V2(v2) => {
-                use mina_rs::SignedCommandPayloadBody2::*;
-                match &v2.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(v2) => v2.t.t.amount.t.t,
-                    StakeDelegation(_) => 0,
+            Self::V2(data) => {
+                use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
+                match data {
+                    UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
+                        Payment(PaymentPayload { amount, .. }) => *amount,
+                        StakeDelegation(_) => 0,
+                    },
+                    UserCommandData::ZkappCommandData(_data) => {
+                        todo!("zkapp amount")
+                    }
                 }
             }
         }
@@ -160,15 +175,18 @@ impl SignedCommand {
                     },
                 }
             }
-            Self::V2(v2) => {
-                use mina_rs::SignedCommandPayloadBody2::*;
-                match &v2.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(v2) => v2.t.t.receiver_pk.to_owned().into(),
-                    StakeDelegation(v2) => match v2.t {
-                        mina_rs::StakeDelegation2::SetDelegate { ref new_delegate } => {
-                            new_delegate.to_owned().into()
+            Self::V2(data) => {
+                use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
+                match data {
+                    UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
+                        Payment(PaymentPayload { receiver_pk, .. }) => receiver_pk.to_owned(),
+                        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
+                            new_delegate.to_owned()
                         }
                     },
+                    UserCommandData::ZkappCommandData(_data) => {
+                        todo!("zkapp receiver_pk")
+                    }
                 }
             }
         }
@@ -203,7 +221,10 @@ impl SignedCommand {
                     StakeDelegation(_v1) => None,
                 }
             }
-            Self::V2(_v2) => None,
+            Self::V2(v2) => match v2 {
+                UserCommandData::SignedCommandData(_) => Some(1), // MINA token
+                UserCommandData::ZkappCommandData(_) => None,
+            },
         }
     }
 
@@ -212,7 +233,12 @@ impl SignedCommand {
     pub fn signer(&self) -> PublicKey {
         match self {
             Self::V1(v1) => v1.t.t.signer.0.t.to_owned().into(),
-            Self::V2(v2) => v2.t.t.signer.0.t.to_owned().into(),
+            Self::V2(v2) => match v2 {
+                UserCommandData::SignedCommandData(data) => data.signer.to_owned(),
+                UserCommandData::ZkappCommandData(data) => {
+                    data.fee_payer.body.public_key.to_owned()
+                }
+            },
         }
     }
 
@@ -238,12 +264,15 @@ impl SignedCommand {
                     StakeDelegation(_) => CommandType::Delegation,
                 }
             }
-            Self::V2(v2) => {
-                use mina_rs::SignedCommandPayloadBody2::*;
-                match &v2.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(_) => CommandType::Payment,
-                    StakeDelegation(_) => CommandType::Delegation,
+            Self::V2(UserCommandData::SignedCommandData(data)) => {
+                use v2::staged_ledger_diff::SignedCommandPayloadKind::*;
+                match &data.payload.body.0 {
+                    Payment => CommandType::Payment,
+                    StakeDelegation => CommandType::Delegation,
                 }
+            }
+            Self::V2(UserCommandData::ZkappCommandData(_)) => {
+                unreachable!("zkapp commands are not signed commands")
             }
         }
     }
@@ -255,14 +284,9 @@ impl SignedCommand {
     pub fn from_user_command(uc: UserCommandWithStatus) -> Self {
         match uc {
             UserCommandWithStatus::V1(v1) => match v1.t.data.t.t {
-                mina_rs::UserCommand1::SignedCommand(v1) => Self::V1(v1),
+                mina_rs::UserCommand1::SignedCommand(v1) => Self::V1(Box::new(v1)),
             },
-            UserCommandWithStatus::V2(v2) => match v2.t.data.t.t {
-                mina_rs::UserCommand2::SignedCommand(v2) => Self::V2(v2),
-                mina_rs::UserCommand2::ZkappCommand(_zkapp) => {
-                    panic!("zkapp cannot be converted to signed command")
-                }
-            },
+            UserCommandWithStatus::V2(v2) => Self::V2(v2.data.1),
         }
     }
 
@@ -473,17 +497,11 @@ impl From<mina_rs::UserCommandWithStatus1> for SignedCommand {
     }
 }
 
-impl From<mina_rs::UserCommandWithStatus2> for SignedCommand {
-    fn from(value: mina_rs::UserCommandWithStatus2) -> Self {
-        Self::from_user_command(value.into())
-    }
-}
-
 impl From<UserCommandWithStatus> for SignedCommand {
     fn from(value: UserCommandWithStatus) -> Self {
         match value {
             UserCommandWithStatus::V1(v1) => v1.t.to_owned().into(),
-            UserCommandWithStatus::V2(v2) => v2.t.to_owned().into(),
+            UserCommandWithStatus::V2(v2) => Self::V2(v2.data.1),
         }
     }
 }
@@ -524,30 +542,25 @@ impl From<SignedCommandWithCreationData> for Command {
                 }
             }
             SignedCommand::V2(v2) => {
-                use mina_rs::SignedCommandPayloadBody2::*;
-                match &v2.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(payment_payload_v2) => {
-                        let mina_rs::PaymentPayload2 {
-                            receiver_pk,
-                            amount,
-                        } = &payment_payload_v2.t.t;
-                        Command::Payment(Payment {
+                use v2::staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegationPayload};
+                match v2 {
+                    UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
+                        SignedCommandPayloadBody::Payment(_) => Command::Payment(Payment {
+                            nonce: signed.nonce(),
                             source: signed.fee_payer_pk(),
-                            receiver: receiver_pk.to_owned().into(),
-                            amount: amount.t.t.into(),
-                            nonce: signed.nonce(),
+                            amount: signed.amount().into(),
+                            receiver: signed.receiver_pk(),
                             is_new_receiver_account: value.is_new_receiver_account,
-                        })
-                    }
-                    StakeDelegation(stake_delegation_v2) => {
-                        let mina_rs::StakeDelegation2::SetDelegate { new_delegate } =
-                            stake_delegation_v2.t.to_owned();
-                        Command::Delegation(Delegation {
-                            delegate: new_delegate.into(),
-                            delegator: signed.source_pk(),
+                        }),
+                        SignedCommandPayloadBody::StakeDelegation(StakeDelegationPayload {
+                            new_delegate,
+                        }) => Command::Delegation(Delegation {
                             nonce: signed.nonce(),
-                        })
-                    }
+                            delegator: signed.source_pk(),
+                            delegate: new_delegate.to_owned(),
+                        }),
+                    },
+                    UserCommandData::ZkappCommandData(data) => Command::Zkapp(data.to_owned()),
                 }
             }
         }
@@ -581,16 +594,7 @@ impl From<SignedCommandWithStateHash> for CommandWithStateHash {
 
 impl From<mina_rs::SignedCommand1> for SignedCommand {
     fn from(value: mina_rs::SignedCommand1) -> Self {
-        Self::V1(Versioned::new(Versioned::new(value)))
-    }
-}
-
-impl From<mina_rs::SignedCommand2> for SignedCommand {
-    fn from(value: mina_rs::SignedCommand2) -> Self {
-        Self::V2(Versioned {
-            t: Versioned::new(value),
-            version: 2,
-        })
+        Self::V1(Box::new(Versioned::new(Versioned::new(value))))
     }
 }
 
@@ -606,15 +610,16 @@ impl From<SignedCommand> for serde_json::Value {
 
                 serde_json::Value::Object(json)
             }
-            SignedCommand::V2(v2) => {
+            SignedCommand::V2(UserCommandData::SignedCommandData(v2)) => {
                 let mut json = serde_json::Map::new();
 
-                json.insert("payload".into(), payload_json_v2(&v2.t.t));
-                json.insert("signer".into(), signer_v2(&v2.t.t));
-                json.insert("signature".into(), signature_v2(&v2.t.t));
+                json.insert("payload".into(), payload_json_v2(&v2));
+                json.insert("signer".into(), signer_v2(&v2));
+                json.insert("signature".into(), signature_v2(&v2));
 
                 serde_json::Value::Object(json)
             }
+            SignedCommand::V2(UserCommandData::ZkappCommandData(_data)) => todo!("zkapp json"),
         }
     }
 }
@@ -714,9 +719,9 @@ fn signer_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
     serde_json::Value::String(pk.0)
 }
 
-fn signer_v2(value: &mina_rs::SignedCommand2) -> serde_json::Value {
-    let pk: PublicKey = value.signer.0.t.to_owned().into();
-    serde_json::Value::String(pk.0)
+fn signer_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_json::Value {
+    let pk = value.signer.0.to_owned();
+    serde_json::Value::String(pk)
 }
 
 fn signature_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
@@ -724,9 +729,8 @@ fn signature_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
     serde_json::Value::String(sig.to_string())
 }
 
-fn signature_v2(value: &mina_rs::SignedCommand2) -> serde_json::Value {
-    let sig: Signature = value.signature.to_owned().into();
-    serde_json::Value::String(sig.to_string())
+fn signature_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_json::Value {
+    serde_json::Value::String(value.signature.to_owned())
 }
 
 fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
@@ -815,71 +819,71 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
     Value::Object(payload_obj)
 }
 
-fn payload_json_v2(value: &mina_rs::SignedCommand2) -> serde_json::Value {
+fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_json::Value {
     use serde_json::*;
+    use v2::staged_ledger_diff::SignedCommandPayloadCommon;
 
     let mut payload_obj = Map::new();
-    let mina_rs::SignedCommand2 { ref payload, .. } = value;
+    let SignedCommandData { ref payload, .. } = value;
 
     let mut common = Map::new();
-    let mina_rs::SignedCommandPayloadCommon2 {
+    let SignedCommandPayloadCommon {
         fee,
         fee_payer_pk,
         nonce,
         valid_until,
         memo,
-    } = &payload.t.t.common.t.t.t;
+    } = &payload.common;
 
-    common.insert("fee".into(), Value::Number(Number::from(fee.t.t)));
+    common.insert("fee".into(), Value::Number(Number::from(*fee)));
     common.insert(
         "fee_payer_pk".into(),
-        Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_address()),
+        Value::String(fee_payer_pk.to_owned().to_address()),
     );
-    common.insert("nonce".into(), Value::Number(Number::from(nonce.t.t)));
+    common.insert("nonce".into(), Value::Number(Number::from(*nonce)));
     common.insert(
         "valid_until".into(),
-        Value::Number(Number::from(valid_until.t.t as u32)),
+        Value::Number(Number::from(*valid_until as u32)),
     );
-    common.insert("memo".into(), Value::String(decode_memo(&memo.t.0)));
+    common.insert("memo".into(), Value::String(memo.to_owned()));
 
-    use mina_rs::SignedCommandPayloadBody2::*;
-    let body = match &payload.t.t.body.t.t {
-        PaymentPayload(payment_payload) => {
+    use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
+    let body = match &payload.body.1 {
+        Payment(PaymentPayload {
+            amount,
+            receiver_pk,
+        }) => {
             let mut body_obj = Map::new();
-            let mina_rs::PaymentPayload2 {
-                receiver_pk,
-                amount,
-            } = &payment_payload.t.t;
 
             body_obj.insert(
                 "receiver_pk".into(),
-                Value::String(PublicKey::from(receiver_pk.to_owned()).to_address()),
+                Value::String(receiver_pk.to_owned().to_address()),
             );
-            body_obj.insert("amount".into(), Value::Number(Number::from(amount.t.t)));
+            body_obj.insert("amount".into(), Value::Number(Number::from(*amount)));
             body_obj.insert("kind".into(), Value::String("Payment".into()));
 
             Value::Object(body_obj)
         }
-        StakeDelegation(stake_delegation) => {
+        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
             let mut body_obj = Map::new();
-            let mina_rs::StakeDelegation2::SetDelegate { new_delegate } =
-                stake_delegation.t.to_owned();
 
             body_obj.insert(
                 "delegator".into(),
-                Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_address()),
+                Value::String(fee_payer_pk.to_owned().to_address()),
             );
             body_obj.insert(
                 "new_delegate".into(),
-                Value::String(PublicKey::from(new_delegate).to_address()),
+                Value::String(new_delegate.to_owned().to_address()),
             );
             body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));
+
             Value::Object(body_obj)
         }
     };
 
     payload_obj.insert("common".into(), Value::Object(common));
     payload_obj.insert("body".into(), body);
+
     Value::Object(payload_obj)
 }
 
@@ -902,7 +906,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn transaction_hash_v1() -> anyhow::Result<()> {
+    fn txn_hash_v1() -> anyhow::Result<()> {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
