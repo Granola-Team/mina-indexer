@@ -63,7 +63,7 @@ pub fn get_cleaned_pcb(file: &str) -> Result<String> {
                 remove_proofs(&mut json_value);
 
                 // Serialize back to JSON
-                let cleaned_json = sonic_rs::to_string_pretty(&json_value).expect("Serialization failed");
+                let cleaned_json = sonic_rs::to_string(&json_value).expect("Serialization failed");
                 Ok(cleaned_json)
             }
             Err(e) => Err(anyhow::Error::new(e)),
