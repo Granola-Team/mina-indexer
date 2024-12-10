@@ -346,3 +346,90 @@ pub enum StatusKind {
     Applied,
     Failed,
 }
+
+impl UserCommandData {
+    pub fn to_mina_json(self) -> serde_json::Value {
+        use crate::command::signed::SignedCommand;
+        use serde_json::Value;
+
+        match &self {
+            Self::SignedCommandData(_) => {
+                let mut json: Value = SignedCommand::V2(self).into();
+                convert_object("", &mut json);
+                to_mina_format(json)
+            }
+            Self::ZkappCommandData(_) => todo!(),
+        }
+    }
+}
+
+fn convert_object(key: &str, value: &mut serde_json::Value) {
+    use serde_json::Value;
+
+    match value {
+        Value::Number(number) => {
+            if key == "fee" {
+                // fee convert
+                let nanomina = number.as_u64().unwrap();
+                *value = Value::String(nanomina_to_mina(nanomina));
+            } else {
+                *value = Value::String(number.to_string());
+            }
+        }
+        Value::Object(obj) => obj
+            .iter_mut()
+            .for_each(|(k, value)| convert_object(k, value)),
+        _ => (),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        block::precomputed::{PcbVersion, PrecomputedBlock},
+        command::{signed::SignedCommand, to_mina_json},
+    };
+    use std::path::PathBuf;
+
+    #[test]
+    fn v2_to_mina_json() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let signed_cmds = precomputed_block
+            .commands()
+            .into_iter()
+            .map(|c| {
+                let json: serde_json::Value = SignedCommand::from_user_command(c).into();
+                println!(
+                    "{}",
+                    serde_json::to_string(&to_mina_json(json.clone())).unwrap()
+                );
+                serde_json::to_string_pretty(&to_mina_json(json)).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let expect0 = r#"{
+  "payload": {
+    "body": [
+      "Payment",
+      {
+        "amount": "1000000000",
+        "receiver_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+      }
+    ],
+    "common": {
+      "fee": "0.0011",
+      "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
+      "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH",
+      "nonce": "765",
+      "valid_until": "4294967295"
+    }
+  },
+  "signature": "7mX5FyaaoRY5a3hKP3kqhm6A4gWo9NtoHMh7irbB3Dt326wm8gyfsEQeHKJgYqQeo7nBgFGNjCD9eC265VrECYZJqYsD5V5R",
+  "signer": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+}"#;
+
+        assert_eq!(signed_cmds, vec![expect0]);
+        Ok(())
+    }
+}
