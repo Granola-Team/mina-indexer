@@ -318,28 +318,24 @@ impl SignedCommand {
                         .into_string(),
                 ))
             }
-            Self::V2(v2) => {
-                // convert versioned signed command to bin_prot bytes
-                let mut binprot_bytes = Vec::with_capacity(TxnHash::V2_LEN * 8); // max number of bits
-                bin_prot::to_writer(&mut binprot_bytes, v2)?;
+            Self::V2(data) => {
+                let json: serde_json::Value = data.to_owned().to_mina_json();
+                if let Ok(cmd_str) = serde_json::to_string(&json) {
+                    let pgm = PathBuf::from("../ops/mina/mina_txn_hasher.exe")
+                        .canonicalize()?
+                        .display()
+                        .to_string();
 
-                // base58 encode + Blake2b hash
-                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
-                    .with_check_version(USER_COMMAND)
-                    .into_string();
-                let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+                    let mut proc = std::process::Command::new(pgm);
+                    proc.arg(cmd_str);
 
-                // add length byte
-                let mut hash = hasher.finalize_boxed().to_vec();
-                hash.insert(0, hash.len() as u8);
+                    if let Ok(output) = proc.output() {
+                        let txn_hash = String::from_utf8(output.stdout).expect("hash read success");
+                        return TxnHash::new(txn_hash.trim().to_string());
+                    }
+                }
 
-                // base58 encode txn hash
-                Ok(TxnHash::V2(
-                    bs58::encode(hash)
-                        .with_check_version(V2_TXN_HASH)
-                        .into_string(),
-                ))
+                bail!("Error hashing {data:?}")
             }
         }
     }
