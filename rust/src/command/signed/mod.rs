@@ -414,71 +414,6 @@ impl SignedCommandWithData {
 // Conversions //
 /////////////////
 
-impl From<CommandData> for Option<SignedCommand> {
-    fn from(value: CommandData) -> Self {
-        match value {
-            CommandData::UserCommandData(ucd) => Some(SignedCommand::V2(Versioned::new(
-                Versioned::new(ucd.as_ref().to_owned().into()),
-            ))),
-            CommandData::ZkappCommandData(_) => None,
-        }
-    }
-}
-
-impl From<v2::staged_ledger_diff::UserCommandData> for mina_rs::SignedCommand2 {
-    fn from(value: v2::staged_ledger_diff::UserCommandData) -> Self {
-        Self {
-            payload: Versioned::new(Versioned::new(value.payload.into())),
-            signer: PublicKey2V1(Versioned::new(value.signer.into())),
-            signature: value.signature.into(),
-        }
-    }
-}
-
-impl From<v2::staged_ledger_diff::UserCommandPayload> for mina_rs::SignedCommandPayload2 {
-    fn from(value: v2::staged_ledger_diff::UserCommandPayload) -> Self {
-        let fee_payer = value.common.fee_payer_pk.to_owned();
-        Self {
-            common: Versioned::new(Versioned::new(Versioned::new(value.common.into()))),
-            body: Versioned::new(Versioned::new((value.body.1, fee_payer).into())),
-        }
-    }
-}
-
-impl From<v2::staged_ledger_diff::UserCommandPayloadCommon>
-    for mina_rs::SignedCommandPayloadCommon2
-{
-    fn from(value: v2::staged_ledger_diff::UserCommandPayloadCommon) -> Self {
-        Self {
-            fee: Versioned::new(Versioned::new(value.fee)),
-            fee_payer_pk: value.fee_payer_pk.into(),
-            nonce: Versioned::new(Versioned::new(value.nonce as i32)),
-            valid_until: Versioned::new(Versioned::new(value.valid_until as i32)),
-            memo: Versioned::new(value.memo.into()),
-        }
-    }
-}
-
-impl From<(v2::staged_ledger_diff::UserCommandPayloadBody, PublicKey)>
-    for mina_rs::SignedCommandPayloadBody2
-{
-    fn from(value: (v2::staged_ledger_diff::UserCommandPayloadBody, PublicKey)) -> Self {
-        match value.0 {
-            v2::staged_ledger_diff::UserCommandPayloadBody::Payment(payload) => {
-                Self::PaymentPayload(Versioned::new(Versioned::new(mina_rs::PaymentPayload2 {
-                    receiver_pk: payload.receiver_pk.into(),
-                    amount: Versioned::new(Versioned::new(payload.amount)),
-                })))
-            }
-            v2::staged_ledger_diff::UserCommandPayloadBody::StakeDelegation(payload) => {
-                Self::StakeDelegation(Versioned::new(mina_rs::StakeDelegation2::SetDelegate {
-                    new_delegate: payload.new_delegate.into(),
-                }))
-            }
-        }
-    }
-}
-
 impl From<(UserCommand, bool)> for SignedCommandWithCreationData {
     fn from(value: (UserCommand, bool)) -> Self {
         match value.0 {
@@ -1054,7 +989,44 @@ mod tests {
   "signer": "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 }"#;
 
-        assert_eq!(signed_commands, vec![expect0, expect1]);
+        assert_eq!(signed_cmds, vec![expect0, expect1]);
+        Ok(())
+    }
+
+    #[test]
+    fn signed_command_json_v2() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let signed_cmds = precomputed_block
+            .commands()
+            .into_iter()
+            .map(|c| format!("{:?}", SignedCommand::from(c)))
+            .collect::<Vec<_>>();
+
+        for cmd in &signed_cmds {
+            println!("{cmd}");
+        }
+
+        let expect0 = r#"{
+  "payload": {
+    "body": {
+      "amount": 1000000000,
+      "kind": "Payment",
+      "receiver_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+    },
+    "common": {
+      "fee": 1100000,
+      "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
+      "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH",
+      "nonce": 765,
+      "valid_until": 4294967295
+    }
+  },
+  "signature": "7mX5FyaaoRY5a3hKP3kqhm6A4gWo9NtoHMh7irbB3Dt326wm8gyfsEQeHKJgYqQeo7nBgFGNjCD9eC265VrECYZJqYsD5V5R",
+  "signer": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"
+}"#;
+
+        assert_eq!(signed_cmds, vec![expect0]);
         Ok(())
     }
 }
