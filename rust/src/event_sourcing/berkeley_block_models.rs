@@ -193,6 +193,7 @@ pub struct CommandWrapper {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Command {
     SignedCommand(SignedCommand),
     ZkappCommand(ZkappCommand),
