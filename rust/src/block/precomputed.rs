@@ -256,7 +256,7 @@ impl PrecomputedBlock {
                 .commands
                 .iter()
                 .cloned()
-                .map(UserCommandWithStatus::V1)
+                .map(|c| UserCommandWithStatus::V1(Box::new(c)))
                 .collect(),
             Self::V2(v2) => v2
                 .staged_ledger_diff
@@ -283,7 +283,7 @@ impl PrecomputedBlock {
                         .commands
                         .iter()
                         .cloned()
-                        .map(UserCommandWithStatus::V1)
+                        .map(|c| UserCommandWithStatus::V1(Box::new(c)))
                         .collect()
                 }),
             Self::V2(v2) => v2.staged_ledger_diff.diff[1]

@@ -12,7 +12,9 @@ use crate::{
     },
     mina_blocks::v2::{
         self,
-        staged_ledger_diff::{SignedCommandPayloadBody, StakeDelegationPayload, UserCommandData},
+        staged_ledger_diff::{
+            SignedCommandPayloadBody, StakeDelegationPayload, UserCommandData, ZkappCommandData,
+        },
     },
     protocol::serialization_types::staged_ledger_diff as mina_rs,
     utility::functions::nanomina_to_mina,
@@ -166,10 +168,9 @@ impl CommandStatusData {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum UserCommandWithStatus {
-    V1(mina_rs::UserCommandWithStatusV1),
+    V1(Box<mina_rs::UserCommandWithStatusV1>),
     V2(v2::staged_ledger_diff::UserCommand),
 }
 
@@ -178,6 +179,8 @@ pub struct ZkappCommand(v2::staged_ledger_diff::ZkappCommandData);
 
 pub trait UserCommandWithStatusT {
     fn is_applied(&self) -> bool;
+
+    fn is_zkapp_command(&self) -> bool;
 
     fn status_data(&self) -> CommandStatusData;
 
@@ -207,6 +210,18 @@ pub trait UserCommandWithStatusT {
 impl UserCommandWithStatusT for UserCommandWithStatus {
     fn is_applied(&self) -> bool {
         self.status_data().is_applied()
+    }
+
+    fn is_zkapp_command(&self) -> bool {
+        use v2::staged_ledger_diff as v2;
+
+        matches!(
+            *self,
+            UserCommandWithStatus::V2(v2::UserCommand {
+                data: (_, v2::UserCommandData::ZkappCommandData { .. }),
+                ..
+            })
+        )
     }
 
     fn receiver_account_creation_fee_paid(&self) -> bool {
@@ -653,7 +668,7 @@ impl From<v2::staged_ledger_diff::UserCommand> for UserCommand {
 
 impl From<mina_rs::UserCommandWithStatus1> for UserCommandWithStatus {
     fn from(value: mina_rs::UserCommandWithStatus1) -> Self {
-        Self::V1(Versioned::new(value))
+        Self::V1(Box::new(Versioned::new(value)))
     }
 }
 
@@ -770,11 +785,14 @@ impl From<Command> for serde_json::Value {
                 is_new_receiver_account: _,
             }) => {
                 let mut payment = Map::new();
+
                 payment.insert("source".into(), Value::String(source.to_address()));
                 payment.insert("receiver".into(), Value::String(receiver.to_address()));
                 payment.insert("amount".into(), Value::Number(Number::from(amount.0)));
                 payment.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Payment".into(), Value::Object(payment));
+
+                Value::Object(json)
             }
 
             Command::Delegation(Delegation {
@@ -783,16 +801,141 @@ impl From<Command> for serde_json::Value {
                 nonce,
             }) => {
                 let mut delegation = Map::new();
+
                 delegation.insert("delegate".into(), Value::String(delegate.to_address()));
                 delegation.insert("delegator".into(), Value::String(delegator.to_address()));
                 delegation.insert("nonce".into(), Value::Number(Number::from(nonce)));
                 json.insert("Stake_delegation".into(), Value::Object(delegation));
+
+                Value::Object(json)
             }
 
-            Command::Zkapp(zkapp) => todo!("{zkapp:?}"),
-        };
-        Value::Object(json)
+            Command::Zkapp(zkapp) => to_zkapp_json(&zkapp),
+        }
     }
+}
+
+pub fn convert_zkapp_json(json: &mut Value) {
+    fn replace_keep(value: &mut Value) {
+        *value = Value::Array(vec![Value::String("Keep".to_string())]);
+    }
+
+    fn replace_ignore(value: &mut Value) {
+        *value = Value::Array(vec![Value::String("Ignore".to_string())]);
+    }
+
+    // update
+    let convert_update = |value: &mut Value| {
+        if let Some(update) = value.as_object_mut() {
+            update.iter_mut().for_each(|(k, v)| {
+                if k == "app_state" {
+                    if let Some(app_state) = v.as_array_mut() {
+                        app_state.iter_mut().for_each(|v| {
+                            if v.is_null() {
+                                replace_keep(v);
+                            }
+
+                            if v.is_string() {
+                                *v =
+                                    Value::Array(vec![Value::String("Set".to_string()), v.clone()]);
+                            }
+                        });
+                    }
+                }
+
+                if v.is_null() {
+                    replace_keep(v);
+                }
+            });
+        }
+    };
+
+    // account
+    let convert_account = |value: &mut Value| {
+        if let Some(account) = value.as_object_mut() {
+            account.iter_mut().for_each(|(k, v)| {
+                if k == "state" {
+                    if let Some(account_state) = v.as_array_mut() {
+                        account_state.iter_mut().for_each(|v| {
+                            if v.is_null() {
+                                replace_ignore(v);
+                            }
+                        });
+                    }
+                }
+
+                if k == "nonce" {
+                    if v.is_null() {
+                        replace_ignore(v);
+                    }
+
+                    if v.is_object() {
+                        *v = Value::Array(vec![Value::String("Check".to_string()), v.clone()]);
+                    }
+                }
+
+                if v.is_null() {
+                    replace_ignore(v);
+                }
+            });
+        }
+    };
+
+    // network
+    let convert_network = |value: &mut Value| {
+        if let Some(network) = value.as_object_mut() {
+            network.iter_mut().for_each(|(k, v)| {
+                if k == "staking_epoch_data" || k == "next_epoch_data" {
+                    if let Some(epoch_data) = v.as_object_mut() {
+                        epoch_data.iter_mut().for_each(|(_, v)| {
+                            if let Some(ledger) = v.as_object_mut() {
+                                ledger.iter_mut().for_each(|(_, v)| {
+                                    if v.is_null() {
+                                        replace_ignore(v);
+                                    }
+                                });
+                            }
+
+                            if v.is_null() {
+                                replace_ignore(v);
+                            }
+                        });
+                    }
+                }
+
+                if v.is_null() {
+                    replace_ignore(v);
+                }
+            });
+        }
+    };
+
+    match json.as_object_mut() {
+        Some(obj) => {
+            obj.iter_mut().for_each(|(k, v)| match k.as_str() {
+                "update" => convert_update(v),
+                "account" => convert_account(v),
+                "network" => convert_network(v),
+                "valid_while" => {
+                    if v.is_null() {
+                        replace_ignore(v);
+                    }
+                }
+                _ => convert_zkapp_json(v),
+            });
+        }
+        None => {
+            if let Some(arr) = json.as_array_mut() {
+                arr.iter_mut().for_each(convert_zkapp_json);
+            }
+        }
+    }
+}
+
+pub fn to_zkapp_json(data: &ZkappCommandData) -> Value {
+    let mut json = serde_json::to_value(data).expect("zkapp json value");
+    convert_zkapp_json(&mut json);
+    to_mina_json(json)
 }
 
 impl std::fmt::Debug for Command {
@@ -914,14 +1057,14 @@ fn to_balance_json(
     Value::Object(balance_obj)
 }
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
 fn convert(test: bool, value: Value) -> Value {
     match value {
         Value::Number(n) => Value::String(n.to_string()),
         Value::Object(mut obj) => {
             obj.iter_mut().for_each(|(key, x)| {
-                if test && (*key == json!("memo") || *key == json!("signature")) {
+                if test && (key == "memo" || key == "signature") {
                     *x = Value::Null
                 } else {
                     *x = convert(test, x.clone())
@@ -940,7 +1083,7 @@ fn fee_convert(value: Value) -> Value {
     match value {
         Value::Object(mut obj) => {
             obj.iter_mut().for_each(|(key, x)| {
-                if *key == json!("fee") {
+                if key == "fee" {
                     *x = {
                         let nanomina = x.clone().to_string().parse::<u64>().unwrap();
                         Value::String(nanomina_to_mina(nanomina))
