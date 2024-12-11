@@ -247,6 +247,7 @@ pub struct Payment {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkappCommand {
     pub fee_payer: FeePayer,
+    pub memo: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -317,7 +318,7 @@ impl CommandWrapper {
     fn get_memo(&self) -> String {
         match &self.command {
             Command::SignedCommand(signed_command) => decode_base58check_to_string(&signed_command.payload.common.memo).unwrap(),
-            Command::ZkappCommand(_) => todo!("get_memo not implemented for ZkappCommand"),
+            Command::ZkappCommand(zk_app_command) => decode_base58check_to_string(&zk_app_command.memo).unwrap(),
         }
     }
 
@@ -597,5 +598,7 @@ mod berkeley_block_tests {
         assert_eq!(first_zkapp_command.get_fee_payer(), "B62qm2aFMwggaVEwAkJB1r77adTBfPkbmJuZkmjzFmsCfAsqrn9kc44");
         assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
         assert_eq!(first_zkapp_command.get_nonce(), 200);
+
+        assert_eq!(first_zkapp_command.get_memo(), "Init vote zkapp".to_string());
     }
 }
