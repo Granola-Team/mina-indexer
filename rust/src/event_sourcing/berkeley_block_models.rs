@@ -2,7 +2,10 @@ use super::{
     block::BlockTrait,
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
 };
-use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
+use crate::{
+    constants::MAINNET_COINBASE_REWARD,
+    utility::{decode_base58check_to_string, TreeNode},
+};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Deserializer, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
@@ -247,7 +250,40 @@ pub struct Payment {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ZkappCommand {
     pub fee_payer: FeePayer,
+    pub account_updates: Vec<AccountUpdateElt>,
     pub memo: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountUpdateElt {
+    pub elt: EltBody,
+}
+
+pub type AccountUpdateTree = TreeNode<AccountUpdateBody>;
+
+impl AccountUpdateElt {
+    pub fn to_tree_node(&self) -> AccountUpdateTree {
+        let mut root = TreeNode::new(self.elt.account_update.body.clone());
+
+        if let Some(calls) = &self.elt.calls {
+            for call in calls {
+                root.add_child(call.to_tree_node());
+            }
+        }
+
+        root
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EltBody {
+    pub account_update: AccountUpdate,
+    pub calls: Option<Vec<AccountUpdateElt>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountUpdate {
+    pub body: AccountUpdateBody,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -260,6 +296,19 @@ pub struct FeePayerBody {
     pub public_key: String,
     pub fee: String,
     pub nonce: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BalanceChange {
+    pub magnitude: String,
+    pub sgn: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountUpdateBody {
+    pub public_key: String,
+    pub token_id: String,
+    pub balance_change: BalanceChange,
 }
 
 impl CommandWrapper {
@@ -319,6 +368,14 @@ impl CommandWrapper {
         match &self.command {
             Command::SignedCommand(signed_command) => decode_base58check_to_string(&signed_command.payload.common.memo).unwrap(),
             Command::ZkappCommand(zk_app_command) => decode_base58check_to_string(&zk_app_command.memo).unwrap(),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn get_account_updates(&self) -> Option<Vec<AccountUpdateTree>> {
+        match &self.command {
+            Command::SignedCommand(_) => None,
+            Command::ZkappCommand(zk_app_command) => Some(zk_app_command.account_updates.iter().map(|au| au.to_tree_node()).collect::<Vec<_>>()),
         }
     }
 
@@ -595,10 +652,28 @@ mod berkeley_block_tests {
         assert_eq!(zk_app_commands.len(), 5);
 
         let first_zkapp_command = zk_app_commands.first().unwrap();
+        let second_zkapp_command = zk_app_commands.get(1).unwrap();
+        let third_zkapp_command = zk_app_commands.get(2).unwrap();
+        let fourth_zkapp_command = zk_app_commands.get(3).unwrap();
+        let fifth_zkapp_command = zk_app_commands.last().unwrap();
         assert_eq!(first_zkapp_command.get_fee_payer(), "B62qm2aFMwggaVEwAkJB1r77adTBfPkbmJuZkmjzFmsCfAsqrn9kc44");
+        assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
         assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
         assert_eq!(first_zkapp_command.get_nonce(), 200);
 
         assert_eq!(first_zkapp_command.get_memo(), "Init vote zkapp".to_string());
+
+        assert_eq!(first_zkapp_command.get_account_updates().unwrap().len(), 1);
+        assert_eq!(first_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
+        assert_eq!(second_zkapp_command.get_account_updates().unwrap().len(), 1);
+        assert_eq!(second_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
+        assert_eq!(third_zkapp_command.get_account_updates().unwrap().len(), 1);
+        assert_eq!(third_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
+        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap().len(), 2);
+        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
+        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap()[1].size(), 3);
+        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap().len(), 2);
+        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
+        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap()[1].size(), 3);
     }
 }
