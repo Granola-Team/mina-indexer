@@ -1,4 +1,7 @@
-use super::models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina};
+use super::{
+    block::BlockTrait,
+    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
+};
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
@@ -16,107 +19,47 @@ pub struct MainnetBlock {
     pub staged_ledger_diff: StagedLedgerDiff,
 }
 
-impl MainnetBlock {
-    pub fn get_block_creator(&self) -> String {
-        self.protocol_state.body.consensus_state.block_creator.to_string()
-    }
-
-    pub fn get_excess_block_fees(&self) -> u64 {
-        let total_snark_fees = self.get_snark_work().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
-
-        let mut total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
-        for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
-            total_fees_paid_into_block_pool += (ftvc.fee * 1_000_000_000f64) as u64;
-        }
-        total_fees_paid_into_block_pool.saturating_sub(total_snark_fees)
-    }
-
-    pub fn get_fee_transfers(&self) -> Vec<FeeTransfer> {
-        let excess_block_fees = self.get_excess_block_fees();
-        let mut fee_transfers: HashMap<String, u64> = HashMap::new();
-        if excess_block_fees > 0 {
-            fee_transfers.insert(self.get_coinbase_receiver(), excess_block_fees);
-        }
-        for completed_work in self.get_snark_work() {
-            *fee_transfers.entry(completed_work.prover).or_insert(0_u64) += completed_work.fee_nanomina;
-        }
-
-        // If the fee for a completed work is higher than the available fees, the remainder
-        // is allotted out of the coinbase via a fee transfer via coinbase
-        for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
-            let ftvc_fee_nanomina = (ftvc.fee * 1_000_000_000f64) as u64;
-
-            if let Some(current_fee) = fee_transfers.get_mut(&ftvc.receiver) {
-                if *current_fee > ftvc_fee_nanomina {
-                    *current_fee -= ftvc_fee_nanomina;
-                } else {
-                    fee_transfers.remove(&ftvc.receiver);
-                }
-            }
-        }
-
-        fee_transfers.retain(|_, v| *v > 0u64);
-        fee_transfers
-            .into_iter()
-            .map(|(prover, fee_nanomina)| FeeTransfer {
-                recipient: prover,
-                fee_nanomina,
+impl BlockTrait for MainnetBlock {
+    fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
+            .flat_map(|works| {
+                works.into_iter().map(|work| {
+                    let fee_decimal = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                    CompletedWorksNanomina {
+                        fee_nanomina: fee_decimal.to_u64().unwrap(),
+                        prover: work.prover.to_string(),
+                    }
+                })
             })
             .collect()
     }
 
-    pub fn get_internal_command_count(&self) -> usize {
-        // Get fee transfers and remove those also in fee transfers via coinbase
-        let fee_transfers = self.get_fee_transfers();
-        let fee_transfers_via_coinbase = self.get_fee_transfers_via_coinbase().unwrap_or_default();
-
-        fee_transfers.len() + fee_transfers_via_coinbase.len() + 1 // +1 for coinbase
-    }
-
-    pub fn get_total_command_count(&self) -> usize {
-        self.get_internal_command_count() + self.get_user_commands_count()
-    }
-
-    pub fn get_fee_transfers_via_coinbase(&self) -> Option<Vec<FeeTransferViaCoinbase>> {
-        // Combine pre and post diff coinbase arrays
-        let diffs = [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()];
-
-        let fee_transfers = diffs
+    fn get_user_commands(&self) -> Vec<CommandSummary> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
-            .filter_map(|opt_diff| {
-                opt_diff.as_ref().and_then(|diff| {
-                    if diff.coinbase.first().map_or(false, |v| v == "One" || v == "Two") {
-                        // Process the remaining elements
-                        Some(
-                            diff.coinbase
-                                .iter()
-                                .filter_map(|v2| {
-                                    // Skip non-objects and null values
-                                    if !v2.is_object() || v2.is_null() {
-                                        return None;
-                                    }
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.clone()))
+            .flat_map(|user_commands| user_commands.into_iter())
+            .map(|uc| uc.to_command_summary())
+            .collect()
+    }
 
-                                    // Try to extract "receiver_pk" and "fee"
-                                    let receiver = v2.get("receiver_pk")?.as_str()?.to_string();
-                                    let fee = v2.get("fee")?.as_str()?.parse::<f64>().ok()?;
+    fn get_coinbase_receiver(&self) -> String {
+        self.protocol_state.body.consensus_state.coinbase_receiver.to_string()
+    }
 
-                                    Some(FeeTransferViaCoinbase { receiver, fee })
-                                })
-                                .collect::<Vec<FeeTransferViaCoinbase>>(),
-                        )
-                    } else {
-                        None
-                    }
-                })
-            })
-            .flatten()
-            .collect::<Vec<FeeTransferViaCoinbase>>();
+    fn get_coinbases(&self) -> Vec<Vec<Value>> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.coinbase.clone()))
+            .collect()
+    }
+}
 
-        if fee_transfers.is_empty() {
-            None
-        } else {
-            Some(fee_transfers)
-        }
+impl MainnetBlock {
+    pub fn get_block_creator(&self) -> String {
+        self.protocol_state.body.consensus_state.block_creator.to_string()
     }
 
     pub fn get_previous_state_hash(&self) -> String {
@@ -125,10 +68,6 @@ impl MainnetBlock {
 
     pub fn get_last_vrf_output(&self) -> String {
         self.protocol_state.body.consensus_state.last_vrf_output.to_string()
-    }
-
-    pub fn get_coinbase_receiver(&self) -> String {
-        self.protocol_state.body.consensus_state.coinbase_receiver.to_string()
     }
 
     fn get_staged_ledger_pre_diff(&self) -> Option<Diff> {
@@ -157,26 +96,6 @@ impl MainnetBlock {
             .sum()
     }
 
-    pub fn get_snark_work_count(&self) -> usize {
-        self.get_snark_work().len()
-    }
-
-    pub fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
-            .flat_map(|works| {
-                works.into_iter().map(|work| {
-                    let fee_decimal = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
-                    CompletedWorksNanomina {
-                        fee_nanomina: fee_decimal.to_u64().unwrap(),
-                        prover: work.prover.to_string(),
-                    }
-                })
-            })
-            .collect()
-    }
-
     pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorksNanomina> {
         let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
 
@@ -190,22 +109,6 @@ impl MainnetBlock {
             .collect()
     }
 
-    pub fn get_user_commands_count(&self) -> usize {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.len()))
-            .sum()
-    }
-
-    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.commands.clone()))
-            .flat_map(|user_commands| user_commands.into_iter())
-            .map(|uc| uc.to_command_summary())
-            .collect()
-    }
-
     pub fn get_global_slot_since_genesis(&self) -> u64 {
         self.protocol_state.body.consensus_state.global_slot_since_genesis.parse::<u64>().unwrap()
     }
@@ -213,18 +116,6 @@ impl MainnetBlock {
     pub fn get_timestamp(&self) -> u64 {
         self.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct FeeTransferViaCoinbase {
-    pub receiver: String,
-    pub fee: f64,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct FeeTransfer {
-    pub recipient: String,
-    pub fee_nanomina: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,7 +1,6 @@
 use super::{
     canonical_items_manager::CanonicalItem,
-    mainnet_block_models::{FeeTransfer, FeeTransferViaCoinbase},
-    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
+    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase},
 };
 use sonic_rs::{Deserialize, Serialize};
 

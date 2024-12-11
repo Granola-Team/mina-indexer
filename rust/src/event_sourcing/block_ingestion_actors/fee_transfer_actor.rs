@@ -71,7 +71,7 @@ async fn test_fee_transfer_actor_handle_event() {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::*,
+        models::*,
         payloads::{InternalCommandLogPayload, MainnetBlockPayload},
     };
     use std::sync::Arc;

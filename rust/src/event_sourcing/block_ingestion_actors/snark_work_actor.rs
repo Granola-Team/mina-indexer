@@ -83,6 +83,7 @@ mod snark_work_actor_tests {
     use crate::{
         event_sourcing::{
             berkeley_block_models::BerkeleyBlock,
+            block::BlockTrait,
             block_ingestion_actors::Actor,
             events::{Event, EventType},
             mainnet_block_models::MainnetBlock,

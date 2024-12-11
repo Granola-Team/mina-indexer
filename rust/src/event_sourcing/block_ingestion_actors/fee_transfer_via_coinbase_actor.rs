@@ -72,7 +72,7 @@ async fn test_handle_mainnet_block_event_publishes_fee_transfer_via_coinbase_eve
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
-        mainnet_block_models::FeeTransferViaCoinbase,
+        models::FeeTransferViaCoinbase,
         payloads::MainnetBlockPayload,
     };
     use std::sync::Arc;

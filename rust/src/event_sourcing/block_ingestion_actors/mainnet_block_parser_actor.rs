@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::{
-    event_sourcing::{mainnet_block_models::MainnetBlock, payloads::MainnetBlockPayload},
+    event_sourcing::{block::BlockTrait, mainnet_block_models::MainnetBlock, payloads::MainnetBlockPayload},
     utility::{extract_height_and_hash, get_cleaned_pcb},
 };
 use async_trait::async_trait;

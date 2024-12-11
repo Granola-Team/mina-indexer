@@ -85,3 +85,15 @@ impl CommandSummary {
         format!("{:x}", hasher.finalize())
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct FeeTransfer {
+    pub recipient: String,
+    pub fee_nanomina: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeeTransferViaCoinbase {
+    pub receiver: String,
+    pub fee: f64,
+}

@@ -21,6 +21,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
 pub mod berkeley_block_models;
+pub mod block;
 mod block_ingestion_actors;
 pub mod canonical_items_manager;
 pub mod db_logger;
