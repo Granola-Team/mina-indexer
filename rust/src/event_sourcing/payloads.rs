@@ -52,6 +52,7 @@ pub struct BerkeleyBlockPayload {
     pub previous_state_hash: String,
     pub last_vrf_output: String,
     pub user_command_count: usize,
+    pub user_commands: Vec<CommandSummary>,
     pub zk_app_command_count: usize,
     pub snark_work_count: usize,
     pub snark_work: Vec<CompletedWorksNanomina>,

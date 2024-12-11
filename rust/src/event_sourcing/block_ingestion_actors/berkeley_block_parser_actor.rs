@@ -51,6 +51,7 @@ impl Actor for BerkeleyBlockParserActor {
                 previous_state_hash: berkeley_block.get_previous_state_hash(),
                 last_vrf_output: berkeley_block.get_last_vrf_output(),
                 user_command_count: berkeley_block.get_user_commands_count(),
+                user_commands: berkeley_block.get_user_commands(),
                 zk_app_command_count: berkeley_block.get_zk_app_commands_count(),
                 snark_work_count: berkeley_block.get_aggregated_snark_work().len(),
                 snark_work: berkeley_block.get_aggregated_snark_work(),

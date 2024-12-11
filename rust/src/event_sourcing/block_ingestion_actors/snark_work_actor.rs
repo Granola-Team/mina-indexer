@@ -195,6 +195,7 @@ mod snark_work_actor_tests {
             previous_state_hash: block.get_previous_state_hash(),
             last_vrf_output: block.get_last_vrf_output(),
             user_command_count: block.get_user_commands_count(),
+            user_commands: block.get_user_commands(),
             snark_work_count: block.get_aggregated_snark_work().len(),
             zk_app_command_count: block.get_zk_app_commands_count(),
             snark_work: block.get_aggregated_snark_work(),
