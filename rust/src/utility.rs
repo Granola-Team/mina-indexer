@@ -396,3 +396,110 @@ mod decode_base58check_to_string_tests {
         Ok(())
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct TreeNode<T> {
+    pub value: T,
+    pub children: Vec<TreeNode<T>>,
+}
+
+impl<T> TreeNode<T> {
+    pub fn new(value: T) -> Self {
+        Self { value, children: Vec::new() }
+    }
+
+    pub fn add_child(&mut self, child: TreeNode<T>) {
+        self.children.push(child);
+    }
+
+    pub fn size(&self) -> usize {
+        let mut total = 1; // Count the current node
+        for child in &self.children {
+            total += child.size(); // Recursively count children
+        }
+        total
+    }
+}
+
+#[cfg(test)]
+mod tree_node_tests {
+    use super::*;
+
+    #[test]
+    fn test_tree_node_creation() {
+        let root = TreeNode::new("root");
+        assert_eq!(root.value, "root");
+        assert!(root.children.is_empty());
+    }
+
+    #[test]
+    fn test_tree_node_add_child() {
+        let mut root = TreeNode::new("root");
+        let child1 = TreeNode::new("child1");
+        let child2 = TreeNode::new("child2");
+
+        root.add_child(child1.clone());
+        root.add_child(child2.clone());
+
+        assert_eq!(root.children.len(), 2);
+        assert_eq!(root.children[0].value, "child1");
+        assert_eq!(root.children[1].value, "child2");
+    }
+
+    #[test]
+    fn test_tree_node_size_single_node() {
+        let root = TreeNode::new("root");
+        assert_eq!(root.size(), 1);
+    }
+
+    #[test]
+    fn test_tree_node_size_with_children() {
+        let mut root = TreeNode::new("root");
+        let mut child1 = TreeNode::new("child1");
+        let child2 = TreeNode::new("child2");
+        let grandchild = TreeNode::new("grandchild");
+
+        child1.add_child(grandchild);
+        root.add_child(child1);
+        root.add_child(child2);
+
+        // The structure is:
+        // root
+        // ├── child1
+        // │   └── grandchild
+        // └── child2
+
+        assert_eq!(root.size(), 4);
+    }
+
+    #[test]
+    fn test_tree_node_with_different_types() {
+        let mut root = TreeNode::new(1);
+        let child = TreeNode::new(2);
+        root.add_child(child);
+
+        assert_eq!(root.value, 1);
+        assert_eq!(root.children[0].value, 2);
+    }
+
+    #[test]
+    fn test_tree_node_deep_hierarchy() {
+        let mut root = TreeNode::new("root");
+        let mut level1 = TreeNode::new("level1");
+        let mut level2 = TreeNode::new("level2");
+        let level3 = TreeNode::new("level3");
+
+        level2.add_child(level3);
+        level1.add_child(level2);
+        root.add_child(level1);
+
+        // The structure is:
+        // root
+        // └── level1
+        //     └── level2
+        //         └── level3
+
+        assert_eq!(root.size(), 4);
+        assert_eq!(root.children[0].children[0].children[0].value, "level3");
+    }
+}
