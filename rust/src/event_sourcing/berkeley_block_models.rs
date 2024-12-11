@@ -1,12 +1,9 @@
 use super::models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina};
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
-use serde::{
-    de::{self, SeqAccess, Visitor},
-    Deserialize, Deserializer, Serialize,
-};
+use serde::{Deserialize, Deserializer, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
-use std::{collections::HashMap, fmt, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BerkeleyBlock {
@@ -183,12 +180,6 @@ pub struct Diff {
     pub coinbase: Vec<Value>,
 }
 
-#[derive(Serialize, Debug, Clone)]
-pub struct CommandWrapper {
-    pub command: Command,
-    pub status: String,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CompletedWorks {
     pub fee: String,
@@ -196,10 +187,64 @@ pub struct CompletedWorks {
 }
 
 #[derive(Serialize, Debug, Clone)]
+pub struct CommandWrapper {
+    pub command: Command,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Command {
     SignedCommand(SignedCommand),
     ZkappCommand(ZkappCommand),
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SignedCommand {
+    pub payload: Payload,
+    pub signer: String,
+    pub signature: String,
+    pub status: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payload {
+    pub common: Common,
+    pub body: Body,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Common {
+    pub fee: String,
+    pub fee_payer_pk: String,
+    pub nonce: String,
+    pub valid_until: String,
+    pub memo: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Body {
+    StakeDelegation(StakeDelegationType),
+    Payment(Payment),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum StakeDelegationType {
+    SetDelegate(DelegateInfo),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DelegateInfo {
+    pub new_delegate: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Payment {
+    pub receiver_pk: String,
+    pub amount: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ZkappCommand {}
 
 impl CommandWrapper {
     pub fn get_status(&self) -> String {
@@ -214,7 +259,7 @@ impl CommandWrapper {
     }
 
     fn get_sender(&self) -> String {
-        String::from("Unknown")
+        self.get_fee_payer()
     }
 
     fn get_type(&self) -> CommandType {
@@ -292,15 +337,12 @@ impl CommandWrapper {
 impl<'de> Deserialize<'de> for CommandWrapper {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
+        // Deserialize into a generic Value first
         let value: Value = Deserialize::deserialize(deserializer)?;
 
-        if !value.is_object() {
-            return Err(serde::de::Error::custom("Expected an object for CommandWrapper"));
-        }
-
-        // Extract the "data" field
+        // Ensure "data" field exists and is an array
         let data = value
             .get("data")
             .and_then(|v| v.clone().into_array())
@@ -310,132 +352,108 @@ impl<'de> Deserialize<'de> for CommandWrapper {
             return Err(serde::de::Error::custom("Expected 'data' field to have exactly 2 elements"));
         }
 
+        // Extract status field
+        let status = value
+            .get("status")
+            .and_then(|v| v.clone().into_array())
+            .and_then(|arr| arr.first().cloned())
+            .map(|v| v.as_str().unwrap().to_string())
+            .unwrap();
+
+        // Parse command type and details
         let command_type = data[0]
             .as_str()
             .ok_or_else(|| serde::de::Error::custom("First element in 'data' must be a string"))?;
-        let details = &data[1];
+        let details = data[1].clone(); // Clone for deserialization
 
-        // Deserialize the `Command`
-        let command = match command_type {
+        // Match and deserialize based on the command type
+        match command_type {
             "Signed_command" => {
-                let signed_command = sonic_rs::from_value::<SignedCommand>(details).map_err(serde::de::Error::custom)?;
-                Ok(Command::SignedCommand(signed_command))
+                let payload = details
+                    .get("payload")
+                    .ok_or_else(|| serde::de::Error::custom("Missing 'payload' field in Signed_command"))?;
+                let signer = details
+                    .get("signer")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| serde::de::Error::custom("Missing 'signer' field in Signed_command"))?
+                    .to_string();
+                let signature = details
+                    .get("signature")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| serde::de::Error::custom("Missing 'signature' field in Signed_command"))?
+                    .to_string();
+
+                let common = payload
+                    .get("common")
+                    .ok_or_else(|| serde::de::Error::custom("Missing 'common' field in payload"))?;
+                let body = payload.get("body").ok_or_else(|| serde::de::Error::custom("Missing 'body' field in payload"))?;
+
+                let parsed_body = parse_body(body).unwrap();
+
+                let signed_command = SignedCommand {
+                    payload: Payload {
+                        common: sonic_rs::from_value(common).map_err(serde::de::Error::custom)?,
+                        body: parsed_body,
+                    },
+                    signer,
+                    signature,
+                    status: status.clone(),
+                };
+
+                Ok(CommandWrapper {
+                    command: Command::SignedCommand(signed_command),
+                    status,
+                })
             }
             "Zkapp_command" => {
-                let zkapp_command = sonic_rs::from_value::<ZkappCommand>(details).map_err(serde::de::Error::custom)?;
-                Ok(Command::ZkappCommand(zkapp_command))
+                let zkapp_command = sonic_rs::from_value(&details).map_err(serde::de::Error::custom)?;
+                Ok(CommandWrapper {
+                    command: Command::ZkappCommand(zkapp_command),
+                    status,
+                })
             }
             _ => Err(serde::de::Error::custom(format!("Unknown command type: {}", command_type))),
-        }?;
-
-        // Extract the "status" field
-        let status_arr = value
-            .get("status")
-            .and_then(|v| v.clone().into_array())
-            .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'status' field"))?;
-
-        let status = status_arr.first().unwrap();
-
-        Ok(CommandWrapper {
-            command,
-            status: status.as_str().unwrap().to_string(),
-        })
+        }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignedCommand {
-    pub payload: Payload,
-    #[serde(skip)]
-    pub status: String,
-}
+fn parse_body(body: &Value) -> Result<Body, sonic_rs::Error> {
+    let body_array = body.clone().into_array().ok_or_else(|| serde::de::Error::custom("Expected array for body"))?;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Payload {
-    pub common: Common,
-    #[serde(deserialize_with = "deserialize_body")]
-    pub body: Body,
-}
+    if body_array.len() != 2 {
+        return Err(serde::de::Error::custom("Expected body array to have exactly 2 elements"));
+    }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Common {
-    pub fee: String,
-    pub fee_payer_pk: String,
-    pub nonce: String,
-    pub valid_until: String,
-    pub memo: String,
-}
+    let body_type = body_array[0]
+        .as_str()
+        .ok_or_else(|| serde::de::Error::custom("First element in body array must be a string"))?;
+    let body_details = &body_array[1];
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum Body {
-    StakeDelegation(StakeDelegationType),
-    Payment(Payment),
-}
+    match body_type {
+        "Stake_delegation" => {
+            let delegation_array = body_details
+                .clone()
+                .into_array()
+                .ok_or_else(|| serde::de::Error::custom("Expected array for Stake_delegation details"))?;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum StakeDelegationType {
-    SetDelegate(DelegateInfo),
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DelegateInfo {
-    pub new_delegate: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Payment {
-    pub receiver_pk: String,
-    pub amount: String,
-}
-
-fn deserialize_body<'de, D>(deserializer: D) -> Result<Body, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    struct BodyVisitor;
-
-    impl<'de> Visitor<'de> for BodyVisitor {
-        type Value = Body;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("an array with a command type string and a nested structure")
-        }
-
-        fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
-        where
-            V: SeqAccess<'de>,
-        {
-            // Parse the command type as a string
-            let command_type: String = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
-
-            // Handle specific command types
-            match command_type.as_str() {
-                "Stake_delegation" => {
-                    let nested: Vec<Value> = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
-
-                    // Assume structure ["Set_delegate", { "new_delegate": ... }]
-                    if let Some(set_delegate_array) = nested.get(1) {
-                        let delegate_info: DelegateInfo = sonic_rs::from_value(set_delegate_array).map_err(de::Error::custom)?;
-                        Ok(Body::StakeDelegation(StakeDelegationType::SetDelegate(delegate_info)))
-                    } else {
-                        Err(de::Error::invalid_value(de::Unexpected::Seq, &"Expected nested Set_delegate structure"))
-                    }
-                }
-                "Payment" => {
-                    // Parse Payment structure
-                    let payment: Payment = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
-                    Ok(Body::Payment(payment))
-                }
-                _ => Err(de::Error::unknown_variant(&command_type, &["Stake_delegation", "Payment"])),
+            if delegation_array.len() != 2 {
+                return Err(serde::de::Error::custom("Expected Stake_delegation array to have exactly 2 elements"));
             }
+
+            if delegation_array[0] != "Set_delegate" {
+                return Err(serde::de::Error::custom("Unknown Stake_delegation type"));
+            }
+
+            let delegate_info: DelegateInfo = sonic_rs::from_value(&delegation_array[1]).map_err(serde::de::Error::custom)?;
+            Ok(Body::StakeDelegation(StakeDelegationType::SetDelegate(delegate_info)))
         }
+        "Payment" => {
+            let payment: Payment = sonic_rs::from_value(body_details).map_err(serde::de::Error::custom)?;
+            Ok(Body::Payment(payment))
+        }
+        _ => Err(serde::de::Error::unknown_variant(body_type, &["Stake_delegation", "Payment"])),
     }
-
-    deserializer.deserialize_seq(BodyVisitor)
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZkappCommand {}
 
 #[cfg(test)]
 mod berkeley_block_tests {
@@ -495,5 +513,54 @@ mod berkeley_block_tests {
             .get_aggregated_snark_work()
             .iter()
             .any(|work| { work.fee_nanomina == 10_000_000 && &work.prover == "B62qosqzHi58Czax2RXfqPhMDzLogBeDVzSpsRDTCN1xeYUfrVy2F8P" }))
+    }
+
+    #[test]
+    fn test_berkeley_block_410543() {
+        // Path to the test JSON file
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410543-3NLeMXBpXKCpHtY2ugK5RdyQsZp2AUBQNYaJdgJNfu4h83TNvKGj.json")
+                .expect("Failed to read test file");
+
+        // Deserialize JSON into BerkeleyBlock struct
+        let berkeley_block_res: Result<BerkeleyBlock, sonic_rs::Error> = sonic_rs::from_str(&file_content);
+
+        if let Err(e) = &berkeley_block_res {
+            println!("{e} => {}", &file_content[37000..39000]);
+        }
+
+        let berkeley_block = berkeley_block_res.unwrap();
+
+        // Test the total number of user commands
+        assert_eq!(berkeley_block.get_user_commands_count(), 62, "User commands count should be 62");
+
+        // Extract all user commands
+        let user_commands = berkeley_block.get_user_commands();
+
+        // Test specific user command: Payment
+        let payment_command = user_commands.iter().find(|cmd| {
+            cmd.txn_type == CommandType::Payment
+                && cmd.sender == "B62qrb1HQwNoK5YdTKnsZhoS7XCEEY1Bb6DJiMT3fSSbv7SVvgi7Q8t"
+                && cmd.receiver == "B62qjcbHzUzpThL4apLCR5pmC3CqoRWUfqwnJxSBc82DxSXt5E6vwbw"
+                && cmd.amount_nanomina == 300_000_000
+        });
+        assert!(
+                payment_command.is_some(),
+                "Expected a payment command from B62qrb1HQwNoK5YdTKnsZhoS7XCEEY1Bb6DJiMT3fSSbv7SVvgi7Q8t to B62qjcbHzUzpThL4apLCR5pmC3CqoRWUfqwnJxSBc82DxSXt5E6vwbw for 300_000_000"
+            );
+
+        // Test specific stake delegation command
+        let stake_delegation_command = user_commands.iter().find(|cmd| {
+            cmd.txn_type == CommandType::StakeDelegation
+                && cmd.sender == "B62qrb1HQwNoK5YdTKnsZhoS7XCEEY1Bb6DJiMT3fSSbv7SVvgi7Q8t"
+                && cmd.receiver == "B62qrQiw9JhUumq457sMxicgQ94Z1WD9JChzJu19kBE8Szb5T8tcUAC"
+        });
+        assert!(
+                stake_delegation_command.is_some(),
+                "Expected a stake delegation command from B62qrb1HQwNoK5YdTKnsZhoS7XCEEY1Bb6DJiMT3fSSbv7SVvgi7Q8t to B62qrQiw9JhUumq457sMxicgQ94Z1WD9JChzJu19kBE8Szb5T8tcUAC"
+            );
+
+        // Test zkApp commands count
+        assert_eq!(berkeley_block.get_zk_app_commands_count(), 1, "zkApp commands count should be 1");
     }
 }
