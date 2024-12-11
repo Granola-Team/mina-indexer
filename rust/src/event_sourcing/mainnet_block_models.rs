@@ -22,11 +22,7 @@ impl MainnetBlock {
     }
 
     pub fn get_excess_block_fees(&self) -> u64 {
-        let total_snark_fees = self
-            .get_snark_work()
-            .iter()
-            .map(|ft| (ft.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64)
-            .sum::<u64>();
+        let total_snark_fees = self.get_snark_work().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
 
         let mut total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
         for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
@@ -42,8 +38,7 @@ impl MainnetBlock {
             fee_transfers.insert(self.get_coinbase_receiver(), excess_block_fees);
         }
         for completed_work in self.get_snark_work() {
-            let fee_nanomina = (completed_work.fee.parse::<f64>().unwrap() * 1_000_000_000f64) as u64;
-            *fee_transfers.entry(completed_work.prover).or_insert(0) += fee_nanomina;
+            *fee_transfers.entry(completed_work.prover).or_insert(0_u64) += completed_work.fee_nanomina;
         }
 
         // If the fee for a completed work is higher than the available fees, the remainder
@@ -166,32 +161,32 @@ impl MainnetBlock {
         self.get_snark_work().len()
     }
 
-    pub fn get_snark_work(&self) -> Vec<CompletedWorks> {
+    pub fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
-            .flat_map(|works| works.into_iter())
+            .flat_map(|works| {
+                works.into_iter().map(|work| {
+                    let fee_decimal = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                    CompletedWorksNanomina {
+                        fee_nanomina: fee_decimal.to_u64().unwrap(),
+                        prover: work.prover.to_string(),
+                    }
+                })
+            })
             .collect()
     }
 
     pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorksNanomina> {
-        let mut aggregated_snark_work: HashMap<String, BigDecimal> = HashMap::new();
+        let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
 
         for completed_work in self.get_snark_work() {
-            let fee_decimal = BigDecimal::from_str(&completed_work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
-            *aggregated_snark_work.entry(completed_work.prover.clone()).or_insert(BigDecimal::from(0)) += fee_decimal;
+            *aggregated_snark_work.entry(completed_work.prover.clone()).or_insert(0_u64) += completed_work.fee_nanomina;
         }
 
         aggregated_snark_work
             .into_iter()
-            .map(|(prover, fee_decimal)| {
-                let fee_nanomina = fee_decimal
-                    .with_scale(0) // Ensure it's rounded to an integer (nanomina are integers)
-                    .to_u64()
-                    .unwrap();
-
-                CompletedWorksNanomina { prover, fee_nanomina }
-            })
+            .map(|(prover, fee_nanomina)| CompletedWorksNanomina { prover, fee_nanomina })
             .collect()
     }
 
