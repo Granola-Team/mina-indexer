@@ -199,18 +199,17 @@ pub enum ProofOrSignature {
     Signature,
 }
 
+// see https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/account_update.ml#L24-L28
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Authorization {
     #[serde(rename = "None_given")]
-    NoneGiven,
-
-    Either,
-    Proof,
+    NoneGiven((String,)),
+    Either((String,)),
+    Proof((String,)),
     Proof_((ProofOrSignature, String)),
-    Signature,
+    Signature((String,)),
     Signature_((ProofOrSignature, String)),
-    Impossible,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -232,10 +231,14 @@ pub struct AccountUpdateBody {
     pub authorization_kind: Authorization,
 }
 
+// see https://github.com/MinaProtocol/mina/blob/compatible/src/lib/mina_base/account_update.ml#L136-L147
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum MayUseToken {
     No,
-    Yes,
+    #[serde(rename = "Parents_own_token")]
+    ParentsOwnToken,
+    #[serde(rename = "Inherit_from_parent")]
+    InheritFromParent,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -247,21 +250,23 @@ pub struct ZkappEvents(pub Vec<String>);
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Update {
     // one for each app state field element
-    pub app_state: [(UpdateKind,); 8],
+    pub app_state: [UpdateKind; 8],
 
-    pub delegate: (UpdateKind,),
-    pub verification_key: (UpdateKind,),
-    pub permissions: (UpdateKind,),
-    pub zkapp_uri: (UpdateKind,),
-    pub token_symbol: (UpdateKind,),
-    pub timing: (UpdateKind,),
-    pub voting_for: (UpdateKind,),
+    pub delegate: UpdateKind,
+    pub verification_key: UpdateKind,
+    pub permissions: UpdateKind,
+    pub zkapp_uri: UpdateKind,
+    pub token_symbol: UpdateKind,
+    pub timing: UpdateKind,
+    pub voting_for: UpdateKind,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum UpdateKind {
+    #[serde(deserialize_with = "from_keep_or_ignore")]
     Keep,
+    #[serde(deserialize_with = "from_set_or_check")]
     Set(String),
 }
 
@@ -269,16 +274,16 @@ pub enum UpdateKind {
 pub struct Preconditions {
     pub network: NetworkPreconditions,
     pub account: AccountPreconditions,
-    pub valid_while: (PreconditionKind,),
+    pub valid_while: Precondition,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NetworkPreconditions {
-    pub snarked_ledger_hash: (PreconditionKind,),
-    pub blockchain_length: (PreconditionKind,),
-    pub min_window_density: (PreconditionKind,),
-    pub total_currency: (PreconditionKind,),
-    pub global_slot_since_genesis: (PreconditionKind,),
+    pub snarked_ledger_hash: Precondition,
+    pub blockchain_length: Precondition,
+    pub min_window_density: Precondition,
+    pub total_currency: Precondition,
+    pub global_slot_since_genesis: Precondition,
     pub staking_epoch_data: StakingEpochDataPreconditions,
     pub next_epoch_data: StakingEpochDataPreconditions,
 }
@@ -286,35 +291,53 @@ pub struct NetworkPreconditions {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct StakingEpochDataPreconditions {
     pub ledger: LedgerPreconditions,
-    pub seed: (PreconditionKind,),
-    pub start_checkpoint: (PreconditionKind,),
-    pub lock_checkpoint: (PreconditionKind,),
-    pub epoch_length: (PreconditionKind,),
+    pub seed: Precondition,
+    pub start_checkpoint: Precondition,
+    pub lock_checkpoint: Precondition,
+    pub epoch_length: Precondition,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct LedgerPreconditions {
-    pub hash: (PreconditionKind,),
-    pub total_currency: (PreconditionKind,),
+    pub hash: Precondition,
+    pub total_currency: Precondition,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountPreconditions {
-    pub balance: (PreconditionKind,),
-    pub nonce: (PreconditionKind,),
-    pub receipt_chain_hash: (PreconditionKind,),
-    pub delegate: (PreconditionKind,),
-    pub state: Vec<(PreconditionKind,)>,
-    pub action_state: (PreconditionKind,),
-    pub proved_state: (PreconditionKind,),
-    pub is_new: (PreconditionKind,),
+    pub balance: Precondition,
+    pub nonce: Precondition,
+    pub receipt_chain_hash: Precondition,
+    pub delegate: Precondition,
+    pub state: [Precondition; 8],
+    pub action_state: Precondition,
+    pub proved_state: Precondition,
+    pub is_new: Precondition,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum PreconditionKind {
+pub enum Precondition {
+    #[serde(deserialize_with = "from_keep_or_ignore")]
     Ignore,
-    Check(String),
+    #[serde(deserialize_with = "from_set_or_check")]
+    Check(CheckPreconditionBounds),
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct CheckPreconditionBounds {
+    #[serde(deserialize_with = "from_str")]
+    lower: u32,
+    #[serde(deserialize_with = "from_str")]
+    upper: u32,
+}
+
+impl std::str::FromStr for CheckPreconditionBounds {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(anyhow::Error::new)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
