@@ -74,6 +74,10 @@ impl BerkeleyBlock {
     }
 
     pub fn get_zk_app_commands_count(&self) -> usize {
+        self.get_zk_app_commands().len()
+    }
+
+    pub fn get_zk_app_commands(&self) -> Vec<CommandWrapper> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
@@ -81,10 +85,12 @@ impl BerkeleyBlock {
                     diff.commands
                         .iter()
                         .filter(|wrapper| matches!(wrapper.command, Command::ZkappCommand(_)))
-                        .count()
+                        .cloned()
+                        .collect::<Vec<CommandWrapper>>()
                 })
             })
-            .sum()
+            .flatten()
+            .collect()
     }
 
     pub fn get_coinbase_reward_nanomina(&self) -> u64 {
@@ -239,7 +245,21 @@ pub struct Payment {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ZkappCommand {}
+pub struct ZkappCommand {
+    pub fee_payer: FeePayer,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeePayer {
+    pub body: FeePayerBody,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FeePayerBody {
+    pub public_key: String,
+    pub fee: String,
+    pub nonce: String,
+}
 
 impl CommandWrapper {
     pub fn get_status(&self) -> String {
@@ -249,7 +269,7 @@ impl CommandWrapper {
     fn get_nonce(&self) -> usize {
         match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.nonce.parse::<usize>().unwrap(),
-            Command::ZkappCommand(_) => todo!("get_nonce not implemented for ZkappCommand"),
+            Command::ZkappCommand(zk_app_command) => zk_app_command.fee_payer.body.nonce.parse::<usize>().unwrap(),
         }
     }
 
@@ -280,7 +300,7 @@ impl CommandWrapper {
     fn get_fee(&self) -> f64 {
         match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.fee.parse::<f64>().unwrap(),
-            Command::ZkappCommand(_) => todo!("get_fee not implemented for ZkappCommand"),
+            Command::ZkappCommand(zkapp_command) => zkapp_command.fee_payer.body.fee.parse::<f64>().unwrap(),
         }
     }
 
@@ -304,7 +324,7 @@ impl CommandWrapper {
     fn get_fee_payer(&self) -> String {
         match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.fee_payer_pk.clone(),
-            Command::ZkappCommand(_) => todo!("get_fee_payer not implemented for ZkappCommand"),
+            Command::ZkappCommand(zkapp_command) => zkapp_command.fee_payer.body.public_key.to_string(),
         }
     }
 
@@ -401,7 +421,8 @@ impl<'de> Deserialize<'de> for CommandWrapper {
                 })
             }
             "Zkapp_command" => {
-                let zkapp_command = sonic_rs::from_value(&details).map_err(serde::de::Error::custom)?;
+                let zkapp_command: ZkappCommand = sonic_rs::from_value(&details).map_err(serde::de::Error::custom)?;
+
                 Ok(CommandWrapper {
                     command: Command::ZkappCommand(zkapp_command),
                     status,
@@ -557,5 +578,24 @@ mod berkeley_block_tests {
 
         // Test zkApp commands count
         assert_eq!(berkeley_block.get_zk_app_commands_count(), 1, "zkApp commands count should be 1");
+    }
+
+    #[test]
+    fn test_berkeley_block_410773() {
+        // Path to the test JSON file
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410773-3NLjmPVZ6HRV3CUdB3N8VbgwdNRAyjJibTCc4viKfUrrFuwTZk9s.json")
+                .expect("Failed to read test file");
+
+        // Deserialize JSON into BerkeleyBlock struct
+        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        let zk_app_commands = berkeley_block.get_zk_app_commands();
+        assert_eq!(zk_app_commands.len(), 5);
+
+        let first_zkapp_command = zk_app_commands.first().unwrap();
+        assert_eq!(first_zkapp_command.get_fee_payer(), "B62qm2aFMwggaVEwAkJB1r77adTBfPkbmJuZkmjzFmsCfAsqrn9kc44");
+        assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
+        assert_eq!(first_zkapp_command.get_nonce(), 200);
     }
 }
