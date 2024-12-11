@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::{
-    event_sourcing::{berkeley_block_models::BerkeleyBlock, payloads::BerkeleyBlockPayload},
+    event_sourcing::{berkeley_block_models::BerkeleyBlock, block::BlockTrait, payloads::BerkeleyBlockPayload},
     utility::extract_height_and_hash,
 };
 use async_trait::async_trait;

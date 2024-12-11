@@ -1,4 +1,7 @@
-use super::models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina};
+use super::{
+    block::BlockTrait,
+    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
+};
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -9,6 +12,48 @@ use std::{collections::HashMap, str::FromStr};
 pub struct BerkeleyBlock {
     pub version: u32,
     pub data: Data,
+}
+
+impl BlockTrait for BerkeleyBlock {
+    fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
+            .flat_map(|works| {
+                works.into_iter().map(|work| {
+                    let fee_nanomina = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                    CompletedWorksNanomina {
+                        fee_nanomina: fee_nanomina.to_u64().unwrap(),
+                        prover: work.prover.to_string(),
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn get_user_commands(&self) -> Vec<CommandSummary> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| {
+                opt_diff
+                    .as_ref()
+                    .map(|diff| diff.commands.iter().filter(|wrapper| matches!(wrapper.command, Command::SignedCommand(_))))
+            })
+            .flat_map(|user_commands| user_commands.into_iter())
+            .map(|wrapper| wrapper.to_command_summary())
+            .collect()
+    }
+
+    fn get_coinbase_receiver(&self) -> String {
+        self.data.protocol_state.body.consensus_state.coinbase_receiver.to_string()
+    }
+
+    fn get_coinbases(&self) -> Vec<Vec<Value>> {
+        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+            .iter()
+            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.coinbase.clone()))
+            .collect()
+    }
 }
 
 impl BerkeleyBlock {
@@ -26,33 +71,6 @@ impl BerkeleyBlock {
 
     pub fn get_staged_ledger_post_diff(&self) -> Option<Diff> {
         self.data.staged_ledger_diff.diff.last().and_then(|opt| opt.clone())
-    }
-
-    pub fn get_user_commands_count(&self) -> usize {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| {
-                opt_diff.as_ref().map(|diff| {
-                    diff.commands
-                        .iter()
-                        .filter(|wrapper| matches!(wrapper.command, Command::SignedCommand(_)))
-                        .count()
-                })
-            })
-            .sum()
-    }
-
-    pub fn get_user_commands(&self) -> Vec<CommandSummary> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| {
-                opt_diff
-                    .as_ref()
-                    .map(|diff| diff.commands.iter().filter(|wrapper| matches!(wrapper.command, Command::SignedCommand(_))))
-            })
-            .flat_map(|user_commands| user_commands.into_iter())
-            .map(|wrapper| wrapper.to_command_summary())
-            .collect()
     }
 
     pub fn get_zk_app_commands_count(&self) -> usize {
@@ -87,26 +105,6 @@ impl BerkeleyBlock {
             .sum()
     }
 
-    pub fn get_snark_work_count(&self) -> usize {
-        self.get_snark_work().len()
-    }
-
-    pub fn get_snark_work(&self) -> Vec<CompletedWorksNanomina> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.completed_works.clone()))
-            .flat_map(|works| {
-                works.into_iter().map(|work| {
-                    let fee_nanomina = BigDecimal::from_str(&work.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
-                    CompletedWorksNanomina {
-                        fee_nanomina: fee_nanomina.to_u64().unwrap(),
-                        prover: work.prover.to_string(),
-                    }
-                })
-            })
-            .collect()
-    }
-
     pub fn get_aggregated_snark_work(&self) -> Vec<CompletedWorksNanomina> {
         let mut aggregated_snark_work: HashMap<String, u64> = HashMap::new();
 
@@ -125,10 +123,6 @@ impl BerkeleyBlock {
 
     pub fn get_timestamp(&self) -> u64 {
         self.data.protocol_state.body.blockchain_state.timestamp.parse::<u64>().unwrap()
-    }
-
-    pub fn get_coinbase_receiver(&self) -> String {
-        self.data.protocol_state.body.consensus_state.coinbase_receiver.to_string()
     }
 
     pub fn get_global_slot_since_genesis(&self) -> u64 {
