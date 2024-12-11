@@ -85,7 +85,7 @@ impl Actor for FeeTransferViaCoinbaseActor {
 }
 
 #[cfg(test)]
-mod fee_transfer_via_coinbase_actor {
+mod fee_transfer_via_coinbase_actor_tests {
 
     use super::*;
     use crate::event_sourcing::{
