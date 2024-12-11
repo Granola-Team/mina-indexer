@@ -56,6 +56,7 @@ impl Actor for BerkeleyBlockParserActor {
                 snark_work_count: berkeley_block.get_aggregated_snark_work().len(),
                 snark_work: berkeley_block.get_aggregated_snark_work(),
                 fee_transfers: berkeley_block.get_fee_transfers(),
+                fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase(),
                 timestamp: berkeley_block.get_timestamp(),
                 coinbase_receiver: berkeley_block.get_coinbase_receiver(),
                 coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
