@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::event_sourcing::payloads::{InternalCommandLogPayload, InternalCommandType, MainnetBlockPayload};
+use crate::event_sourcing::payloads::{BerkeleyBlockPayload, InternalCommandLogPayload, InternalCommandType, MainnetBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -54,7 +54,22 @@ impl Actor for FeeTransferActor {
                 }
             }
             EventType::BerkeleyBlock => {
-                todo!("impl for berkeley block");
+                let block_payload: BerkeleyBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
+                for fee_transfer in block_payload.fee_transfers.iter() {
+                    let payload = InternalCommandLogPayload {
+                        internal_command_type: InternalCommandType::FeeTransfer,
+                        height: block_payload.height,
+                        state_hash: block_payload.state_hash.clone(),
+                        timestamp: block_payload.timestamp,
+                        recipient: fee_transfer.recipient.to_string(),
+                        amount_nanomina: fee_transfer.fee_nanomina,
+                        source: None,
+                    };
+                    self.publish(Event {
+                        event_type: EventType::InternalCommandLog,
+                        payload: sonic_rs::to_string(&payload).unwrap(),
+                    });
+                }
             }
             _ => {}
         }
@@ -66,77 +81,147 @@ impl Actor for FeeTransferActor {
     }
 }
 
-#[tokio::test]
-async fn test_fee_transfer_actor_handle_event() {
+#[cfg(test)]
+mod fee_transfer_actor_tests {
     use super::*;
     use crate::event_sourcing::{
         events::{Event, EventType},
         models::*,
-        payloads::{InternalCommandLogPayload, MainnetBlockPayload},
+        payloads::{BerkeleyBlockPayload, InternalCommandLogPayload},
     };
-    use std::sync::Arc;
+    use std::sync::{atomic::Ordering, Arc};
 
-    // Create a shared publisher to capture published events
-    let shared_publisher = Arc::new(SharedPublisher::new(100));
-    let actor = FeeTransferActor::new(Arc::clone(&shared_publisher));
+    #[tokio::test]
+    async fn test_fee_transfer_actor_handle_berkeley_block_event() {
+        // Create a shared publisher to capture published events
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = FeeTransferActor::new(Arc::clone(&shared_publisher));
 
-    // Mock a MainnetBlockPayload with fee transfers
-    let fee_transfers = vec![
-        FeeTransfer {
-            recipient: "recipient_1".to_string(),
-            fee_nanomina: 100_000,
-        },
-        FeeTransfer {
-            recipient: "recipient_2".to_string(),
-            fee_nanomina: 200_000,
-        },
-    ];
+        // Mock a BerkeleyBlockPayload with fee transfers
+        let fee_transfers = vec![
+            FeeTransfer {
+                recipient: "recipient_1".to_string(),
+                fee_nanomina: 150_000,
+            },
+            FeeTransfer {
+                recipient: "recipient_2".to_string(),
+                fee_nanomina: 250_000,
+            },
+        ];
 
-    // MainnetBlockPayload with sample fee transfers
-    let block_payload = MainnetBlockPayload {
-        height: 15,
-        state_hash: "state_hash_example".to_string(),
-        previous_state_hash: "previous_state_hash_example".to_string(),
-        last_vrf_output: "last_vrf_output_example".to_string(),
-        fee_transfers,
-        timestamp: 1615986540000,
-        ..Default::default()
-    };
+        // BerkeleyBlockPayload with sample fee transfers
+        let block_payload = BerkeleyBlockPayload {
+            height: 20,
+            state_hash: "berkeley_state_hash_example".to_string(),
+            previous_state_hash: "berkeley_previous_state_hash_example".to_string(),
+            last_vrf_output: "last_vrf_output_example".to_string(),
+            fee_transfers,
+            timestamp: 1615986545000,
+            ..Default::default()
+        };
 
-    // Serialize the MainnetBlockPayload to JSON for the event payload
-    let payload_json = sonic_rs::to_string(&block_payload).unwrap();
-    let event = Event {
-        event_type: EventType::MainnetBlock,
-        payload: payload_json,
-    };
+        // Serialize the BerkeleyBlockPayload to JSON for the event payload
+        let payload_json = sonic_rs::to_string(&block_payload).unwrap();
+        let event = Event {
+            event_type: EventType::BerkeleyBlock,
+            payload: payload_json,
+        };
 
-    // Subscribe to the shared publisher to capture published events
-    let mut receiver = shared_publisher.subscribe();
+        // Subscribe to the shared publisher to capture published events
+        let mut receiver = shared_publisher.subscribe();
 
-    // Call handle_event to process the MainnetBlock event
-    actor.handle_event(event).await;
+        // Call handle_event to process the BerkeleyBlock event
+        actor.handle_event(event).await;
 
-    // Capture and verify the published InternalCommand events for fee transfers
-    for fee_transfer in block_payload.fee_transfers.iter() {
-        // Check if the InternalCommand event was published
-        if let Ok(received_event) = receiver.recv().await {
-            assert_eq!(received_event.event_type, EventType::InternalCommandLog);
+        // Capture and verify the published InternalCommand events for fee transfers
+        for fee_transfer in block_payload.fee_transfers.iter() {
+            // Check if the InternalCommand event was published
+            if let Ok(received_event) = receiver.recv().await {
+                assert_eq!(received_event.event_type, EventType::InternalCommandLog);
 
-            // Deserialize the payload of the InternalCommand event
-            let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+                // Deserialize the payload of the InternalCommand event
+                let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
-            // Verify that the InternalCommandPayload matches the expected values
-            assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);
-            assert_eq!(command_payload.height, block_payload.height);
-            assert_eq!(command_payload.state_hash, block_payload.state_hash);
-            assert_eq!(command_payload.timestamp, block_payload.timestamp);
-            assert_eq!(command_payload.recipient, fee_transfer.recipient);
-            assert_eq!(command_payload.amount_nanomina, fee_transfer.fee_nanomina);
-        } else {
-            panic!("Did not receive expected InternalCommand event from FeeTransferActor.");
+                // Verify that the InternalCommandPayload matches the expected values
+                assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);
+                assert_eq!(command_payload.height, block_payload.height);
+                assert_eq!(command_payload.state_hash, block_payload.state_hash);
+                assert_eq!(command_payload.timestamp, block_payload.timestamp);
+                assert_eq!(command_payload.recipient, fee_transfer.recipient);
+                assert_eq!(command_payload.amount_nanomina, fee_transfer.fee_nanomina);
+            } else {
+                panic!("Did not receive expected InternalCommand event from FeeTransferActor.");
+            }
         }
+
+        // Verify that the event count matches the number of fee transfers processed
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), block_payload.fee_transfers.len());
     }
 
-    // Verify that the event count matches the number of fee transfers processed
-    assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), block_payload.fee_transfers.len());
+    #[tokio::test]
+    async fn test_fee_transfer_actor_handle_event() {
+        // Create a shared publisher to capture published events
+        let shared_publisher = Arc::new(SharedPublisher::new(100));
+        let actor = FeeTransferActor::new(Arc::clone(&shared_publisher));
+
+        // Mock a MainnetBlockPayload with fee transfers
+        let fee_transfers = vec![
+            FeeTransfer {
+                recipient: "recipient_1".to_string(),
+                fee_nanomina: 100_000,
+            },
+            FeeTransfer {
+                recipient: "recipient_2".to_string(),
+                fee_nanomina: 200_000,
+            },
+        ];
+
+        // MainnetBlockPayload with sample fee transfers
+        let block_payload = MainnetBlockPayload {
+            height: 15,
+            state_hash: "state_hash_example".to_string(),
+            previous_state_hash: "previous_state_hash_example".to_string(),
+            last_vrf_output: "last_vrf_output_example".to_string(),
+            fee_transfers,
+            timestamp: 1615986540000,
+            ..Default::default()
+        };
+
+        // Serialize the MainnetBlockPayload to JSON for the event payload
+        let payload_json = sonic_rs::to_string(&block_payload).unwrap();
+        let event = Event {
+            event_type: EventType::MainnetBlock,
+            payload: payload_json,
+        };
+
+        // Subscribe to the shared publisher to capture published events
+        let mut receiver = shared_publisher.subscribe();
+
+        // Call handle_event to process the MainnetBlock event
+        actor.handle_event(event).await;
+
+        // Capture and verify the published InternalCommand events for fee transfers
+        for fee_transfer in block_payload.fee_transfers.iter() {
+            // Check if the InternalCommand event was published
+            if let Ok(received_event) = receiver.recv().await {
+                assert_eq!(received_event.event_type, EventType::InternalCommandLog);
+
+                // Deserialize the payload of the InternalCommand event
+                let command_payload: InternalCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+
+                // Verify that the InternalCommandPayload matches the expected values
+                assert_eq!(command_payload.internal_command_type, InternalCommandType::FeeTransfer);
+                assert_eq!(command_payload.height, block_payload.height);
+                assert_eq!(command_payload.state_hash, block_payload.state_hash);
+                assert_eq!(command_payload.timestamp, block_payload.timestamp);
+                assert_eq!(command_payload.recipient, fee_transfer.recipient);
+                assert_eq!(command_payload.amount_nanomina, fee_transfer.fee_nanomina);
+            } else {
+                panic!("Did not receive expected InternalCommand event from FeeTransferActor.");
+            }
+        }
+
+        // Verify that the event count matches the number of fee transfers processed
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), block_payload.fee_transfers.len());
+    }
 }

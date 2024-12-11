@@ -200,6 +200,7 @@ mod snark_work_actor_tests {
             snark_work_count: block.get_aggregated_snark_work().len(),
             zk_app_command_count: block.get_zk_app_commands_count(),
             snark_work: block.get_aggregated_snark_work(),
+            fee_transfers: block.get_fee_transfers(),
             timestamp: block.get_timestamp(),
             coinbase_receiver: block.get_coinbase_receiver(),
             coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
