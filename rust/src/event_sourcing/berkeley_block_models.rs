@@ -35,9 +35,12 @@ impl BerkeleyBlock {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
-                opt_diff
-                    .as_ref()
-                    .map(|diff| diff.commands.iter().filter(|command| matches!(command, Command::SignedCommand(_))).count())
+                opt_diff.as_ref().map(|diff| {
+                    diff.commands
+                        .iter()
+                        .filter(|wrapper| matches!(wrapper.command, Command::SignedCommand(_)))
+                        .count()
+                })
             })
             .sum()
     }
@@ -48,10 +51,10 @@ impl BerkeleyBlock {
             .filter_map(|opt_diff| {
                 opt_diff
                     .as_ref()
-                    .map(|diff| diff.commands.iter().filter(|command| matches!(command, Command::SignedCommand(_))))
+                    .map(|diff| diff.commands.iter().filter(|wrapper| matches!(wrapper.command, Command::SignedCommand(_))))
             })
             .flat_map(|user_commands| user_commands.into_iter())
-            .map(|uc| uc.to_command_summary())
+            .map(|wrapper| wrapper.to_command_summary())
             .collect()
     }
 
@@ -59,9 +62,12 @@ impl BerkeleyBlock {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
-                opt_diff
-                    .as_ref()
-                    .map(|diff| diff.commands.iter().filter(|command| matches!(command, Command::ZkappCommand(_))).count())
+                opt_diff.as_ref().map(|diff| {
+                    diff.commands
+                        .iter()
+                        .filter(|wrapper| matches!(wrapper.command, Command::ZkappCommand(_)))
+                        .count()
+                })
             })
             .sum()
     }
@@ -173,8 +179,14 @@ pub struct StagedLedgerDiff {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Diff {
     pub completed_works: Vec<CompletedWorks>,
-    pub commands: Vec<Command>,
+    pub commands: Vec<CommandWrapper>,
     pub coinbase: Vec<Value>,
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub struct CommandWrapper {
+    pub command: Command,
+    pub status: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -189,13 +201,13 @@ pub enum Command {
     ZkappCommand(ZkappCommand),
 }
 
-impl Command {
-    fn get_status(&self) -> String {
-        todo!("")
+impl CommandWrapper {
+    pub fn get_status(&self) -> String {
+        self.status.to_string()
     }
 
     fn get_nonce(&self) -> usize {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.nonce.parse::<usize>().unwrap(),
             Command::ZkappCommand(_) => todo!("get_nonce not implemented for ZkappCommand"),
         }
@@ -206,7 +218,7 @@ impl Command {
     }
 
     fn get_type(&self) -> CommandType {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => match &signed_command.payload.body {
                 Body::Payment(_) => CommandType::Payment,
                 Body::StakeDelegation(_) => CommandType::StakeDelegation,
@@ -216,7 +228,7 @@ impl Command {
     }
 
     fn get_receiver(&self) -> String {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => match &signed_command.payload.body {
                 Body::Payment(payment) => payment.receiver_pk.clone(),
                 Body::StakeDelegation(StakeDelegationType::SetDelegate(delegate)) => delegate.new_delegate.clone(),
@@ -226,14 +238,14 @@ impl Command {
     }
 
     fn get_fee(&self) -> f64 {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.fee.parse::<f64>().unwrap(),
             Command::ZkappCommand(_) => todo!("get_fee not implemented for ZkappCommand"),
         }
     }
 
     fn get_amount_nanomina(&self) -> u64 {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => match &signed_command.payload.body {
                 Body::Payment(payment) => payment.amount.parse::<u64>().unwrap(),
                 Body::StakeDelegation(_) => 0,
@@ -243,21 +255,21 @@ impl Command {
     }
 
     fn get_memo(&self) -> String {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => decode_base58check_to_string(&signed_command.payload.common.memo).unwrap(),
             Command::ZkappCommand(_) => todo!("get_memo not implemented for ZkappCommand"),
         }
     }
 
     fn get_fee_payer(&self) -> String {
-        match self {
+        match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.fee_payer_pk.clone(),
             Command::ZkappCommand(_) => todo!("get_fee_payer not implemented for ZkappCommand"),
         }
     }
 
     pub fn to_command_summary(&self) -> CommandSummary {
-        match self {
+        match &self.command {
             Command::SignedCommand(_) => CommandSummary {
                 memo: self.get_memo(),
                 fee_payer: self.get_fee_payer(),
@@ -277,7 +289,7 @@ impl Command {
     }
 }
 
-impl<'de> Deserialize<'de> for Command {
+impl<'de> Deserialize<'de> for CommandWrapper {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -285,36 +297,28 @@ impl<'de> Deserialize<'de> for Command {
         let value: Value = Deserialize::deserialize(deserializer)?;
 
         if !value.is_object() {
-            return Err(serde::de::Error::custom("Expected an object for Command"));
+            return Err(serde::de::Error::custom("Expected an object for CommandWrapper"));
         }
 
-        // Extract the "data" field and ensure it is a two-element array
+        // Extract the "data" field
         let data = value
             .get("data")
             .and_then(|v| v.clone().into_array())
             .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'data' field"))?;
 
-        let status_val = value
-            .get("status")
-            .and_then(|v| v.clone().into_array())
-            .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'status' field"))?;
-        let status = status_val.first().unwrap();
-
         if data.len() != 2 {
             return Err(serde::de::Error::custom("Expected 'data' field to have exactly 2 elements"));
         }
 
-        // Extract the type and details
         let command_type = data[0]
             .as_str()
             .ok_or_else(|| serde::de::Error::custom("First element in 'data' must be a string"))?;
         let details = &data[1];
 
-        // Match on the command type and deserialize appropriately
-        match command_type {
+        // Deserialize the `Command`
+        let command = match command_type {
             "Signed_command" => {
-                let mut signed_command = sonic_rs::from_value::<SignedCommand>(details).map_err(serde::de::Error::custom)?;
-                signed_command.status = status.clone().as_str().unwrap().to_string();
+                let signed_command = sonic_rs::from_value::<SignedCommand>(details).map_err(serde::de::Error::custom)?;
                 Ok(Command::SignedCommand(signed_command))
             }
             "Zkapp_command" => {
@@ -322,7 +326,20 @@ impl<'de> Deserialize<'de> for Command {
                 Ok(Command::ZkappCommand(zkapp_command))
             }
             _ => Err(serde::de::Error::custom(format!("Unknown command type: {}", command_type))),
-        }
+        }?;
+
+        // Extract the "status" field
+        let status_arr = value
+            .get("status")
+            .and_then(|v| v.clone().into_array())
+            .ok_or_else(|| serde::de::Error::custom("Missing or invalid 'status' field"))?;
+
+        let status = status_arr.first().unwrap();
+
+        Ok(CommandWrapper {
+            command,
+            status: status.as_str().unwrap().to_string(),
+        })
     }
 }
 
