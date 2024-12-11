@@ -555,7 +555,7 @@ impl From<SignedCommand> for serde_json::Value {
 
                 serde_json::Value::Object(json)
             }
-            SignedCommand::V2(UserCommandData::ZkappCommandData(_data)) => todo!("zkapp json"),
+            SignedCommand::V2(UserCommandData::ZkappCommandData(data)) => to_zkapp_json(&data),
         }
     }
 }
@@ -877,13 +877,31 @@ mod tests {
 
     #[ignore = "not yet implemented"]
     #[test]
-    fn txn_hash_zkapp_command_v2() -> anyhow::Result<()> {
+    fn txn_hash_zkapp_command() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
-        let hashes = precomputed_block.command_hashes();
+        let hashes = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                let cmd: SignedCommand = cmd.into();
+                Some(cmd.hash_signed_command().unwrap())
+            })
+            .collect::<Vec<_>>();
 
         // see https://minaexplorer.com/block/3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK
-        assert_eq!(hashes, vec![]);
+        assert_eq!(
+            hashes,
+            vec![
+                TxnHash::V2("5JvQqrHBgDtB7gew76AkFhSkkfUTCtYQhPT53erZZQYibV6ms9YD".to_string()),
+                TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string())
+            ]
+        );
         Ok(())
     }
 
