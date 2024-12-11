@@ -3,7 +3,9 @@ pub mod completed_work;
 
 use super::protocol_state::SupplyAdjustment;
 use crate::{
-    command::to_mina_format, ledger::public_key::PublicKey, mina_blocks::common::*,
+    command::{to_mina_format, to_zkapp_json},
+    ledger::public_key::PublicKey,
+    mina_blocks::common::*,
     protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
     utility::functions::nanomina_to_mina,
 };
@@ -373,15 +375,14 @@ pub enum StatusKind {
 impl UserCommandData {
     pub fn to_mina_json(self) -> serde_json::Value {
         use crate::command::signed::SignedCommand;
-        use serde_json::Value;
 
         match &self {
-            Self::SignedCommandData(_) => {
-                let mut json: Value = SignedCommand::V2(self).into();
+            UserCommandData::SignedCommandData(_) => {
+                let mut json: serde_json::Value = SignedCommand::V2(self).into();
                 convert_object("", &mut json);
                 to_mina_format(json)
             }
-            Self::ZkappCommandData(_) => todo!(),
+            UserCommandData::ZkappCommandData(data) => to_zkapp_json(data),
         }
     }
 }
@@ -410,12 +411,16 @@ fn convert_object(key: &str, value: &mut serde_json::Value) {
 mod tests {
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        command::{signed::SignedCommand, to_mina_json},
+        command::{
+            convert_zkapp_json, signed::SignedCommand, to_mina_json, to_zkapp_json,
+            UserCommandWithStatusT,
+        },
+        mina_blocks::v2::staged_ledger_diff::UserCommandData,
     };
     use std::path::PathBuf;
 
     #[test]
-    fn v2_to_mina_json() -> anyhow::Result<()> {
+    fn v2_signed_command_to_mina_json() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let signed_cmds = precomputed_block
@@ -423,10 +428,6 @@ mod tests {
             .into_iter()
             .map(|c| {
                 let json: serde_json::Value = SignedCommand::from_user_command(c).into();
-                println!(
-                    "{}",
-                    serde_json::to_string(&to_mina_json(json.clone())).unwrap()
-                );
                 serde_json::to_string_pretty(&to_mina_json(json)).unwrap()
             })
             .collect::<Vec<_>>();
@@ -453,6 +454,293 @@ mod tests {
 }"#;
 
         assert_eq!(signed_cmds, vec![expect0]);
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_command_to_mina_json_1() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-410535-3NLLmswaSwYVSERiQMdvTdKdBN6TNMgUGmd548zK7e82CaS3tNJK.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let signed_cmds = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = cmd.into() {
+                    return Some(serde_json::to_string_pretty(&to_zkapp_json(&data)).unwrap());
+                }
+
+                None
+            })
+            .collect::<Vec<_>>();
+
+        let expect = r#"{
+  "account_updates": [],
+  "fee_payer": {
+    "authorization": "7mXBToH3YVEDek6hpsfzNV3AE89udwKfG4vXKpyKBkhkxdJXvvxdtQRUjMBz1cnPiBVLSPKRgp88tN2ndN85NujFeH3bjQCE",
+    "body": {
+      "fee": "0.1",
+      "nonce": "3",
+      "public_key": "B62qkbCH6jLfVEgR36UGyUzzFTPogr2CQb8fPLLFr6DWajMokYEAJvX",
+      "valid_until": null
+    }
+  },
+  "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+}"#;
+
+        assert_eq!(signed_cmds, vec![expect]);
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_command_to_mina_json_2() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let json = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                let cmd: SignedCommand = cmd.into();
+                let mut json: serde_json::Value = cmd.into();
+
+                convert_zkapp_json(&mut json);
+                Some(serde_json::to_string_pretty(&json).unwrap())
+            })
+            .collect::<Vec<_>>();
+
+        // check the first zkapp json
+        let expect = r#"{
+  "account_updates": [
+    {
+      "elt": {
+        "account_update": {
+          "authorization": [
+            "Signature",
+            "7mXQ2QQakF4g4DCv8Q9EzCMzGdDpZXR8GdBWd4KMMoyDcoMerEAF1eouCrVByGUZcoXXLCTxkdJdk9Y7u4EoAemCAQuArjGa"
+          ],
+          "body": {
+            "actions": [],
+            "authorization_kind": [
+              "Signature"
+            ],
+            "balance_change": {
+              "magnitude": "0",
+              "sgn": [
+                "Pos"
+              ]
+            },
+            "call_data": "0x1450BC0E0E4E32BEF69CCBCC7E238503648E25C1DFA915FAF548AE3AE7377AD1",
+            "events": [],
+            "implicit_account_creation_fee": false,
+            "increment_nonce": true,
+            "may_use_token": [
+              "No"
+            ],
+            "preconditions": {
+              "account": {
+                "action_state": [
+                  "Ignore"
+                ],
+                "balance": [
+                  "Ignore"
+                ],
+                "delegate": [
+                  "Ignore"
+                ],
+                "is_new": [
+                  "Ignore"
+                ],
+                "nonce": [
+                  "Check",
+                  {
+                    "lower": "1",
+                    "upper": "1"
+                  }
+                ],
+                "proved_state": [
+                  "Ignore"
+                ],
+                "receipt_chain_hash": [
+                  "Ignore"
+                ],
+                "state": [
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ],
+                  [
+                    "Ignore"
+                  ]
+                ]
+              },
+              "network": {
+                "blockchain_length": [
+                  "Ignore"
+                ],
+                "global_slot_since_genesis": [
+                  "Ignore"
+                ],
+                "min_window_density": [
+                  "Ignore"
+                ],
+                "next_epoch_data": {
+                  "epoch_length": [
+                    "Ignore"
+                  ],
+                  "ledger": {
+                    "hash": [
+                      "Ignore"
+                    ],
+                    "total_currency": [
+                      "Ignore"
+                    ]
+                  },
+                  "lock_checkpoint": [
+                    "Ignore"
+                  ],
+                  "seed": [
+                    "Ignore"
+                  ],
+                  "start_checkpoint": [
+                    "Ignore"
+                  ]
+                },
+                "snarked_ledger_hash": [
+                  "Ignore"
+                ],
+                "staking_epoch_data": {
+                  "epoch_length": [
+                    "Ignore"
+                  ],
+                  "ledger": {
+                    "hash": [
+                      "Ignore"
+                    ],
+                    "total_currency": [
+                      "Ignore"
+                    ]
+                  },
+                  "lock_checkpoint": [
+                    "Ignore"
+                  ],
+                  "seed": [
+                    "Ignore"
+                  ],
+                  "start_checkpoint": [
+                    "Ignore"
+                  ]
+                },
+                "total_currency": [
+                  "Ignore"
+                ]
+              },
+              "valid_while": [
+                "Ignore"
+              ]
+            },
+            "public_key": "B62qjSHAcwTouw5pxYECuJSFtmG6xup3DeK6f5BWW3BBhvEumW6daEm",
+            "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+            "update": {
+              "app_state": [
+                [
+                  "Set",
+                  "0x1513A94458106D79124BD9251708B62F511581ED00983E90AA7C125FDA08A9F8"
+                ],
+                [
+                  "Set",
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+                ],
+                [
+                  "Keep"
+                ],
+                [
+                  "Set",
+                  "0x1B4F433A35A59849FC94ACB07B73487A0C6D204F99B16E9AC7C6EF786F67BDB6"
+                ],
+                [
+                  "Set",
+                  "0x0000000000000000000000000000000000000000000000000000000000000000"
+                ],
+                [
+                  "Keep"
+                ],
+                [
+                  "Keep"
+                ],
+                [
+                  "Keep"
+                ]
+              ],
+              "delegate": [
+                "Keep"
+              ],
+              "permissions": [
+                "Keep"
+              ],
+              "timing": [
+                "Keep"
+              ],
+              "token_symbol": [
+                "Keep"
+              ],
+              "verification_key": [
+                "Keep"
+              ],
+              "voting_for": [
+                "Keep"
+              ],
+              "zkapp_uri": [
+                "Keep"
+              ]
+            },
+            "use_full_commitment": false
+          }
+        },
+        "account_update_digest": "0x0BAFE556B3706E6A1E4AF4FDFCEC5CB5A3C66696EC987451229CAB2433AE754A",
+        "calls": []
+      },
+      "stack_hash": "0x24FCD22A629D5A3B078514C990F5EF78843459E0EC0DA4FBDB8E7FA64D8EA8CE"
+    }
+  ],
+  "fee_payer": {
+    "authorization": "7mX2MVezL3QtFuuWvw7EEYd1gF2kTkLwPVkScYmiZFc3qg8dJtTdbNe2jmc3zPaioMQ2yXesdRfnYPfDaH7hicQJPC9MxEHQ",
+    "body": {
+      "fee": "0.005",
+      "nonce": "190",
+      "public_key": "B62qp4Wa3FxifJZJVeKWZEWUkGnuhbRwRiEogHhJTijUGYvH79CV72H",
+      "valid_until": null
+    }
+  },
+  "memo": "E4YrkRobQVqEQff65f7rcUE6x9zgK6XuLx7wzbGEs6E5Fi194KTzd"
+}"#;
+
+        assert_eq!(json[0], expect);
         Ok(())
     }
 }
