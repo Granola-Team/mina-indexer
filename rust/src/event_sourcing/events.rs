@@ -18,6 +18,7 @@ pub enum EventType {
     TransitionFrontier,
     UserCommandLog,
     ZkAppCommandLog,
+    CanonicalBatchZkappCommandLog,
     CanonicalUserCommandLog,
     BatchCanonicalUserCommandLog,
     InternalCommandLog,

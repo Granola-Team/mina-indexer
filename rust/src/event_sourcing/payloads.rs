@@ -439,6 +439,35 @@ impl CanonicalItem for CanonicalUserCommandLogPayload {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CanonicalBatchZkappCommandLogPayload {
+    pub canonical: bool,
+    pub was_canonical: bool,
+    pub height: u64,
+    pub state_hash: String,
+    pub timestamp: u64,
+    pub global_slot: u64,
+    pub commands: Vec<ZkAppCommandSummary>,
+}
+
+impl CanonicalItem for CanonicalBatchZkappCommandLogPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.height
+    }
+
+    fn set_was_canonical(&mut self, was_canonical: bool) {
+        self.was_canonical = was_canonical;
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BatchCanonicalUserCommandLogPayload {
     pub height: u64,

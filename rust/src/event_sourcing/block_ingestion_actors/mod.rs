@@ -14,6 +14,7 @@ pub(crate) mod canonical_internal_command_log_actor;
 pub(crate) mod canonical_internal_command_log_persistence_actor;
 pub(crate) mod canonical_user_command_log_actor;
 pub(crate) mod canonical_user_command_persistence_actor;
+pub(crate) mod canonical_zk_app_command_log_actor;
 pub(crate) mod coinbase_transfer_actor;
 pub(crate) mod fee_transfer_actor;
 pub(crate) mod fee_transfer_via_coinbase_actor;
