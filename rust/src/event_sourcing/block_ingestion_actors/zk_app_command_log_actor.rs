@@ -3,7 +3,7 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::event_sourcing::payloads::{BerkeleyBlockPayload, ZkappCommandLogPayload};
+use crate::event_sourcing::payloads::{BatchZkappCommandLogPayload, BerkeleyBlockPayload};
 use async_trait::async_trait;
 use std::sync::{atomic::AtomicUsize, Arc};
 
@@ -37,25 +37,17 @@ impl Actor for ZkappCommandActor {
         if let EventType::BerkeleyBlock = event.event_type {
             let block_payload: BerkeleyBlockPayload = sonic_rs::from_str(&event.payload).unwrap();
 
-            for zkapp_command in block_payload.zk_app_commands.iter() {
-                let payload = ZkappCommandLogPayload {
-                    height: block_payload.height,
-                    state_hash: block_payload.state_hash.clone(),
-                    txn_hash: zkapp_command.txn_hash(),
-                    timestamp: block_payload.timestamp,
-                    txn_type: zkapp_command.txn_type.clone(),
-                    status: zkapp_command.status.clone(),
-                    nonce: zkapp_command.nonce,
-                    fee_nanomina: zkapp_command.fee_nanomina,
-                    fee_payer: zkapp_command.fee_payer.clone(),
-                    global_slot: block_payload.global_slot_since_genesis,
-                    memo: zkapp_command.memo.clone(),
-                };
-                self.publish(Event {
-                    event_type: EventType::ZkAppCommandLog,
-                    payload: sonic_rs::to_string(&payload).unwrap(),
-                });
-            }
+            let payload = BatchZkappCommandLogPayload {
+                height: block_payload.height,
+                state_hash: block_payload.state_hash.clone(),
+                timestamp: block_payload.timestamp,
+                global_slot: block_payload.global_slot_since_genesis,
+                commands: block_payload.zk_app_commands,
+            };
+            self.publish(Event {
+                event_type: EventType::ZkAppCommandLog,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            });
         }
     }
 
@@ -71,7 +63,7 @@ mod zkapp_command_actor_tests {
     use crate::event_sourcing::{
         events::{Event, EventType},
         models::{CommandStatus, CommandType, ZkAppCommandSummary},
-        payloads::BerkeleyBlockPayload,
+        payloads::{BatchZkappCommandLogPayload, BerkeleyBlockPayload},
     };
     use std::sync::{atomic::Ordering, Arc};
 
@@ -107,7 +99,7 @@ mod zkapp_command_actor_tests {
             height: 15,
             state_hash: "state_hash_berkeley".to_string(),
             global_slot_since_genesis: 25,
-            zk_app_commands,
+            zk_app_commands: zk_app_commands.clone(),
             timestamp: 1672531200,
             ..Default::default()
         };
@@ -126,25 +118,33 @@ mod zkapp_command_actor_tests {
         actor.handle_event(event).await;
 
         // Capture and verify the published ZkappCommandLog events
-        for expected_summary in block_payload.zk_app_commands.iter() {
-            if let Ok(received_event) = receiver.recv().await {
-                assert_eq!(received_event.event_type, EventType::ZkAppCommandLog);
+        if let Ok(received_event) = receiver.recv().await {
+            assert_eq!(received_event.event_type, EventType::ZkAppCommandLog);
 
-                // Deserialize the payload of the ZkappCommandLog event
-                let log_payload: ZkappCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+            // Deserialize the payload of the BatchZkappCommandLogPayload event
+            let log_payload: BatchZkappCommandLogPayload = sonic_rs::from_str(&received_event.payload).unwrap();
 
-                // Verify that the ZkappCommandLogPayload matches the expected values
-                assert_eq!(log_payload.height, block_payload.height);
-                assert_eq!(log_payload.state_hash, block_payload.state_hash);
-                assert_eq!(log_payload.timestamp, block_payload.timestamp);
-                assert_eq!(log_payload.fee_payer, expected_summary.fee_payer);
-                assert_eq!(log_payload.memo, expected_summary.memo);
-            } else {
-                panic!("Did not receive expected ZkappCommandLog event from ZkappCommandActor.");
+            // Verify that the BatchZkappCommandLogPayload matches the expected values
+            assert_eq!(log_payload.height, block_payload.height);
+            assert_eq!(log_payload.state_hash, block_payload.state_hash);
+            assert_eq!(log_payload.timestamp, block_payload.timestamp);
+            assert_eq!(log_payload.global_slot, block_payload.global_slot_since_genesis);
+
+            assert_eq!(log_payload.commands.len(), zk_app_commands.len());
+            for (expected, actual) in zk_app_commands.iter().zip(log_payload.commands.iter()) {
+                assert_eq!(expected.memo, actual.memo);
+                assert_eq!(expected.fee_payer, actual.fee_payer);
+                assert_eq!(expected.status, actual.status);
+                assert_eq!(expected.txn_type, actual.txn_type);
+                assert_eq!(expected.nonce, actual.nonce);
+                assert_eq!(expected.fee_nanomina, actual.fee_nanomina);
+                assert_eq!(expected.account_updates, actual.account_updates);
             }
+        } else {
+            panic!("Did not receive expected ZkAppCommandLog event from ZkappCommandActor.");
         }
 
         // Verify that the event count matches the number of zkapp commands processed
-        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), block_payload.zk_app_commands.len());
+        assert_eq!(actor.actor_outputs().load(Ordering::SeqCst), 1); // Only one batch event is published
     }
 }

@@ -331,18 +331,12 @@ pub struct UserCommandLogPayload {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ZkappCommandLogPayload {
+pub struct BatchZkappCommandLogPayload {
     pub height: u64,
     pub state_hash: String,
-    pub txn_hash: String,
     pub timestamp: u64,
-    pub txn_type: CommandType,
-    pub status: CommandStatus,
-    pub nonce: usize,
-    pub fee_nanomina: u64,
-    pub fee_payer: String,
     pub global_slot: u64,
-    pub memo: String,
+    pub commands: Vec<ZkAppCommandSummary>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
