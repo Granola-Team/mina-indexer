@@ -379,6 +379,17 @@ impl CommandWrapper {
         }
     }
 
+    pub fn to_zk_app_commands(commands: Vec<Self>) -> Option<Vec<ZkappCommand>> {
+        let zk_app_commands = commands
+            .into_iter()
+            .filter_map(|wrapper| match &wrapper.command {
+                Command::SignedCommand(_) => None,
+                Command::ZkappCommand(zk_app_command) => Some(zk_app_command.clone()),
+            })
+            .collect::<Vec<ZkappCommand>>();
+        (!zk_app_commands.is_empty()).then_some(zk_app_commands)
+    }
+
     fn get_fee_payer(&self) -> String {
         match &self.command {
             Command::SignedCommand(signed_command) => signed_command.payload.common.fee_payer_pk.clone(),

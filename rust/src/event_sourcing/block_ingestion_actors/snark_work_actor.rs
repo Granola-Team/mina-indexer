@@ -199,6 +199,7 @@ mod snark_work_actor_tests {
             user_commands: block.get_user_commands(),
             snark_work_count: block.get_aggregated_snark_work().len(),
             zk_app_command_count: block.get_zk_app_commands_count(),
+            zk_app_commands: vec![],
             snark_work: block.get_aggregated_snark_work(),
             fee_transfers: block.get_fee_transfers(),
             fee_transfer_via_coinbase: block.get_fee_transfers_via_coinbase(),

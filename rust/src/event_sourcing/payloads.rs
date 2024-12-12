@@ -1,4 +1,5 @@
 use super::{
+    berkeley_block_models::ZkappCommand,
     canonical_items_manager::CanonicalItem,
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase},
 };
@@ -53,6 +54,7 @@ pub struct BerkeleyBlockPayload {
     pub user_command_count: usize,
     pub user_commands: Vec<CommandSummary>,
     pub zk_app_command_count: usize,
+    pub zk_app_commands: Vec<ZkappCommand>,
     pub snark_work_count: usize,
     pub snark_work: Vec<CompletedWorksNanomina>,
     pub fee_transfers: Vec<FeeTransfer>,
