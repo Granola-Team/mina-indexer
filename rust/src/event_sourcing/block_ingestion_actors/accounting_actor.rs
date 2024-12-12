@@ -6,8 +6,8 @@ use super::super::{
 use crate::event_sourcing::{
     models::{CommandStatus, CommandType},
     payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload,
-        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBatchZkappCommandLogPayload, CanonicalInternalCommandLogPayload,
+        CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
     },
 };
 use async_trait::async_trait;
@@ -226,6 +226,46 @@ impl AccountingActor {
 
         self.publish_transaction(&txn_2).await;
     }
+
+    async fn process_batch_zk_app_commands(&self, payload: &CanonicalBatchZkappCommandLogPayload) {
+        for command in &payload.commands {
+            let mut fee_payer_entry = AccountingEntry {
+                counterparty: format!("BlockRewardPool#{}", payload.state_hash),
+                transfer_type: "BlockRewardPool".to_string(),
+                entry_type: AccountingEntryType::Debit,
+                account: command.fee_payer.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: command.fee_nanomina,
+                timestamp: payload.timestamp,
+            };
+
+            let mut block_reward_pool_entry = AccountingEntry {
+                counterparty: command.fee_payer.to_string(),
+                transfer_type: "BlockRewardPool".to_string(),
+                entry_type: AccountingEntryType::Credit,
+                account: format!("BlockRewardPool#{}", payload.state_hash),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: command.fee_nanomina,
+                timestamp: payload.timestamp,
+            };
+
+            if !payload.canonical {
+                // Swap debits and credits
+                fee_payer_entry.entry_type = AccountingEntryType::Credit;
+                block_reward_pool_entry.entry_type = AccountingEntryType::Debit;
+            }
+
+            let txn = DoubleEntryRecordPayload {
+                height: payload.height,
+                state_hash: payload.state_hash.to_string(),
+                ledger_destination: LedgerDestination::BlockchainLedger,
+                lhs: vec![fee_payer_entry],
+                rhs: vec![block_reward_pool_entry],
+            };
+
+            self.publish_transaction(&txn).await;
+        }
+    }
 }
 
 #[async_trait]
@@ -289,6 +329,14 @@ impl Actor for AccountingActor {
                 }
                 self.process_user_commands(&payload).await;
             }
+            EventType::CanonicalBatchZkappCommandLog => {
+                let payload: CanonicalBatchZkappCommandLogPayload = sonic_rs::from_str(&event.payload).unwrap();
+                // not canonical, and wasn't before. No need to deduct
+                if !payload.canonical && !payload.was_canonical {
+                    return;
+                }
+                self.process_batch_zk_app_commands(&payload).await;
+            }
             _ => {}
         }
     }
@@ -302,7 +350,10 @@ impl Actor for AccountingActor {
 #[cfg(test)]
 mod accounting_actor_tests {
     use super::*;
-    use crate::event_sourcing::payloads::{CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType};
+    use crate::event_sourcing::{
+        models::ZkAppCommandSummary,
+        payloads::{CanonicalInternalCommandLogPayload, CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType},
+    };
     use std::sync::{atomic::Ordering, Arc};
     use tokio::time::timeout;
 
@@ -862,5 +913,121 @@ mod accounting_actor_tests {
         );
 
         assert_eq!(actor.entries_processed.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_process_canonical_batch_zkapp_command_log() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = CanonicalBatchZkappCommandLogPayload {
+            canonical: true,
+            was_canonical: false,
+            height: 400,
+            state_hash: "state_hash_7".to_string(),
+            timestamp: 1620000600,
+            global_slot: 1000,
+            commands: vec![
+                ZkAppCommandSummary {
+                    memo: "memo_1".to_string(),
+                    fee_payer: "B62qfee_payer1".to_string(),
+                    status: CommandStatus::Applied,
+                    txn_type: CommandType::Payment,
+                    nonce: 1,
+                    fee_nanomina: 10_000,
+                    account_updates: 2,
+                },
+                ZkAppCommandSummary {
+                    memo: "memo_2".to_string(),
+                    fee_payer: "B62qfee_payer2".to_string(),
+                    status: CommandStatus::Failed,
+                    txn_type: CommandType::StakeDelegation,
+                    nonce: 2,
+                    fee_nanomina: 20_000,
+                    account_updates: 3,
+                },
+            ],
+        };
+
+        actor
+            .handle_event(Event {
+                event_type: EventType::CanonicalBatchZkappCommandLog,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await;
+
+        // Verify the published transactions for each command in the batch
+        for command in &payload.commands {
+            let published_event = tokio::time::timeout(std::time::Duration::from_secs(1), receiver.recv())
+                .await
+                .expect("Expected a DoubleEntryTransaction event")
+                .expect("Event received");
+
+            let published_payload: DoubleEntryRecordPayload = sonic_rs::from_str(&published_event.payload).unwrap();
+
+            // Ensure the published transaction matches the height and state hash
+            assert_eq!(published_payload.height, payload.height);
+            assert_eq!(published_payload.state_hash, payload.state_hash);
+
+            // Verify the fee transaction for the fee payer
+            assert_eq!(published_payload.lhs.len(), 1);
+            assert_eq!(published_payload.rhs.len(), 1);
+
+            assert_eq!(published_payload.lhs[0].entry_type, AccountingEntryType::Debit);
+            assert_eq!(published_payload.lhs[0].account, command.fee_payer);
+            assert_eq!(published_payload.lhs[0].amount_nanomina, command.fee_nanomina);
+
+            assert_eq!(published_payload.rhs[0].entry_type, AccountingEntryType::Credit);
+            assert_eq!(published_payload.rhs[0].account, format!("BlockRewardPool#{}", payload.state_hash));
+            assert_eq!(published_payload.rhs[0].amount_nanomina, command.fee_nanomina);
+        }
+
+        assert_eq!(
+            actor.entries_processed.load(std::sync::atomic::Ordering::SeqCst),
+            payload.commands.len(),
+            "Expected the number of processed entries to match the number of commands in the batch"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_non_canonical_batch_zkapp_command_log() {
+        let (actor, mut receiver) = setup_actor();
+
+        let payload = CanonicalBatchZkappCommandLogPayload {
+            canonical: false,
+            was_canonical: false,
+            height: 500,
+            state_hash: "state_hash_8".to_string(),
+            timestamp: 1620000700,
+            global_slot: 2000,
+            commands: vec![ZkAppCommandSummary {
+                memo: "memo_3".to_string(),
+                fee_payer: "B62qfee_payer3".to_string(),
+                status: CommandStatus::Applied,
+                txn_type: CommandType::Payment,
+                nonce: 1,
+                fee_nanomina: 15_000,
+                account_updates: 2,
+            }],
+        };
+
+        actor
+            .handle_event(Event {
+                event_type: EventType::CanonicalBatchZkappCommandLog,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await;
+
+        // Verify no event is published for non-canonical payloads
+        let published_event = tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv()).await;
+        assert!(
+            published_event.is_err(),
+            "No event should be published for non-canonical batch zkapp command logs"
+        );
+
+        assert_eq!(
+            actor.entries_processed.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "No entries should be processed for non-canonical batch zkapp command logs"
+        );
     }
 }
