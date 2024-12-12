@@ -48,11 +48,13 @@ pub enum CommandType {
     #[default]
     Payment,
     StakeDelegation,
+    ZkApp,
 }
 
 impl fmt::Display for CommandType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_text = match self {
+            CommandType::ZkApp => "ZkApp",
             CommandType::Payment => "Payment",
             CommandType::StakeDelegation => "StakeDelegation",
         };
@@ -84,6 +86,17 @@ impl CommandSummary {
         // Return the hash as a hexadecimal string
         format!("{:x}", hasher.finalize())
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default, Hash, Debug)]
+pub struct ZkAppCommandSummary {
+    pub memo: String,
+    pub fee_payer: String,
+    pub status: CommandStatus,
+    pub txn_type: CommandType,
+    pub nonce: usize,
+    pub fee_nanomina: u64,
+    pub account_updates: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

@@ -1,6 +1,6 @@
 use super::{
     block::BlockTrait,
-    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
+    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, ZkAppCommandSummary},
 };
 use crate::{
     constants::MAINNET_COINBASE_REWARD,
@@ -80,7 +80,7 @@ impl BerkeleyBlock {
         self.get_zk_app_commands().len()
     }
 
-    pub fn get_zk_app_commands(&self) -> Vec<CommandWrapper> {
+    pub fn get_zk_app_commands(&self) -> Vec<ZkAppCommandSummary> {
         [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
             .iter()
             .filter_map(|opt_diff| {
@@ -93,6 +93,7 @@ impl BerkeleyBlock {
                 })
             })
             .flatten()
+            .map(|w| w.to_zk_app_summary())
             .collect()
     }
 
@@ -347,10 +348,16 @@ impl CommandWrapper {
         }
     }
 
-    fn get_fee(&self) -> f64 {
+    fn get_fee(&self) -> u64 {
         match &self.command {
-            Command::SignedCommand(signed_command) => signed_command.payload.common.fee.parse::<f64>().unwrap(),
-            Command::ZkappCommand(zkapp_command) => zkapp_command.fee_payer.body.fee.parse::<f64>().unwrap(),
+            Command::SignedCommand(signed_command) => {
+                let fee_nanomina = BigDecimal::from_str(&signed_command.payload.common.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                fee_nanomina.to_u64().unwrap()
+            }
+            Command::ZkappCommand(zkapp_command) => {
+                let fee_nanomina = BigDecimal::from_str(&zkapp_command.fee_payer.body.fee).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
+                fee_nanomina.to_u64().unwrap()
+            }
         }
     }
 
@@ -410,10 +417,33 @@ impl CommandWrapper {
                 },
                 txn_type: self.get_type(),
                 nonce: self.get_nonce(),
-                fee_nanomina: (self.get_fee() * 1_000_000_000f64) as u64,
+                fee_nanomina: self.get_fee(),
                 amount_nanomina: self.get_amount_nanomina(),
             },
-            Command::ZkappCommand(_) => todo!("to_command_summary not implemented for ZkappCommand"),
+            Command::ZkappCommand(_) => panic!("Cannot convert zk app command to CommandSummary"),
+        }
+    }
+
+    pub fn to_zk_app_summary(&self) -> ZkAppCommandSummary {
+        match &self.command {
+            Command::SignedCommand(_) => panic!("Cannot convert signed command to CommandSummary"),
+            Command::ZkappCommand(_) => ZkAppCommandSummary {
+                memo: self.get_memo(),
+                fee_payer: self.get_fee_payer(),
+                status: match self.get_status().as_str() {
+                    "Applied" => CommandStatus::Applied,
+                    _ => CommandStatus::Failed,
+                },
+                txn_type: CommandType::ZkApp,
+                nonce: self.get_nonce(),
+                fee_nanomina: self.get_fee(),
+                account_updates: self
+                    .get_account_updates()
+                    .unwrap_or_default()
+                    .iter()
+                    .map(|update_tree| update_tree.size())
+                    .sum::<usize>(),
+            },
         }
     }
 }
@@ -663,28 +693,24 @@ mod berkeley_block_tests {
         assert_eq!(zk_app_commands.len(), 5);
 
         let first_zkapp_command = zk_app_commands.first().unwrap();
+        assert_eq!(first_zkapp_command.fee_payer, "B62qm2aFMwggaVEwAkJB1r77adTBfPkbmJuZkmjzFmsCfAsqrn9kc44");
+        assert_eq!(first_zkapp_command.fee_nanomina, 5_000_000);
+        assert_eq!(first_zkapp_command.nonce, 200);
+        assert_eq!(first_zkapp_command.memo, "Init vote zkapp".to_string());
+        assert_eq!(first_zkapp_command.status, CommandStatus::Applied);
+        assert_eq!(first_zkapp_command.txn_type, CommandType::ZkApp);
+        assert_eq!(first_zkapp_command.account_updates, 1);
+
         let second_zkapp_command = zk_app_commands.get(1).unwrap();
+        assert_eq!(second_zkapp_command.account_updates, 1);
+
         let third_zkapp_command = zk_app_commands.get(2).unwrap();
+        assert_eq!(third_zkapp_command.account_updates, 1);
+
         let fourth_zkapp_command = zk_app_commands.get(3).unwrap();
+        assert_eq!(fourth_zkapp_command.account_updates, 4);
+
         let fifth_zkapp_command = zk_app_commands.last().unwrap();
-        assert_eq!(first_zkapp_command.get_fee_payer(), "B62qm2aFMwggaVEwAkJB1r77adTBfPkbmJuZkmjzFmsCfAsqrn9kc44");
-        assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
-        assert_eq!(first_zkapp_command.get_fee(), 0.005_f64);
-        assert_eq!(first_zkapp_command.get_nonce(), 200);
-
-        assert_eq!(first_zkapp_command.get_memo(), "Init vote zkapp".to_string());
-
-        assert_eq!(first_zkapp_command.get_account_updates().unwrap().len(), 1);
-        assert_eq!(first_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
-        assert_eq!(second_zkapp_command.get_account_updates().unwrap().len(), 1);
-        assert_eq!(second_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
-        assert_eq!(third_zkapp_command.get_account_updates().unwrap().len(), 1);
-        assert_eq!(third_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
-        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap().len(), 2);
-        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
-        assert_eq!(fourth_zkapp_command.get_account_updates().unwrap()[1].size(), 3);
-        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap().len(), 2);
-        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap()[0].size(), 1);
-        assert_eq!(fifth_zkapp_command.get_account_updates().unwrap()[1].size(), 3);
+        assert_eq!(fifth_zkapp_command.account_updates, 4);
     }
 }

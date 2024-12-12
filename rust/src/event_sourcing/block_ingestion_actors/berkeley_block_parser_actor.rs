@@ -4,11 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::{
-    event_sourcing::{
-        berkeley_block_models::{BerkeleyBlock, CommandWrapper},
-        block::BlockTrait,
-        payloads::BerkeleyBlockPayload,
-    },
+    event_sourcing::{berkeley_block_models::BerkeleyBlock, block::BlockTrait, payloads::BerkeleyBlockPayload},
     utility::extract_height_and_hash,
 };
 use async_trait::async_trait;
@@ -57,7 +53,7 @@ impl Actor for BerkeleyBlockParserActor {
                 user_command_count: berkeley_block.get_user_commands_count(),
                 user_commands: berkeley_block.get_user_commands(),
                 zk_app_command_count: berkeley_block.get_zk_app_commands_count(),
-                zk_app_commands: CommandWrapper::to_zk_app_commands(berkeley_block.get_zk_app_commands()).unwrap_or_default(),
+                zk_app_commands: berkeley_block.get_zk_app_commands(),
                 snark_work_count: berkeley_block.get_aggregated_snark_work().len(),
                 snark_work: berkeley_block.get_aggregated_snark_work(),
                 fee_transfers: berkeley_block.get_fee_transfers(),

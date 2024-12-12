@@ -1,7 +1,6 @@
 use super::{
-    berkeley_block_models::ZkappCommand,
     canonical_items_manager::CanonicalItem,
-    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase},
+    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
 };
 use sonic_rs::{Deserialize, Serialize};
 
@@ -54,7 +53,7 @@ pub struct BerkeleyBlockPayload {
     pub user_command_count: usize,
     pub user_commands: Vec<CommandSummary>,
     pub zk_app_command_count: usize,
-    pub zk_app_commands: Vec<ZkappCommand>,
+    pub zk_app_commands: Vec<ZkAppCommandSummary>,
     pub snark_work_count: usize,
     pub snark_work: Vec<CompletedWorksNanomina>,
     pub fee_transfers: Vec<FeeTransfer>,
@@ -327,6 +326,21 @@ pub struct UserCommandLogPayload {
     pub fee_nanomina: u64,
     pub fee_payer: String,
     pub amount_nanomina: u64,
+    pub global_slot: u64,
+    pub memo: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct ZkappCommandLogPayload {
+    pub height: u64,
+    pub state_hash: String,
+    pub txn_hash: String,
+    pub timestamp: u64,
+    pub txn_type: CommandType,
+    pub status: CommandStatus,
+    pub nonce: usize,
+    pub fee_nanomina: u64,
+    pub fee_payer: String,
     pub global_slot: u64,
     pub memo: String,
 }
