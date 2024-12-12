@@ -17,6 +17,7 @@ pub enum EventType {
     BulkSnarkCanonicity,
     TransitionFrontier,
     UserCommandLog,
+    ZkAppCommandLog,
     CanonicalUserCommandLog,
     BatchCanonicalUserCommandLog,
     InternalCommandLog,

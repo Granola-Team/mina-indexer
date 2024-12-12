@@ -11,7 +11,7 @@ use block_ingestion_actors::{
     ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor, monitor_actor::MonitorActor, new_account_actor::NewAccountActor,
     pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
     snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_ledger_actor::StakingLedgerActor,
-    user_command_log_actor::UserCommandLogActor, username_actor::UsernameActor, Actor,
+    user_command_log_actor::UserCommandLogActor, username_actor::UsernameActor, zk_app_command_log_actor::ZkappCommandActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -73,6 +73,7 @@ pub async fn subscribe_actors(
         Arc::new(BatchCanonicalUserCommandLogActor::new(Arc::clone(shared_publisher))),
         Arc::new(BulkSnarkCanonicitySummaryActor::new(Arc::clone(shared_publisher))),
         Arc::new(UsernameActor::new(Arc::clone(shared_publisher))),
+        Arc::new(ZkappCommandActor::new(Arc::clone(shared_publisher))),
         Arc::new(MonitorActor::new(Arc::clone(shared_publisher), SLIDING_WINDOW_SIZE, None)),
         Arc::new(internal_command_persistence_actor),
         Arc::new(user_command_persistence_actor),

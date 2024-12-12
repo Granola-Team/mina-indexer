@@ -99,6 +99,19 @@ pub struct ZkAppCommandSummary {
     pub account_updates: usize,
 }
 
+impl ZkAppCommandSummary {
+    // TODO: this needs to use bin_prot
+    // but for now we'll make up a hash
+    pub fn txn_hash(&self) -> String {
+        let serialized = sonic_rs::to_string(self).unwrap();
+        // Use a SHA-256 hasher
+        let mut hasher = Sha256::new();
+        hasher.update(serialized);
+        // Return the hash as a hexadecimal string
+        format!("{:x}", hasher.finalize())
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct FeeTransfer {
     pub recipient: String,
