@@ -75,11 +75,11 @@ lint:
   ruby -cw ops/*.rb
   standardrb --no-fix ops/*.rb
   shellcheck tests/regression.bash
+  @echo "--- Linting Nix configs"
+  alejandra --check flake.nix
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features -- -D warnings
-  @echo "--- Linting Nix configs"
-  alejandra --check flake.nix
   @echo "--- Linting Cargo dependencies"
   cd rust && cargo machete Cargo.toml
 

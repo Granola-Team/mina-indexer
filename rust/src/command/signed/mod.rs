@@ -15,10 +15,7 @@ use crate::{
 use anyhow::bail;
 use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
-use std::{
-    io::{ErrorKind, Write},
-    path::PathBuf,
-};
+use std::io::{ErrorKind, Write};
 
 // re-export [txn_hash::TxnHash]
 pub type TxnHash = txn_hash::TxnHash;
@@ -326,21 +323,7 @@ impl SignedCommand {
 
                 match serde_json::to_string(&json) {
                     Ok(cmd_str) => {
-                        let path = PathBuf::from("../ops/mina/mina_txn_hasher.exe");
-
-                        // Check if file exists and is executable
-                        if let Ok(metadata) = std::fs::metadata(&path) {
-                            #[cfg(unix)]
-                            use std::os::unix::fs::PermissionsExt;
-                            if metadata.permissions().mode() & 0o111 == 0 {
-                                bail!("Error: File exists but is not executable");
-                            }
-                        } else {
-                            bail!("Error: File does not exist");
-                        }
-
-                        let pgm = path.display().to_string();
-                        let mut proc = std::process::Command::new(pgm);
+                        let mut proc = std::process::Command::new("mina_txn_hasher.exe");
                         proc.arg(cmd_str);
 
                         match proc.output() {
@@ -355,7 +338,6 @@ impl SignedCommand {
                                 TxnHash::new(txn_hash.trim().to_string())
                             }
                             Err(e) => {
-                                // More specific error handling
                                 let err_msg = match e.kind() {
                                     ErrorKind::NotFound => "Executable not found",
                                     ErrorKind::PermissionDenied => "Permission denied",

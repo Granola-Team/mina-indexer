@@ -28,7 +28,16 @@
         rustc = rust;
       };
 
-      runtimeDependencies = with pkgs; [openssl zstd];
+      # Define common libraries needed for both runtime and development
+      commonLibs = with pkgs; [
+        openssl
+        zstd
+        libffi
+        gmp
+        jemalloc
+      ];
+
+      runtimeDependencies = commonLibs;
 
       frameworks = pkgs.darwin.apple_sdk.frameworks;
 
@@ -78,6 +87,13 @@
           mdformat
         ]
         ++ buildDependencies;
+
+      # Common environment setup for both runtime and development
+      commonEnv = {
+        NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
+        NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
+        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath commonLibs}:/run/current-system/sw/share/nix-ld/lib";
+      };
 
       cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
     in
@@ -142,18 +158,39 @@
             created = "now";
             tag = builtins.substring 0 8 (self.rev or "dev");
             copyToRoot = pkgs.buildEnv {
-              paths = with pkgs; [mina-indexer openssl zstd bash self];
+              paths = with pkgs; [mina-indexer bash self] ++ commonLibs;
               name = "mina-indexer-root";
-              pathsToLink = ["/bin" "/share"];
+              pathsToLink = ["/bin" "/share" "/lib"];
             };
-            config.Cmd = ["${pkgs.lib.getExe mina-indexer}"];
+            config = {
+              Cmd = ["${pkgs.lib.getExe mina-indexer}"];
+              Env = [
+                "NIX_LD=${commonEnv.NIX_LD}"
+                "NIX_LD_LIBRARY_PATH=${commonEnv.NIX_LD_LIBRARY_PATH}"
+                "LD_LIBRARY_PATH=${commonEnv.LD_LIBRARY_PATH}"
+              ];
+            };
           };
         };
 
         devShells.default = mkShell {
-          env = {LIBCLANG_PATH = "${libclang.lib}/lib";};
+          env = {
+            LIBCLANG_PATH = "${libclang.lib}/lib";
+            inherit (commonEnv) NIX_LD NIX_LD_LIBRARY_PATH LD_LIBRARY_PATH;
+          };
           buildInputs = developmentDependencies;
-          shellHook = "export TMPDIR=/var/tmp";
+          shellHook = ''
+            export TMPDIR=/var/tmp
+
+            # Create wrapper script for mina_txn_hasher.exe
+            mkdir -p .local/bin
+            cat > .local/bin/mina_txn_hasher.exe <<EOF
+            #!/bin/sh
+            exec ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 ${toString ./.}/ops/mina/mina_txn_hasher.exe "\$@"
+            EOF
+            chmod +x .local/bin/mina_txn_hasher.exe
+            export PATH="$PWD/.local/bin:$PATH"
+          '';
         };
       });
 }
