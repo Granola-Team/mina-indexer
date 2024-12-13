@@ -44,6 +44,13 @@ task ingest: [:build] do
   chdir root_dir
 end
 
+desc "Ingest blocks using Kafka"
+task ingest_kafka: [:build] do
+  chdir "rust"
+  sh "cargo run --bin kafka-ingestion"
+  chdir root_dir
+end
+
 desc "Ingest staking ledgers"
 task staking: [:build] do
   chdir "rust"

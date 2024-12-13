@@ -22,6 +22,7 @@ rayon = "1.10"
 walkdir = "2.5"
 tracing = "0.1.40"
 bs58 = { version = "0.5.1", features = ["check"] }
+rdkafka = "0.37.0"
 
 [dev-dependencies]
 tempfile = "3.14.0"
@@ -33,6 +34,10 @@ path = "src/bin/ingest_staking_ledgers.rs"
 [[bin]]
 name = "ingestion"
 path = "src/bin/ingest_blocks.rs"
+
+[[bin]]
+name = "kafka-ingestion"
+path = "src/bin/ingest_blocks_kafka.rs"
 
 [package.metadata.cargo-machete]
 ignored = ["serde"]
