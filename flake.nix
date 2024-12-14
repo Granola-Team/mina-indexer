@@ -46,7 +46,6 @@
           cargo-nextest
           clang
           libclang.lib
-          mold-wrapped # https://github.com/rui314/mold#mold-a-modern-linker
           pkg-config
           rustPlatform.bindgenHook
         ]
@@ -55,6 +54,9 @@
           frameworks.Security
           frameworks.CoreServices
           zld
+        ]
+        ++ lib.optionals (!stdenv.isDarwin) [
+          mold-wrapped # Linux only - https://github.com/rui314/mold#mold-a-modern-linker
         ];
 
       # used to ensure rustfmt is nightly version to support unstable features
@@ -88,12 +90,20 @@
         ]
         ++ buildDependencies;
 
-      # Common environment setup for both runtime and development
-      commonEnv = {
-        NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
-        NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
-        LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath commonLibs}:/run/current-system/sw/share/nix-ld/lib";
-      };
+      # Platform-specific environment setup
+      commonEnv = with pkgs.lib; let
+        linuxEnv = {
+          NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
+          NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
+          LD_LIBRARY_PATH = "${makeLibraryPath commonLibs}:/run/current-system/sw/share/nix-ld/lib";
+        };
+        darwinEnv = {
+          LIBRARY_PATH = "${makeLibraryPath commonLibs}";
+        };
+      in
+        if pkgs.stdenv.isDarwin
+        then darwinEnv
+        else linuxEnv;
 
       cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
     in
@@ -131,8 +141,6 @@
 
             buildInputs = runtimeDependencies;
 
-            # env = { LIBCLANG_PATH = "${libclang.lib}/lib"; };
-
             # This is equivalent to `git rev-parse --short=8 HEAD`
             gitCommitHash = builtins.substring 0 8 (self.rev or "dev");
 
@@ -141,8 +149,6 @@
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
             '';
-            # TODO:
-            # doCheck = true;
             checkPhase = ''
               set -ex
               cargo clippy --all-targets --all-features -- -D warnings
@@ -164,22 +170,19 @@
             };
             config = {
               Cmd = ["${pkgs.lib.getExe mina-indexer}"];
-              Env = [
-                "NIX_LD=${commonEnv.NIX_LD}"
-                "NIX_LD_LIBRARY_PATH=${commonEnv.NIX_LD_LIBRARY_PATH}"
-                "LD_LIBRARY_PATH=${commonEnv.LD_LIBRARY_PATH}"
-              ];
+              Env = lib.mapAttrsToList (name: value: "${name}=${value}") commonEnv;
             };
           };
         };
 
         devShells.default = mkShell {
-          env = {
-            LIBCLANG_PATH = "${libclang.lib}/lib";
-            inherit (commonEnv) NIX_LD NIX_LD_LIBRARY_PATH LD_LIBRARY_PATH;
-          };
+          env =
+            {
+              LIBCLANG_PATH = "${libclang.lib}/lib";
+            }
+            // commonEnv;
           buildInputs = developmentDependencies;
-          shellHook = ''
+          shellHook = lib.optionalString (!stdenv.isDarwin) ''
             export TMPDIR=/var/tmp
 
             # Create wrapper script for mina_txn_hasher.exe
