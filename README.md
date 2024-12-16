@@ -22,8 +22,6 @@
     </tr>
 </table>
 
-______________________________________________________________________
-
 The Mina Indexer is a redesigned version of the software collectively
 called the "[Mina archive
 node](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive)."
