@@ -1,11 +1,14 @@
 use async_trait::async_trait;
 use convert_case::{Case, Casing};
 use rdkafka::{
-    consumer::{Consumer, StreamConsumer},
-    message::Message,
+    admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
+    client::DefaultClientContext,
+    error::KafkaResult,
+    util::Timeout,
+    ClientConfig,
 };
+use std::time::Duration;
 use strum_macros::{AsRefStr, EnumString};
-use tokio_stream::StreamExt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, AsRefStr, EnumString)]
 pub enum EventType {
@@ -33,28 +36,51 @@ impl EventType {
 
 #[async_trait]
 pub trait Actor {
-    /// Consumes messages from assigned topics and delegates to `handle_event`.
-    async fn consume(&self, consumer: &StreamConsumer, topics: &[&str]) {
-        // Subscribe to the topics
-        consumer.subscribe(topics).expect("Failed to subscribe to topics");
+    /// Perform setup tasks, like creating required topics.
+    async fn setup(&self, brokers: &str, topics: &[&str]) {
+        // Create the AdminClient
+        let client: AdminClient<DefaultClientContext> = ClientConfig::new()
+            .set("bootstrap.servers", brokers)
+            .create()
+            .expect("Admin client creation error");
 
-        // Start streaming messages
-        let mut stream = consumer.stream();
-        while let Some(result) = stream.next().await {
-            match result {
-                Ok(message) => {
-                    if let Some(Ok(payload)) = message.payload_view::<str>() {
-                        let topic = message.topic();
-                        let event = Event {
-                            event_type: EventType::from_str(topic).unwrap(),
-                            payload: payload.to_string(),
-                        };
-                        self.handle_event(event).await;
+        // Iterate over topics and create each one if it doesn't exist
+        for topic in topics {
+            match self.topic_exists(&client, topic).await {
+                Ok(true) => println!("Topic '{}' already exists.", topic),
+                Ok(false) => {
+                    if let Err(err) = self.create_topic(&client, topic).await {
+                        eprintln!("Failed to create topic '{}': {:?}", topic, err);
                     }
                 }
-                Err(err) => eprintln!("Error consuming message: {:?}", err),
+                Err(err) => eprintln!("Failed to check existence of topic '{}': {:?}", topic, err),
             }
         }
+    }
+
+    /// Check if a Kafka topic exists.
+    async fn topic_exists(&self, client: &AdminClient<DefaultClientContext>, topic: &str) -> KafkaResult<bool> {
+        let metadata = client.inner().fetch_metadata(None, Timeout::Never)?;
+        Ok(metadata.topics().iter().any(|t| t.name() == topic))
+    }
+
+    /// Create a single Kafka topic.
+    async fn create_topic(&self, client: &AdminClient<DefaultClientContext>, topic: &str) -> KafkaResult<()> {
+        let new_topic = NewTopic::new(topic, 1, TopicReplication::Fixed(1));
+        let res = client
+            .create_topics(
+                &[new_topic],
+                &AdminOptions::new().operation_timeout(Some(Timeout::After(Duration::from_secs(10)))),
+            )
+            .await?;
+
+        for result in res {
+            match result {
+                Ok(_) => println!("Topic '{}' created successfully.", topic),
+                Err((err, _)) => eprintln!("Failed to create topic '{}': {:?}", topic, err),
+            }
+        }
+        Ok(())
     }
 
     /// Handles a single event, processing it and potentially publishing a result.
