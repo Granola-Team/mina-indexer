@@ -1,11 +1,28 @@
 <h1 align="center">mina-indexer</h1>
 
-<p align="center">
-    <a href="https://buildkite.com/granola/mina-indexer?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a>
-    <img src="https://github.com/Granola-Team/mina-indexer/workflows/CI/badge.svg?branch=main">
-    <a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
-</p>
+<table align="center">
+    <tr>
+        <td align="center">Tier 1</td>
+        <td align="center">Tier 2</td>
+        <td align="center">Tier 3</td>
+        <td align="center">Production</td>
+        <td align="center">License</td>
+    </tr>
+    <tr>
+        <!-- Buildkite - tier 1 -->
+        <td><a href="https://buildkite.com/granola/mina-indexer/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
+        <!-- Buildkite - tier 2 -->
+        <td><a href="https://buildkite.com/granola/mina-indexer-tier-2/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
+        <!-- Buildkite - tier 3 -->
+        <td><a href="https://buildkite.com/granola/mina-indexer-tier-3/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
+        <!-- Buildkite - prod -->
+        <td><a href="https://buildkite.com/granola/mina-indexer-production/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
+        <!-- Apache license -->
+        <td><a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a></td>
+    </tr>
+</table>
 
+______________________________________________________________________
 
 The Mina Indexer is a redesigned version of the software collectively
 called the "[Mina archive
@@ -49,7 +66,7 @@ optimized for the Mina ecosystem.
 ### Development Prerequisites
 
 1. Install Nix (with Flakes) using [The Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer#the-determinate-nix-installer).
-2. Install and configure [Direnv](https://direnv.net).
+1. Install and configure [Direnv](https://direnv.net).
 
 ### Execution Environment
 
@@ -126,8 +143,9 @@ To deploy a mina-indexer locally, the directory `/mnt/mina-indexer-prod`
 must exist.
 
 There are two options to start an instance:
+
 1. `just deploy-local-prod` uses the release binary
-2. `just deploy-local-prod-dev` uses the debug binary
+1. `just deploy-local-prod-dev` uses the debug binary
 
 ## Generating OCI Images With Nix
 
