@@ -1,6 +1,7 @@
 use anyhow::Result;
 use duckdb::Connection;
 
+pub(crate) mod actors;
 pub(crate) mod blockchain_tree;
 pub mod blocks;
 pub mod constants;
