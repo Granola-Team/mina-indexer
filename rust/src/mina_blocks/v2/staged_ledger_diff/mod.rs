@@ -266,10 +266,8 @@ pub struct Update {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum UpdateKind {
-    #[serde(deserialize_with = "from_keep_or_ignore")]
-    Keep,
-    #[serde(deserialize_with = "from_set_or_check")]
-    Set(String),
+    Keep((String,)),
+    Set((String, String)),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -320,10 +318,8 @@ pub struct AccountPreconditions {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Precondition {
-    #[serde(deserialize_with = "from_keep_or_ignore")]
-    Ignore,
-    #[serde(deserialize_with = "from_set_or_check")]
-    Check(CheckPreconditionBounds),
+    Ignore((String,)),
+    Check((String, CheckPreconditionBounds)),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -411,10 +407,7 @@ fn convert_object(key: &str, value: &mut serde_json::Value) {
 mod tests {
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        command::{
-            convert_zkapp_json, signed::SignedCommand, to_mina_json, to_zkapp_json,
-            UserCommandWithStatusT,
-        },
+        command::{signed::SignedCommand, to_mina_json, to_zkapp_json, UserCommandWithStatusT},
         mina_blocks::v2::staged_ledger_diff::UserCommandData,
     };
     use std::path::PathBuf;
@@ -510,9 +503,8 @@ mod tests {
                 }
 
                 let cmd: SignedCommand = cmd.into();
-                let mut json: serde_json::Value = cmd.into();
+                let json: serde_json::Value = cmd.into();
 
-                convert_zkapp_json(&mut json);
                 Some(serde_json::to_string_pretty(&json).unwrap())
             })
             .collect::<Vec<_>>();
