@@ -35,6 +35,8 @@ sqlfluff.pkg-path = "sqlfluff"
 cargo-machete.pkg-path = "cargo-machete"
 cargo-edit.pkg-path = "cargo-edit"
 libpqxx.pkg-path = "libpqxx"
+docker.pkg-path = "docker"
+docker-compose.pkg-path = "docker-compose"
 
 # Misc
 
