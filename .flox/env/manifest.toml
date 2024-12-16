@@ -37,6 +37,7 @@ cargo-edit.pkg-path = "cargo-edit"
 libpqxx.pkg-path = "libpqxx"
 docker.pkg-path = "docker"
 docker-compose.pkg-path = "docker-compose"
+colima.pkg-path = "colima"
 
 # Misc
 

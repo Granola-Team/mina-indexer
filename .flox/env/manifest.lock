@@ -9,6 +9,9 @@
       "cargo-machete": {
         "pkg-path": "cargo-machete"
       },
+      "colima": {
+        "pkg-path": "colima"
+      },
       "docker": {
         "pkg-path": "docker"
       },
@@ -563,6 +566,126 @@
       ],
       "outputs": {
         "out": "/nix/store/7w1xb7vlrbdn2hif03lf0mblf0kzfajd-cargo-machete-0.7.0"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "colima",
+      "broken": false,
+      "derivation": "/nix/store/qk9yhrn5417f9kyxhk61mxb86q4zkqha-colima-0.7.6.drv",
+      "description": "Container runtimes with minimal setup",
+      "install_id": "colima",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dc460ec76cbff0e66e269457d7b728432263166c",
+      "name": "colima-0.7.6",
+      "pname": "colima",
+      "rev": "dc460ec76cbff0e66e269457d7b728432263166c",
+      "rev_count": 706477,
+      "rev_date": "2024-11-11T10:11:37Z",
+      "scrape_date": "2024-11-15T03:58:27Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/wi9k86vzkr1mb3ghn306l7a4g4s1npl1-colima-0.7.6"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "colima",
+      "broken": false,
+      "derivation": "/nix/store/fzyq03i02pcqh25k57wy3mlb5saim7zd-colima-0.7.6.drv",
+      "description": "Container runtimes with minimal setup",
+      "install_id": "colima",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dc460ec76cbff0e66e269457d7b728432263166c",
+      "name": "colima-0.7.6",
+      "pname": "colima",
+      "rev": "dc460ec76cbff0e66e269457d7b728432263166c",
+      "rev_count": 706477,
+      "rev_date": "2024-11-11T10:11:37Z",
+      "scrape_date": "2024-11-15T03:58:27Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/55l9g5py8hrbw0yc0pc2jn67qv864xvx-colima-0.7.6"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "colima",
+      "broken": false,
+      "derivation": "/nix/store/m0m27fzpi5aqc31nqa22sk0cfakhq76r-colima-0.7.6.drv",
+      "description": "Container runtimes with minimal setup",
+      "install_id": "colima",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dc460ec76cbff0e66e269457d7b728432263166c",
+      "name": "colima-0.7.6",
+      "pname": "colima",
+      "rev": "dc460ec76cbff0e66e269457d7b728432263166c",
+      "rev_count": 706477,
+      "rev_date": "2024-11-11T10:11:37Z",
+      "scrape_date": "2024-11-15T03:58:27Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/qq2yb5krffp224997850axhsf2fawffs-colima-0.7.6"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "colima",
+      "broken": false,
+      "derivation": "/nix/store/kzdz1zd35gibvj1237zvsnq7x66y0lz6-colima-0.7.6.drv",
+      "description": "Container runtimes with minimal setup",
+      "install_id": "colima",
+      "license": "MIT",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=dc460ec76cbff0e66e269457d7b728432263166c",
+      "name": "colima-0.7.6",
+      "pname": "colima",
+      "rev": "dc460ec76cbff0e66e269457d7b728432263166c",
+      "rev_count": 706477,
+      "rev_date": "2024-11-11T10:11:37Z",
+      "scrape_date": "2024-11-15T03:58:27Z",
+      "stabilities": [
+        "staging",
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "0.7.6",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/nfpd36g5ksa8rq7s9chfgcv55pn5pz0r-colima-0.7.6"
       },
       "system": "x86_64-linux",
       "group": "toplevel",
