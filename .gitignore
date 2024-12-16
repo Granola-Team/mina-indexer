@@ -30,3 +30,6 @@ database/
 
 # tier3 blocks
 files-to-fetch.list
+
+# mina_txn_hasher wrapper
+.local
