@@ -238,7 +238,7 @@ impl StagedLedgerStore for IndexerStore {
         {
             if self
                 .add_staged_ledger_hashes(
-                    &LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
+                    &LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
                     state_hash,
                 )
                 .unwrap_or(false)
@@ -247,7 +247,7 @@ impl StagedLedgerStore for IndexerStore {
                     DbLedgerEvent::NewLedger {
                         blockchain_length: 0,
                         state_hash: state_hash.clone(),
-                        ledger_hash: LedgerHash(MAINNET_GENESIS_LEDGER_HASH.into()),
+                        ledger_hash: LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
                     },
                 )))?;
             }
