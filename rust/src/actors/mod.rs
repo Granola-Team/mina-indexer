@@ -24,7 +24,7 @@ pub struct Event {
 impl EventType {
     /// Convert the `EventType` to snake case string
     pub fn to_string(&self) -> String {
-        self.as_ref().to_case(Case::Snake)
+        self.as_ref().to_case(Case::Kebab)
     }
 
     /// Convert a snake case string to an `EventType`
@@ -58,7 +58,6 @@ pub trait Actor {
         }
     }
 
-    /// Check if a Kafka topic exists.
     async fn topic_exists(&self, client: &AdminClient<DefaultClientContext>, topic: &str) -> KafkaResult<bool> {
         let metadata = client.inner().fetch_metadata(None, Timeout::Never)?;
         Ok(metadata.topics().iter().any(|t| t.name() == topic))
@@ -88,4 +87,30 @@ pub trait Actor {
 
     /// Publishes a processed message to the appropriate topic.
     async fn publish(&self, topic: &str, message: String);
+}
+
+#[cfg(test)]
+mod eventtype_tests {
+    use super::*;
+
+    #[test]
+    fn test_eventtype_to_string() {
+        let event_type = EventType::PrecomputedBlockPath;
+        let snake_case = event_type.to_string();
+        assert_eq!(snake_case, "precomputed-block-path");
+    }
+
+    #[test]
+    fn test_eventtype_from_str_valid() {
+        let snake_case = "precomputed-block-path";
+        let event_type = EventType::from_str(snake_case).unwrap();
+        assert_eq!(event_type, EventType::PrecomputedBlockPath);
+    }
+
+    #[test]
+    fn test_eventtype_from_str_invalid() {
+        let invalid_case = "unknown_event";
+        let result = EventType::from_str(invalid_case);
+        assert!(result.is_err());
+    }
 }
