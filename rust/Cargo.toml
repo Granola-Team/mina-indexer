@@ -39,9 +39,5 @@ path = "src/bin/ingest_staking_ledgers.rs"
 name = "ingestion"
 path = "src/bin/ingest_blocks.rs"
 
-[[bin]]
-name = "kafka-ingestion"
-path = "src/bin/ingest_blocks_kafka.rs"
-
 [package.metadata.cargo-machete]
 ignored = ["serde"]
