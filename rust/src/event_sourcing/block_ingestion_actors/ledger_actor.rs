@@ -137,7 +137,6 @@ impl Actor for LedgerActor {
                 {
                     Ok(affected_rows) => {
                         assert_eq!(affected_rows, 1);
-                        self.shared_publisher.incr_database_insert();
                         self.actor_outputs().fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         self.publish(Event {
                             event_type: EventType::ActorHeight,

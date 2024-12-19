@@ -108,7 +108,6 @@ impl Actor for SnarkSummaryPersistenceActor {
             let event_payload: BatchSnarkCanonicityPayload = sonic_rs::from_str(&event.payload).unwrap();
             match self.log_batch(&event_payload).await {
                 Ok(_) => {
-                    self.shared_publisher.incr_database_insert();
                     self.publish(Event {
                         event_type: EventType::ActorHeight,
                         payload: sonic_rs::to_string(&ActorHeightPayload {

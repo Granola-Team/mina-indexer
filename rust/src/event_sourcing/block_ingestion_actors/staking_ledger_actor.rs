@@ -126,7 +126,6 @@ impl Actor for StakingLedgerActor {
                 {
                     Ok(affected_rows) => {
                         assert_eq!(affected_rows, 1);
-                        self.shared_publisher.incr_database_insert();
                         self.publish(Event {
                             event_type: EventType::ActorHeight,
                             payload: sonic_rs::to_string(&ActorHeightPayload {
