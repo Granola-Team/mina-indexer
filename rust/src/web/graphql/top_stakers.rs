@@ -1,7 +1,7 @@
 use super::db;
 use crate::{
     block::store::BlockStore,
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore},
+    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
     store::username::UsernameStore,
     utility::store::{from_be_bytes, U32_LEN},
 };
@@ -76,14 +76,16 @@ impl TopStakersQueryRoot {
             let num = from_be_bytes(key[U32_LEN..][..U32_LEN].to_vec());
             let pk = PublicKey::from_bytes(&key[U32_LEN..][U32_LEN..])?;
             let account = db
-                .get_best_account(&pk)?
+                .get_best_account(&pk, &TokenAddress::default())? // always MINA
                 .with_context(|| format!("Account missing {pk}"))
                 .unwrap()
                 .display();
+
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,
                 Ok(Some(username)) => Some(username.0),
             };
+
             let account = TopStakerAccount::from((
                 account.clone(),
                 db.get_block_production_pk_epoch_count(&pk, Some(epoch))?,
@@ -98,6 +100,7 @@ impl TopStakersQueryRoot {
                 break;
             }
         }
+
         Ok(accounts)
     }
 }
