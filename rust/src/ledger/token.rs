@@ -1,5 +1,8 @@
 use super::{account::Amount, public_key::PublicKey};
-use crate::constants::MINA_TOKEN_ADDRESS;
+use crate::{
+    constants::MINA_TOKEN_ADDRESS, protocol::serialization_types::version_bytes::TOKEN_ID_KEY,
+    utility::store::U64_LEN,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -46,20 +49,32 @@ impl TokenAddress {
 
 impl From<u64> for TokenAddress {
     fn from(value: u64) -> Self {
-        match value {
-            1 => Self::default(),
-            _ => todo!("unknown token id {value}"),
-        }
+        let mut big_int = [0; 32];
+        let le_bytes = value.to_le_bytes();
+
+        // big int LE bytes
+        big_int[..U64_LEN].copy_from_slice(&le_bytes);
+        Self(
+            bs58::encode(&big_int[..])
+                .with_check_version(TOKEN_ID_KEY)
+                .into_string(),
+        )
     }
 }
 
 impl From<TokenAddress> for u64 {
     fn from(value: TokenAddress) -> Self {
-        if value.0 == MINA_TOKEN_ADDRESS {
-            1
-        } else {
-            todo!("unknown token address {value}")
-        }
+        let bs58_bytes = value.0.as_bytes();
+        let big_int = bs58::decode(bs58_bytes)
+            .with_check(Some(TOKEN_ID_KEY))
+            .into_vec()
+            .expect("valid base58 check");
+
+        // drop version byte
+        let mut le_bytes = [0; U64_LEN];
+        le_bytes.copy_from_slice(&big_int[1..=U64_LEN]);
+
+        u64::from_le_bytes(le_bytes)
     }
 }
 
@@ -80,5 +95,25 @@ impl std::default::Default for TokenSymbol {
     /// MINA token symbol
     fn default() -> Self {
         Self("MINA".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::constants::MINA_TOKEN_ID;
+
+    #[test]
+    fn u64_to_token_address() {
+        let token = TokenAddress::from(MINA_TOKEN_ID);
+        assert_eq!(token.0, MINA_TOKEN_ADDRESS);
+    }
+
+    #[test]
+    fn token_address_to_u64() {
+        let token = TokenAddress::default();
+        let id = u64::from(token);
+
+        assert_eq!(id, MINA_TOKEN_ID);
     }
 }
