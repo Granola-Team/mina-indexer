@@ -1,7 +1,7 @@
 use super::{
     account::{Account, Amount, Nonce, Permissions, ReceiptChainHash, Timing, TokenPermissions},
     public_key::PublicKey,
-    Ledger,
+    Ledger, TokenLedger,
 };
 use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
 use anyhow::anyhow;
@@ -52,7 +52,7 @@ pub struct GenesisAccounts {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
-    ledger: Ledger,
+    ledger: TokenLedger,
 }
 
 impl std::str::FromStr for GenesisRoot {
@@ -120,6 +120,14 @@ impl From<GenesisRoot> for GenesisLedger {
 
 impl From<GenesisLedger> for Ledger {
     fn from(value: GenesisLedger) -> Self {
+        let token_ledger: TokenLedger = value.into();
+
+        Ledger::from_mina_ledger(token_ledger)
+    }
+}
+
+impl From<GenesisLedger> for TokenLedger {
+    fn from(value: GenesisLedger) -> Self {
         Self {
             accounts: value
                 .ledger
@@ -150,17 +158,17 @@ impl GenesisLedger {
 
         // Add genesis block winner
         let block_creator = Account::from(GenesisBlock::new_v1().unwrap());
-        let pk = block_creator.public_key.clone();
-        accounts.insert(pk, block_creator);
+        accounts.insert(block_creator.public_key.clone(), block_creator);
 
-        for genesis_account in genesis.accounts {
-            let balance = Amount(match str::parse::<Decimal>(&genesis_account.balance) {
+        for account in genesis.accounts {
+            let balance = Amount(match str::parse::<Decimal>(&account.balance) {
                 Ok(amt) => (amt * MINA_SCALE_DEC)
                     .to_u64()
                     .expect("Parsed Genesis Balance has wrong format"),
                 Err(_) => panic!("Unable to parse Genesis Balance"),
             });
-            let public_key = PublicKey::from(genesis_account.pk);
+
+            let public_key = PublicKey::from(account.pk);
             accounts.insert(
                 public_key.clone(),
                 Account {
@@ -169,23 +177,21 @@ impl GenesisLedger {
                     nonce: None,
                     public_key: public_key.clone(),
                     // If delegate is None, delegate to yourself
-                    delegate: genesis_account
-                        .delegate
-                        .map(PublicKey)
-                        .unwrap_or(public_key),
-                    token: genesis_account.token,
-                    token_permissions: genesis_account.token_permissions,
-                    receipt_chain_hash: genesis_account.receipt_chain_hash,
-                    voting_for: genesis_account.voting_for.map(|v| v.into()),
-                    permissions: genesis_account.permissions,
-                    timing: genesis_account.timing.map(|t| t.into()),
-                    zkapp: genesis_account.zkapp,
+                    delegate: account.delegate.map_or(public_key, PublicKey),
+                    token: account.token,
+                    token_permissions: account.token_permissions,
+                    receipt_chain_hash: account.receipt_chain_hash,
+                    voting_for: account.voting_for.map(|v| v.into()),
+                    permissions: account.permissions,
+                    timing: account.timing.map(|t| t.into()),
+                    zkapp: account.zkapp,
                     genesis_account: true,
                 },
             );
         }
-        GenesisLedger {
-            ledger: Ledger { accounts },
+
+        Self {
+            ledger: TokenLedger { accounts },
         }
     }
 }
