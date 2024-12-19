@@ -1,5 +1,4 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
 use env_logger::Builder;
 use futures::future::try_join_all;
 use log::{error, info};
@@ -59,7 +58,6 @@ async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     let publish_handle = spawn_block_publisher(blocks_dir, Arc::clone(&shared_publisher), shutdown_receiver.resubscribe(), root_node);
-    let monitor_handle = spawn_monitor(Arc::clone(&shared_publisher), shutdown_receiver.resubscribe());
 
     // Wait for SIGINT to trigger shutdown
     signal::ctrl_c().await?;
@@ -69,7 +67,7 @@ async fn async_main(root_node: Option<(u64, String)>) -> Result<()> {
     let _ = shutdown_sender.send(());
 
     // Await all tasks
-    try_join_all(vec![process_handle, publish_handle, monitor_handle]).await?;
+    try_join_all(vec![process_handle, publish_handle]).await?;
 
     Ok(())
 }
@@ -97,34 +95,6 @@ fn spawn_block_publisher(
     tokio::spawn(async move {
         if let Err(e) = publish_block_dir_paths(blocks_dir, &shared_publisher, shutdown_receiver, root_node).await {
             error!("Error publishing block paths: {:?}", e);
-        }
-    })
-}
-
-/// Spawn a task for monitoring system metrics with a shutdown signal
-fn spawn_monitor(shared_publisher: Arc<SharedPublisher>, mut shutdown_receiver: broadcast::Receiver<()>) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                _ = shutdown_receiver.recv() => {
-                    info!("Shutdown signal received, terminating monitor task.");
-                    break;
-                }
-                _ = tokio::time::sleep(Duration::from_secs(60)) => {
-                    let now: DateTime<Utc> = Utc::now();
-                    info!(
-                        "{} Messages published: {}. Database inserts: {}. Ratio: {}",
-                        now.to_rfc3339(),
-                        shared_publisher.buffer_size(),
-                        shared_publisher.database_inserts(),
-                        if shared_publisher.database_inserts() > 0 {
-                            format!("{:.2}", shared_publisher.buffer_size() as f64 / shared_publisher.database_inserts() as f64)
-                        } else {
-                            "n/a".to_string()
-                        }
-                    );
-                }
-            }
         }
     })
 }

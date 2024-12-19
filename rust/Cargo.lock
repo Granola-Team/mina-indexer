@@ -1123,7 +1123,6 @@ dependencies = [
  "async-trait",
  "bigdecimal",
  "bs58",
- "chrono",
  "duckdb",
  "env_logger",
  "futures",
