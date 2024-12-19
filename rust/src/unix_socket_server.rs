@@ -13,6 +13,7 @@ use crate::{
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
+        token::TokenAddress,
         Ledger, LedgerHash,
     },
     snark_work::store::SnarkStore,
@@ -100,7 +101,7 @@ pub async fn handle_connection(
                         invalid_public_key(&pk)
                     } else {
                         let pk: PublicKey = pk.into();
-                        if let Some(account) = db.get_best_account(&pk)? {
+                        if let Some(account) = db.get_best_account(&pk, &TokenAddress::default())? {
                             info!("Writing account {pk} to client");
                             Some(format!("{account}"))
                         } else {

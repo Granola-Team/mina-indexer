@@ -3,6 +3,7 @@ use super::{
         account::{AccountDiff, UpdateType},
         LedgerDiff,
     },
+    token::TokenAddress,
     username::Username,
 };
 use crate::{
@@ -231,12 +232,13 @@ impl Account {
     ///
     /// # Returns
     ///
-    /// A new `Account` instance with the specified public key and default
-    /// values for other fields.
-    pub fn empty(public_key: PublicKey) -> Self {
+    /// A new `Account` instance with the specified public key and token,
+    /// default values for other fields.
+    pub fn empty(public_key: PublicKey, token: TokenAddress) -> Self {
         Account {
             public_key: public_key.clone(),
             delegate: public_key,
+            token: Some(token.into()),
             ..Default::default()
         }
     }
@@ -419,7 +421,6 @@ impl Account {
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
             }
             Zkapp(zkapp_diff) => {
-                // TODO only apply diff to matching account?
                 todo!("apply zkapp account diff {zkapp_diff:?}")
             }
             Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
@@ -502,6 +503,7 @@ impl std::fmt::Display for Account {
             balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
             ..self.clone()
         };
+
         match serde_json::to_string_pretty(&deducted) {
             Ok(s) => write!(f, "{s}"),
             Err(_) => Err(std::fmt::Error),

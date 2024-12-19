@@ -23,6 +23,7 @@ use crate::{
             StakingLedger,
         },
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
+        token::TokenAddress,
         username::Username,
         Ledger, LedgerHash,
     },
@@ -38,7 +39,7 @@ use crate::{
     utility::{
         functions::pretty_print_duration,
         store::{
-            block_u32_prefix_from_key, staking_ledger::split_staking_ledger_epoch_key,
+            block_u32_prefix_from_key, ledger::staking::split_staking_ledger_epoch_key,
             state_hash_suffix, u64_from_be_bytes,
         },
     },
@@ -596,11 +597,14 @@ impl IndexerState {
 
             if let Some(username_updates) = self.update_best_block_in_store(&best_tip.state_hash)? {
                 for (pk, username) in username_updates.iter() {
-                    if let Some(account) = self.ledger.accounts.get_mut(pk) {
+                    // only use MINA token
+                    if let Some(account) = self.ledger.get_mut_account(pk, &TokenAddress::default())
+                    {
                         account.username = Some(username.clone());
                     }
                 }
             }
+
             new_canonical_blocks.iter().for_each(|block| {
                 self.add_canonical_block_to_store(block, &block.genesis_state_hash, None)
                     .unwrap()
