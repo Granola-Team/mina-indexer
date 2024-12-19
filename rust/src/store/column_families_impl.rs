@@ -512,7 +512,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing best ledger accounts
     /// ```
-    /// key: public key bytes
+    /// key: {token}{pk}
     /// val: account serde bytes
     fn best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
@@ -522,7 +522,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting best ledger accounts by balance
     /// ```
-    /// key: {balance}{pk}
+    /// key: {token}{balance}{pk}
     /// val: b""
     /// where
     /// - balance: [u64] BE bytes

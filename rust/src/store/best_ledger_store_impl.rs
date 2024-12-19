@@ -12,26 +12,35 @@ use crate::{
             best::{BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
         },
-        Ledger,
+        token::TokenAddress,
+        Ledger, TokenLedger,
     },
-    utility::store::{from_be_bytes, pk_index_key, u64_prefix_key},
+    utility::store::{from_be_bytes, ledger::best::*, pk_index_key},
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashMap;
 
 impl BestLedgerStore for IndexerStore {
-    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
+    fn get_best_account(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+    ) -> anyhow::Result<Option<Account>> {
         trace!("Getting best ledger account {pk}");
         Ok(self
             .database
-            .get_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?
+            .get_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?
             .and_then(|bytes| serde_json::from_slice::<Account>(&bytes).ok()))
     }
 
-    fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>> {
+    fn get_best_account_display(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+    ) -> anyhow::Result<Option<Account>> {
         trace!("Display best ledger account {pk}");
-        if let Some(best_acct) = self.get_best_account(pk)? {
+        if let Some(best_acct) = self.get_best_account(pk, token)? {
             return Ok(Some(best_acct.display()));
         }
         Ok(None)
@@ -49,15 +58,20 @@ impl BestLedgerStore for IndexerStore {
         }))
     }
 
-    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()> {
+    fn update_best_account(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+        account: Option<Account>,
+    ) -> anyhow::Result<()> {
+        // remove account
         if account.is_none() {
-            // delete stale data
-            if let Some(acct) = self.get_best_account(pk)? {
+            if let Some(acct) = self.get_best_account(pk, token)? {
                 self.database
-                    .delete_cf(self.best_ledger_accounts_cf(), pk.0.as_bytes())?;
+                    .delete_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?;
                 self.database.delete_cf(
                     self.best_ledger_accounts_balance_sort_cf(),
-                    u64_prefix_key(acct.balance.0, pk),
+                    best_account_sort_key(token, acct.balance.0, pk),
                 )?;
             }
             return Ok(());
@@ -66,17 +80,20 @@ impl BestLedgerStore for IndexerStore {
         // update best account
         let account = account.unwrap();
         let balance = account.balance.0;
-        let acct = self.get_best_account(pk)?;
+        let acct = self.get_best_account(pk, token)?;
+
         if let Some(acct) = acct.as_ref() {
             // delete stale balance sorting data
             self.database.delete_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                u64_prefix_key(acct.balance.0, pk),
+                best_account_sort_key(token, acct.balance.0, pk),
             )?;
         }
+
+        // write new account
         self.database.put_cf(
             self.best_ledger_accounts_cf(),
-            pk.0.as_bytes(),
+            best_account_key(token, pk),
             serde_json::to_vec(&account)?,
         )?;
 
@@ -86,10 +103,11 @@ impl BestLedgerStore for IndexerStore {
         } else {
             self.database.put_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                u64_prefix_key(balance, pk),
+                best_account_sort_key(token, balance, pk),
                 serde_json::to_vec(&account)?,
             )?;
         }
+
         Ok(())
     }
 
@@ -153,9 +171,12 @@ impl BestLedgerStore for IndexerStore {
         for (block_diffs, remove_pks) in updates.unapply.iter() {
             for diff in block_diffs {
                 let pk: PublicKey = diff.public_key();
+                let token = diff.token_address();
+
                 let acct = self
-                    .get_best_account(&pk)?
-                    .unwrap_or(Account::empty(pk.clone()));
+                    .get_best_account(&pk, &token)?
+                    .unwrap_or(Account::empty(pk.clone(), token.clone()));
+
                 let account = match diff {
                     Payment(diff) => match diff.update_type {
                         UpdateType::Credit => Some(Account {
@@ -210,12 +231,14 @@ impl BestLedgerStore for IndexerStore {
                     }),
                     Zkapp(_diff) => todo!("zkapp diff unapply update_best_accounts"),
                 };
-                self.update_best_account(&pk, account)?;
+
+                self.update_best_account(&pk, &token, account)?;
             }
 
+            // TODO generalize over tokens
             // remove accounts
             for pk in remove_pks.iter() {
-                self.update_best_account(pk, None)?;
+                self.update_best_account(pk, &TokenAddress::default(), None)?;
             }
         }
 
@@ -223,9 +246,12 @@ impl BestLedgerStore for IndexerStore {
         for (block_apply_diffs, _) in updates.apply.iter() {
             for diff in block_apply_diffs {
                 let pk = diff.public_key();
+                let token = diff.token_address();
+
                 let acct = self
-                    .get_best_account(&pk)?
-                    .unwrap_or(Account::empty(pk.clone()));
+                    .get_best_account(&pk, &token)?
+                    .unwrap_or(Account::empty(pk.clone(), token.clone()));
+
                 let account = match diff {
                     Payment(diff) => match diff.update_type {
                         UpdateType::Credit => Some(Account {
@@ -268,7 +294,8 @@ impl BestLedgerStore for IndexerStore {
                     }),
                     Zkapp(_diff) => todo!("zkapp diff apply update_best_accounts"),
                 };
-                self.update_best_account(&pk, account)?;
+
+                self.update_best_account(&pk, &token, account)?;
             }
         }
         Ok(())
@@ -371,6 +398,7 @@ impl BestLedgerStore for IndexerStore {
         {
             trace!("Best ledger (length {best_block_height}): {best_block_hash}");
             let mut accounts = HashMap::new();
+
             for (_, value) in self
                 .best_ledger_account_balance_iterator(IteratorMode::End)
                 .flatten()
@@ -378,7 +406,8 @@ impl BestLedgerStore for IndexerStore {
                 let account: Account = serde_json::from_slice(&value)?;
                 accounts.insert(account.public_key.clone(), account);
             }
-            return Ok(Some(Ledger { accounts }));
+
+            return Ok(Some(Ledger::from_mina_ledger(TokenLedger { accounts })));
         }
         Ok(None)
     }
