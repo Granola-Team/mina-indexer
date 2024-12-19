@@ -1,7 +1,7 @@
 use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
 use crate::{
     canonicity::store::CanonicityStore,
-    ledger::{account::Account, store::staged::StagedLedgerStore},
+    ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};
@@ -11,6 +11,7 @@ pub struct StagedLedgerQueryInput {
     ledger_hash: Option<String>,
     state_hash: Option<String>,
     public_key: Option<String>,
+    token: Option<String>,
 
     #[graphql(name = "blockchain_length")]
     blockchain_length: Option<u32>,
@@ -40,25 +41,31 @@ impl StagedLedgerQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<StagedLedgerAccount>>> {
         let db = db(ctx);
+        let token = query
+            .as_ref()
+            .map_or(TokenAddress::default(), |q| match q.token.to_owned() {
+                Some(token) => TokenAddress::new(token).expect("valid token address"),
+                None => TokenAddress::default(),
+            });
 
         // pk staged account query
         if let Some(pk) = query.as_ref().and_then(|q| q.public_key.clone()) {
             if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
                 return Ok(db
-                    .get_staged_account(&pk.into(), &state_hash.into())?
+                    .get_staged_account(&pk.into(), &token, &state_hash.into())?
                     .map(|acct| vec![acct.into()]));
             } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
                 if let Some(state_hash) =
                     db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
                 {
                     return Ok(db
-                        .get_staged_account(&pk.into(), &state_hash)?
+                        .get_staged_account(&pk.into(), &token, &state_hash)?
                         .map(|acct| vec![acct.into()]));
                 }
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
                 if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
                     return Ok(db
-                        .get_staged_account(&pk.into(), &state_hash)?
+                        .get_staged_account(&pk.into(), &token, &state_hash)?
                         .map(|acct| vec![acct.into()]));
                 }
             }
@@ -79,12 +86,20 @@ impl StagedLedgerQueryRoot {
             } else {
                 return Ok(None);
             };
+
         let mut accounts = staged_ledger.map_or(vec![], |ledger| {
             ledger
-                .accounts
-                .into_values()
-                .map(StagedLedgerAccount::from)
-                .collect()
+                .tokens
+                .get(&token)
+                .map(|token_ledger| {
+                    token_ledger
+                        .accounts
+                        .to_owned()
+                        .into_values()
+                        .map(StagedLedgerAccount::from)
+                        .collect()
+                })
+                .expect("MINA token ledger")
         });
 
         reorder(&mut accounts, sort_by);

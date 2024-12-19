@@ -2,8 +2,10 @@
 
 use crate::{
     block::BlockHash,
-    ledger::{account::Account, diff::LedgerDiff, public_key::PublicKey, Ledger, LedgerHash},
-    utility::store::{balance_key_prefix, pk_key_prefix, U64_LEN},
+    ledger::{
+        account::Account, diff::LedgerDiff, public_key::PublicKey, token::TokenAddress, Ledger,
+        LedgerHash, TokenLedger,
+    },
 };
 use speedb::{DBIterator, Direction, WriteBatch};
 
@@ -12,6 +14,7 @@ pub trait StagedLedgerStore {
     fn get_staged_account(
         &self,
         pk: &PublicKey,
+        token: &TokenAddress,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Account>>;
 
@@ -22,6 +25,7 @@ pub trait StagedLedgerStore {
     fn get_staged_account_display(
         &self,
         pk: &PublicKey,
+        token: &TokenAddress,
         state_hash: &BlockHash,
     ) -> anyhow::Result<Option<Account>>;
 
@@ -29,6 +33,7 @@ pub trait StagedLedgerStore {
     fn get_staged_account_block_height(
         &self,
         pk: &PublicKey,
+        token: &TokenAddress,
         block_height: u32,
     ) -> anyhow::Result<Option<Account>>;
 
@@ -58,6 +63,7 @@ pub trait StagedLedgerStore {
     fn set_staged_account(
         &self,
         pk: &PublicKey,
+        token: &TokenAddress,
         state_hash: &BlockHash,
         account: &Account,
     ) -> anyhow::Result<()>;
@@ -66,6 +72,7 @@ pub trait StagedLedgerStore {
     fn set_staged_account_raw_bytes(
         &self,
         pk: &PublicKey,
+        token: &TokenAddress,
         state_hash: &BlockHash,
         balance: u64,
         account_serde_bytes: &[u8],
@@ -100,7 +107,7 @@ pub trait StagedLedgerStore {
     fn add_genesis_ledger(
         &self,
         state_hash: &BlockHash,
-        genesis_ledger: Ledger,
+        genesis_ledger: TokenLedger,
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff
@@ -145,121 +152,4 @@ pub trait StagedLedgerStore {
         state_hash: &BlockHash,
         direction: Direction,
     ) -> DBIterator<'_>;
-}
-
-/// Key format for storing staged ledger accounts by state hash
-/// ```
-/// {state_hash}{pk}
-/// where
-/// - state_hash:   [BlockHash::LEN] bytes
-/// - pk:           [PublicKey::LEN] bytes
-pub fn staged_account_key(
-    state_hash: &BlockHash,
-    pk: &PublicKey,
-) -> [u8; BlockHash::LEN + PublicKey::LEN] {
-    let mut key = [0; BlockHash::LEN + PublicKey::LEN];
-    key[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-    key[BlockHash::LEN..].copy_from_slice(pk.0.as_bytes());
-    key
-}
-
-/// Key format for sorting staged ledger accounts by balance
-/// ```
-/// {state_hash}{balance}{pk}
-/// where
-/// - state_hash: [BlockHash::LEN] bytes
-/// - balance:    [u64] BE bytes
-/// - pk:         [PublicKey::LEN] bytes
-pub fn staged_account_balance_sort_key(
-    state_hash: &BlockHash,
-    balance: u64,
-    pk: &PublicKey,
-) -> [u8; BlockHash::LEN + U64_LEN + PublicKey::LEN] {
-    let mut res = [0; BlockHash::LEN + U64_LEN + PublicKey::LEN];
-    res[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-    res[BlockHash::LEN..][..U64_LEN].copy_from_slice(&balance.to_be_bytes());
-    res[BlockHash::LEN..][U64_LEN..].copy_from_slice(pk.0.as_bytes());
-    res
-}
-
-/// Split [staged_account_balance_sort_key] into constituent parts
-pub fn split_staged_account_balance_sort_key(key: &[u8]) -> Option<(BlockHash, u64, PublicKey)> {
-    if key.len() == BlockHash::LEN + U64_LEN + PublicKey::LEN {
-        let state_hash = BlockHash::from_bytes(&key[..BlockHash::LEN]).expect("block hash");
-        let balance = balance_key_prefix(&key[BlockHash::LEN..]);
-        let pk = pk_key_prefix(&key[BlockHash::LEN + U64_LEN..]);
-        return Some((state_hash, balance, pk));
-    }
-    None
-}
-
-#[cfg(test)]
-mod staged_tests {
-    use super::*;
-    use crate::{block::BlockHash, ledger::public_key::PublicKey};
-
-    #[test]
-    fn test_staged_account_key_length() {
-        // Mock a BlockHash and PublicKey with known sizes
-        let mock_state_hash = BlockHash::default();
-        let mock_pk = PublicKey::default();
-
-        // Assert the length of the result is BlockHash::LEN + PublicKey::LEN
-        assert_eq!(
-            staged_account_key(&mock_state_hash, &mock_pk).len(),
-            BlockHash::LEN + PublicKey::LEN
-        );
-    }
-
-    #[test]
-    fn test_staged_account_key_content() {
-        // Mock a BlockHash and PublicKey with specific known values
-        let mock_state_hash = BlockHash::default();
-        let mock_pk = PublicKey::default();
-        let result = staged_account_key(&mock_state_hash, &mock_pk);
-
-        // Assert the first BlockHash::LEN bytes match the state_hash
-        assert_eq!(&result[..BlockHash::LEN], mock_state_hash.0.as_bytes());
-
-        // Assert the remaining bytes match the public key
-        assert_eq!(&result[BlockHash::LEN..], mock_pk.0.as_bytes());
-    }
-
-    #[test]
-    fn test_staged_account_balance_sort_key_length() -> anyhow::Result<()> {
-        // Mock inputs
-        let state_hash = BlockHash::default();
-        let balance = 123456789u64;
-        let pk = PublicKey::default();
-
-        // Check that the result has the correct length
-        assert_eq!(
-            staged_account_balance_sort_key(&state_hash, balance, &pk).len(),
-            BlockHash::LEN + U64_LEN + PublicKey::LEN
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_staged_account_balance_sort_key_content() -> anyhow::Result<()> {
-        // Mock inputs
-        let state_hash = BlockHash::default(); // Use default for BlockHash
-        let balance = 987654321u64; // Mock balance
-        let pk = PublicKey::default(); // Use default for PublicKey
-
-        // Generate key
-        let result = staged_account_balance_sort_key(&state_hash, balance, &pk);
-
-        // Check the state hash bytes
-        assert_eq!(&result[..BlockHash::LEN], state_hash.0.as_bytes());
-
-        // Check the balance bytes (u64, big-endian)
-        assert_eq!(&result[BlockHash::LEN..][..U64_LEN], &balance.to_be_bytes());
-
-        // Check the public key bytes
-        assert_eq!(&result[BlockHash::LEN..][U64_LEN..], pk.0.as_bytes());
-
-        Ok(())
-    }
 }

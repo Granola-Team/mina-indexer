@@ -9,7 +9,7 @@ use mina_indexer::{
     server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
-    utility::store::staking_ledger::split_staking_ledger_sort_key,
+    utility::store::ledger::staking::split_staking_ledger_sort_key,
 };
 use std::{path::PathBuf, sync::Arc};
 

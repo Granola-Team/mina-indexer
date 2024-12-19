@@ -62,16 +62,19 @@ async fn account_diffs() {
                 public_key,
                 amount,
                 update_type,
+                token: _,
             })
             | AccountDiff::FeeTransfer(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
+                token: _,
             })
             | AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
+                token: _,
             }) => {
                 println!("\n* Payment");
                 println!("public_key:  {public_key}");

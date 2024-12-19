@@ -2,7 +2,10 @@
 
 use crate::{
     block::{store::DbBlockUpdate, BlockHash},
-    ledger::{account::Account, diff::account::AccountDiff, public_key::PublicKey, Ledger},
+    ledger::{
+        account::Account, diff::account::AccountDiff, public_key::PublicKey, token::TokenAddress,
+        Ledger,
+    },
     store::DbUpdate,
 };
 use speedb::{DBIterator, IteratorMode};
@@ -10,19 +13,32 @@ use std::collections::HashSet;
 
 pub trait BestLedgerStore {
     /// Get pk's best ledger account
-    fn get_best_account(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
+    fn get_best_account(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+    ) -> anyhow::Result<Option<Account>>;
 
     /// Get the display view of pk's account
     /// ****************************************************************
     /// This is `pk`'s balance accounting for any potential creation fee
     /// ****************************************************************
-    fn get_best_account_display(&self, pk: &PublicKey) -> anyhow::Result<Option<Account>>;
+    fn get_best_account_display(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+    ) -> anyhow::Result<Option<Account>>;
 
     /// Get the best ledger
     fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>>;
 
     /// Update pk's best ledger account
-    fn update_best_account(&self, pk: &PublicKey, account: Option<Account>) -> anyhow::Result<()>;
+    fn update_best_account(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+        account: Option<Account>,
+    ) -> anyhow::Result<()>;
 
     /// Updates best ledger accounts
     fn update_best_accounts(
@@ -64,8 +80,9 @@ pub trait BestLedgerStore {
 
     /// Iterator for balance-sorted best ledger accounts
     /// ```
-    /// {balance}{pk} -> _
+    /// {token}{balance}{pk} -> _
     /// where
+    /// - token:   [TokenAddress::LEN] bytes
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey::LEN] bytes
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;

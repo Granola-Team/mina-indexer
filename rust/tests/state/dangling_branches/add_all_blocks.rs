@@ -4,7 +4,7 @@ use mina_indexer::{
     ledger::{
         account::{Account, Amount},
         genesis::{GenesisLedger, GenesisRoot},
-        public_key::PublicKey,
+        token::TokenAddress,
         Ledger,
     },
     state::IndexerState,
@@ -28,19 +28,21 @@ async fn extension() -> anyhow::Result<()> {
     let mut ledger: Ledger = genesis_ledger.into();
 
     // add required accounts with sufficient balance
-    ledger.accounts.insert(
-        PublicKey::from("B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"),
+    ledger.insert_account(
         Account {
+            public_key: "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP".into(),
             balance: Amount(1000 * MINA_SCALE),
             ..Default::default()
         },
+        &TokenAddress::default(),
     );
-    ledger.accounts.insert(
-        PublicKey::from("B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV"),
+    ledger.insert_account(
         Account {
+            public_key: "B62qrRvo5wngd5WA1dgXkQpCdQMRDndusmjfWXWT1LgsSFFdBS9RCsV".into(),
             balance: Amount(1000 * MINA_SCALE),
             ..Default::default()
         },
+        &TokenAddress::default(),
     );
 
     let mut n = 0;

@@ -2,7 +2,7 @@ use super::db;
 use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore},
+    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::username::UsernameStore,
     web::graphql::Timing,
@@ -16,6 +16,7 @@ pub struct AccountQueryInput {
     delegate: Option<String>,
     username: Option<String>,
     balance: Option<u64>,
+    token: Option<String>,
 
     #[graphql(name = "balance_gt")]
     balance_gt: Option<u64>,
@@ -90,13 +91,20 @@ impl AccountQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<Account>> {
         use AccountSortByInput::*;
+
         let db = db(ctx);
+        let token = query
+            .as_ref()
+            .map_or(TokenAddress::default(), |q| match q.token.to_owned() {
+                Some(token) => TokenAddress::new(token).expect("valid token address"),
+                None => TokenAddress::default(),
+            });
 
         // public key query handler
         if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.clone()) {
             let pk: PublicKey = public_key.into();
             return Ok(db
-                .get_best_account_display(&pk)?
+                .get_best_account_display(&pk, &token)?
                 .iter()
                 .filter_map(|acct| {
                     let username = match db.get_username(&pk) {
@@ -192,6 +200,7 @@ impl AccountQueryInput {
             balance_lt,
             balance_lte,
             balance_ne,
+            token,
         } = self;
         if let Some(public_key) = public_key {
             if *public_key != account.public_key.0 {
@@ -238,6 +247,11 @@ impl AccountQueryInput {
         }
         if let Some(balance_ne) = balance_ne {
             if account.balance.0 == *balance_ne {
+                return false;
+            }
+        }
+        if let Some(token) = token.to_owned() {
+            if account.token != Some(TokenAddress(token).into()) {
                 return false;
             }
         }

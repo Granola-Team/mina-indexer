@@ -61,7 +61,7 @@ impl StakingLedgerParser {
 
 pub fn extract_epoch_hash(path: &Path) -> (u32, LedgerHash) {
     let (epoch, hash) = extract_height_and_hash(path);
-    (epoch, LedgerHash(hash.to_string()))
+    (epoch, LedgerHash::new_or_panic(hash.to_string()))
 }
 
 #[cfg(test)]

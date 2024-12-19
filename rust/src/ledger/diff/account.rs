@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
-    ledger::{account::Nonce, coinbase::Coinbase, Amount, PublicKey},
+    ledger::{account::Nonce, coinbase::Coinbase, token::TokenAddress, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ pub struct PaymentDiff {
     pub update_type: UpdateType,
     pub public_key: PublicKey,
     pub amount: Amount,
+    pub token: TokenAddress,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -79,13 +80,21 @@ pub enum UnapplyAccountDiff {
 pub enum AccountDiffType {
     Payment(Nonce),
     Delegation(Nonce),
-    Zkapp(Nonce),
+    Zkapp { token: TokenAddress, nonce: Nonce },
     Coinbase,
     FeeTransfer,
     FeeTransferViaCoinbase,
 }
 
 impl AccountDiff {
+    pub fn token_address(&self) -> TokenAddress {
+        if let &Self::Payment(PaymentDiff { ref token, .. }) = self {
+            return token.to_owned();
+        }
+
+        TokenAddress::default()
+    }
+
     pub fn from_command(command: Command) -> Vec<Vec<Self>> {
         match command {
             Command::Payment(payment) => {
@@ -94,11 +103,13 @@ impl AccountDiff {
                         public_key: payment.receiver,
                         amount: payment.amount,
                         update_type: UpdateType::Credit,
+                        token: TokenAddress::default(), // always MINA
                     }),
                     Self::Payment(PaymentDiff {
                         public_key: payment.source,
                         amount: payment.amount,
                         update_type: UpdateType::Debit(Some(payment.nonce + 1)),
+                        token: TokenAddress::default(), // always MINA
                     }),
                 ]]
             }
@@ -175,11 +186,13 @@ impl AccountDiff {
                             public_key: coinbase_receiver.clone(),
                             amount: (*fee).into(),
                             update_type: UpdateType::Credit,
+                            token: TokenAddress::default(), // always MINA
                         }),
                         Self::FeeTransfer(PaymentDiff {
                             public_key: pk.clone(),
                             amount: (*fee).into(),
                             update_type: UpdateType::Debit(None),
+                            token: TokenAddress::default(), // always MINA
                         }),
                     ]);
                 }
@@ -225,11 +238,13 @@ impl AccountDiff {
                             public_key: prover.clone(),
                             amount: (*total_fee).into(),
                             update_type: UpdateType::Credit,
+                            token: TokenAddress::default(), // always MINA
                         }),
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: precomputed_block.coinbase_receiver(),
                             amount: (*total_fee).into(),
                             update_type: UpdateType::Debit(None),
+                            token: TokenAddress::default(), // always MINA
                         }),
                     ]);
                 }
@@ -271,11 +286,13 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                    token: TokenAddress::default(),
                 }),
                 Self::Payment(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(Some(nonce)),
+                    token: TokenAddress::default(),
                 }),
             ]],
             AccountDiffType::Delegation(nonce) => vec![vec![Self::Delegation(DelegationDiff {
@@ -292,11 +309,13 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                    token: TokenAddress::default(),
                 }),
                 Self::FeeTransfer(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(None),
+                    token: TokenAddress::default(),
                 }),
             ]],
             AccountDiffType::FeeTransferViaCoinbase => vec![vec![
@@ -304,15 +323,17 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
+                    token: TokenAddress::default(),
                 }),
                 Self::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(None),
+                    token: TokenAddress::default(),
                 }),
             ]],
             // TODO
-            AccountDiffType::Zkapp(nonce) => vec![vec![Self::Zkapp(ZkappDiff {
+            AccountDiffType::Zkapp { token, nonce } => vec![vec![Self::Zkapp(ZkappDiff {
                 public_key: sender.into(),
                 amount: amount.into(),
                 update_type: UpdateType::Debit(Some(nonce)),
@@ -320,6 +341,7 @@ impl AccountDiff {
                     update_type: UpdateType::Credit,
                     public_key: receiver.into(),
                     amount: amount.into(),
+                    token,
                 }],
             })]],
         }
@@ -330,13 +352,13 @@ impl PaymentDiff {
     pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
         use AccountDiff::*;
 
-        // TODO zkapp => Vec<Self>
         match diff {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => Some(diff),
             Coinbase(cb_diff) => Some(Self {
                 update_type: UpdateType::Credit,
                 public_key: cb_diff.public_key,
                 amount: cb_diff.amount,
+                token: TokenAddress::default(), // always MINA
             }),
             Delegation(_) | FailedTransactionNonce(_) => None,
             Zkapp(diff) => todo!("from_account_diff zkapp {diff:?}"),
@@ -436,6 +458,7 @@ mod tests {
             account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
             diff::LedgerDiff,
+            token::TokenAddress,
             PublicKey,
         },
     };
@@ -451,6 +474,7 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: credit_amount,
             update_type: UpdateType::Credit,
+            token: TokenAddress::default(),
         });
         assert_eq!(payment_diff_credit.amount(), 1000);
 
@@ -459,6 +483,7 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: debit_amount,
             update_type: UpdateType::Debit(Some(Nonce(1))),
+            token: TokenAddress::default(),
         });
         assert_eq!(payment_diff_debit.amount(), -500);
 
@@ -474,6 +499,7 @@ mod tests {
             public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u"),
             amount: credit_amount,
             update_type: UpdateType::Credit,
+            token: TokenAddress::default(),
         });
         assert_eq!(fee_transfer_diff_credit.amount(), 1000);
 
@@ -485,6 +511,7 @@ mod tests {
                 ),
                 amount: debit_amount,
                 update_type: UpdateType::Debit(None),
+                token: TokenAddress::default(),
             });
         assert_eq!(fee_transfer_via_coinbase_diff_debit.amount(), -500);
 
@@ -530,11 +557,13 @@ mod tests {
                     public_key: snarker,
                     amount: fee.into(),
                     update_type: UpdateType::Credit,
+                    token: TokenAddress::default(),
                 }),
                 AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: receiver,
                     amount: fee.into(),
                     update_type: UpdateType::Debit(None),
+                    token: TokenAddress::default(),
                 }),
             ],
         ];
@@ -562,11 +591,13 @@ mod tests {
                 public_key: receiver_public_key.clone(),
                 amount: Amount(536900000000),
                 update_type: UpdateType::Credit,
+                token: TokenAddress::default(),
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: source_public_key,
                 amount: Amount(536900000000),
                 update_type: UpdateType::Debit(Some(nonce + 1)),
+                token: TokenAddress::default(),
             }),
         ]];
         assert_eq!(AccountDiff::from_command(payment_command), expected_result);
@@ -619,6 +650,7 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
             amount: Amount(536900000000),
             update_type: UpdateType::Debit(Some(nonce)),
+            token: TokenAddress::default(),
         };
         let account_diff = AccountDiff::Payment(payment_diff);
         let result = account_diff.public_key();

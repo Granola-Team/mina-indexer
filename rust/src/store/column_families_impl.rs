@@ -512,7 +512,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing best ledger accounts
     /// ```
-    /// key: public key bytes
+    /// key: {token}{pk}
     /// val: account serde bytes
     fn best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
@@ -522,7 +522,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting best ledger accounts by balance
     /// ```
-    /// key: {balance}{pk}
+    /// key: {token}{balance}{pk}
     /// val: b""
     /// where
     /// - balance: [u64] BE bytes
@@ -563,9 +563,10 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staged ledger accounts (use [staged_account_key])
     /// ```
-    /// {state_hash}{pk} -> account
+    /// {state_hash}{token}{pk} -> account
     /// where
     /// - state_hash: [BlockHash::LEN] bytes
+    /// - token:      [TokenAddress::LEN] bytes
     /// - pk:         [PublicKey::LEN] bytes
     /// - account:    serde bytes
     fn staged_ledger_accounts_cf(&self) -> &ColumnFamily {
@@ -576,9 +577,10 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting staged ledger accounts by balance
     /// ```
-    /// {state_hash}{balance}{pk} -> _
+    /// {state_hash}{token}{balance}{pk} -> _
     /// where
     /// - state_hash: [BlockHash::LEN] bytes
+    /// - token:      [TokenAddress::LEN] bytes
     /// - balance:    [u64] BE bytes
     /// - pk:         [PublicKey::LEN] bytes
     fn staged_ledger_account_balance_sort_cf(&self) -> &ColumnFamily {

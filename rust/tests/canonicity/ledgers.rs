@@ -8,6 +8,7 @@ use mina_indexer::{
         genesis::{GenesisLedger, GenesisRoot},
         public_key::PublicKey,
         store::staged::StagedLedgerStore,
+        token::TokenAddress,
     },
     server::IndexerVersion,
     state::IndexerState,
@@ -49,8 +50,16 @@ async fn test() -> anyhow::Result<()> {
         ledger_diff._apply_diff(&LedgerDiff::from_precomputed(&block))?;
 
         if ledger != ledger_diff {
-            let mut keys: Vec<&PublicKey> = ledger.accounts.keys().collect();
-            let mut keys_diff: Vec<&PublicKey> = ledger_diff.accounts.keys().collect();
+            let mut keys: Vec<&PublicKey> = ledger
+                .tokens
+                .get(&TokenAddress::default())
+                .map(|token_ledger| token_ledger.accounts.keys().collect())
+                .expect("MINA token ledger");
+            let mut keys_diff: Vec<&PublicKey> = ledger_diff
+                .tokens
+                .get(&TokenAddress::default())
+                .map(|token_ledger| token_ledger.accounts.keys().collect())
+                .expect("MINA token ledger");
 
             keys.sort();
             keys_diff.sort();
@@ -68,15 +77,25 @@ async fn test() -> anyhow::Result<()> {
                 let pk_diff = keys_diff[n];
                 let ledger_balance = |pk: &PublicKey| {
                     ledger
-                        .accounts
-                        .get(pk)
-                        .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
+                        .tokens
+                        .get(&TokenAddress::default())
+                        .map(|token_ledger| {
+                            token_ledger
+                                .accounts
+                                .get(pk)
+                                .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
+                        })
                 };
                 let ledger_diff_balance = |pk: &PublicKey| {
                     ledger_diff
-                        .accounts
-                        .get(pk)
-                        .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
+                        .tokens
+                        .get(&TokenAddress::default())
+                        .map(|token_ledger| {
+                            token_ledger
+                                .accounts
+                                .get(pk)
+                                .map(|acct| (acct.balance.0, acct.nonce.map_or(0, |n| n.0)))
+                        })
                 };
 
                 if *pk != pk_diff {

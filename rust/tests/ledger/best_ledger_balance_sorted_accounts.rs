@@ -11,9 +11,9 @@ use mina_indexer::{
     server::IndexerVersion,
     state::IndexerState,
     store::IndexerStore,
-    utility::store::{balance_key_prefix, pk_key_prefix},
+    utility::store::ledger::best::split_best_account_sort_key,
 };
-use std::{mem::size_of, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 #[tokio::test]
 async fn check_best_accounts() -> anyhow::Result<()> {
@@ -51,23 +51,22 @@ async fn check_best_accounts() -> anyhow::Result<()> {
         .flatten()
         .enumerate()
     {
-        let pk = pk_key_prefix(&key[size_of::<u64>()..]);
-        let pk_key_balance = balance_key_prefix(&key);
+        let (token, balance, pk) = split_best_account_sort_key(&key).unwrap();
+
         let pk_value_account = serde_json::from_slice::<Account>(&value)?;
-        let pk_store_account = indexer_store.get_best_account(&pk)?.unwrap();
+        let pk_store_account = indexer_store.get_best_account(&pk, &token)?.unwrap();
         let pk_best_account = best_ledger
-            .accounts
-            .get(&pk)
+            .get_account(&pk, &token)
             .with_context(|| format!("pk: {pk}"))
             .unwrap()
             .clone();
 
         if pk_store_account != pk_best_account
             || pk_best_account != pk_value_account
-            || pk_store_account.balance.0 != pk_key_balance
+            || pk_store_account.balance.0 != balance
         {
             println!(
-                "(n: {n}) {pk}: {} (store), {} (ledger), {} (value), {pk_key_balance} (key)",
+                "(n: {n}) {pk}: {} (store), {} (ledger), {} (value), {balance} (key)",
                 pk_store_account.balance.0, pk_best_account.balance.0, pk_value_account.balance.0
             );
         }
@@ -76,7 +75,7 @@ async fn check_best_accounts() -> anyhow::Result<()> {
         assert_eq!(pk_store_account, pk_best_account);
 
         // store balance coincides with key balance
-        assert_eq!(pk_store_account.balance.0, pk_key_balance);
+        assert_eq!(pk_store_account.balance.0, balance);
 
         // best ledger balances decreasing
         assert!(curr_ledger_balance.unwrap_or(u64::MAX) >= pk_best_account.balance.0);
@@ -84,8 +83,14 @@ async fn check_best_accounts() -> anyhow::Result<()> {
     }
 
     // check best ledger balances equal sorted store balances
-    for (pk, best_acct) in best_ledger.accounts.iter() {
-        assert_eq!(*best_acct, indexer_store.get_best_account(pk)?.unwrap());
+    for (token, token_ledger) in best_ledger.tokens.iter() {
+        for (pk, best_acct) in token_ledger.accounts.iter() {
+            assert_eq!(
+                *best_acct,
+                indexer_store.get_best_account(pk, token)?.unwrap()
+            );
+        }
     }
+
     Ok(())
 }

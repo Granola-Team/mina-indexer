@@ -13,6 +13,7 @@ use crate::{
         public_key::{self, PublicKey},
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
+        token::TokenAddress,
         Ledger, LedgerHash,
     },
     snark_work::store::SnarkStore,
@@ -100,7 +101,7 @@ pub async fn handle_connection(
                         invalid_public_key(&pk)
                     } else {
                         let pk: PublicKey = pk.into();
-                        if let Some(account) = db.get_best_account(&pk)? {
+                        if let Some(account) = db.get_best_account(&pk, &TokenAddress::default())? {
                             info!("Writing account {pk} to client");
                             Some(format!("{account}"))
                         } else {
@@ -623,11 +624,12 @@ pub async fn handle_connection(
                             error!("Ledger at state hash {hash} is not in the store");
                             Some(format!("Ledger at state hash {hash} is not in the store"))
                         }
-                    } else if ledger::is_valid_ledger_hash(&hash) {
+                    } else if ledger::hash::is_valid_ledger_hash(&hash) {
                         trace!("{hash} is a ledger hash");
-                        if let Some(ledger) =
-                            db.get_staged_ledger_at_ledger_hash(&LedgerHash(hash.clone()), memoize)?
-                        {
+                        if let Some(ledger) = db.get_staged_ledger_at_ledger_hash(
+                            &LedgerHash::new_or_panic(hash.clone()),
+                            memoize,
+                        )? {
                             write_ledger(path, ledger, &hash)
                         } else {
                             error!("Ledger at ledger hash {hash} is not in the store");
@@ -675,7 +677,7 @@ pub async fn handle_connection(
             ClientCli::StakingLedgers(__) => match __ {
                 StakingLedgers::Hash { hash, path } => {
                     info!("Received staking-ledgers-hash command for {hash}");
-                    if ledger::is_valid_ledger_hash(&hash) {
+                    if ledger::hash::is_valid_ledger_hash(&hash) {
                         trace!("{hash} is a ledger hash");
                         if let Some(staking_ledger) =
                             db.get_staking_ledger(&hash.clone().into(), None, None)?
