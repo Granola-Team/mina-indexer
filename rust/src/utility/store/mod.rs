@@ -4,8 +4,8 @@ use std::mem::size_of;
 
 pub mod block;
 pub mod command;
+pub mod ledger;
 pub mod snarks;
-pub mod staking_ledger;
 
 pub(crate) const U32_LEN: usize = size_of::<u32>();
 pub(crate) const U64_LEN: usize = size_of::<u64>();
