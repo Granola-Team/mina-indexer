@@ -131,8 +131,11 @@ async fn account_diffs() -> anyhow::Result<()> {
     println!("=== Final ===");
     println!("{ledger:?}");
 
-    for (pk, pk_ledger) in ledger.accounts.iter() {
-        assert_eq!(pk_ledger, expected.accounts.get(pk).unwrap());
+    for (token, token_ledger) in ledger.tokens.iter() {
+        for (pk, pk_ledger) in token_ledger.accounts.iter() {
+            assert_eq!(pk_ledger, expected.get_account(pk, token).unwrap());
+        }
     }
+
     Ok(())
 }

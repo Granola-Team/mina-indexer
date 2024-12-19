@@ -5,6 +5,7 @@ use mina_indexer::{
     ledger::{
         genesis::{self, GenesisLedger},
         public_key::PublicKey,
+        token::TokenAddress,
         Ledger,
     },
 };
@@ -13,9 +14,14 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     let genesis_root = genesis::parse_file("./data/genesis_ledgers/mainnet.json")?;
     let genesis_ledger: GenesisLedger = genesis_root.clone().into();
     let ledger: Ledger = genesis_ledger.into();
+    let mina_accounts = &ledger
+        .tokens
+        .get(&TokenAddress::default())
+        .unwrap()
+        .accounts;
 
     // Ledger account balances are in nanomina
-    let total_supply = ledger.accounts.values().fold(0, |acc, account| {
+    let total_supply = mina_accounts.values().fold(0, |acc, account| {
         acc + account.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0
     });
 
@@ -30,12 +36,12 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     );
 
     // genesis block creator is in genesis ledger
-    assert!(ledger.accounts.contains_key(&PublicKey::from(
+    assert!(mina_accounts.contains_key(&PublicKey::from(
         "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
     )));
     assert_eq!(
         1676,
-        ledger.accounts.len(),
+        mina_accounts.len(),
         "Total number of genesis accounts"
     );
 

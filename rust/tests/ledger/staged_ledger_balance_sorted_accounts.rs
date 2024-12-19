@@ -1,4 +1,5 @@
 use crate::helpers::setup_new_db_dir;
+use anyhow::Context;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion, BlockHash},
     constants::*,
@@ -48,12 +49,20 @@ async fn check_staged_accounts() -> anyhow::Result<()> {
         .unwrap();
 
     if best_ledger != staged_ledger {
-        for (pk, staged_acct) in staged_ledger.accounts.iter() {
-            let staged_ledger_acct = indexer_store.get_staged_account(pk, &state_hash)?.unwrap();
-            assert_eq!(*staged_acct, staged_ledger_acct);
-            assert_eq!(staged_acct, best_ledger.accounts.get(pk).unwrap());
+        for (token, token_ledger) in staged_ledger.tokens.iter() {
+            for (pk, staged_acct) in token_ledger.accounts.iter() {
+                let staged_ledger_acct = &indexer_store
+                    .get_staged_account(pk, token, &state_hash)?
+                    .with_context(|| format!("\npk: {pk}\ntoken: {token}\nblock: {state_hash}"))
+                    .unwrap();
+
+                assert_eq!(staged_acct, staged_ledger_acct);
+                assert_eq!(staged_acct, best_ledger.get_account(pk, token).unwrap());
+            }
         }
+
         panic!("Ledgers do not match")
     }
+
     Ok(())
 }
