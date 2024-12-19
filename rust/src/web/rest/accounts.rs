@@ -1,7 +1,7 @@
 use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore},
+    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::IndexerStore,
 };
@@ -36,8 +36,10 @@ pub async fn get_account(
 ) -> HttpResponse {
     let db = store.as_ref();
     let pk: PublicKey = public_key.clone().into();
-    if let Ok(Some(account)) = db.get_best_account(&pk) {
+
+    if let Ok(Some(account)) = db.get_best_account(&pk, &TokenAddress::default()) {
         debug!("Found account in ledger: {account}");
+
         let account = Account {
             account: account.clone(),
             epoch_num_blocks: db
@@ -59,6 +61,7 @@ pub async fn get_account(
                 .get_internal_commands_pk_total_count(&pk)
                 .unwrap_or_default(),
         };
+
         return HttpResponse::Ok().content_type(ContentType::json()).body(
             serde_json::to_string_pretty(&Account {
                 account: account.account.clone().display(),
@@ -67,5 +70,6 @@ pub async fn get_account(
             .expect("serde account bytes"),
         );
     }
+
     HttpResponse::NotFound().finish()
 }
