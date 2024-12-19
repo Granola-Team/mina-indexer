@@ -1,4 +1,4 @@
-use crate::{constants::SLIDING_WINDOW_SIZE, event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor};
+use crate::event_sourcing::block_ingestion_actors::blockchain_tree_builder_actor::BlockchainTreeBuilderActor;
 use block_ingestion_actors::{
     accounting_actor::AccountingActor, batch_canonical_snark_actor::BulkSnarkCanonicitySummaryActor,
     batch_canonical_user_command_actor::BatchCanonicalUserCommandLogActor, berkeley_block_parser_actor::BerkeleyBlockParserActor,
@@ -9,10 +9,9 @@ use block_ingestion_actors::{
     canonical_user_command_log_actor::CanonicalUserCommandLogActor, canonical_user_command_persistence_actor::CanonicalUserCommandPersistenceActor,
     canonical_zk_app_command_log_actor::CanonicalZkAppCommandLogActor, coinbase_transfer_actor::CoinbaseTransferActor, fee_transfer_actor::FeeTransferActor,
     fee_transfer_via_coinbase_actor::FeeTransferViaCoinbaseActor, ledger_actor::LedgerActor, mainnet_block_parser_actor::MainnetBlockParserActor,
-    monitor_actor::MonitorActor, new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor,
-    snark_canonicity_summary_actor::SnarkCanonicitySummaryActor, snark_summary_persistence_actor::SnarkSummaryPersistenceActor,
-    snark_work_actor::SnarkWorkSummaryActor, staking_ledger_actor::StakingLedgerActor, user_command_log_actor::UserCommandLogActor,
-    username_actor::UsernameActor, zk_app_command_log_actor::ZkappCommandActor, Actor,
+    new_account_actor::NewAccountActor, pcb_path_actor::PCBBlockPathActor, snark_canonicity_summary_actor::SnarkCanonicitySummaryActor,
+    snark_summary_persistence_actor::SnarkSummaryPersistenceActor, snark_work_actor::SnarkWorkSummaryActor, staking_ledger_actor::StakingLedgerActor,
+    user_command_log_actor::UserCommandLogActor, username_actor::UsernameActor, zk_app_command_log_actor::ZkappCommandActor, Actor,
 };
 use events::Event;
 use futures::future::try_join_all;
@@ -76,7 +75,6 @@ pub async fn subscribe_actors(
         Arc::new(UsernameActor::new(Arc::clone(shared_publisher))),
         Arc::new(ZkappCommandActor::new(Arc::clone(shared_publisher))),
         Arc::new(CanonicalZkAppCommandLogActor::new(Arc::clone(shared_publisher))),
-        Arc::new(MonitorActor::new(Arc::clone(shared_publisher), SLIDING_WINDOW_SIZE, None)),
         Arc::new(internal_command_persistence_actor),
         Arc::new(user_command_persistence_actor),
         Arc::new(snark_summary_persistence_actor),

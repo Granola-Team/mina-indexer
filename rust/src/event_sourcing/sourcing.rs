@@ -12,7 +12,7 @@ use crate::{
     utility::extract_height_and_hash,
 };
 use anyhow::Result;
-use log::{debug, info};
+use log::info;
 use std::{
     cmp::Ordering,
     fs,
@@ -98,7 +98,7 @@ pub async fn publish_block_dir_paths(
     mut shutdown_receiver: broadcast::Receiver<()>,
     root_node: Option<(u64, String)>, // height and state hash
 ) -> Result<()> {
-    let mut millisecond_pause = get_millisecond_pause_from_rate();
+    let millisecond_pause = get_millisecond_pause_from_rate();
     let mut entries = get_block_entries(&blocks_dir).await?;
 
     // Sort entries by height and hash
@@ -111,29 +111,16 @@ pub async fn publish_block_dir_paths(
         publish_root_file(shared_publisher, root_file).await?;
     }
 
-    let mut high_priority_subcriber = shared_publisher.subscribe_high_priority();
-
     let publisher_handle = tokio::spawn({
         let shared_publisher = Arc::clone(shared_publisher);
         async move {
-            for (i, entry) in entries.iter().enumerate() {
+            for entry in entries.iter() {
                 let path = entry.as_path();
 
                 publish_block_path(&shared_publisher, path).await.unwrap();
                 publish_actor_height(&shared_publisher, path).await.unwrap();
 
-                let running_avg_height_spread = handle_height_spread_event(&mut high_priority_subcriber).await;
-                // Actors should keep pace with each other, on average. If their processing height differs to much,
-                // the pause should increase
-                if running_avg_height_spread < 1.0 {
-                    millisecond_pause = millisecond_pause.saturating_sub(10).max(10); // decrement pause, to speed up ingestion
-                } else {
-                    millisecond_pause = (millisecond_pause + 10).min(1_000); // increment pause, to slow down ingestion
-                }
                 tokio::time::sleep(Duration::from_millis(millisecond_pause)).await;
-                if i % 100 == 0 {
-                    debug!("Pause is currently {millisecond_pause}ms for spread {:.2}", running_avg_height_spread);
-                }
 
                 if shutdown_receiver.try_recv().is_ok() {
                     info!("Shutdown signal received. Stopping publishing...");
@@ -200,20 +187,6 @@ async fn publish_root_file(shared_publisher: &Arc<SharedPublisher>, root_file: P
     Ok(())
 }
 
-async fn handle_height_spread_event(subscriber: &mut broadcast::Receiver<Event>) -> f64 {
-    let mut height_spread: f64 = 0.0; // Default to 0
-
-    // Drain events with a timeout and keep the highest HeightSpread value
-    while let Ok(Ok(event)) = tokio::time::timeout(std::time::Duration::from_millis(1), subscriber.recv()).await {
-        if event.event_type == EventType::RunningAvgHeightSpread {
-            let spread = event.payload.parse::<f64>().unwrap_or(0.0);
-            height_spread = spread;
-        }
-    }
-
-    height_spread
-}
-
 async fn publish_block_path(shared_publisher: &Arc<SharedPublisher>, path: &Path) -> Result<()> {
     shared_publisher.publish(Event {
         event_type: EventType::PrecomputedBlockPath,
@@ -249,7 +222,6 @@ pub fn get_millisecond_pause_from_rate() -> u64 {
 mod sourcing_tests {
     use super::*;
     use crate::event_sourcing::events::EventType;
-    use futures::lock::Mutex;
     use tokio::sync::broadcast;
 
     fn setup_shared_publisher() -> Arc<SharedPublisher> {
@@ -324,19 +296,5 @@ mod sourcing_tests {
 
         // Clean up by sending the shutdown signal
         let _ = shutdown_sender.send(());
-    }
-
-    #[tokio::test]
-    async fn test_handle_height_spread_event_default_zero_if_no_events() {
-        // Create a broadcast channel and a subscriber
-        let (_, rx) = broadcast::channel::<Event>(10);
-        let subscriber = Arc::new(Mutex::new(rx));
-
-        // Call the function to handle events (no events sent)
-        let mut sub = subscriber.lock().await;
-        let highest_spread = handle_height_spread_event(&mut sub).await;
-
-        // Assert that the highest spread is 0, as no events were received
-        assert_eq!(highest_spread, 0.0);
     }
 }
