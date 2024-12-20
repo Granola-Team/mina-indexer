@@ -1,11 +1,8 @@
 use super::events::{Event, EventType};
 use futures::future::BoxFuture;
 use log::error;
-use std::{collections::HashMap, future::Future, sync::Arc};
-use tokio::{
-    sync::{mpsc, Mutex},
-    task::JoinHandle,
-};
+use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
+use tokio::sync::{mpsc, Mutex};
 
 pub struct Stateless;
 
@@ -37,15 +34,6 @@ impl<S> ActorNode<S>
 where
     S: Send + 'static,
 {
-    /// Retrieves the internal state for inspection
-    pub async fn get_state<F, R>(&self, accessor: F) -> R
-    where
-        F: FnOnce(&S) -> R,
-    {
-        let locked_state = self.state.lock().await;
-        accessor(&*locked_state)
-    }
-
     /// Adds a child node to the current node
     pub fn add_child(&mut self, mut child: ActorNode<S>) {
         // Take ownership of the child's sender
@@ -72,28 +60,30 @@ where
     }
 
     /// Recursively spawns tasks for the node and its children, returning their handles
-    pub fn spawn_all(mut self) -> BoxFuture<'static, Vec<JoinHandle<()>>> {
+    pub async fn spawn_all(node: Arc<Mutex<Self>>) {
         Box::pin(async move {
             let mut handles = vec![];
 
-            let child_nodes = self.child_nodes.drain(..).collect::<Vec<ActorNode<S>>>();
-
             // Spawn a task for the current node
+            let node_clone = Arc::clone(&node);
             let handle = tokio::spawn(async move {
-                let node = Arc::new(Mutex::new(self));
-                ActorNode::start_processing(node).await;
+                ActorNode::start_processing(node_clone).await;
             });
             handles.push(handle);
 
             // Recursively spawn tasks for child nodes
-            for child in child_nodes {
-                // Move each child into the recursive call
-                let mut child_handles = child.spawn_all().await; // Await recursive call
-                handles.append(&mut child_handles); // Merge handles
-            }
+            let child_nodes = {
+                let mut locked_node = node.lock().await; // Lock the node
+                std::mem::take(&mut locked_node.child_nodes) // Take the child nodes for recursion
+            };
 
-            handles
+            for child in child_nodes {
+                let child_arc = Arc::new(Mutex::new(child)); // Wrap child in Arc<Mutex>
+
+                ActorNode::spawn_all(child_arc).await; // Recursively spawn child tasks
+            }
         })
+        .await;
     }
 
     /// Starts processing messages asynchronously
@@ -191,10 +181,13 @@ impl<S> ActorNodeBuilder<S> {
         node
     }
 }
+
 #[cfg(test)]
 mod actor_node_tests {
     use super::*;
     use log::trace;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn test_size_of_tree() {
@@ -250,7 +243,13 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        tokio::spawn(async { root.spawn_all().await });
+        let root = Arc::new(Mutex::new(root));
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
 
         // Trigger the root node
         sender
@@ -304,8 +303,13 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        // Spawn all tasks
-        tokio::spawn(async { root.spawn_all().await });
+        let root = Arc::new(Mutex::new(root));
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
 
         // Trigger the root node
         sender
@@ -345,7 +349,13 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        tokio::spawn(async { root.spawn_all().await });
+        let root = Arc::new(Mutex::new(root));
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
 
         // Trigger the root node
         sender
@@ -372,7 +382,7 @@ mod actor_node_tests {
                 Box::pin(async move {
                     let mut locked_state = state.lock().await; // Lock the state
                     locked_state.count += 1; // Increment the counter
-                    trace!("Processing event: {:?}, updated state: {:?}", event, state);
+                    trace!("Processing event: {:?}, updated state: {:?}", event, locked_state.count);
                     Some(Event {
                         event_type: EventType::NewBlock,
                         payload: format!("Processed: {}", event.payload),
@@ -383,8 +393,15 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        // Spawn the actor tasks
-        tokio::spawn(async { root.spawn_all().await });
+        println!("here");
+
+        let root = Arc::new(Mutex::new(root));
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
 
         // Send events to the root
         sender
@@ -403,11 +420,18 @@ mod actor_node_tests {
             .await
             .expect("Message should send");
 
-        // Allow some time for processing
+        println!("here 2");
+
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        // // Verify state has been updated
-        // let state_count = root.get_state(|state| state.count).await;
-        // assert_eq!(state_count, 2, "State counter should have incremented by the number of processed events.");
+        println!("here 3");
+
+        // Verify state has been updated
+        let root_clone = Arc::clone(&root);
+        let locked_root = root_clone.lock().await;
+        println!("here 4");
+        let state = locked_root.state.lock().await;
+        println!("here 5");
+        assert_eq!(state.count, 2, "State counter should have incremented by the number of processed events.");
     }
 }
