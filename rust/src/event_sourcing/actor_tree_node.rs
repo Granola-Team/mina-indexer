@@ -27,6 +27,9 @@ pub struct ActorNode {
     // Represents the actual child nodes connected to this node (the graph nodes)
     child_nodes: Vec<ActorNode>,
 
+    // Size of the tree formed by this node and it's descendents
+    size: usize,
+
     // Internal receiver for incoming events
     receiver: mpsc::Receiver<Event>,
 
@@ -38,7 +41,7 @@ pub struct ActorNode {
 }
 
 impl ActorNode {
-    pub fn size(&self) -> usize {
+    fn size(&self) -> usize {
         // Start by counting the current node
         let mut count = 1;
 
@@ -51,7 +54,7 @@ impl ActorNode {
     }
 
     /// Recursively spawns tasks for the node and its children, returning their handles
-    pub fn spawn(mut self) -> BoxFuture<'static, Vec<JoinHandle<()>>> {
+    pub fn spawn_all(mut self) -> BoxFuture<'static, Vec<JoinHandle<()>>> {
         Box::pin(async move {
             let mut handles = vec![];
 
@@ -67,7 +70,7 @@ impl ActorNode {
             // Recursively spawn tasks for child nodes
             for child in child_nodes {
                 // Move each child into the recursive call
-                let mut child_handles = child.spawn().await; // Await recursive call
+                let mut child_handles = child.spawn_all().await; // Await recursive call
                 handles.append(&mut child_handles); // Merge handles
             }
 
@@ -147,6 +150,7 @@ impl ActorNodeBuilder {
             id: self.id,
             child_edges: HashMap::new(),
             child_nodes: vec![], // Store child nodes directly
+            size: 0,
             receiver: rx,
             sender: Some(tx),
             event_processor: self.event_processor.expect("Event processor must be set before building"),
@@ -162,6 +166,9 @@ impl ActorNodeBuilder {
                 error!("Child {:?} does not have a valid sender", child_id);
             }
         }
+
+        // calculate size before children are consumed
+        node.size = node.size();
 
         node
     }
@@ -202,7 +209,7 @@ mod actor_node_tests {
             .build();
 
         // Assert that the size matches the number of nodes in the tree (1 root + 2 children)
-        assert_eq!(root.size(), 4, "The tree should contain 4 nodes (1 root + 3 children).");
+        assert_eq!(root.size, 4, "The tree should contain 4 nodes (1 root + 3 children).");
     }
 
     #[tokio::test]
@@ -218,7 +225,7 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        tokio::spawn(async { root.spawn().await });
+        tokio::spawn(async { root.spawn_all().await });
 
         // Trigger the root node
         sender
@@ -269,7 +276,7 @@ mod actor_node_tests {
         let sender = root.sender.take().expect("Sender should exist");
 
         // Spawn all tasks
-        tokio::spawn(async { root.spawn().await });
+        tokio::spawn(async { root.spawn_all().await });
 
         // Trigger the root node
         sender
@@ -306,7 +313,7 @@ mod actor_node_tests {
 
         let sender = root.sender.take().expect("Sender should exist");
 
-        tokio::spawn(async { root.spawn().await });
+        tokio::spawn(async { root.spawn_all().await });
 
         // Trigger the root node
         sender
