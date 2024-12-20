@@ -1,7 +1,10 @@
 use futures::future::BoxFuture;
 use log::error;
 use std::{collections::HashMap, future::Future, sync::Arc};
-use tokio::sync::{mpsc, Mutex};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task::JoinHandle,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventType {
@@ -37,6 +40,31 @@ impl ActorNode {
         count
     }
 
+    /// Recursively spawns tasks for the node and its children, returning their handles
+    pub fn spawn(mut self) -> BoxFuture<'static, Vec<JoinHandle<()>>> {
+        Box::pin(async move {
+            let mut handles = vec![];
+
+            let child_nodes = self.child_nodes.drain(..).collect::<Vec<ActorNode>>();
+
+            // Spawn a task for the current node
+            let handle = tokio::spawn(async move {
+                let node = Arc::new(Mutex::new(self));
+                ActorNode::start_processing(node).await;
+            });
+            handles.push(handle);
+
+            // Recursively spawn tasks for child nodes
+            for child in child_nodes {
+                // Move each child into the recursive call
+                let mut child_handles = child.spawn().await; // Await recursive call
+                handles.append(&mut child_handles); // Merge handles
+            }
+
+            handles
+        })
+    }
+
     /// Starts processing messages asynchronously
     pub async fn start_processing(node: Arc<Mutex<Self>>) {
         loop {
@@ -65,17 +93,6 @@ impl ActorNode {
                     }
                 }
             }
-        }
-    }
-
-    /// Trigger an event for this node
-    pub async fn trigger(&self, event: Event) {
-        if let Some(sender) = &self.sender {
-            if let Err(err) = sender.send(event).await {
-                error!("Failed to trigger event: {:?}", err);
-            }
-        } else {
-            error!("Node {:?} does not have a valid sender to trigger events", self.id);
         }
     }
 }
@@ -139,13 +156,10 @@ impl ActorNodeBuilder {
         node
     }
 }
-
 #[cfg(test)]
 mod actor_node_tests {
     use super::*;
     use log::trace;
-    use std::sync::Arc;
-    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn test_size_of_tree() {
@@ -178,128 +192,120 @@ mod actor_node_tests {
             .build();
 
         // Assert that the size matches the number of nodes in the tree (1 root + 2 children)
-        assert_eq!(root.size(), 4, "The tree should contain 3 nodes (1 root + 2 children).");
+        assert_eq!(root.size(), 4, "The tree should contain 4 nodes (1 root + 3 children).");
     }
 
     #[tokio::test]
     async fn test_no_children() {
-        let safe_root = Arc::new(Mutex::new(
-            ActorNodeBuilder::new(EventType::GenesisBlock)
-                .with_processor(|_| {
-                    Box::pin(async move {
-                        trace!("Root processing event");
-                        None // No propagation since there are no children
-                    })
+        let mut root = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_processor(|_| {
+                Box::pin(async move {
+                    trace!("Root processing event");
+                    None // No propagation since there are no children
                 })
-                .build(),
-        ));
+            })
+            .build();
 
-        let processing_root = Arc::clone(&safe_root);
-        tokio::spawn(async move {
-            ActorNode::start_processing(processing_root).await;
-        });
+        let sender = root.sender.take().expect("Sender should exist");
 
-        safe_root
-            .lock()
-            .await
-            .trigger(Event {
+        tokio::spawn(async { root.spawn().await });
+
+        // Trigger the root node
+        sender
+            .send(Event {
                 event_type: EventType::GenesisBlock,
                 payload: "Root event".to_string(),
             })
-            .await;
+            .await
+            .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     #[tokio::test]
     async fn test_multiple_children() {
-        let safe_root = Arc::new(Mutex::new(
-            ActorNodeBuilder::new(EventType::GenesisBlock)
-                .with_processor(|event| {
-                    Box::pin(async move {
-                        trace!("Root processing: {:?}", event);
-                        Some(Event {
-                            event_type: EventType::NewBlock,
-                            payload: format!("Processed by root: {}", event.payload),
-                        })
+        let mut root = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_processor(|event| {
+                Box::pin(async move {
+                    trace!("Root processing: {:?}", event);
+                    Some(Event {
+                        event_type: EventType::NewBlock,
+                        payload: format!("Processed by root: {}", event.payload),
                     })
                 })
-                .add_child(
-                    ActorNodeBuilder::new(EventType::NewBlock)
-                        .with_processor(|event| {
-                            Box::pin(async move {
-                                trace!("Child1 processing: {:?}", event);
-                                None // Stop propagation
-                            })
+            })
+            .add_child(
+                ActorNodeBuilder::new(EventType::NewBlock)
+                    .with_processor(|event| {
+                        Box::pin(async move {
+                            trace!("Child1 processing: {:?}", event);
+                            None // Stop propagation
                         })
-                        .build(),
-                )
-                .add_child(
-                    ActorNodeBuilder::new(EventType::NewBlock)
-                        .with_processor(|event| {
-                            Box::pin(async move {
-                                trace!("Child2 processing: {:?}", event);
-                                None // Stop propagation
-                            })
+                    })
+                    .build(),
+            )
+            .add_child(
+                ActorNodeBuilder::new(EventType::NewBlock)
+                    .with_processor(|event| {
+                        Box::pin(async move {
+                            trace!("Child2 processing: {:?}", event);
+                            None // Stop propagation
                         })
-                        .build(),
-                )
-                .build(),
-        ));
+                    })
+                    .build(),
+            )
+            .build();
 
-        let processing_root = Arc::clone(&safe_root);
-        tokio::spawn(async move {
-            ActorNode::start_processing(processing_root).await;
-        });
+        let sender = root.sender.take().expect("Sender should exist");
 
-        safe_root
-            .lock()
-            .await
-            .trigger(Event {
+        // Spawn all tasks
+        tokio::spawn(async { root.spawn().await });
+
+        // Trigger the root node
+        sender
+            .send(Event {
                 event_type: EventType::GenesisBlock,
                 payload: "Root event".to_string(),
             })
-            .await;
+            .await
+            .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     #[tokio::test]
     async fn test_event_processor_filtering() {
-        let safe_root = Arc::new(Mutex::new(
-            ActorNodeBuilder::new(EventType::GenesisBlock)
-                .with_processor(|_| {
-                    Box::pin(async move {
-                        trace!("Root processing event");
-                        None // Do not propagate
-                    })
+        let mut root = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_processor(|_| {
+                Box::pin(async move {
+                    trace!("Root processing event");
+                    None // Do not propagate
                 })
-                .add_child(
-                    ActorNodeBuilder::new(EventType::NewBlock)
-                        .with_processor(|_| {
-                            Box::pin(async move {
-                                trace!("Child processing event");
-                                None
-                            })
+            })
+            .add_child(
+                ActorNodeBuilder::new(EventType::NewBlock)
+                    .with_processor(|_| {
+                        Box::pin(async move {
+                            trace!("Child processing event");
+                            None
                         })
-                        .build(),
-                )
-                .build(),
-        ));
+                    })
+                    .build(),
+            )
+            .build();
 
-        let processing_root = Arc::clone(&safe_root);
-        tokio::spawn(async move {
-            ActorNode::start_processing(processing_root).await;
-        });
+        let sender = root.sender.take().expect("Sender should exist");
 
-        safe_root
-            .lock()
-            .await
-            .trigger(Event {
+        tokio::spawn(async { root.spawn().await });
+
+        // Trigger the root node
+        sender
+            .send(Event {
                 event_type: EventType::GenesisBlock,
                 payload: "Root event".to_string(),
             })
-            .await;
+            .await
+            .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
