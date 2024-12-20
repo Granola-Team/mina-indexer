@@ -1,8 +1,8 @@
 use super::events::{Event, EventType};
 use futures::future::BoxFuture;
-use log::error;
+use log::{error, info};
 use std::{collections::HashMap, future::Future, sync::Arc};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, watch, Mutex};
 
 pub struct Stateless;
 
@@ -28,6 +28,8 @@ pub struct ActorNode<S> {
 
     // internal state
     state: Arc<Mutex<S>>, // State wrapped in Arc<Mutex> for safe sharing
+
+    shutdown_receiver: watch::Receiver<bool>,
 }
 
 impl<S> ActorNode<S>
@@ -89,26 +91,42 @@ where
     /// Starts processing messages asynchronously
     pub async fn start_processing(node: Arc<Mutex<Self>>) {
         loop {
+            let is_shutdown = {
+                let locked_node = node.lock().await; // Lock the node to access the shutdown_receiver
+                let shutdown_receiver = locked_node.shutdown_receiver.clone(); // Clone the receiver
+                drop(locked_node); // Explicitly drop the lock
+                let shutdown_sigal = *shutdown_receiver.borrow(); // Access the shutdown signal value
+                shutdown_sigal
+            };
+
+            if is_shutdown {
+                info!("Node shutting down");
+                break; // Exit the loop on shutdown
+            }
+
+            // Process an incoming event with a timeout
             let event = {
-                let mut locked_node = node.lock().await; // Acquire the lock
-                locked_node.receiver.recv().await // Receive an event
+                let mut locked_node = node.lock().await;
+                tokio::time::timeout(tokio::time::Duration::from_millis(1), locked_node.receiver.recv())
+                    .await
+                    .ok()
+                    .flatten()
             };
 
             if let Some(event) = event {
                 let processed_event = {
-                    let locked_node = node.lock().await; // Lock the node
-                    let event_processor = &locked_node.event_processor; // Borrow the processor immutably
-                    let state = locked_node.state.clone(); // Clone the state Arc
-                    event_processor(event, state).await // Pass the state Arc to the processor
+                    let locked_node = node.lock().await;
+                    let event_processor = &locked_node.event_processor;
+                    let state = Arc::clone(&locked_node.state);
+                    event_processor(event, state).await
                 };
 
                 if let Some(processed_event) = processed_event {
                     let children = {
-                        let locked_node = node.lock().await; // Acquire the lock again
-                        locked_node.child_edges.clone() // Clone the children map
+                        let locked_node = node.lock().await;
+                        locked_node.child_edges.clone()
                     };
 
-                    // Send the processed event to all children
                     for (_, sender) in children {
                         if let Err(err) = sender.send(processed_event.clone()).await {
                             error!("Failed to send event to child: {:?}", err);
@@ -116,6 +134,9 @@ where
                     }
                 }
             }
+
+            // Add a short sleep to avoid busy-waiting
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
     }
 }
@@ -154,7 +175,7 @@ impl<S> ActorNodeBuilder<S> {
     }
 
     /// Builds the `ActorNode`, ensuring all required fields are set
-    pub fn build(self) -> ActorNode<S> {
+    pub fn build(self, shutdown_receiver: watch::Receiver<bool>) -> ActorNode<S> {
         let (tx, rx) = mpsc::channel(10);
 
         let mut node = ActorNode {
@@ -165,6 +186,7 @@ impl<S> ActorNodeBuilder<S> {
             sender: Some(tx),
             event_processor: self.event_processor.expect("Event processor must be set before building"),
             state: Arc::new(Mutex::new(self.initial_state.expect("Should have initial state"))),
+            shutdown_receiver,
         };
 
         for child in self.children {
@@ -187,41 +209,36 @@ mod actor_node_tests {
     use super::*;
     use log::trace;
     use std::sync::Arc;
-    use tokio::sync::Mutex;
+    use tokio::sync::{watch, Mutex};
 
     #[tokio::test]
     async fn test_size_of_tree() {
+        // Shutdown signal
+        let (_, shutdown_rx) = watch::channel(false);
+
         // Create a root node with two children
         let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(Stateless {})
-            .with_processor(|_event, _state| {
-                Box::pin(async { None }) // No propagation for this test
-            })
-            .build();
+            .with_processor(|_event, _state| Box::pin(async { None }))
+            .build(shutdown_rx.clone());
 
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
                 .with_state(Stateless {})
-                .with_processor(|_event, _state| {
-                    Box::pin(async { None }) // No propagation for this test
-                })
-                .build(),
+                .with_processor(|_event, _state| Box::pin(async { None }))
+                .build(shutdown_rx.clone()),
         );
 
         let mut child2 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(Stateless {})
-            .with_processor(|_event, _state| {
-                Box::pin(async { None }) // No propagation for this test
-            })
-            .build();
+            .with_processor(|_event, _state| Box::pin(async { None }))
+            .build(shutdown_rx.clone());
 
         child2.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
                 .with_state(Stateless {})
-                .with_processor(|_event, _state| {
-                    Box::pin(async { None }) // No propagation for this test
-                })
-                .build(),
+                .with_processor(|_event, _state| Box::pin(async { None }))
+                .build(shutdown_rx.clone()),
         );
         root.add_child(child2);
 
@@ -231,6 +248,8 @@ mod actor_node_tests {
 
     #[tokio::test]
     async fn test_no_children() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
         let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(Stateless {})
             .with_processor(|_event, _state| {
@@ -239,7 +258,7 @@ mod actor_node_tests {
                     None // No propagation since there are no children
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         let sender = root.sender.take().expect("Sender should exist");
 
@@ -261,10 +280,16 @@ mod actor_node_tests {
             .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     #[tokio::test]
     async fn test_multiple_children() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
         let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(Stateless {})
             .with_processor(|event, _state| {
@@ -276,7 +301,7 @@ mod actor_node_tests {
                     })
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         let child1 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(Stateless {})
@@ -286,7 +311,7 @@ mod actor_node_tests {
                     None // Stop propagation
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         let child2 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(Stateless {})
@@ -296,7 +321,7 @@ mod actor_node_tests {
                     None // Stop propagation
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         root.add_child(child1);
         root.add_child(child2);
@@ -321,10 +346,16 @@ mod actor_node_tests {
             .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     #[tokio::test]
     async fn test_event_processor_filtering() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
         let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(Stateless {})
             .with_processor(|_event, _state| {
@@ -333,7 +364,7 @@ mod actor_node_tests {
                     None // Do not propagate
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
@@ -344,7 +375,7 @@ mod actor_node_tests {
                         None
                     })
                 })
-                .build(),
+                .build(shutdown_rx.clone()),
         );
 
         let sender = root.sender.take().expect("Sender should exist");
@@ -367,6 +398,10 @@ mod actor_node_tests {
             .expect("Message should send");
 
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     #[derive(Debug, Default)]
@@ -376,6 +411,8 @@ mod actor_node_tests {
 
     #[tokio::test]
     async fn test_mutate_and_inspect_state() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
         let mut root: ActorNode<CounterState> = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(CounterState { count: 0 })
             .with_processor(|event, state| {
@@ -389,11 +426,9 @@ mod actor_node_tests {
                     })
                 })
             })
-            .build();
+            .build(shutdown_rx.clone());
 
         let sender = root.sender.take().expect("Sender should exist");
-
-        println!("here");
 
         let root = Arc::new(Mutex::new(root));
         tokio::spawn({
@@ -420,9 +455,12 @@ mod actor_node_tests {
             .await
             .expect("Message should send");
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        // Verify state has been updated
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+
+        //Verify state has been updated
         let root_clone = Arc::clone(&root);
         let locked_root = root_clone.lock().await;
         let state = locked_root.state.lock().await;
