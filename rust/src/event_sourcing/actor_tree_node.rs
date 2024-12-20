@@ -20,7 +20,7 @@ pub struct Event {
 
 pub struct ActorNode {
     id: EventType, // Unique identifier for the node
-    children: HashMap<EventType, mpsc::Sender<Event>>,
+    child_edges: HashMap<EventType, mpsc::Sender<Event>>,
     child_nodes: Vec<ActorNode>,                                                     // Channels to children identified by EventType
     receiver: mpsc::Receiver<Event>,                                                 // Internal receiver for events
     sender: Option<mpsc::Sender<Event>>,                                             // Internal sender for this node
@@ -82,7 +82,7 @@ impl ActorNode {
                 if let Some(processed_event) = processed_event {
                     let children = {
                         let locked_node = node.lock().await; // Acquire the lock again
-                        locked_node.children.clone() // Clone the children map
+                        locked_node.child_edges.clone() // Clone the children map
                     };
 
                     // Send the processed event to all children
@@ -135,7 +135,7 @@ impl ActorNodeBuilder {
 
         let mut node = ActorNode {
             id: self.id,
-            children: HashMap::new(),
+            child_edges: HashMap::new(),
             child_nodes: vec![], // Store child nodes directly
             receiver: rx,
             sender: Some(tx),
@@ -147,7 +147,7 @@ impl ActorNodeBuilder {
             let mut child_sender = child.sender.clone();
             node.child_nodes.push(child);
             if let Some(sender) = child_sender.take() {
-                node.children.insert(child_id, sender);
+                node.child_edges.insert(child_id, sender);
             } else {
                 error!("Child {:?} does not have a valid sender", child_id);
             }
