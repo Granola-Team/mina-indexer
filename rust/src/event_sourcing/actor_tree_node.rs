@@ -20,11 +20,21 @@ pub struct Event {
 
 pub struct ActorNode {
     id: EventType, // Unique identifier for the node
+
+    // Represents the communication connectors (edges) between this node and its children
     child_edges: HashMap<EventType, mpsc::Sender<Event>>,
-    child_nodes: Vec<ActorNode>,                                                     // Channels to children identified by EventType
-    receiver: mpsc::Receiver<Event>,                                                 // Internal receiver for events
-    sender: Option<mpsc::Sender<Event>>,                                             // Internal sender for this node
-    event_processor: Box<dyn Fn(Event) -> BoxFuture<'static, Option<Event>> + Send>, // Async event processor
+
+    // Represents the actual child nodes connected to this node (the graph nodes)
+    child_nodes: Vec<ActorNode>,
+
+    // Internal receiver for incoming events
+    receiver: mpsc::Receiver<Event>,
+
+    // Sender for outgoing events from this node
+    sender: Option<mpsc::Sender<Event>>,
+
+    // Asynchronous function to process events received by this node
+    event_processor: Box<dyn Fn(Event) -> BoxFuture<'static, Option<Event>> + Send>,
 }
 
 impl ActorNode {
