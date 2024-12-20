@@ -27,9 +27,6 @@ pub struct ActorNode {
     // Represents the actual child nodes connected to this node (the graph nodes)
     child_nodes: Vec<ActorNode>,
 
-    // Size of the tree formed by this node and it's descendents
-    size: usize,
-
     // Internal receiver for incoming events
     receiver: mpsc::Receiver<Event>,
 
@@ -41,7 +38,20 @@ pub struct ActorNode {
 }
 
 impl ActorNode {
-    fn size(&self) -> usize {
+    /// Adds a child node to the current node
+    pub fn add_child(&mut self, mut child: ActorNode) {
+        // Take ownership of the child's sender
+        let child_id = child.id.clone();
+        if let Some(sender) = child.sender.take() {
+            self.child_edges.insert(child_id.clone(), sender); // Add edge
+            self.child_nodes.push(child); // Add node
+        } else {
+            error!("Failed to add child: Sender for {:?} does not exist", child_id);
+        }
+    }
+
+    /// Gets the size of the graph
+    pub fn size(&self) -> usize {
         // Start by counting the current node
         let mut count = 1;
 
@@ -138,12 +148,6 @@ impl ActorNodeBuilder {
         self
     }
 
-    /// Adds a child to the node
-    pub fn add_child(mut self, child: ActorNode) -> Self {
-        self.children.push(child);
-        self
-    }
-
     /// Builds the `ActorNode`, ensuring all required fields are set
     pub fn build(self) -> ActorNode {
         let (tx, rx) = mpsc::channel(10);
@@ -151,8 +155,7 @@ impl ActorNodeBuilder {
         let mut node = ActorNode {
             id: self.id,
             child_edges: HashMap::new(),
-            child_nodes: vec![], // Store child nodes directly
-            size: 0,
+            child_nodes: vec![],
             receiver: rx,
             sender: Some(tx),
             event_processor: self.event_processor.expect("Event processor must be set before building"),
@@ -169,9 +172,6 @@ impl ActorNodeBuilder {
             }
         }
 
-        // calculate size before children are consumed
-        node.size = node.size();
-
         node
     }
 }
@@ -183,35 +183,37 @@ mod actor_node_tests {
     #[tokio::test]
     async fn test_size_of_tree() {
         // Create a root node with two children
-        let root = ActorNodeBuilder::new(EventType::GenesisBlock)
+        let mut root = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_processor(|_event| {
                 Box::pin(async { None }) // No propagation for this test
             })
-            .add_child(
-                ActorNodeBuilder::new(EventType::NewBlock)
-                    .with_processor(|_event| {
-                        Box::pin(async { None }) // No propagation for this test
-                    })
-                    .build(),
-            )
-            .add_child(
-                ActorNodeBuilder::new(EventType::NewBlock)
-                    .with_processor(|_event| {
-                        Box::pin(async { None }) // No propagation for this test
-                    })
-                    .add_child(
-                        ActorNodeBuilder::new(EventType::NewBlock)
-                            .with_processor(|_event| {
-                                Box::pin(async { None }) // No propagation for this test
-                            })
-                            .build(),
-                    )
-                    .build(),
-            )
             .build();
 
+        root.add_child(
+            ActorNodeBuilder::new(EventType::NewBlock)
+                .with_processor(|_event| {
+                    Box::pin(async { None }) // No propagation for this test
+                })
+                .build(),
+        );
+
+        let mut child2 = ActorNodeBuilder::new(EventType::NewBlock)
+            .with_processor(|_event| {
+                Box::pin(async { None }) // No propagation for this test
+            })
+            .build();
+
+        child2.add_child(
+            ActorNodeBuilder::new(EventType::NewBlock)
+                .with_processor(|_event| {
+                    Box::pin(async { None }) // No propagation for this test
+                })
+                .build(),
+        );
+        root.add_child(child2);
+
         // Assert that the size matches the number of nodes in the tree (1 root + 2 children)
-        assert_eq!(root.size, 4, "The tree should contain 4 nodes (1 root + 3 children).");
+        assert_eq!(root.size(), 4, "The tree should contain 4 nodes (1 root + 3 children).");
     }
 
     #[tokio::test]
@@ -253,27 +255,28 @@ mod actor_node_tests {
                     })
                 })
             })
-            .add_child(
-                ActorNodeBuilder::new(EventType::NewBlock)
-                    .with_processor(|event| {
-                        Box::pin(async move {
-                            trace!("Child1 processing: {:?}", event);
-                            None // Stop propagation
-                        })
-                    })
-                    .build(),
-            )
-            .add_child(
-                ActorNodeBuilder::new(EventType::NewBlock)
-                    .with_processor(|event| {
-                        Box::pin(async move {
-                            trace!("Child2 processing: {:?}", event);
-                            None // Stop propagation
-                        })
-                    })
-                    .build(),
-            )
             .build();
+
+        let child1 = ActorNodeBuilder::new(EventType::NewBlock)
+            .with_processor(|event| {
+                Box::pin(async move {
+                    trace!("Child1 processing: {:?}", event);
+                    None // Stop propagation
+                })
+            })
+            .build();
+
+        let child2 = ActorNodeBuilder::new(EventType::NewBlock)
+            .with_processor(|event| {
+                Box::pin(async move {
+                    trace!("Child2 processing: {:?}", event);
+                    None // Stop propagation
+                })
+            })
+            .build();
+
+        root.add_child(child1);
+        root.add_child(child2);
 
         let sender = root.sender.take().expect("Sender should exist");
 
@@ -301,17 +304,18 @@ mod actor_node_tests {
                     None // Do not propagate
                 })
             })
-            .add_child(
-                ActorNodeBuilder::new(EventType::NewBlock)
-                    .with_processor(|_| {
-                        Box::pin(async move {
-                            trace!("Child processing event");
-                            None
-                        })
-                    })
-                    .build(),
-            )
             .build();
+
+        root.add_child(
+            ActorNodeBuilder::new(EventType::NewBlock)
+                .with_processor(|_| {
+                    Box::pin(async move {
+                        trace!("Child processing event");
+                        None
+                    })
+                })
+                .build(),
+        );
 
         let sender = root.sender.take().expect("Sender should exist");
 
