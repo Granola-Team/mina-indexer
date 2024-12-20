@@ -1,7 +1,7 @@
 use super::events::{Event, EventType};
 use futures::future::BoxFuture;
 use log::error;
-use std::{collections::HashMap, future::Future, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{mpsc, Mutex};
 
 pub struct Stateless;
@@ -420,18 +420,12 @@ mod actor_node_tests {
             .await
             .expect("Message should send");
 
-        println!("here 2");
-
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-        println!("here 3");
 
         // Verify state has been updated
         let root_clone = Arc::clone(&root);
         let locked_root = root_clone.lock().await;
-        println!("here 4");
         let state = locked_root.state.lock().await;
-        println!("here 5");
         assert_eq!(state.count, 2, "State counter should have incremented by the number of processed events.");
     }
 }
