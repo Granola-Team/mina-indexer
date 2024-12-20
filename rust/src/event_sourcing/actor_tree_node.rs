@@ -1,3 +1,4 @@
+use super::events::{Event, EventType};
 use futures::future::BoxFuture;
 use log::error;
 use std::{collections::HashMap, future::Future, sync::Arc};
@@ -5,18 +6,6 @@ use tokio::{
     sync::{mpsc, Mutex},
     task::JoinHandle,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum EventType {
-    GenesisBlock,
-    NewBlock,
-}
-
-#[derive(Debug, Clone)]
-pub struct Event {
-    pub event_type: EventType,
-    pub payload: String,
-}
 
 pub struct ActorNode {
     id: EventType, // Unique identifier for the node
