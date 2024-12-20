@@ -110,9 +110,11 @@ impl ActorNode {
     }
 }
 
+type EP = Option<Box<dyn Fn(Event) -> BoxFuture<'static, Option<Event>> + Send>>;
+
 pub struct ActorNodeBuilder {
     id: EventType,
-    event_processor: Option<Box<dyn Fn(Event) -> BoxFuture<'static, Option<Event>> + Send>>,
+    event_processor: EP,
     children: Vec<ActorNode>,
 }
 
