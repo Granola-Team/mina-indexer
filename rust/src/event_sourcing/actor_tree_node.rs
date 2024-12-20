@@ -16,14 +16,27 @@ pub struct Event {
 }
 
 pub struct ActorNode {
-    id: EventType,                                                                   // Unique identifier for the node
-    children: HashMap<EventType, mpsc::Sender<Event>>,                               // Channels to children identified by EventType
+    id: EventType, // Unique identifier for the node
+    children: HashMap<EventType, mpsc::Sender<Event>>,
+    child_nodes: Vec<ActorNode>,                                                     // Channels to children identified by EventType
     receiver: mpsc::Receiver<Event>,                                                 // Internal receiver for events
     sender: Option<mpsc::Sender<Event>>,                                             // Internal sender for this node
     event_processor: Box<dyn Fn(Event) -> BoxFuture<'static, Option<Event>> + Send>, // Async event processor
 }
 
 impl ActorNode {
+    pub fn size(&self) -> usize {
+        // Start by counting the current node
+        let mut count = 1;
+
+        // Recursively count each child node
+        for child_node in &self.child_nodes {
+            count += child_node.size();
+        }
+
+        count
+    }
+
     /// Starts processing messages asynchronously
     pub async fn start_processing(node: Arc<Mutex<Self>>) {
         loop {
@@ -106,16 +119,20 @@ impl ActorNodeBuilder {
         let mut node = ActorNode {
             id: self.id,
             children: HashMap::new(),
+            child_nodes: vec![], // Store child nodes directly
             receiver: rx,
             sender: Some(tx),
             event_processor: self.event_processor.expect("Event processor must be set before building"),
         };
 
-        for mut child in self.children {
-            if let Some(sender) = child.sender.take() {
-                node.children.insert(child.id.clone(), sender);
+        for child in self.children {
+            let child_id = child.id.clone();
+            let mut child_sender = child.sender.clone();
+            node.child_nodes.push(child);
+            if let Some(sender) = child_sender.take() {
+                node.children.insert(child_id, sender);
             } else {
-                error!("Child {:?} does not have a valid sender", child.id);
+                error!("Child {:?} does not have a valid sender", child_id);
             }
         }
 
@@ -129,6 +146,40 @@ mod actor_node_tests {
     use log::trace;
     use std::sync::Arc;
     use tokio::sync::Mutex;
+
+    #[tokio::test]
+    async fn test_size_of_tree() {
+        // Create a root node with two children
+        let root = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_processor(|_event| {
+                Box::pin(async { None }) // No propagation for this test
+            })
+            .add_child(
+                ActorNodeBuilder::new(EventType::NewBlock)
+                    .with_processor(|_event| {
+                        Box::pin(async { None }) // No propagation for this test
+                    })
+                    .build(),
+            )
+            .add_child(
+                ActorNodeBuilder::new(EventType::NewBlock)
+                    .with_processor(|_event| {
+                        Box::pin(async { None }) // No propagation for this test
+                    })
+                    .add_child(
+                        ActorNodeBuilder::new(EventType::NewBlock)
+                            .with_processor(|_event| {
+                                Box::pin(async { None }) // No propagation for this test
+                            })
+                            .build(),
+                    )
+                    .build(),
+            )
+            .build();
+
+        // Assert that the size matches the number of nodes in the tree (1 root + 2 children)
+        assert_eq!(root.size(), 4, "The tree should contain 3 nodes (1 root + 2 children).");
+    }
 
     #[tokio::test]
     async fn test_no_children() {
