@@ -33,6 +33,11 @@ pub enum ClientCli {
         output_path: PathBuf,
     },
 
+    /// Hash a v2 txn (signed/zkapp command)
+    #[clap(hide = true)]
+    #[clap(subcommand)]
+    Hash(HashTxn),
+
     /// Query best & staged ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),
@@ -200,6 +205,16 @@ pub enum Chain {
         /// Display the entire precomputed block
         #[arg(long, default_value_t = false)]
         verbose: bool,
+    },
+}
+
+#[derive(Subcommand, Debug, Encode, Decode)]
+#[command(author, version, about, long_about = None)]
+pub enum HashTxn {
+    Txn {
+        /// V2 transaction JSON
+        #[arg(long)]
+        json: String,
     },
 }
 
