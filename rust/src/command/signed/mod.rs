@@ -322,37 +322,7 @@ impl SignedCommand {
                 let json: serde_json::Value = data.to_owned().to_mina_json();
 
                 match serde_json::to_string(&json) {
-                    Ok(cmd_str) => {
-                        let mut proc = std::process::Command::new("mina_txn_hasher.exe");
-                        proc.arg(cmd_str);
-
-                        match proc.output() {
-                            Ok(output) => {
-                                if !output.status.success() {
-                                    let err = String::from_utf8_lossy(&output.stderr);
-                                    bail!("Process failed: {}\ndata: {:?}", err, data);
-                                }
-                                let txn_hash = String::from_utf8(output.stdout).map_err(|e| {
-                                    anyhow::anyhow!("Invalid UTF-8 in output: {}", e)
-                                })?;
-                                TxnHash::new(txn_hash.trim().to_string())
-                            }
-                            Err(e) => {
-                                let err_msg = match e.kind() {
-                                    ErrorKind::NotFound => "Executable not found",
-                                    ErrorKind::PermissionDenied => "Permission denied",
-                                    ErrorKind::InvalidInput => "Invalid input",
-                                    _ => "Unknown error occurred",
-                                };
-                                bail!(
-                                    "Error executing command: {} ({})\ndata: {:?}",
-                                    err_msg,
-                                    e,
-                                    data
-                                )
-                            }
-                        }
-                    }
+                    Ok(cmd_str) => hash_signed_command_v2(cmd_str),
                     Err(e) => bail!("Error serializing JSON: {}\ndata: {:?}", e, data),
                 }
             }
@@ -368,6 +338,40 @@ impl SignedCommand {
                 signed_command: Self::from(u),
             })
             .collect()
+    }
+}
+
+pub fn hash_signed_command_v2(cmd_str: String) -> anyhow::Result<TxnHash> {
+    let mut proc = std::process::Command::new("mina_txn_hasher.exe");
+    proc.arg(&cmd_str);
+
+    match proc.output() {
+        Ok(output) => {
+            if !output.status.success() {
+                let err = String::from_utf8_lossy(&output.stderr);
+                bail!("Process failed: {}\ndata: {}", err, cmd_str);
+            }
+
+            let txn_hash = String::from_utf8(output.stdout)
+                .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in output: {}", e))?;
+            TxnHash::new(txn_hash.trim().to_string())
+        }
+        Err(e) => {
+            let err_msg = match e.kind() {
+                ErrorKind::NotFound => "Executable not found",
+                ErrorKind::PermissionDenied => "Permission denied",
+                ErrorKind::InvalidInput => "Invalid input",
+                _ => "Unknown error occurred",
+            };
+
+            bail!(
+                "Error executing command '{:?}': {} ({})\ndata: {}",
+                proc.get_program(),
+                err_msg,
+                e,
+                cmd_str
+            )
+        }
     }
 }
 
@@ -873,6 +877,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "tested in regression test: v2_signed_command_hash"]
     #[test]
     fn txn_hash_signed_command_v2() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
