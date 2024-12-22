@@ -204,11 +204,11 @@ test_indexer_cli_reports() {
     idxr blocks children --help 2>&1 |
         grep -iq "Usage: mina-indexer blocks children"
 
-    idxr ledgers best --help 2>&1 |
-        grep -iq "Usage: mina-indexer ledgers best"
-
     idxr ledgers --help 2>&1 |
         grep -iq "Usage: mina-indexer ledgers"
+
+    idxr ledgers best --help 2>&1 |
+        grep -iq "Usage: mina-indexer ledgers best"
 
     idxr ledgers height --help 2>&1 |
         grep -iq "Usage: mina-indexer ledgers height"
@@ -656,14 +656,14 @@ test_ledgers() {
     canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     canonical_height=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-    hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .${pk}.balance)
-    height_balance=$(idxr ledgers height --height $canonical_height | jq -r .${pk}.balance)
+    hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+    height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert 607904750000000 $hash_balance
     assert 607904750000000 $height_balance
 
     # genesis ledger account
-    hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .${pk0}.balance)
-    height_balance=$(idxr ledgers height --height $canonical_height | jq -r .${pk0}.balance)
+    hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
+    height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
     assert 502777775000000 $hash_balance
     assert 502777775000000 $height_balance
 
@@ -671,18 +671,18 @@ test_ledgers() {
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    best_balance=$(idxr ledgers best --memoize | jq -r .${pk}.balance)
-    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .${pk}.balance)
-    height_balance=$(idxr ledgers height --height $best_height | jq -r .${pk}.balance)
+    best_balance=$(idxr ledgers best --memoize | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+    height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
 
     assert 607904750000000 $best_balance
     assert 607904750000000 $hash_balance
     assert 607904750000000 $height_balance
 
     # genesis ledger account
-    best_balance=$(idxr ledgers best | jq -r .${pk0}.balance)
-    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .${pk0}.balance)
-    height_balance=$(idxr ledgers height --height $best_height | jq -r .${pk0}.balance)
+    best_balance=$(idxr ledgers best | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
+    hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
+    height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
     assert 502777775000000 $best_balance
     assert 502777775000000 $hash_balance
     assert 502777775000000 $height_balance
@@ -691,21 +691,21 @@ test_ledgers() {
     file=./ledgers/best-block-$best_height-$best_hash.json
     idxr ledgers best --path $file
 
-    file_result=$(cat $file | jq -r .${pk}.balance)
+    file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert 607904750000000 $file_result
     rm -f $file
 
     file=./ledgers/best-ledger-$best_height-$best_hash.json
     idxr ledgers hash --hash $best_hash --path $file
 
-    file_result=$(cat $file | jq -r .${pk}.balance)
+    file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert 607904750000000 $file_result
     rm -f $file
 
     file=./ledgers/ledger-height-$best_height-$best_hash.json
     idxr ledgers height --height $best_height --path $file
 
-    file_result=$(cat $file | jq -r .${pk}.balance)
+    file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert 607904750000000 $file_result
     rm -f $file
 
@@ -1212,11 +1212,11 @@ test_best_chain_many_blocks() {
 
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert '502777775000000' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .${pk}.balance)
+    balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     assert '502777775000000' $balance
 }
 
@@ -1225,7 +1225,7 @@ test_genesis_block_creator() {
     wait_for_socket
 
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-    balance=$(idxr ledgers height --height 1 | jq -r .${pk}.balance)
+    balance=$(idxr ledgers height --height 1 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
 
     # verify that the genesis block winner account gets 1000 magic nanomina
     assert '1000' $balance
@@ -1239,19 +1239,19 @@ test_txn_nonces() {
 
     # after block 3
     pk0=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
-    assert 4 $(idxr ledgers height --height 3 | jq -r .${pk0}.nonce)
+    assert 4 $(idxr ledgers height --height 3 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.nonce)
 
     # after block 11
     pk1=B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM
-    assert 'null' $(idxr ledgers height --height 11 | jq -r .${pk1}.nonce)
+    assert 'null' $(idxr ledgers height --height 11 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk1}.nonce)
 
     # after block 100
     ## pk0
-    assert 150 $(idxr ledgers height --height 100 | jq -r .${pk0}.nonce)
+    assert 150 $(idxr ledgers height --height 100 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.nonce)
     assert 150 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
 
     ## pk1
-    assert 'null' $(idxr ledgers height --height 100 | jq -r .${pk1}.nonce)
+    assert 'null' $(idxr ledgers height --height 100 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk1}.nonce)
     assert 'null' $(idxr accounts public-key --public-key $pk1 | jq -r .nonce)
 }
 
