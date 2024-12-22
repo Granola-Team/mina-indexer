@@ -45,6 +45,7 @@ test_names = %w[
   database_create
   reuse_databases
   snapshot_database_dir
+  v2_signed_command_hash
   rest_accounts_summary
   rest_blocks
   genesis_block_creator

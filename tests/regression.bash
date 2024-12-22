@@ -319,6 +319,16 @@ test_startup_dirs_get_created() {
     rm -fr ./blocks-dir
 }
 
+# Indexer hashes v2 signed commands correctly
+# Transaction from mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg
+test_v2_signed_command_hash() {
+    idxr_server_start_standard
+    wait_for_socket
+
+    result=$(idxr hash txn --json '{"payload":{"body":["Payment",{"amount":"1000000000","receiver_pk":"B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"}],"common":{"fee":"0.0011","fee_payer_pk":"B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32","memo":"E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH","nonce":"765","valid_until":"4294967295"}},"signature":"7mX5FyaaoRY5a3hKP3kqhm6A4gWo9NtoHMh7irbB3Dt326wm8gyfsEQeHKJgYqQeo7nBgFGNjCD9eC265VrECYZJqYsD5V5R","signer":"B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32"}')
+    assert '5JuJ1eRNWdE8jSMmCDoHnAdBGhLyBnCk2gkcvkfCZ7WvrKtGuWHB' $result
+}
+
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
     idxr_server_start_standard
@@ -1843,6 +1853,7 @@ for test_name in "$@"; do
         "test_reuse_databases") test_reuse_databases ;;
         "test_snapshot_database_dir") test_snapshot_database_dir ;;
         "test_startup_dirs_get_created") test_startup_dirs_get_created ;;
+        "test_v2_signed_command_hash") test_v2_signed_command_hash;;
         "test_account_balance_cli") test_account_balance_cli ;;
         "test_account_public_key_json") test_account_public_key_json ;;
         "test_canonical_root") test_canonical_root ;;
