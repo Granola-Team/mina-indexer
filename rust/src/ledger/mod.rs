@@ -15,9 +15,10 @@ use crate::{
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
-        account::{Account, Nonce},
+        account::Account,
         amount::Amount,
         diff::{account::AccountDiff, LedgerDiff},
+        nonce::Nonce,
         public_key::PublicKey,
         token::TokenAddress,
     },
@@ -472,7 +473,7 @@ mod tests {
     use crate::{
         block::BlockHash,
         constants::MINA_SCALE,
-        ledger::{account::Nonce, token::TokenAddress, TokenLedger},
+        ledger::{nonce::Nonce, token::TokenAddress, TokenLedger},
     };
     use std::collections::{BTreeMap, HashMap};
 

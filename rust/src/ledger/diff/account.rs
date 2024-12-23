@@ -1,7 +1,7 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
-    ledger::{account::Nonce, coinbase::Coinbase, token::TokenAddress, Amount, PublicKey},
+    ledger::{coinbase::Coinbase, nonce::Nonce, token::TokenAddress, Amount, PublicKey},
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -455,11 +455,11 @@ mod tests {
         command::{Command, Delegation, Payment},
         constants::MAINNET_COINBASE_REWARD,
         ledger::{
-            account::{Amount, Nonce},
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
             diff::LedgerDiff,
+            nonce::Nonce,
             token::TokenAddress,
-            PublicKey,
+            Amount, PublicKey,
         },
     };
     use std::path::PathBuf;
