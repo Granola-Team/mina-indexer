@@ -258,11 +258,8 @@ impl PrecomputedBlock {
                 .cloned()
                 .map(|c| UserCommandWithStatus::V1(Box::new(c)))
                 .collect(),
-            Self::V2(v2) => v2
-                .staged_ledger_diff
-                .diff
+            Self::V2(v2) => v2.staged_ledger_diff.diff[0]
                 .iter()
-                .flatten()
                 .flat_map(|d| d.commands.to_owned())
                 .map(UserCommandWithStatus::from)
                 .collect(),
