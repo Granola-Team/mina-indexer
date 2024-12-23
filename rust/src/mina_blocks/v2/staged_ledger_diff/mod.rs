@@ -735,4 +735,77 @@ mod tests {
         assert_eq!(json[0], expect);
         Ok(())
     }
+
+    #[test]
+    fn zkapp_command_to_mina_json_compatibility_1() -> anyhow::Result<()> {
+        use serde_json::*;
+
+        // indexer zkapp command json
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-410535-3NLLmswaSwYVSERiQMdvTdKdBN6TNMgUGmd548zK7e82CaS3tNJK.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let indexer_json = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                let cmd: SignedCommand = cmd.into();
+                let json: Value = cmd.into();
+
+                Some(json)
+            })
+            .collect::<Vec<_>>();
+
+        // mina zkapp command json
+        // first user command is the only zkapp command
+        let contents = std::fs::read(block_file)?;
+        let mina_json: Value = from_slice::<Value>(&contents)?["data"]["staged_ledger_diff"]
+            ["diff"][0]["commands"][0]["data"][1] // remove the Zkapp_command constructor
+            .clone();
+
+        assert_eq!(indexer_json[0], mina_json);
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_command_to_mina_json_compatibility_2() -> anyhow::Result<()> {
+        use serde_json::*;
+
+        // indexer zkapp command json
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let indexer_json = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                let cmd: SignedCommand = cmd.into();
+                let json: Value = cmd.into();
+
+                Some(json)
+            })
+            .collect::<Vec<_>>();
+
+        // mina zkapp command json
+        // 12th "pre-diff" & 6th "post-diff" user commands are the only zkapp commands
+        let contents = std::fs::read(block_file)?;
+        let mina_zkapp_json_0: Value = from_slice::<Value>(&contents)?["data"]
+            ["staged_ledger_diff"]["diff"][0]["commands"][11]["data"][1]
+            .clone();
+        let mina_zkapp_json_1: Value = from_slice::<Value>(&contents)?["data"]
+            ["staged_ledger_diff"]["diff"][1]["commands"][5]["data"][1]
+            .clone();
+
+        assert_eq!(indexer_json[0], mina_zkapp_json_0);
+        assert_eq!(indexer_json[1], mina_zkapp_json_1);
+
+        Ok(())
+    }
 }
