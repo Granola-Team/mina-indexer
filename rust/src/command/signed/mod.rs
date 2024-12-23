@@ -894,7 +894,7 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "not yet implemented"]
+    #[ignore = "tested in regression test: zkapp_command_hash"]
     #[test]
     fn txn_hash_zkapp_command() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
@@ -917,8 +917,8 @@ mod tests {
         assert_eq!(
             hashes,
             vec![
+                TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string()),
                 TxnHash::V2("5JvQqrHBgDtB7gew76AkFhSkkfUTCtYQhPT53erZZQYibV6ms9YD".to_string()),
-                TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string())
             ]
         );
         Ok(())
