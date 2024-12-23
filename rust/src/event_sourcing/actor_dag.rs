@@ -3,6 +3,7 @@ use futures::future::BoxFuture;
 use log::{error, info};
 use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{mpsc, watch, Mutex};
+use tracing::warn;
 
 pub struct Stateless;
 
@@ -14,11 +15,14 @@ pub struct ActorNode<S> {
     // Represents the communication connectors (edges) between this node and its children
     child_edges: HashMap<EventType, mpsc::Sender<Event>>,
 
+    // Represents the communication connectors (edges) between this node and its parents
+    parent_edges: HashMap<EventType, mpsc::Receiver<Event>>,
+
     // Represents the actual child nodes connected to this node (the graph nodes)
     child_nodes: Vec<ActorNode<S>>,
 
     // Internal receiver for incoming events
-    receiver: mpsc::Receiver<Event>,
+    receiver: Option<mpsc::Receiver<Event>>,
 
     // Sender for outgoing events from this node
     sender: Option<mpsc::Sender<Event>>,
@@ -50,6 +54,13 @@ where
 
     pub fn consume_sender(&mut self) -> Option<mpsc::Sender<Event>> {
         self.sender.take()
+    }
+
+    /// Add a parent connection and return the corresponding sender
+    pub fn add_parent(&mut self, id: EventType) -> mpsc::Sender<Event> {
+        let (sender, receiver) = mpsc::channel(10);
+        self.parent_edges.insert(id, receiver); // Add to parent edges
+        sender // Return the sender for the parent to use
     }
 
     /// Adds a child node to the current node
@@ -104,55 +115,73 @@ where
         .await;
     }
 
-    /// Starts processing messages asynchronously
     pub async fn start_processing(node: Arc<Mutex<Self>>) {
-        loop {
-            let is_shutdown = {
-                let locked_node = node.lock().await; // Lock the node to access the shutdown_receiver
-                let shutdown_receiver = locked_node.shutdown_receiver.clone(); // Clone the receiver
-                drop(locked_node); // Explicitly drop the lock
-                let shutdown_sigal = *shutdown_receiver.borrow(); // Access the shutdown signal value
-                shutdown_sigal
-            };
-
-            if is_shutdown {
-                info!("Node shutting down");
-                break; // Exit the loop on shutdown
-            }
-
-            // Process an incoming event with a timeout
-            let event = {
-                let mut locked_node = node.lock().await;
-                tokio::time::timeout(tokio::time::Duration::from_millis(1), locked_node.receiver.recv())
-                    .await
-                    .ok()
-                    .flatten()
-            };
-
-            if let Some(event) = event {
-                let processed_event = {
-                    let locked_node = node.lock().await;
-                    let event_processor = &locked_node.event_processor;
-                    let state = Arc::clone(&locked_node.state);
-                    event_processor(event, state).await
-                };
-
-                if let Some(processed_event) = processed_event {
-                    let n = node.lock().await;
-                    let event_type = processed_event.event_type.clone();
-                    if let Some(sender) = n.child_edges.get(&event_type) {
-                        if let Err(err) = sender.send(processed_event).await {
-                            error!("Failed to send event to child: {:?}", err);
-                        }
-                    } else {
-                        error!("No child exists for to process event for node");
-                    }
+        // Move parent_edges out of the node to process them independently
+        let parent_edges = {
+            let mut locked_node = node.lock().await;
+            let mut parent_edges = std::mem::take(&mut locked_node.parent_edges); // Move the parent_edges out
+            if let Some(receiver) = locked_node.receiver.take() {
+                if parent_edges.insert(locked_node.id.clone(), receiver).is_some() {
+                    warn!("Overwrote old receiver in");
                 }
             }
 
-            // Add a short sleep to avoid busy-waiting
-            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            parent_edges
+        };
+
+        let shutdown_receiver = {
+            // Clone the shutdown_receiver while the lock is held
+            let locked_node = node.lock().await;
+            locked_node.shutdown_receiver.clone()
+        };
+
+        // Spawn tasks for each parent receiver
+        for (event_type, mut receiver) in parent_edges {
+            let node_clone = Arc::clone(&node);
+
+            tokio::spawn({
+                let shutdown_receiver = shutdown_receiver.clone();
+                async move {
+                    loop {
+                        // Check for shutdown signal
+                        if *shutdown_receiver.borrow() {
+                            info!("Node shutting down for parent receiver {:?}", event_type);
+                            break;
+                        }
+
+                        // Process incoming events for this receiver
+                        if let Some(event) = receiver.recv().await {
+                            let processed_event = {
+                                let locked_node = node_clone.lock().await;
+                                let event_processor = &locked_node.event_processor;
+                                let state = Arc::clone(&locked_node.state);
+                                event_processor(event, state).await
+                            };
+
+                            if let Some(processed_event) = processed_event {
+                                let locked_node = node_clone.lock().await;
+                                let child_sender = locked_node.child_edges.get(&processed_event.event_type);
+
+                                if let Some(sender) = child_sender {
+                                    if let Err(err) = sender.send(processed_event).await {
+                                        error!("Failed to send event to child: {:?}", err);
+                                    }
+                                } else {
+                                    error!("No child exists to process event for EventType {:?}", processed_event.event_type);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
+
+        // Keep the main loop alive until the shutdown signal is received
+        while !*shutdown_receiver.borrow() {
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+
+        info!("Node processing loop shutting down.");
     }
 }
 
@@ -196,8 +225,9 @@ impl<S> ActorNodeBuilder<S> {
         let mut node = ActorNode {
             id: self.id,
             child_edges: HashMap::new(),
+            parent_edges: HashMap::new(),
             child_nodes: vec![],
-            receiver: rx,
+            receiver: Some(rx),
             sender: Some(tx),
             event_processor: self.event_processor.expect("Event processor must be set before building"),
             state: Arc::new(Mutex::new(self.initial_state.expect("Should have initial state"))),
@@ -226,7 +256,7 @@ pub trait ActorFactory {
 }
 
 #[cfg(test)]
-mod actor_node_tests {
+mod actor_node_tests_v2 {
     use super::*;
     use crate::{constants::POSTGRES_CONNECTION_STRING, event_sourcing::db_logger::DbLogger};
     use log::trace;
@@ -684,6 +714,74 @@ mod actor_node_tests {
 
         // Ensure the first receiver does not receive the event
         assert!(receiver2.try_recv().is_err(), "Receiver 1 should not receive the event.");
+
+        // Signal shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_processing_with_add_parent_api() {
+        use std::sync::Arc;
+        use tokio::sync::watch;
+
+        // Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        pub struct CounterState {
+            i: u64,
+        }
+
+        // Create the actor
+        let mut actor = ActorNodeBuilder::new(EventType::NewBlock)
+            .with_state(CounterState { i: 0 })
+            .with_processor(|event, state| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    state.i += 1;
+                    println!("Processing event: {:?}", event);
+                    None
+                })
+            })
+            .build(shutdown_rx.clone());
+
+        // Add multiple parent connections using the `add_parent` API
+        let parent1_sender = actor.add_parent(EventType::GenesisBlock);
+        let parent2_sender = actor.add_parent(EventType::PrecomputedBlockPath);
+
+        // Wrap the actor in Arc<Mutex> for shared ownership
+        let actor = Arc::new(Mutex::new(actor));
+
+        // Spawn the actor
+        tokio::spawn({
+            let actor_clone = Arc::clone(&actor);
+            async move {
+                ActorNode::start_processing(actor_clone).await;
+            }
+        });
+
+        // Send events to the parent connections
+        parent1_sender
+            .send(Event {
+                event_type: EventType::GenesisBlock,
+                payload: "Event from Parent 1".to_string(),
+            })
+            .await
+            .expect("Failed to send event from Parent 1");
+
+        parent2_sender
+            .send(Event {
+                event_type: EventType::PrecomputedBlockPath,
+                payload: "Event from Parent 2".to_string(),
+            })
+            .await
+            .expect("Failed to send event from Parent 2");
+
+        // Allow time for processing
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        let locked_actor = actor.lock().await;
+        let locked_state = locked_actor.state.lock().await;
+        assert_eq!(locked_state.i, 2, "State should have incremented twice");
 
         // Signal shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
