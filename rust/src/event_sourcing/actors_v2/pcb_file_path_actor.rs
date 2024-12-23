@@ -58,7 +58,7 @@ mod pcb_file_path_actor_tests_v2 {
         let actor_sender = actor.consume_sender().unwrap();
 
         // Add a receiver to the actor
-        let mut test_receiver = actor.add_receiver(EventType::Test);
+        let mut test_receiver = actor.add_receiver(EventType::BerkeleyBlockPath);
 
         // Spawn the actor
         tokio::spawn({
