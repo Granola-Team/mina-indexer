@@ -3,7 +3,7 @@ use futures::future::BoxFuture;
 use log::{error, info};
 use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{mpsc, watch, Mutex};
-use tracing::warn;
+use tracing::{trace, warn};
 
 pub struct Stateless;
 
@@ -159,6 +159,7 @@ where
                             };
 
                             if let Some(processed_event) = processed_event {
+                                trace!("{:#?}", processed_event);
                                 let locked_node = node_clone.lock().await;
                                 let child_sender = locked_node.child_edges.get(&processed_event.event_type);
 
@@ -167,7 +168,7 @@ where
                                         error!("Failed to send event to child: {:?}", err);
                                     }
                                 } else {
-                                    error!("No child exists to process event for EventType {:?}", processed_event.event_type);
+                                    warn!("No child exists to process event for EventType {:?}", processed_event.event_type);
                                 }
                             }
                         }

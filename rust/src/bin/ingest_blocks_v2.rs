@@ -1,12 +1,12 @@
 use env_logger::Builder;
 use log::error;
 use mina_indexer::event_sourcing::{
-    actor_dag::{ActorFactory, ActorNode},
-    actors_v2::{mainnet_block_actor::MainnetBlockParserActor, pcb_file_path_actor::PcbFilePathActor},
+    actor_dag::ActorNode,
+    actors_v2::get_actor_dag,
     events::{Event, EventType},
     sourcing::{get_block_entries, sort_entries},
 };
-use std::{env, path::PathBuf, sync::Arc};
+use std::{env, path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::{watch, Mutex};
 
 #[tokio::main]
@@ -21,9 +21,7 @@ async fn main() {
         .map(PathBuf::from)
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
-    let mut root = PcbFilePathActor::create_actor(shutdown_rx.clone());
-    let mainnet_block_actor = MainnetBlockParserActor::create_actor(shutdown_rx);
-    root.add_child(mainnet_block_actor);
+    let mut root = get_actor_dag(&shutdown_rx);
     let sender = root.consume_sender().unwrap();
 
     tokio::spawn(async move {
@@ -44,4 +42,6 @@ async fn main() {
             error!("{}", err);
         }
     }
+
+    tokio::time::sleep(Duration::from_secs(1)).await;
 }
