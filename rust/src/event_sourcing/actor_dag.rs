@@ -204,6 +204,12 @@ impl<S> ActorNodeBuilder<S> {
     }
 }
 
+pub trait ActorFactory {
+    type State;
+
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> Arc<Mutex<ActorNode<Self::State>>>;
+}
+
 #[cfg(test)]
 mod actor_node_tests {
     use super::*;

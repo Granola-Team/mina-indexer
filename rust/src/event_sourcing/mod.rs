@@ -20,7 +20,7 @@ use shared_publisher::SharedPublisher;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
-pub mod actor_tree_node;
+pub mod actor_dag;
 pub mod berkeley_block_models;
 pub mod block;
 mod block_ingestion_actors;
