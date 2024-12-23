@@ -1,12 +1,12 @@
 pub mod parser;
 
-use super::account::Nonce;
 use crate::{
     block::{extract_height_and_hash, extract_network, BlockHash},
     chain::Network,
     constants::MINA_SCALE_DEC,
     ledger::{
         account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
+        nonce::Nonce,
         public_key::PublicKey,
         LedgerHash,
     },

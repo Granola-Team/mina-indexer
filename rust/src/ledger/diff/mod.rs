@@ -128,8 +128,8 @@ mod tests {
     use crate::{
         block::precomputed::{PcbVersion, PrecomputedBlock},
         ledger::{
-            account::Nonce,
             diff::{account::AccountDiffType::*, LedgerDiff},
+            nonce::Nonce,
         },
     };
     use std::path::PathBuf;
