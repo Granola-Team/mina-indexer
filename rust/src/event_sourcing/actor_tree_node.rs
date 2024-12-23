@@ -207,9 +207,11 @@ impl<S> ActorNodeBuilder<S> {
 #[cfg(test)]
 mod actor_node_tests {
     use super::*;
+    use crate::{constants::POSTGRES_CONNECTION_STRING, event_sourcing::db_logger::DbLogger};
     use log::trace;
     use std::sync::Arc;
     use tokio::sync::{watch, Mutex};
+    use tokio_postgres::NoTls;
 
     #[tokio::test]
     async fn test_size_of_tree() {
@@ -465,5 +467,109 @@ mod actor_node_tests {
         let locked_root = root_clone.lock().await;
         let state = locked_root.state.lock().await;
         assert_eq!(state.count, 2, "State counter should have incremented by the number of processed events.");
+    }
+
+    #[tokio::test]
+    async fn test_child_node_with_db_connection() {
+        // Database setup
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to the database");
+
+        // Spawn the connection handler
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        // Setup the DbLogger
+        let logger = DbLogger::builder(client)
+            .name("child_node_log")
+            .add_column("height BIGINT")
+            .add_column("payload TEXT")
+            .distinct_columns(&["payload"])
+            .build(&None)
+            .await
+            .expect("Failed to build child_node_log and view");
+
+        struct State {
+            logger: DbLogger,
+        }
+
+        // ActorNode with database connection in its state
+        let mut root = ActorNodeBuilder::new(EventType::NewBlock)
+            .with_state(State { logger }) // Pass the DbLogger as state
+            .with_processor(|event, state| {
+                Box::pin(async move {
+                    let state = state.lock().await;
+
+                    // Insert the event into the database
+                    state
+                        .logger
+                        .insert(
+                            &[&0_i64, &event.payload],
+                            0, // Height is not relevant in this test
+                        )
+                        .await
+                        .expect("Failed to insert event into database");
+
+                    None // No propagation
+                })
+            })
+            .build(watch::channel(false).1); // Use a dummy shutdown_receiver
+
+        // Send events to the child node
+        let sender = root.sender.take().expect("Sender should exist");
+
+        let root = Arc::new(Mutex::new(root));
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
+
+        // Trigger the child node with events
+        sender
+            .send(Event {
+                event_type: EventType::NewBlock,
+                payload: "Payload 1".to_string(),
+            })
+            .await
+            .expect("Message should send");
+
+        sender
+            .send(Event {
+                event_type: EventType::NewBlock,
+                payload: "Payload 2".to_string(),
+            })
+            .await
+            .expect("Message should send");
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+        {
+            let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+                .await
+                .expect("Failed to connect to the database");
+
+            // Spawn the connection handler
+            tokio::spawn(async move {
+                if let Err(e) = connection.await {
+                    eprintln!("Connection error: {}", e);
+                }
+            });
+
+            // Verify that the events were inserted into the database
+            let query = "SELECT * FROM child_node_log";
+            let rows = client.query(query, &[]).await.expect("Failed to query database");
+
+            assert_eq!(rows.len(), 2, "Expected 2 rows in the database");
+
+            let payloads: Vec<String> = rows.iter().map(|row| row.get("payload")).collect();
+            assert!(payloads.contains(&"Payload 1".to_string()));
+            assert!(payloads.contains(&"Payload 2".to_string()));
+        }
     }
 }
