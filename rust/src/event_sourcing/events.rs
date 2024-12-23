@@ -34,6 +34,7 @@ pub enum EventType {
     PostForkStakingLedgerFilePath,
     StakingLedgerEntry,
     Username,
+    Test,
 }
 
 #[derive(Debug, Clone, PartialEq)]

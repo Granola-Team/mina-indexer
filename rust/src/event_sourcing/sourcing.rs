@@ -139,7 +139,7 @@ pub async fn publish_block_dir_paths(
     Ok(())
 }
 
-async fn get_block_entries(blocks_dir: &Path) -> Result<Vec<PathBuf>> {
+pub async fn get_block_entries(blocks_dir: &Path) -> Result<Vec<PathBuf>> {
     let entries: Vec<PathBuf> = fs::read_dir(blocks_dir)?
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
@@ -148,7 +148,7 @@ async fn get_block_entries(blocks_dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(entries)
 }
 
-fn sort_entries(entries: &mut [PathBuf]) {
+pub fn sort_entries(entries: &mut [PathBuf]) {
     entries.sort_by(|a, b| {
         let (a_num, a_hash) = extract_height_and_hash(a);
         let (b_num, b_hash) = extract_height_and_hash(b);

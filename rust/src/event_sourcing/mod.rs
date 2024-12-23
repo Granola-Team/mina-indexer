@@ -21,6 +21,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::{sync::broadcast, task};
 
 pub mod actor_dag;
+pub mod actors_v2;
 pub mod berkeley_block_models;
 pub mod block;
 mod block_ingestion_actors;

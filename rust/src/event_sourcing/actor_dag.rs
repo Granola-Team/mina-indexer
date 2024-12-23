@@ -36,6 +36,22 @@ impl<S> ActorNode<S>
 where
     S: Send + 'static,
 {
+    /// Adds a receiver to the ActorNode and returns the corresponding `mpsc::Receiver`.
+    pub fn add_receiver(&mut self, id: EventType) -> mpsc::Receiver<Event> {
+        // Create a new channel
+        let (sender, receiver) = mpsc::channel(10);
+
+        // Insert the sender into child_edges
+        self.child_edges.insert(id, sender);
+
+        // Return the receiver
+        receiver
+    }
+
+    pub fn consume_sender(&mut self) -> Option<mpsc::Sender<Event>> {
+        self.sender.take()
+    }
+
     /// Adds a child node to the current node
     pub fn add_child(&mut self, mut child: ActorNode<S>) {
         // Take ownership of the child's sender
