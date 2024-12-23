@@ -2,7 +2,8 @@ use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock},
     constants::MINA_SCALE,
     ledger::{
-        account::{Account, Amount},
+        account::Account,
+        amount::Amount,
         genesis::{GenesisLedger, GenesisRoot},
         token::TokenAddress,
         Ledger,

@@ -3,7 +3,7 @@ use crate::{
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::{MAINNET_EPOCH_SLOT_COUNT, VERSION},
-    ledger::{account::Amount, store::best::BestLedgerStore},
+    ledger::{amount::Amount, store::best::BestLedgerStore},
     snark_work::store::SnarkStore,
     store::{
         version::{IndexerStoreVersion, VersionStore},
