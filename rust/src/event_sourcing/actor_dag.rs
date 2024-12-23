@@ -138,15 +138,14 @@ where
                 };
 
                 if let Some(processed_event) = processed_event {
-                    let children = {
-                        let locked_node = node.lock().await;
-                        locked_node.child_edges.clone()
-                    };
-
-                    for (_, sender) in children {
-                        if let Err(err) = sender.send(processed_event.clone()).await {
+                    let n = node.lock().await;
+                    let event_type = processed_event.event_type.clone();
+                    if let Some(sender) = n.child_edges.get(&event_type) {
+                        if let Err(err) = sender.send(processed_event).await {
                             error!("Failed to send event to child: {:?}", err);
                         }
+                    } else {
+                        error!("No child exists for to process event for node");
                     }
                 }
             }
@@ -593,5 +592,100 @@ mod actor_node_tests {
             assert!(payloads.contains(&"Payload 1".to_string()));
             assert!(payloads.contains(&"Payload 2".to_string()));
         }
+    }
+
+    #[tokio::test]
+    async fn test_event_routing_to_specific_receiver() {
+        use std::sync::Arc;
+        use tokio::sync::watch;
+
+        // Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        struct ModuloState {
+            i: u64,
+        }
+
+        // Create the root actor
+        let mut root: ActorNode<ModuloState> = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ModuloState { i: 1 })
+            .with_processor(|_event, state| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    if state.i % 2 == 0 {
+                        state.i += 1;
+                        Some(Event {
+                            event_type: EventType::NewBlock,
+                            payload: String::from("Payload for NewBlock"),
+                        })
+                    } else {
+                        state.i += 1;
+                        Some(Event {
+                            event_type: EventType::PrecomputedBlockPath,
+                            payload: String::from("Payload for PrecomputedBlockPath"),
+                        })
+                    }
+                })
+            }) // Root does not process events
+            .build(shutdown_rx.clone());
+
+        // Add two receivers for specific EventTypes
+        let mut receiver1 = root.add_receiver(EventType::NewBlock);
+        let mut receiver2 = root.add_receiver(EventType::PrecomputedBlockPath);
+
+        // Wrap the root in an Arc<Mutex> for shared ownership
+        let root = Arc::new(Mutex::new(root));
+
+        // Spawn the root actor
+        tokio::spawn({
+            let root_clone = Arc::clone(&root);
+            async move {
+                ActorNode::spawn_all(root_clone).await;
+            }
+        });
+
+        // Consume the sender once
+        let sender = root.lock().await.consume_sender().unwrap();
+
+        // Scenario 1: Send an event for NewBlock
+        sender
+            .send(Event {
+                event_type: EventType::NewBlock,
+                payload: "Payload for NewBlock".to_string(),
+            })
+            .await
+            .expect("Failed to send event for NewBlock");
+
+        sender
+            .send(Event {
+                event_type: EventType::PrecomputedBlockPath,
+                payload: "Payload for PrecomputedBlockPath".to_string(),
+            })
+            .await
+            .expect("Failed to send event for PrecomputedBlockPath");
+
+        // Verify that only the first receiver gets the event
+        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver1.recv()).await {
+            assert_eq!(received_event.event_type, EventType::NewBlock);
+            assert_eq!(received_event.payload, "Payload for NewBlock");
+        } else {
+            panic!("Receiver 1 did not receive the expected event within the timeout.");
+        }
+
+        // Ensure the second receiver does not receive the event
+        assert!(receiver1.try_recv().is_err(), "Receiver 2 should not receive the event.");
+
+        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver2.recv()).await {
+            assert_eq!(received_event.event_type, EventType::PrecomputedBlockPath);
+            assert_eq!(received_event.payload, "Payload for PrecomputedBlockPath");
+        } else {
+            panic!("Receiver 2 did not receive the expected event within the timeout.");
+        }
+
+        // Ensure the first receiver does not receive the event
+        assert!(receiver2.try_recv().is_err(), "Receiver 1 should not receive the event.");
+
+        // Signal shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 }
