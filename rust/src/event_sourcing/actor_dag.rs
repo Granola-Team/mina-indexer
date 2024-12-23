@@ -223,7 +223,7 @@ impl<S> ActorNodeBuilder<S> {
 pub trait ActorFactory {
     type State;
 
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> Arc<Mutex<ActorNode<Self::State>>>;
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode<Self::State>;
 }
 
 #[cfg(test)]

@@ -5,36 +5,33 @@ use crate::{
     },
     utility::get_top_level_keys_from_json_file,
 };
-use std::sync::Arc;
-use tokio::sync::{watch::Receiver, Mutex};
+use tokio::sync::watch::Receiver;
 
 pub struct PcbFilePathActor;
 
 impl ActorFactory for PcbFilePathActor {
     type State = Stateless;
 
-    fn create_actor(shutdown_rx: Receiver<bool>) -> Arc<Mutex<ActorNode<Self::State>>> {
-        Arc::new(Mutex::new(
-            ActorNodeBuilder::new(EventType::PrecomputedBlockPath)
-                .with_state(Stateless {})
-                .with_processor(|event, _state| {
-                    Box::pin(async move {
-                        let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
-                        if keys == vec!["data".to_string(), "version".to_string()] {
-                            Some(Event {
-                                event_type: EventType::BerkeleyBlockPath,
-                                payload: event.payload,
-                            })
-                        } else {
-                            Some(Event {
-                                event_type: EventType::MainnetBlockPath,
-                                payload: event.payload,
-                            })
-                        }
-                    })
+    fn create_actor(shutdown_rx: Receiver<bool>) -> ActorNode<Self::State> {
+        ActorNodeBuilder::new(EventType::PrecomputedBlockPath)
+            .with_state(Stateless {})
+            .with_processor(|event, _state| {
+                Box::pin(async move {
+                    let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
+                    if keys == vec!["data".to_string(), "version".to_string()] {
+                        Some(Event {
+                            event_type: EventType::BerkeleyBlockPath,
+                            payload: event.payload,
+                        })
+                    } else {
+                        Some(Event {
+                            event_type: EventType::MainnetBlockPath,
+                            payload: event.payload,
+                        })
+                    }
                 })
-                .build(shutdown_rx),
-        ))
+            })
+            .build(shutdown_rx)
     }
 }
 
@@ -45,6 +42,7 @@ mod pcb_file_path_actor_tests_v2 {
         actor_dag::{ActorFactory, ActorNode},
         events::{Event, EventType},
     };
+    use tokio::sync::Mutex;
 
     #[tokio::test]
     async fn test_actor_with_add_receiver() {
@@ -56,17 +54,15 @@ mod pcb_file_path_actor_tests_v2 {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
         // Create the actor
-        let actor = PcbFilePathActor::create_actor(shutdown_rx);
+        let mut actor = PcbFilePathActor::create_actor(shutdown_rx);
+        let actor_sender = actor.consume_sender().unwrap();
 
         // Add a receiver to the actor
-        let mut test_receiver = {
-            let mut locked_actor = actor.lock().await;
-            locked_actor.add_receiver(EventType::Test)
-        };
+        let mut test_receiver = actor.add_receiver(EventType::Test);
 
         // Spawn the actor
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let actor_clone = Arc::new(Mutex::new(actor));
             async move { ActorNode::spawn_all(actor_clone).await }
         });
 
@@ -79,10 +75,7 @@ mod pcb_file_path_actor_tests_v2 {
         };
 
         // Send the event to the actor
-        {
-            let actor_sender = actor.lock().await.consume_sender().unwrap();
-            actor_sender.send(test_event).await.expect("Failed to send event");
-        }
+        actor_sender.send(test_event).await.expect("Failed to send event");
 
         // Verify the event is sent through the test receiver
         if let Some(received_event) = test_receiver.recv().await {
