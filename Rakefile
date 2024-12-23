@@ -44,6 +44,13 @@ task ingest: [:build] do
   chdir root_dir
 end
 
+desc "Ingest blocks (v2)"
+task ingest_v2: [:build] do
+  chdir "rust"
+  sh "cargo run --bin ingest"
+  chdir root_dir
+end
+
 desc "Ingest staking ledgers"
 task staking: [:build] do
   chdir "rust"
