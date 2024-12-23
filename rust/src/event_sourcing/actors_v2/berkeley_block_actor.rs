@@ -1,6 +1,6 @@
 use crate::{
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, Stateless},
+        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         berkeley_block_models::BerkeleyBlock,
         block::BlockTrait,
         events::{Event, EventType},
@@ -14,11 +14,9 @@ use tokio::sync::watch;
 pub struct BerkeleyBlockActor;
 
 impl ActorFactory for BerkeleyBlockActor {
-    type State = Stateless;
-
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode<Self::State> {
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::BerkeleyBlockPath)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     // Parse the block path and contents

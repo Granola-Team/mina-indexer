@@ -1,15 +1,44 @@
 use super::events::{Event, EventType};
 use futures::future::BoxFuture;
 use log::{error, info};
-use std::{collections::HashMap, future::Future, sync::Arc};
+use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{mpsc, watch, Mutex};
 use tracing::{trace, warn};
 
-pub struct Stateless;
+pub struct ActorStore {
+    pub data: HashMap<String, Box<dyn Any + Send + Sync>>,
+}
+
+impl Default for ActorStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ActorStore {
+    pub fn new() -> Self {
+        Self { data: HashMap::new() }
+    }
+
+    // Insert a value into the store
+    pub fn insert<T: Any + Send + Sync>(&mut self, key: &str, value: T) {
+        self.data.insert(key.to_string(), Box::new(value));
+    }
+
+    // Retrieve a value from the store
+    pub fn get<T: Any>(&self, key: &str) -> Option<&T> {
+        self.data.get(key)?.downcast_ref::<T>()
+    }
+
+    // Remove a value from the store
+    pub fn remove<T: Any>(&mut self, key: &str) -> Option<T> {
+        self.data.remove(key)?.downcast::<T>().ok().map(|b| *b)
+    }
+}
 
 type EP<S> = Box<dyn Fn(Event, Arc<Mutex<S>>) -> BoxFuture<'static, Option<Event>> + Send + Sync>;
 
-pub struct ActorNode<S> {
+pub struct ActorNode {
     id: EventType, // Unique identifier for the node
 
     // Represents the communication connectors (edges) between this node and its children
@@ -19,7 +48,7 @@ pub struct ActorNode<S> {
     parent_edges: HashMap<EventType, mpsc::Receiver<Event>>,
 
     // Represents the actual child nodes connected to this node (the graph nodes)
-    child_nodes: Vec<ActorNode<S>>,
+    child_nodes: Vec<ActorNode>,
 
     // Internal receiver for incoming events
     receiver: Option<mpsc::Receiver<Event>>,
@@ -28,18 +57,15 @@ pub struct ActorNode<S> {
     sender: Option<mpsc::Sender<Event>>,
 
     // Asynchronous function to process events received by this node
-    event_processor: EP<S>,
+    event_processor: EP<ActorStore>,
 
     // internal state
-    state: Arc<Mutex<S>>, // State wrapped in Arc<Mutex> for safe sharing
+    state: Arc<Mutex<ActorStore>>, // State wrapped in Arc<Mutex> for safe sharing
 
     shutdown_receiver: watch::Receiver<bool>,
 }
 
-impl<S> ActorNode<S>
-where
-    S: Send + 'static,
-{
+impl ActorNode {
     /// Adds a receiver to the ActorNode and returns the corresponding `mpsc::Receiver`.
     pub fn add_receiver(&mut self, id: EventType) -> mpsc::Receiver<Event> {
         // Create a new channel
@@ -64,7 +90,7 @@ where
     }
 
     /// Adds a child node to the current node
-    pub fn add_child(&mut self, mut child: ActorNode<S>) {
+    pub fn add_child(&mut self, mut child: ActorNode) {
         // Take ownership of the child's sender
         let child_id = child.id.clone();
         if let Some(sender) = child.sender.take() {
@@ -186,14 +212,14 @@ where
     }
 }
 
-pub struct ActorNodeBuilder<S> {
+pub struct ActorNodeBuilder {
     id: EventType,
-    event_processor: Option<EP<S>>,
-    children: Vec<ActorNode<S>>,
-    initial_state: Option<S>,
+    event_processor: Option<EP<ActorStore>>,
+    children: Vec<ActorNode>,
+    initial_state: Option<ActorStore>,
 }
 
-impl<S> ActorNodeBuilder<S> {
+impl ActorNodeBuilder {
     /// Creates a new builder with the specified ID
     pub fn new(id: EventType) -> Self {
         Self {
@@ -204,7 +230,7 @@ impl<S> ActorNodeBuilder<S> {
         }
     }
 
-    pub fn with_state(mut self, state: S) -> Self {
+    pub fn with_state(mut self, state: ActorStore) -> Self {
         self.initial_state = Some(state);
         self
     }
@@ -212,7 +238,7 @@ impl<S> ActorNodeBuilder<S> {
     /// Sets the async event processor for the node
     pub fn with_processor<F, Fut>(mut self, processor: F) -> Self
     where
-        F: Fn(Event, Arc<Mutex<S>>) -> Fut + Send + Sync + 'static,
+        F: Fn(Event, Arc<Mutex<ActorStore>>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Option<Event>> + Send + 'static,
     {
         self.event_processor = Some(Box::new(move |event, state| Box::pin(processor(event, state))));
@@ -220,7 +246,7 @@ impl<S> ActorNodeBuilder<S> {
     }
 
     /// Builds the `ActorNode`, ensuring all required fields are set
-    pub fn build(self, shutdown_receiver: watch::Receiver<bool>) -> ActorNode<S> {
+    pub fn build(self, shutdown_receiver: watch::Receiver<bool>) -> ActorNode {
         let (tx, rx) = mpsc::channel(10);
 
         let mut node = ActorNode {
@@ -251,9 +277,7 @@ impl<S> ActorNodeBuilder<S> {
 }
 
 pub trait ActorFactory {
-    type State;
-
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode<Self::State>;
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode;
 }
 
 #[cfg(test)]
@@ -271,26 +295,26 @@ mod actor_node_tests_v2 {
         let (_, shutdown_rx) = watch::channel(false);
 
         // Create a root node with two children
-        let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(Stateless {})
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ActorStore::new())
             .with_processor(|_event, _state| Box::pin(async { None }))
             .build(shutdown_rx.clone());
 
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
-                .with_state(Stateless {})
+                .with_state(ActorStore::new())
                 .with_processor(|_event, _state| Box::pin(async { None }))
                 .build(shutdown_rx.clone()),
         );
 
         let mut child2 = ActorNodeBuilder::new(EventType::NewBlock)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|_event, _state| Box::pin(async { None }))
             .build(shutdown_rx.clone());
 
         child2.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
-                .with_state(Stateless {})
+                .with_state(ActorStore::new())
                 .with_processor(|_event, _state| Box::pin(async { None }))
                 .build(shutdown_rx.clone()),
         );
@@ -304,8 +328,8 @@ mod actor_node_tests_v2 {
     async fn test_no_children() {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(Stateless {})
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ActorStore::new())
             .with_processor(|_event, _state| {
                 Box::pin(async move {
                     trace!("Root processing event");
@@ -344,8 +368,8 @@ mod actor_node_tests_v2 {
     async fn test_multiple_children() {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(Stateless {})
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     trace!("Root processing: {:?}", event);
@@ -358,7 +382,7 @@ mod actor_node_tests_v2 {
             .build(shutdown_rx.clone());
 
         let child1 = ActorNodeBuilder::new(EventType::NewBlock)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     trace!("Child1 processing: {:?}", event);
@@ -368,7 +392,7 @@ mod actor_node_tests_v2 {
             .build(shutdown_rx.clone());
 
         let child2 = ActorNodeBuilder::new(EventType::NewBlock)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     trace!("Child2 processing: {:?}", event);
@@ -410,8 +434,8 @@ mod actor_node_tests_v2 {
     async fn test_event_processor_filtering() {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        let mut root: ActorNode<Stateless> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(Stateless {})
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ActorStore::new())
             .with_processor(|_event, _state| {
                 Box::pin(async move {
                     trace!("Root processing event");
@@ -422,7 +446,7 @@ mod actor_node_tests_v2 {
 
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
-                .with_state(Stateless {})
+                .with_state(ActorStore::new())
                 .with_processor(|_event, _state| {
                     Box::pin(async move {
                         trace!("Child processing event");
@@ -458,22 +482,20 @@ mod actor_node_tests_v2 {
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
-    #[derive(Debug, Default)]
-    pub struct CounterState {
-        count: u32,
-    }
-
     #[tokio::test]
     async fn test_mutate_and_inspect_state() {
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        let mut root: ActorNode<CounterState> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(CounterState { count: 0 })
+        let mut store = ActorStore::new();
+        store.insert("count", 0u64);
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(store)
             .with_processor(|event, state| {
                 Box::pin(async move {
                     let mut locked_state = state.lock().await; // Lock the state
-                    locked_state.count += 1; // Increment the counter
-                    trace!("Processing event: {:?}, updated state: {:?}", event, locked_state.count);
+                    let current_count: u64 = locked_state.remove("count").unwrap();
+                    locked_state.insert("count", current_count + 1u64); // Increment the counter
+                    println!("Processing event: {:?}, updated state: {:?}", event, current_count);
                     Some(Event {
                         event_type: EventType::NewBlock,
                         payload: format!("Processed: {}", event.payload),
@@ -518,7 +540,11 @@ mod actor_node_tests_v2 {
         let root_clone = Arc::clone(&root);
         let locked_root = root_clone.lock().await;
         let state = locked_root.state.lock().await;
-        assert_eq!(state.count, 2, "State counter should have incremented by the number of processed events.");
+        assert_eq!(
+            state.get("count").unwrap() as &u64,
+            &2_u64,
+            "State counter should have incremented by the number of processed events."
+        );
     }
 
     #[tokio::test]
@@ -545,20 +571,19 @@ mod actor_node_tests_v2 {
             .await
             .expect("Failed to build child_node_log and view");
 
-        struct State {
-            logger: DbLogger,
-        }
-
         // ActorNode with database connection in its state
+        let mut store = ActorStore::new();
+        store.insert("logger", logger);
         let mut root = ActorNodeBuilder::new(EventType::NewBlock)
-            .with_state(State { logger }) // Pass the DbLogger as state
-            .with_processor(|event, state: Arc<Mutex<State>>| {
+            .with_state(store) // Pass the DbLogger as state
+            .with_processor(|event, state: Arc<Mutex<ActorStore>>| {
                 Box::pin(async move {
-                    let state = state.lock().await;
+                    let mut state = state.lock().await;
+
+                    let logger: DbLogger = state.remove("logger").unwrap();
 
                     // Insert the event into the database
-                    state
-                        .logger
+                    logger
                         .insert(
                             &[&0_i64, &event.payload],
                             0, // Height is not relevant in this test
@@ -566,6 +591,7 @@ mod actor_node_tests_v2 {
                         .await
                         .expect("Failed to insert event into database");
 
+                    state.insert("logger", logger);
                     None // No propagation
                 })
             })
@@ -633,24 +659,23 @@ mod actor_node_tests_v2 {
         // Create the shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        struct ModuloState {
-            i: u64,
-        }
-
         // Create the root actor
-        let mut root: ActorNode<ModuloState> = ActorNodeBuilder::new(EventType::GenesisBlock)
-            .with_state(ModuloState { i: 1 })
+        let mut state = ActorStore::new();
+        state.insert("i", 1u64);
+        let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(state)
             .with_processor(|_event, state| {
                 Box::pin(async move {
                     let mut state = state.lock().await;
-                    if state.i % 2 == 0 {
-                        state.i += 1;
+                    let i: u64 = state.remove("i").unwrap();
+                    if i % 2 == 0 {
+                        state.insert("i", i + 1u64);
                         Some(Event {
                             event_type: EventType::NewBlock,
                             payload: String::from("Payload for NewBlock"),
                         })
                     } else {
-                        state.i += 1;
+                        state.insert("i", i + 1u64);
                         Some(Event {
                             event_type: EventType::PrecomputedBlockPath,
                             payload: String::from("Payload for PrecomputedBlockPath"),
@@ -728,17 +753,16 @@ mod actor_node_tests_v2 {
         // Create the shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        pub struct CounterState {
-            i: u64,
-        }
-
         // Create the actor
+        let mut state = ActorStore::new();
+        state.insert("i", 0u64);
         let mut actor = ActorNodeBuilder::new(EventType::NewBlock)
-            .with_state(CounterState { i: 0 })
+            .with_state(state)
             .with_processor(|event, state| {
                 Box::pin(async move {
                     let mut state = state.lock().await;
-                    state.i += 1;
+                    let i: u64 = state.remove("i").unwrap();
+                    state.insert("i", i + 1u64);
                     println!("Processing event: {:?}", event);
                     None
                 })
@@ -782,7 +806,7 @@ mod actor_node_tests_v2 {
 
         let locked_actor = actor.lock().await;
         let locked_state = locked_actor.state.lock().await;
-        assert_eq!(locked_state.i, 2, "State should have incremented twice");
+        assert_eq!(locked_state.get("i").unwrap() as &u64, &2_u64, "State should have incremented twice");
 
         // Signal shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");

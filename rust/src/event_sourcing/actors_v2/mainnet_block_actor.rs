@@ -1,6 +1,6 @@
 use crate::{
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, Stateless},
+        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         block::BlockTrait,
         events::{Event, EventType},
         mainnet_block_models::MainnetBlock,
@@ -14,11 +14,9 @@ use tokio::sync::watch;
 pub struct MainnetBlockParserActor;
 
 impl ActorFactory for MainnetBlockParserActor {
-    type State = Stateless;
-
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode<Self::State> {
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::MainnetBlockPath)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     // Parse the block path and contents

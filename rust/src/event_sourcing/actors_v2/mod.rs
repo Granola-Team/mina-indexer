@@ -1,4 +1,4 @@
-use super::actor_dag::{ActorFactory, ActorNode, Stateless};
+use super::actor_dag::{ActorFactory, ActorNode};
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
 use mainnet_block_actor::MainnetBlockParserActor;
@@ -10,7 +10,7 @@ pub(crate) mod block_ancestor_actor;
 pub(crate) mod mainnet_block_actor;
 pub(crate) mod pcb_file_path_actor;
 
-pub fn get_actor_dag(shutdown_rx: &Receiver<bool>) -> ActorNode<Stateless> {
+pub fn get_actor_dag(shutdown_rx: &Receiver<bool>) -> ActorNode {
     // Setup root
     let mut root = PcbFilePathActor::create_actor(shutdown_rx.clone());
 

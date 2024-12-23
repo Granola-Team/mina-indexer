@@ -1,6 +1,6 @@
 use crate::{
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, Stateless},
+        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         events::{Event, EventType},
     },
     utility::get_top_level_keys_from_json_file,
@@ -10,11 +10,9 @@ use tokio::sync::watch::Receiver;
 pub struct PcbFilePathActor;
 
 impl ActorFactory for PcbFilePathActor {
-    type State = Stateless;
-
-    fn create_actor(shutdown_rx: Receiver<bool>) -> ActorNode<Self::State> {
+    fn create_actor(shutdown_rx: Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::PrecomputedBlockPath)
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");

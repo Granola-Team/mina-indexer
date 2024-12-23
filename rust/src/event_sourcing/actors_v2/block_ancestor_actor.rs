@@ -1,5 +1,5 @@
 use crate::event_sourcing::{
-    actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, Stateless},
+    actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
     events::{Event, EventType},
     payloads::{BerkeleyBlockPayload, BlockAncestorPayload, MainnetBlockPayload},
 };
@@ -9,11 +9,9 @@ use tokio::sync::watch;
 pub struct BlockAncestorActor;
 
 impl ActorFactory for BlockAncestorActor {
-    type State = Stateless;
-
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode<Self::State> {
+    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::BerkeleyBlock) // Node listens for BerkeleyBlock and MainnetBlock
-            .with_state(Stateless {})
+            .with_state(ActorStore::new())
             .with_processor(|event, _state| {
                 Box::pin(async move {
                     match event.event_type {
