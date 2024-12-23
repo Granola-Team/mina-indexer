@@ -6,10 +6,7 @@ pub mod zkapp;
 use crate::{
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::{SignedCommand, SignedCommandWithKind},
-    ledger::{
-        account::{Amount, Nonce},
-        public_key::PublicKey,
-    },
+    ledger::{account::Nonce, amount::Amount, public_key::PublicKey},
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{

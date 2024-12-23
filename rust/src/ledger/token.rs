@@ -1,4 +1,4 @@
-use super::{account::Amount, public_key::PublicKey};
+use super::{amount::Amount, public_key::PublicKey};
 use crate::{
     constants::MINA_TOKEN_ADDRESS, protocol::serialization_types::version_bytes::TOKEN_ID_KEY,
     utility::store::U64_LEN,
