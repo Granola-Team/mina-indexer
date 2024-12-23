@@ -500,7 +500,7 @@ mod actor_node_tests {
         // ActorNode with database connection in its state
         let mut root = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(State { logger }) // Pass the DbLogger as state
-            .with_processor(|event, state| {
+            .with_processor(|event, state: Arc<Mutex<State>>| {
                 Box::pin(async move {
                     let state = state.lock().await;
 
