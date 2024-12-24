@@ -7,7 +7,6 @@ use super::{
 };
 use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
 use anyhow::anyhow;
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
 
@@ -163,12 +162,10 @@ impl GenesisLedger {
         accounts.insert(block_creator.public_key.clone(), block_creator);
 
         for account in genesis.accounts {
-            let balance = Amount(match str::parse::<Decimal>(&account.balance) {
-                Ok(amt) => (amt * MINA_SCALE_DEC)
-                    .to_u64()
-                    .expect("Parsed Genesis Balance has wrong format"),
-                Err(_) => panic!("Unable to parse Genesis Balance"),
-            });
+            let balance = account
+                .balance
+                .parse::<Amount>()
+                .unwrap_or_else(|_| panic!("Unable to parse Genesis Balance"));
 
             let public_key = PublicKey::from(account.pk);
             accounts.insert(
@@ -206,26 +203,23 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<GenesisRoot> {
 impl From<GenesisAccountTiming> for Timing {
     fn from(value: GenesisAccountTiming) -> Self {
         Self {
-            initial_minimum_balance: match value.initial_minimum_balance.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC)
-                    .to_u64()
-                    .expect("genesis initial minimum balance is u64"),
-                Err(_) => panic!("Unable to parse genesis initial minimum balance"),
-            },
+            initial_minimum_balance: value
+                .initial_minimum_balance
+                .parse::<Amount>()
+                .unwrap_or_else(|_| panic!("Unable to parse genesis initial minimum balance"))
+                .0,
             cliff_time: value.cliff_time.parse().expect("cliff time is u64"),
-            cliff_amount: match value.cliff_amount.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC)
-                    .to_u64()
-                    .expect("genesis cliff amount is u64"),
-                Err(_) => panic!("Unable to parse genesis cliff amount"),
-            },
+            cliff_amount: value
+                .cliff_amount
+                .parse::<Amount>()
+                .unwrap_or_else(|_| panic!("Unable to parse genesis cliff amount"))
+                .0,
             vesting_period: value.vesting_period.parse().expect("vesting period is u64"),
-            vesting_increment: match value.vesting_increment.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC)
-                    .to_u64()
-                    .expect("genesis vesting increment is u64"),
-                Err(_) => panic!("Unable to parse genesis vesting increment"),
-            },
+            vesting_increment: value
+                .vesting_increment
+                .parse::<Amount>()
+                .unwrap_or_else(|_| panic!("Unable to parse genesis vesting increment"))
+                .0,
         }
     }
 }
