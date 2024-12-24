@@ -1,9 +1,13 @@
+pub mod symbol;
+
 use super::{amount::Amount, public_key::PublicKey};
 use crate::{
     constants::MINA_TOKEN_ADDRESS, protocol::serialization_types::version_bytes::TOKEN_ID_KEY,
     utility::store::U64_LEN,
 };
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
+use symbol::TokenSymbol;
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Token {
@@ -12,9 +16,6 @@ pub struct Token {
     symbol: TokenSymbol,
     supply: Amount,
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TokenSymbol(pub String);
 
 /// Also referred to as `TokenId`
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -44,6 +45,18 @@ impl TokenAddress {
     /// Used to surpass the [TokenAddress] bytes in a db key
     pub fn upper_bound() -> [u8; TokenAddress::LEN] {
         [u8::MAX; TokenAddress::LEN]
+    }
+}
+
+impl std::str::FromStr for TokenAddress {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some(token) = Self::new(s) {
+            return Ok(token);
+        }
+
+        bail!("Invalid token address: {s}")
     }
 }
 
@@ -88,13 +101,6 @@ impl std::default::Default for TokenAddress {
     /// MINA token address
     fn default() -> Self {
         Self(MINA_TOKEN_ADDRESS.into())
-    }
-}
-
-impl std::default::Default for TokenSymbol {
-    /// MINA token symbol
-    fn default() -> Self {
-        Self("MINA".into())
     }
 }
 
