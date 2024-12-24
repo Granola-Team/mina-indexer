@@ -10,6 +10,8 @@ pub mod previous_state_hash;
 pub mod store;
 pub mod vrf_output;
 
+mod post_hardfork;
+
 use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
     canonicity::Canonicity,
