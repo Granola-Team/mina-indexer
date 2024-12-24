@@ -7,6 +7,7 @@ use tokio::sync::watch::Receiver;
 
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
+// pub(crate) mod blockchain_tree_builder_actor;
 pub(crate) mod mainnet_block_actor;
 pub(crate) mod pcb_file_path_actor;
 

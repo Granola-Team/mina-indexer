@@ -17,7 +17,7 @@ impl ActorFactory for BerkeleyBlockActor {
     fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::BerkeleyBlockPath)
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     // Parse the block path and contents
                     let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
@@ -78,7 +78,7 @@ mod berkeley_block_actor_tests_v2 {
         let mut test_receiver = actor.add_receiver(EventType::BerkeleyBlock);
 
         // Consume the sender once and hold a reference to it
-        let sender = actor.consume_sender().unwrap();
+        let sender = actor.get_sender().unwrap();
 
         // Wrap the actor in Arc<Mutex> for shared ownership
         let actor = Arc::new(Mutex::new(actor));

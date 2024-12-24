@@ -13,7 +13,7 @@ impl ActorFactory for PcbFilePathActor {
     fn create_actor(shutdown_rx: Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::PrecomputedBlockPath)
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
                     if keys == vec!["data".to_string(), "version".to_string()] {
@@ -53,7 +53,7 @@ mod pcb_file_path_actor_tests_v2 {
 
         // Create the actor
         let mut actor = PcbFilePathActor::create_actor(shutdown_rx);
-        let actor_sender = actor.consume_sender().unwrap();
+        let actor_sender = actor.get_sender().unwrap();
 
         // Add a receiver to the actor
         let mut test_receiver = actor.add_receiver(EventType::BerkeleyBlockPath);

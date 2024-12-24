@@ -2,7 +2,10 @@ use super::events::{Event, EventType};
 use futures::future::BoxFuture;
 use log::{error, info};
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
-use tokio::sync::{mpsc, watch, Mutex};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    watch, Mutex,
+};
 use tracing::{trace, warn};
 
 pub struct ActorStore {
@@ -36,25 +39,25 @@ impl ActorStore {
     }
 }
 
-type EP<S> = Box<dyn Fn(Event, Arc<Mutex<S>>) -> BoxFuture<'static, Option<Event>> + Send + Sync>;
+type EP<S> = Box<dyn Fn(Event, Arc<Mutex<S>>, Sender<Event>) -> BoxFuture<'static, Option<Event>> + Send + Sync>;
 
 pub struct ActorNode {
     id: EventType, // Unique identifier for the node
 
     // Represents the communication connectors (edges) between this node and its children
-    child_edges: HashMap<EventType, mpsc::Sender<Event>>,
+    child_edges: HashMap<EventType, Sender<Event>>,
 
     // Represents the communication connectors (edges) between this node and its parents
-    parent_edges: HashMap<EventType, mpsc::Receiver<Event>>,
+    parent_edges: HashMap<EventType, Receiver<Event>>,
 
     // Represents the actual child nodes connected to this node (the graph nodes)
     child_nodes: Vec<ActorNode>,
 
     // Internal receiver for incoming events
-    receiver: Option<mpsc::Receiver<Event>>,
+    receiver: Option<Receiver<Event>>,
 
     // Sender for outgoing events from this node
-    sender: Option<mpsc::Sender<Event>>,
+    sender: Option<Sender<Event>>,
 
     // Asynchronous function to process events received by this node
     event_processor: EP<ActorStore>,
@@ -78,8 +81,8 @@ impl ActorNode {
         receiver
     }
 
-    pub fn consume_sender(&mut self) -> Option<mpsc::Sender<Event>> {
-        self.sender.take()
+    pub fn get_sender(&mut self) -> Option<mpsc::Sender<Event>> {
+        self.sender.clone()
     }
 
     /// Add a parent connection and return the corresponding sender
@@ -178,10 +181,11 @@ impl ActorNode {
                         // Process incoming events for this receiver
                         if let Some(event) = receiver.recv().await {
                             let processed_event = {
-                                let locked_node = node_clone.lock().await;
+                                let mut locked_node = node_clone.lock().await;
+                                let requeue = locked_node.get_sender().unwrap();
                                 let event_processor = &locked_node.event_processor;
                                 let state = Arc::clone(&locked_node.state);
-                                event_processor(event, state).await
+                                event_processor(event, state, requeue).await
                             };
 
                             if let Some(processed_event) = processed_event {
@@ -238,10 +242,10 @@ impl ActorNodeBuilder {
     /// Sets the async event processor for the node
     pub fn with_processor<F, Fut>(mut self, processor: F) -> Self
     where
-        F: Fn(Event, Arc<Mutex<ActorStore>>) -> Fut + Send + Sync + 'static,
+        F: Fn(Event, Arc<Mutex<ActorStore>>, Sender<Event>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Option<Event>> + Send + 'static,
     {
-        self.event_processor = Some(Box::new(move |event, state| Box::pin(processor(event, state))));
+        self.event_processor = Some(Box::new(move |event, state, sender| Box::pin(processor(event, state, sender))));
         self
     }
 
@@ -297,25 +301,25 @@ mod actor_node_tests_v2 {
         // Create a root node with two children
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(ActorStore::new())
-            .with_processor(|_event, _state| Box::pin(async { None }))
+            .with_processor(|_event, _state, _requeue| Box::pin(async { None }))
             .build(shutdown_rx.clone());
 
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
                 .with_state(ActorStore::new())
-                .with_processor(|_event, _state| Box::pin(async { None }))
+                .with_processor(|_event, _state, _requeue| Box::pin(async { None }))
                 .build(shutdown_rx.clone()),
         );
 
         let mut child2 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(ActorStore::new())
-            .with_processor(|_event, _state| Box::pin(async { None }))
+            .with_processor(|_event, _state, _requeue| Box::pin(async { None }))
             .build(shutdown_rx.clone());
 
         child2.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
                 .with_state(ActorStore::new())
-                .with_processor(|_event, _state| Box::pin(async { None }))
+                .with_processor(|_event, _state, _requeue| Box::pin(async { None }))
                 .build(shutdown_rx.clone()),
         );
         root.add_child(child2);
@@ -330,7 +334,7 @@ mod actor_node_tests_v2 {
 
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(ActorStore::new())
-            .with_processor(|_event, _state| {
+            .with_processor(|_event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Root processing event");
                     None // No propagation since there are no children
@@ -370,7 +374,7 @@ mod actor_node_tests_v2 {
 
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Root processing: {:?}", event);
                     Some(Event {
@@ -383,7 +387,7 @@ mod actor_node_tests_v2 {
 
         let child1 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Child1 processing: {:?}", event);
                     None // Stop propagation
@@ -393,7 +397,7 @@ mod actor_node_tests_v2 {
 
         let child2 = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Child2 processing: {:?}", event);
                     None // Stop propagation
@@ -436,7 +440,7 @@ mod actor_node_tests_v2 {
 
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(ActorStore::new())
-            .with_processor(|_event, _state| {
+            .with_processor(|_event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Root processing event");
                     None // Do not propagate
@@ -447,7 +451,7 @@ mod actor_node_tests_v2 {
         root.add_child(
             ActorNodeBuilder::new(EventType::NewBlock)
                 .with_state(ActorStore::new())
-                .with_processor(|_event, _state| {
+                .with_processor(|_event, _state, _requeue| {
                     Box::pin(async move {
                         trace!("Child processing event");
                         None
@@ -490,7 +494,7 @@ mod actor_node_tests_v2 {
         store.insert("count", 0u64);
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(store)
-            .with_processor(|event, state| {
+            .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
                     let mut locked_state = state.lock().await; // Lock the state
                     let current_count: u64 = locked_state.remove("count").unwrap();
@@ -576,7 +580,7 @@ mod actor_node_tests_v2 {
         store.insert("logger", logger);
         let mut root = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(store) // Pass the DbLogger as state
-            .with_processor(|event, state: Arc<Mutex<ActorStore>>| {
+            .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
                     let mut state = state.lock().await;
 
@@ -664,7 +668,7 @@ mod actor_node_tests_v2 {
         state.insert("i", 1u64);
         let mut root: ActorNode = ActorNodeBuilder::new(EventType::GenesisBlock)
             .with_state(state)
-            .with_processor(|_event, state| {
+            .with_processor(|_event, state, _requeue| {
                 Box::pin(async move {
                     let mut state = state.lock().await;
                     let i: u64 = state.remove("i").unwrap();
@@ -701,7 +705,7 @@ mod actor_node_tests_v2 {
         });
 
         // Consume the sender once
-        let sender = root.lock().await.consume_sender().unwrap();
+        let sender = root.lock().await.get_sender().unwrap();
 
         // Scenario 1: Send an event for NewBlock
         sender
@@ -758,7 +762,7 @@ mod actor_node_tests_v2 {
         state.insert("i", 0u64);
         let mut actor = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(state)
-            .with_processor(|event, state| {
+            .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
                     let mut state = state.lock().await;
                     let i: u64 = state.remove("i").unwrap();

@@ -12,7 +12,7 @@ impl ActorFactory for BlockAncestorActor {
     fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
         ActorNodeBuilder::new(EventType::BerkeleyBlock) // Node listens for BerkeleyBlock and MainnetBlock
             .with_state(ActorStore::new())
-            .with_processor(|event, _state| {
+            .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     match event.event_type {
                         EventType::BerkeleyBlock => {
@@ -76,7 +76,7 @@ mod block_ancestor_actor_tests_v2 {
         let mut test_receiver = actor.add_receiver(EventType::BlockAncestor);
 
         // Consume the sender once and hold a reference to it
-        let sender = actor.consume_sender().unwrap();
+        let sender = actor.get_sender().unwrap();
 
         // Wrap the actor in Arc<Mutex> for shared ownership
         let actor = Arc::new(Mutex::new(actor));
@@ -136,7 +136,7 @@ mod block_ancestor_actor_tests_v2 {
         let mut test_receiver = actor.add_receiver(EventType::BlockAncestor);
 
         // Consume the sender once and hold a reference to it
-        let sender = actor.consume_sender().unwrap();
+        let sender = actor.get_sender().unwrap();
 
         // Wrap the actor in Arc<Mutex> for shared ownership
         let actor = Arc::new(Mutex::new(actor));

@@ -22,7 +22,7 @@ async fn main() {
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
     let mut root = get_actor_dag(&shutdown_rx);
-    let sender = root.consume_sender().unwrap();
+    let sender = root.get_sender().unwrap();
 
     tokio::spawn(async move {
         let root = Arc::new(Mutex::new(root));
