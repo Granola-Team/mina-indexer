@@ -6,7 +6,7 @@ use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     watch, Mutex,
 };
-use tracing::{trace, warn};
+use tracing::{debug, warn};
 
 pub struct ActorStore {
     pub data: HashMap<String, Box<dyn Any + Send + Sync>>,
@@ -69,6 +69,10 @@ pub struct ActorNode {
 }
 
 impl ActorNode {
+    pub fn id(&self) -> EventType {
+        self.id.clone()
+    }
+
     /// Adds a receiver to the ActorNode and returns the corresponding `mpsc::Receiver`.
     pub fn add_receiver(&mut self, id: EventType) -> mpsc::Receiver<Event> {
         // Create a new channel
@@ -86,18 +90,23 @@ impl ActorNode {
     }
 
     /// Add a parent connection and return the corresponding sender
-    pub fn add_parent(&mut self, id: EventType) -> mpsc::Sender<Event> {
+    pub fn add_parent(&mut self, id: EventType, actor: &mut ActorNode) -> mpsc::Sender<Event> {
         let (sender, receiver) = mpsc::channel(10);
-        self.parent_edges.insert(id, receiver); // Add to parent edges
+        self.parent_edges.insert(id.clone(), receiver); // Add to parent edges
+        actor.add_edge(id, sender.clone());
         sender // Return the sender for the parent to use
+    }
+
+    pub fn add_edge(&mut self, id: EventType, sender: Sender<Event>) {
+        self.child_edges.insert(id, sender); // Add edge
     }
 
     /// Adds a child node to the current node
     pub fn add_child(&mut self, mut child: ActorNode) {
         // Take ownership of the child's sender
         let child_id = child.id.clone();
-        if let Some(sender) = child.sender.take() {
-            self.child_edges.insert(child_id.clone(), sender); // Add edge
+        if let Some(sender) = child.get_sender() {
+            self.add_edge(child_id, sender);
             self.child_nodes.push(child); // Add node
         } else {
             error!("Failed to add child: Sender for {:?} does not exist", child_id);
@@ -189,13 +198,13 @@ impl ActorNode {
                             };
 
                             if let Some(processed_event) = processed_event {
-                                trace!("{:#?}", processed_event);
+                                debug!("{:#?}", processed_event);
                                 let locked_node = node_clone.lock().await;
                                 let child_sender = locked_node.child_edges.get(&processed_event.event_type);
 
                                 if let Some(sender) = child_sender {
-                                    if let Err(err) = sender.send(processed_event).await {
-                                        error!("Failed to send event to child: {:?}", err);
+                                    if let Err(err) = sender.send(processed_event.clone()).await {
+                                        error!("Failed to send event to child: {}. Error: {err}", processed_event.event_type);
                                     }
                                 } else {
                                     warn!("No child exists to process event for EventType {:?}", processed_event.event_type);
@@ -342,7 +351,7 @@ mod actor_node_tests_v2 {
             })
             .build(shutdown_rx.clone());
 
-        let sender = root.sender.take().expect("Sender should exist");
+        let sender = root.get_sender().expect("Sender should exist");
 
         let root = Arc::new(Mutex::new(root));
         tokio::spawn({
@@ -508,7 +517,7 @@ mod actor_node_tests_v2 {
             })
             .build(shutdown_rx.clone());
 
-        let sender = root.sender.take().expect("Sender should exist");
+        let sender = root.get_sender().expect("Sender should exist");
 
         let root = Arc::new(Mutex::new(root));
         tokio::spawn({
@@ -602,7 +611,7 @@ mod actor_node_tests_v2 {
             .build(watch::channel(false).1); // Use a dummy shutdown_receiver
 
         // Send events to the child node
-        let sender = root.sender.take().expect("Sender should exist");
+        let sender = root.get_sender().expect("Sender should exist");
 
         let root = Arc::new(Mutex::new(root));
         tokio::spawn({
@@ -752,7 +761,7 @@ mod actor_node_tests_v2 {
     #[tokio::test]
     async fn test_processing_with_add_parent_api() {
         use std::sync::Arc;
-        use tokio::sync::watch;
+        use tokio::sync::{watch, Mutex};
 
         // Create the shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -760,7 +769,7 @@ mod actor_node_tests_v2 {
         // Create the actor
         let mut state = ActorStore::new();
         state.insert("i", 0u64);
-        let mut actor = ActorNodeBuilder::new(EventType::NewBlock)
+        let mut child_actor = ActorNodeBuilder::new(EventType::NewBlock)
             .with_state(state)
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -773,23 +782,65 @@ mod actor_node_tests_v2 {
             })
             .build(shutdown_rx.clone());
 
-        // Add multiple parent connections using the `add_parent` API
-        let parent1_sender = actor.add_parent(EventType::GenesisBlock);
-        let parent2_sender = actor.add_parent(EventType::PrecomputedBlockPath);
+        // Create two parent actors
+        let mut parent1 = ActorNodeBuilder::new(EventType::GenesisBlock)
+            .with_state(ActorStore::new())
+            .with_processor(|event, _state, _requeue| {
+                Box::pin(async move {
+                    println!("Parent 1 processing: {:?}", event);
+                    Some(event)
+                })
+            })
+            .build(shutdown_rx.clone());
 
-        // Wrap the actor in Arc<Mutex> for shared ownership
-        let actor = Arc::new(Mutex::new(actor));
+        let mut parent2 = ActorNodeBuilder::new(EventType::PrecomputedBlockPath)
+            .with_state(ActorStore::new())
+            .with_processor(|event, _state, _requeue| {
+                Box::pin(async move {
+                    println!("Parent 2 processing: {:?}", event);
+                    Some(event)
+                })
+            })
+            .build(shutdown_rx.clone());
 
-        // Spawn the actor
+        // Add two parents for one child
+        child_actor.add_parent(EventType::GenesisBlock, &mut parent1);
+        child_actor.add_parent(EventType::PrecomputedBlockPath, &mut parent2);
+
+        // Wrap the child actor in Arc<Mutex> for shared ownership
+        let child_actor = Arc::new(Mutex::new(child_actor));
+        let parent1 = Arc::new(Mutex::new(parent1));
+        let parent2 = Arc::new(Mutex::new(parent2));
+
+        // Spawn the child actor
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let p = Arc::clone(&parent1);
+
             async move {
-                ActorNode::start_processing(actor_clone).await;
+                ActorNode::spawn_all(p).await;
+            }
+        });
+        tokio::spawn({
+            let p = Arc::clone(&parent2);
+
+            async move {
+                ActorNode::spawn_all(p).await;
+            }
+        });
+        tokio::spawn({
+            let ch = Arc::clone(&child_actor);
+
+            async move {
+                ActorNode::start_processing(ch).await;
             }
         });
 
         // Send events to the parent connections
-        parent1_sender
+        parent1
+            .lock()
+            .await
+            .get_sender()
+            .unwrap()
             .send(Event {
                 event_type: EventType::GenesisBlock,
                 payload: "Event from Parent 1".to_string(),
@@ -797,7 +848,11 @@ mod actor_node_tests_v2 {
             .await
             .expect("Failed to send event from Parent 1");
 
-        parent2_sender
+        parent2
+            .lock()
+            .await
+            .get_sender()
+            .unwrap()
             .send(Event {
                 event_type: EventType::PrecomputedBlockPath,
                 payload: "Event from Parent 2".to_string(),
@@ -808,8 +863,10 @@ mod actor_node_tests_v2 {
         // Allow time for processing
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-        let locked_actor = actor.lock().await;
-        let locked_state = locked_actor.state.lock().await;
+        // Verify the child actor's state
+        let locked_child = child_actor.lock().await;
+        let locked_state = locked_child.state.lock().await;
+        println!("{:#?}", locked_state.get("i").unwrap() as &u64);
         assert_eq!(locked_state.get("i").unwrap() as &u64, &2_u64, "State should have incremented twice");
 
         // Signal shutdown

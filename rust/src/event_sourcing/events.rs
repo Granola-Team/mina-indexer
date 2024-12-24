@@ -1,4 +1,6 @@
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+use strum_macros::Display;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Display)]
 pub enum EventType {
     GenesisBlock,
     PrecomputedBlockPath,

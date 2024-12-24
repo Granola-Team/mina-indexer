@@ -1,13 +1,12 @@
 use env_logger::Builder;
 use log::error;
 use mina_indexer::event_sourcing::{
-    actor_dag::ActorNode,
-    actors_v2::get_actor_dag,
+    actors_v2::spawn_actor_dag,
     events::{Event, EventType},
     sourcing::{get_block_entries, sort_entries},
 };
-use std::{env, path::PathBuf, sync::Arc, time::Duration};
-use tokio::sync::{watch, Mutex};
+use std::{env, path::PathBuf, time::Duration};
+use tokio::sync::watch;
 
 #[tokio::main]
 async fn main() {
@@ -21,13 +20,7 @@ async fn main() {
         .map(PathBuf::from)
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
-    let mut root = get_actor_dag(&shutdown_rx);
-    let sender = root.get_sender().unwrap();
-
-    tokio::spawn(async move {
-        let root = Arc::new(Mutex::new(root));
-        ActorNode::spawn_all(root).await;
-    });
+    let sender = spawn_actor_dag(&shutdown_rx);
 
     let mut entries = get_block_entries(&blocks_dir).await.unwrap();
     sort_entries(&mut entries);
