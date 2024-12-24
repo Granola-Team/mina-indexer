@@ -1,4 +1,9 @@
-use crate::{constants::MINA_SCALE, utility::functions::nanomina_to_mina};
+use crate::{
+    constants::{MINA_SCALE, MINA_SCALE_DEC},
+    utility::functions::nanomina_to_mina,
+};
+use anyhow::anyhow;
+use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Sub};
 
@@ -60,6 +65,16 @@ impl Sub<u64> for Amount {
 impl From<u64> for Amount {
     fn from(value: u64) -> Self {
         Amount(value)
+    }
+}
+
+impl std::str::FromStr for Amount {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<Decimal>()
+            .map(|amt| Self((amt * MINA_SCALE_DEC).to_u64().expect("currency amount")))
+            .map_err(|e| anyhow!("{e}"))
     }
 }
 
