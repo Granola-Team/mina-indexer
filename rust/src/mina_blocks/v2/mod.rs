@@ -7,6 +7,7 @@ use crate::{
     ledger::{
         account::{ReceiptChainHash, Timing},
         public_key::PublicKey,
+        token::{symbol::TokenSymbol, TokenAddress},
     },
     mina_blocks::common::*,
 };
@@ -41,6 +42,7 @@ pub struct PrecomputedBlockDataV2 {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountAccessed {
     #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
@@ -60,26 +62,30 @@ pub struct AccountAccessed {
     #[serde(deserialize_with = "from_str")]
     pub voting_for: BlockHash,
 
-    pub token_id: String,
-    pub token_symbol: String,
+    #[serde(deserialize_with = "from_str")]
+    pub token_id: TokenAddress,
+
+    #[serde(deserialize_with = "from_str")]
+    pub token_symbol: TokenSymbol,
+
     pub permissions: Permissions,
     pub timing: AccountAccessedTiming,
     pub zkapp: Option<ZkappAccount>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AccountAccessedTiming {
     Untimed((TimingKind,)),
     Timed((TimingKind, Timing)),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum TimingKind {
     Timed,
     Untimed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Permissions {
     pub edit_state: (Permission,),
     pub access: (Permission,),
@@ -96,15 +102,15 @@ pub struct Permissions {
     pub set_timing: (Permission,),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SetVerificationKey(pub u32);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Permission(pub (PermissionKind,));
 
 /// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/permissions.mli
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PermissionKind {
     None,
     Either,
@@ -115,8 +121,8 @@ pub enum PermissionKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappAccount {
-    pub app_state: [String; 8],    // 64 hex digits
-    pub action_state: [String; 5], // 64 hex digits
+    pub app_state: [String; 8],    // 32 bytes each
+    pub action_state: [String; 5], // 32 bytes each
     pub verification_key: VerificationKey,
     pub proved_state: bool,
     pub zkapp_uri: String,
@@ -131,8 +137,11 @@ pub struct ZkappAccount {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationKey {
     pub data: String,
-    pub hash: String,
+    pub hash: VerificationKeyHash,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VerificationKeyHash(pub String);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolVersion {
