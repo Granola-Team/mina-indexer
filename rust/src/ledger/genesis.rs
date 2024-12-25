@@ -1,8 +1,9 @@
 use super::{
-    account::{Account, Permissions, ReceiptChainHash, Timing, TokenPermissions},
+    account::{Account, Permissions, ReceiptChainHash, Timing},
     amount::Amount,
     nonce::Nonce,
     public_key::PublicKey,
+    token::TokenAddress,
     Ledger, TokenLedger,
 };
 use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
@@ -28,7 +29,6 @@ pub struct GenesisAccount {
     pub nonce: Option<Nonce>,
     pub delegate: Option<String>,
     pub token: Option<u64>,
-    pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
     pub voting_for: Option<String>,
     pub permissions: Option<Permissions>,
@@ -177,8 +177,7 @@ impl GenesisLedger {
                     public_key: public_key.clone(),
                     // If delegate is None, delegate to yourself
                     delegate: account.delegate.map_or(public_key, PublicKey),
-                    token: account.token,
-                    token_permissions: account.token_permissions,
+                    token: account.token.map(TokenAddress::from),
                     receipt_chain_hash: account.receipt_chain_hash,
                     voting_for: account.voting_for.map(|v| v.into()),
                     permissions: account.permissions,
