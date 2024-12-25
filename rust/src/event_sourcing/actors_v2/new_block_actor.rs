@@ -58,8 +58,6 @@ impl ActorFactory for NewBlockActor {
 
                     state.insert(BLOCKCHAIN_TREE_KEY, blockchain_tree);
 
-                    println!("{:#?}", added_payload);
-
                     Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: sonic_rs::to_string(&added_payload).unwrap(),

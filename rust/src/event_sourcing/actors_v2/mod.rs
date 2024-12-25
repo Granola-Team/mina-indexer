@@ -4,6 +4,7 @@ use super::{
 };
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
+use block_canonicity_actor::BlockCanonicityActor;
 use mainnet_block_actor::MainnetBlockParserActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
@@ -12,6 +13,7 @@ use tokio::sync::{mpsc::Sender, watch::Receiver, Mutex};
 
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
+pub(crate) mod block_canonicity_actor;
 pub(crate) mod mainnet_block_actor;
 pub(crate) mod new_block_actor;
 pub(crate) mod pcb_file_path_actor;
@@ -31,7 +33,9 @@ pub fn spawn_actor_dag(shutdown_rx: &Receiver<bool>) -> Sender<Event> {
     root.add_child(mainnet_block);
     root.add_child(berkeley_block);
 
-    let new_block = NewBlockActor::create_actor(shutdown_rx.clone());
+    let mut new_block = NewBlockActor::create_actor(shutdown_rx.clone());
+    let block_canonicity = BlockCanonicityActor::create_actor(shutdown_rx.clone());
+    new_block.add_child(block_canonicity);
     block_ancestor.add_child(new_block);
 
     // actors with multiple parents require individual spawning of DAG
