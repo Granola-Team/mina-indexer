@@ -250,8 +250,8 @@ impl AccountQueryInput {
                 return false;
             }
         }
-        if let Some(token) = token.to_owned() {
-            if account.token != Some(TokenAddress(token).into()) {
+        if let Some(token) = token.as_ref() {
+            if account.token != Some(TokenAddress::new(token).expect("valid token address")) {
                 return false;
             }
         }

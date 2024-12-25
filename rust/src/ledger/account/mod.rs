@@ -12,8 +12,9 @@ use crate::{
     block::{genesis::GenesisBlock, BlockHash},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
-    mina_blocks::v2::ZkappAccount,
+    mina_blocks::v2::{self, ZkappAccount},
 };
+use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,8 +27,7 @@ pub struct Account {
     pub genesis_account: bool,
 
     // optional
-    pub token: Option<u64>,
-    pub token_permissions: Option<TokenPermissions>,
+    pub token: Option<TokenAddress>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
     pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
@@ -42,23 +42,34 @@ pub struct Account {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Permissions {
-    stake: bool,
-    edit_state: Permission,
-    send: Permission,
-    set_delegate: Permission,
-    set_permissions: Permission,
-    set_verification_key: Permission,
+    pub edit_state: Permission,
+    pub access: Permission,
+    pub send: Permission,
+    pub receive: Permission,
+    pub set_delegate: Permission,
+    pub set_permissions: Permission,
+    pub set_verification_key: (Permission, String),
+    pub set_zkapp_uri: Permission,
+    pub edit_action_state: Permission,
+    pub set_token_symbol: Permission,
+    pub increment_nonce: Permission,
+    pub set_voting_for: Permission,
+    pub set_timing: Permission,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
+#[auto_from(v2::PermissionKind)]
 pub enum Permission {
     #[default]
-    Signature,
+    None,
+    Either,
     Proof,
+    Signature,
+    Impossible,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
+#[auto_from(v2::Timing)]
 pub struct Timing {
     pub initial_minimum_balance: u64,
     pub cliff_time: u32,
@@ -66,9 +77,6 @@ pub struct Timing {
     pub vesting_period: u32,
     pub vesting_increment: u64,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TokenPermissions {}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptChainHash(pub String);
@@ -114,7 +122,7 @@ impl Account {
         Account {
             public_key: public_key.clone(),
             delegate: public_key,
-            token: Some(token.into()),
+            token: Some(token),
             ..Default::default()
         }
     }

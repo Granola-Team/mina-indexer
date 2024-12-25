@@ -1,11 +1,12 @@
 pub mod parser;
+pub mod permissions;
 
 use crate::{
     block::{extract_height_and_hash, extract_network, BlockHash},
     chain::Network,
     constants::MINA_SCALE_DEC,
     ledger::{
-        account::{Permissions, ReceiptChainHash, Timing, TokenPermissions},
+        account::{ReceiptChainHash, Timing},
         nonce::Nonce,
         public_key::PublicKey,
         LedgerHash,
@@ -14,6 +15,7 @@ use crate::{
 };
 use anyhow::Context;
 use log::trace;
+use permissions::StakingPermissions;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -38,10 +40,9 @@ pub struct StakingAccount {
     pub delegate: PublicKey,
     pub username: Option<String>,
     pub token: Option<u64>,
-    pub token_permissions: TokenPermissions,
+    pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
-    pub permissions: Permissions,
     pub nonce: Option<Nonce>,
     pub timing: Option<Timing>,
     pub zkapp: Option<ZkappAccount>,
@@ -54,10 +55,9 @@ pub struct StakingAccountJson {
     pub delegate: PublicKey,
     pub username: Option<String>,
     pub token: String,
-    pub token_permissions: TokenPermissions,
+    pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: BlockHash,
-    pub permissions: Permissions,
     pub nonce: Option<String>,
     pub timing: Option<TimingJson>,
 }
@@ -139,7 +139,6 @@ impl From<StakingAccountJson> for StakingAccount {
             username: value.username,
             voting_for: value.voting_for,
             permissions: value.permissions,
-            token_permissions: value.token_permissions,
             receipt_chain_hash: value.receipt_chain_hash,
             zkapp: None,
         }
