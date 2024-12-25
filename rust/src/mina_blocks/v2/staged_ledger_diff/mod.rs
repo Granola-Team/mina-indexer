@@ -4,7 +4,8 @@ pub mod completed_work;
 use super::protocol_state::SupplyAdjustment;
 use crate::{
     command::{to_mina_format, to_zkapp_json},
-    ledger::public_key::PublicKey,
+    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
+    ledger::{public_key::PublicKey, token::TokenAddress},
     mina_blocks::common::*,
     protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
     utility::functions::nanomina_to_mina,
@@ -218,8 +219,9 @@ pub enum Authorization {
 pub struct AccountUpdateBody {
     #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
+    #[serde(deserialize_with = "from_str")]
+    pub token_id: TokenAddress,
 
-    pub token_id: String,
     pub update: Update,
     pub balance_change: SupplyAdjustment,
     pub increment_nonce: bool,
@@ -251,8 +253,7 @@ pub struct ZkappEvents(pub Vec<String>);
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Update {
-    // one for each app state field element
-    pub app_state: [UpdateKind; 8],
+    pub app_state: [UpdateKind; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
 
     pub delegate: UpdateKind,
     pub verification_key: UpdateKind,
@@ -309,7 +310,7 @@ pub struct AccountPreconditions {
     pub nonce: Precondition,
     pub receipt_chain_hash: Precondition,
     pub delegate: Precondition,
-    pub state: [Precondition; 8],
+    pub state: [Precondition; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
     pub action_state: Precondition,
     pub proved_state: Precondition,
     pub is_new: Precondition,

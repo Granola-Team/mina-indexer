@@ -91,6 +91,8 @@ pub const HARDFORK_PROTOCOL_TXN_VERSION_DIGEST: &str = "eccbc87e4b5ce2fe28308fd9
 pub const HARDFORK_CHAIN_ID: &str =
     "a7351abc7ddf2ea92d1b38cc8e636c271c1dfd2c081c637f62ebc2af34eb7cc1";
 
+pub const ZKAPP_STATE_FIELD_ELEMENTS_NUM: usize = 8;
+
 // Name service constants
 pub const MINA_EXPLORER_NAME_SERVICE_ADDRESS: &str =
     "B62qjzJvc59DdG9ahht9rwxkEz7GedKuUMsnaVTuXFUeANKqfBeWpRE";
