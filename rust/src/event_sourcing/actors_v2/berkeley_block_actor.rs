@@ -45,10 +45,10 @@ impl ActorFactory for BerkeleyBlockActor {
                     };
 
                     // Publish the BerkeleyBlock event
-                    Some(Event {
+                    Some(vec![Event {
                         event_type: EventType::BerkeleyBlock,
                         payload: sonic_rs::to_string(&berkeley_block_payload).unwrap(),
-                    })
+                    }])
                 })
             })
             .build(shutdown_rx)

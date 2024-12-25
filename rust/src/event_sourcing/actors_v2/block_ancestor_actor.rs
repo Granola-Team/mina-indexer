@@ -25,10 +25,10 @@ impl ActorFactory for BlockAncestorActor {
                                 last_vrf_output: block_payload.last_vrf_output,
                             };
                             // Publish the BlockAncestor event
-                            Some(Event {
+                            Some(vec![Event {
                                 event_type: EventType::BlockAncestor,
                                 payload: sonic_rs::to_string(&block_ancestor_payload).unwrap(),
-                            })
+                            }])
                         }
                         EventType::MainnetBlock => {
                             // Deserialize MainnetBlock payload
@@ -40,10 +40,10 @@ impl ActorFactory for BlockAncestorActor {
                                 last_vrf_output: block_payload.last_vrf_output,
                             };
                             // Publish the BlockAncestor event
-                            Some(Event {
+                            Some(vec![Event {
                                 event_type: EventType::BlockAncestor,
                                 payload: sonic_rs::to_string(&block_ancestor_payload).unwrap(),
-                            })
+                            }])
                         }
                         _ => None,
                     }

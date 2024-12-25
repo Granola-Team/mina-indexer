@@ -45,10 +45,10 @@ impl ActorFactory for MainnetBlockParserActor {
                     };
 
                     // Publish the MainnetBlock event
-                    Some(Event {
+                    Some(vec![Event {
                         event_type: EventType::MainnetBlock,
                         payload: sonic_rs::to_string(&block_payload).unwrap(),
-                    })
+                    }])
                 })
             })
             .build(shutdown_rx)

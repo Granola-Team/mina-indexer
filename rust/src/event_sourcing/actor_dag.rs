@@ -39,7 +39,7 @@ impl ActorStore {
     }
 }
 
-type EP<S> = Box<dyn Fn(Event, Arc<Mutex<S>>, Sender<Event>) -> BoxFuture<'static, Option<Event>> + Send + Sync>;
+type EP<S> = Box<dyn Fn(Event, Arc<Mutex<S>>, Sender<Event>) -> BoxFuture<'static, Option<Vec<Event>>> + Send + Sync>;
 
 pub struct ActorNode {
     id: EventType, // Unique identifier for the node
@@ -189,7 +189,7 @@ impl ActorNode {
 
                         // Process incoming events for this receiver
                         if let Some(event) = receiver.recv().await {
-                            let processed_event = {
+                            let processed_events = {
                                 let mut locked_node = node_clone.lock().await;
                                 let requeue = locked_node.get_sender().unwrap();
                                 let event_processor = &locked_node.event_processor;
@@ -197,17 +197,19 @@ impl ActorNode {
                                 event_processor(event, state, requeue).await
                             };
 
-                            if let Some(processed_event) = processed_event {
-                                debug!("{:#?}", processed_event);
-                                let locked_node = node_clone.lock().await;
-                                let child_sender = locked_node.child_edges.get(&processed_event.event_type);
+                            if let Some(processed_events) = processed_events {
+                                for processed_event in processed_events {
+                                    debug!("{:#?}", processed_event);
+                                    let locked_node = node_clone.lock().await;
+                                    let child_sender = locked_node.child_edges.get(&processed_event.event_type);
 
-                                if let Some(sender) = child_sender {
-                                    if let Err(err) = sender.send(processed_event.clone()).await {
-                                        error!("Failed to send event to child: {}. Error: {err}", processed_event.event_type);
+                                    if let Some(sender) = child_sender {
+                                        if let Err(err) = sender.send(processed_event.clone()).await {
+                                            error!("Failed to send event to child: {}. Error: {err}", processed_event.event_type);
+                                        }
+                                    } else {
+                                        warn!("No child exists to process event for EventType {:?}", processed_event.event_type);
                                     }
-                                } else {
-                                    warn!("No child exists to process event for EventType {:?}", processed_event.event_type);
                                 }
                             }
                         }
@@ -252,7 +254,7 @@ impl ActorNodeBuilder {
     pub fn with_processor<F, Fut>(mut self, processor: F) -> Self
     where
         F: Fn(Event, Arc<Mutex<ActorStore>>, Sender<Event>) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Option<Event>> + Send + 'static,
+        Fut: Future<Output = Option<Vec<Event>>> + Send + 'static,
     {
         self.event_processor = Some(Box::new(move |event, state, sender| Box::pin(processor(event, state, sender))));
         self
@@ -386,10 +388,10 @@ mod actor_node_tests_v2 {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     trace!("Root processing: {:?}", event);
-                    Some(Event {
+                    Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: format!("Processed by root: {}", event.payload),
-                    })
+                    }])
                 })
             })
             .build(shutdown_rx.clone());
@@ -509,10 +511,10 @@ mod actor_node_tests_v2 {
                     let current_count: u64 = locked_state.remove("count").unwrap();
                     locked_state.insert("count", current_count + 1u64); // Increment the counter
                     println!("Processing event: {:?}, updated state: {:?}", event, current_count);
-                    Some(Event {
+                    Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: format!("Processed: {}", event.payload),
-                    })
+                    }])
                 })
             })
             .build(shutdown_rx.clone());
@@ -683,16 +685,16 @@ mod actor_node_tests_v2 {
                     let i: u64 = state.remove("i").unwrap();
                     if i % 2 == 0 {
                         state.insert("i", i + 1u64);
-                        Some(Event {
+                        Some(vec![Event {
                             event_type: EventType::NewBlock,
                             payload: String::from("Payload for NewBlock"),
-                        })
+                        }])
                     } else {
                         state.insert("i", i + 1u64);
-                        Some(Event {
+                        Some(vec![Event {
                             event_type: EventType::PrecomputedBlockPath,
                             payload: String::from("Payload for PrecomputedBlockPath"),
-                        })
+                        }])
                     }
                 })
             }) // Root does not process events
@@ -788,7 +790,7 @@ mod actor_node_tests_v2 {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     println!("Parent 1 processing: {:?}", event);
-                    Some(event)
+                    Some(vec![event])
                 })
             })
             .build(shutdown_rx.clone());
@@ -798,7 +800,7 @@ mod actor_node_tests_v2 {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     println!("Parent 2 processing: {:?}", event);
-                    Some(event)
+                    Some(vec![event])
                 })
             })
             .build(shutdown_rx.clone());
