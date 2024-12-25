@@ -1,6 +1,13 @@
 //! Indexer internal precomputed block representation
 
-use super::{epoch_data::EpochSeed, extract_network_height_hash, Block, BlockHash, VrfOutput};
+use super::{
+    epoch_data::EpochSeed,
+    extract_network_height_hash,
+    post_hardfork::{
+        account_accessed::AccountAccessed, account_created::AccountCreated, token_used::TokenUsed,
+    },
+    Block, BlockHash, VrfOutput,
+};
 use crate::{
     canonicity::Canonicity,
     chain::Network,
@@ -64,6 +71,11 @@ pub struct BlockFileDataV2 {
 
     protocol_state: v2::protocol_state::ProtocolState,
     staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
+
+    // new post-hardfork data
+    tokens_used: Vec<v2::TokenUsed>,
+    accounts_accessed: Vec<(u64, v2::AccountAccessed)>,
+    accounts_created: Vec<v2::AccountCreated>,
 }
 
 fn berkeley_genesis_timestamp() -> u64 {
@@ -106,6 +118,10 @@ pub struct PrecomputedBlockV2 {
     pub scheduled_time: u64,
     pub protocol_state: v2::protocol_state::ProtocolState,
     pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
+    // new post-hardfork data
+    pub tokens_used: Vec<v2::TokenUsed>,
+    pub accounts_accessed: Vec<(u64, v2::AccountAccessed)>,
+    pub accounts_created: Vec<v2::AccountCreated>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -169,6 +185,9 @@ impl PrecomputedBlock {
                             scheduled_time,
                             protocol_state,
                             staged_ledger_diff,
+                            tokens_used,
+                            accounts_accessed,
+                            accounts_created,
                         },
                 } = serde_json::from_slice(&block_file_contents.contents)?;
                 Ok(Self::V2(PrecomputedBlockV2 {
@@ -178,6 +197,9 @@ impl PrecomputedBlock {
                     network: block_file_contents.network,
                     protocol_state,
                     staged_ledger_diff,
+                    tokens_used,
+                    accounts_accessed,
+                    accounts_created,
                 }))
             }
         }
@@ -231,6 +253,42 @@ impl PrecomputedBlock {
                 BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
             }
             Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
+        }
+    }
+
+    pub fn accounts_accessed(&self) -> Vec<AccountAccessed> {
+        match self {
+            Self::V1(_v1) => vec![],
+            Self::V2(v2) => v2
+                .accounts_accessed
+                .iter()
+                .cloned()
+                .map(AccountAccessed::from)
+                .collect(),
+        }
+    }
+
+    pub fn accounts_created_v2(&self) -> Vec<AccountCreated> {
+        match self {
+            Self::V1(_v1) => vec![],
+            Self::V2(v2) => v2
+                .accounts_created
+                .iter()
+                .cloned()
+                .map(AccountCreated::from)
+                .collect(),
+        }
+    }
+
+    pub fn tokens_used(&self) -> Vec<TokenUsed> {
+        match self {
+            Self::V1(_v1) => vec![],
+            Self::V2(v2) => v2
+                .tokens_used
+                .iter()
+                .cloned()
+                .map(TokenUsed::from)
+                .collect(),
         }
     }
 
