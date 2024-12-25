@@ -75,7 +75,7 @@ pub struct EpochStakeDelegationPayload {
     pub canonical: bool,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct MainnetBlockPayload {
     pub height: u64,
     pub state_hash: String,
@@ -138,6 +138,37 @@ impl MainnetBlockPayload {
 
         let unique: HashSet<_> = accounts.into_iter().collect();
         unique.into_iter().collect()
+    }
+}
+
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
+pub struct CanonicalMainnetBlockPayload {
+    pub block: MainnetBlockPayload, // Composition
+    pub canonical: bool,
+    pub was_canonical: bool,
+}
+
+impl CanonicalMainnetBlockPayload {
+    pub fn valid_accounts(&self) -> Vec<String> {
+        self.block.valid_accounts() // Delegate to the mainnet_block method
+    }
+}
+
+impl CanonicalItem for CanonicalMainnetBlockPayload {
+    fn set_canonical(&mut self, canonical: bool) {
+        self.canonical = canonical;
+    }
+
+    fn get_state_hash(&self) -> &str {
+        &self.block.state_hash
+    }
+
+    fn get_height(&self) -> u64 {
+        self.block.height
+    }
+
+    fn set_was_canonical(&mut self, was_canonical: bool) {
+        self.was_canonical = was_canonical
     }
 }
 

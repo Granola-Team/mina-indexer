@@ -14,6 +14,7 @@ pub enum EventType {
     BestBlock,
     BlockLog,
     CanonicalBlockLog,
+    CanonicalMainnetBlock,
     SnarkWorkSummary,
     SnarkCanonicitySummary,
     BulkSnarkCanonicity,
