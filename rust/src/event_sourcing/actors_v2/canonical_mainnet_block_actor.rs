@@ -96,7 +96,7 @@ impl ActorFactory for CanonicalMainnetBlockActor {
 
                     state.insert(CANONICAL_MANAGER_KEY, manager);
 
-                    if output_events.len() == 0 {
+                    if output_events.is_empty() {
                         None
                     } else {
                         Some(output_events)
