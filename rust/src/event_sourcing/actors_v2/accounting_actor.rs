@@ -1501,4 +1501,236 @@ mod accounting_actor_tests_v2 {
         // 10) shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
+
+    #[tokio::test]
+    async fn test_canonical_user_command_failed_payment() {
+        // 1) Create shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Create and link the sink node
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) Wrap + spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) Build a user command with status = Failed, txn_type = Payment => no sender→receiver pair, but we do have the fee pair.
+        let test_command = CommandSummary {
+            sender: "B62qSenderFailed".to_string(),
+            receiver: "B62qReceiverFailed".to_string(),
+            fee_payer: "B62qFeePayerFailed".to_string(),
+            amount_nanomina: 55_000_000_000, // would be the payment, but it's ignored for "Failed"
+            fee_nanomina: 1_000_000_000,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
+            status: crate::event_sourcing::models::CommandStatus::Failed, // not Applied
+            ..Default::default()
+        };
+
+        let test_block = MainnetBlockPayload {
+            height: 600,
+            state_hash: "hash_cmd_failed_payment".to_string(),
+            previous_state_hash: "prev_cmd_hash_failed".to_string(),
+            last_vrf_output: "vrf_output_failed".to_string(),
+            user_command_count: 1,
+            internal_command_count: 0,
+            user_commands: vec![test_command],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 999_888_777,
+            coinbase_receiver: "B62qNoCoinbaseFailed".to_string(),
+            coinbase_reward_nanomina: 0,
+            global_slot_since_genesis: 202,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 202,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: true,
+            was_canonical: false,
+        };
+
+        // 7) Send the event
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send failed user_command event");
+
+        // 8) Wait a bit
+        sleep(Duration::from_millis(200)).await;
+
+        // 9) Read from sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(transactions.len(), 1, "Expected 1 DoubleEntryTransaction for failed user command");
+
+        // 10) Parse & check
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+
+        assert_eq!(record.height, 600);
+        assert_eq!(record.state_hash, "hash_cmd_failed_payment");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // Because status=Failed => NO sender→receiver pair, but we STILL do fee_payer→BlockRewardPool
+        // => exactly 1 pair => 1 LHS, 1 RHS
+        assert_eq!(record.lhs.len(), 2, "Only 1 debit: the fee (+ FTVC)");
+        assert_eq!(record.rhs.len(), 2, "Only 1 credit: the fee (+ FTVC)");
+
+        // Check that single fee pair
+        let lhs_fee = &record.lhs[0];
+        let rhs_fee = &record.rhs[0];
+
+        assert_eq!(lhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(lhs_fee.entry_type, AccountingEntryType::Debit);
+        assert_eq!(lhs_fee.account, "B62qFeePayerFailed");
+        assert_eq!(lhs_fee.amount_nanomina, 1_000_000_000);
+
+        assert_eq!(rhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(rhs_fee.entry_type, AccountingEntryType::Credit);
+        assert_eq!(rhs_fee.account, "BlockRewardPool#hash_cmd_failed_payment");
+        assert_eq!(rhs_fee.amount_nanomina, 1_000_000_000);
+
+        // shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_canonical_user_command_stake_delegation() {
+        // 1) Create shutdown
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) DAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Root
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Sink
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) stake delegation => even if Applied, we do no sender->receiver pair, only fee pair
+        let test_command = CommandSummary {
+            sender: "B62qSenderStake".to_string(),
+            receiver: "B62qReceiverStake".to_string(),
+            fee_payer: "B62qFeePayerStake".to_string(),
+            amount_nanomina: 999_000_000_000,
+            fee_nanomina: 50_000_000_000,
+            txn_type: crate::event_sourcing::models::CommandType::StakeDelegation,
+            status: crate::event_sourcing::models::CommandStatus::Applied,
+            ..Default::default()
+        };
+
+        let test_block = MainnetBlockPayload {
+            height: 700,
+            state_hash: "hash_cmd_stake_delegation".to_string(),
+            previous_state_hash: "prev_cmd_hash_stake".to_string(),
+            last_vrf_output: "vrf_output_stake".to_string(),
+            user_command_count: 1,
+            internal_command_count: 0,
+            user_commands: vec![test_command],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 222_333_444,
+            coinbase_receiver: "B62qNoCoinbaseStake".to_string(),
+            coinbase_reward_nanomina: 0,
+            global_slot_since_genesis: 300,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 300,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: true, // normal arrangement
+            was_canonical: false,
+        };
+
+        // 7) Send
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send stake delegation user_command event");
+
+        // wait
+        sleep(Duration::from_millis(200)).await;
+
+        // 8) read sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(
+            transactions.len(),
+            1,
+            "Expected 1 DoubleEntryTransaction for canonical stake delegation user command"
+        );
+
+        // 9) parse
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+        assert_eq!(record.height, 700);
+        assert_eq!(record.state_hash, "hash_cmd_stake_delegation");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // Because stake delegation => no sender->receiver pair, but we still do fee
+        // => 1 pair => 1 LHS, 1 RHS
+        assert_eq!(
+            record.lhs.len(),
+            2,
+            "Should have exactly 1 debit entry (fee payer -> reward pool) for stake delegation (+ FTVC)"
+        );
+        assert_eq!(
+            record.rhs.len(),
+            2,
+            "Should have exactly 1 credit entry (fee payer -> reward pool) for stake delegation (+ FTVC)"
+        );
+
+        let lhs_fee = &record.lhs[0];
+        let rhs_fee = &record.rhs[0];
+
+        assert_eq!(lhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(lhs_fee.entry_type, AccountingEntryType::Debit);
+        assert_eq!(lhs_fee.account, "B62qFeePayerStake");
+        assert_eq!(lhs_fee.amount_nanomina, 50_000_000_000);
+
+        assert_eq!(rhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(rhs_fee.entry_type, AccountingEntryType::Credit);
+        assert_eq!(rhs_fee.account, "BlockRewardPool#hash_cmd_stake_delegation");
+        assert_eq!(rhs_fee.amount_nanomina, 50_000_000_000);
+
+        // 10) shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
 }
