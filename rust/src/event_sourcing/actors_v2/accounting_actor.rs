@@ -1036,4 +1036,208 @@ mod accounting_actor_tests_v2 {
         // 10) Shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
+
+    #[tokio::test]
+    async fn test_canonical_coinbase_only() {
+        // 1) Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Create the sink node, add to DAG, link from AccountingActor
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) Wrap + spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) Build a MainnetBlockPayload that has only coinbase reward (nonzero), and canonical=true, was_canonical=false
+        let test_block = MainnetBlockPayload {
+            height: 1001,
+            state_hash: "hash_canonical_coinbase_only".to_string(),
+            previous_state_hash: "some_prev_hash".to_string(),
+            last_vrf_output: "vrf_output_here".to_string(),
+            user_command_count: 0,
+            internal_command_count: 0,
+            user_commands: vec![],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 123456,
+            coinbase_receiver: "B62qCoinbaseReceiverOnly".to_string(),
+            coinbase_reward_nanomina: 99_000_000_000, // e.g. 99 Mina as reward
+            global_slot_since_genesis: 1001,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 1001,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: true, // canonical
+            was_canonical: false,
+        };
+
+        // 7) Send the event
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send canonical coinbase-only event");
+
+        // Wait a bit
+        sleep(Duration::from_millis(200)).await;
+
+        // 8) Read from the sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for canonical coinbase-only");
+
+        // 9) Parse the DoubleEntryRecordPayload and verify
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+
+        assert_eq!(record.height, 1001);
+        assert_eq!(record.state_hash, "hash_canonical_coinbase_only");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // With only coinbase, we expect 1 LHS + 1 RHS for a canonical scenario
+        assert_eq!(record.lhs.len(), 1, "Expected exactly 1 debit from coinbase");
+        assert_eq!(record.rhs.len(), 1, "Expected exactly 1 credit for coinbase");
+
+        let lhs_0 = &record.lhs[0];
+        let rhs_0 = &record.rhs[0];
+
+        // Canonical coinbase => LHS: Debit from MinaCoinbasePayment#[state_hash],
+        //                      RHS: Credit coinbase receiver
+        assert_eq!(lhs_0.transfer_type, "Coinbase");
+        assert_eq!(lhs_0.entry_type, AccountingEntryType::Debit);
+        assert_eq!(lhs_0.account, "MinaCoinbasePayment#hash_canonical_coinbase_only");
+        assert_eq!(lhs_0.amount_nanomina, 99_000_000_000);
+
+        assert_eq!(rhs_0.transfer_type, "Coinbase");
+        assert_eq!(rhs_0.entry_type, AccountingEntryType::Credit);
+        assert_eq!(rhs_0.account, "B62qCoinbaseReceiverOnly");
+        assert_eq!(rhs_0.amount_nanomina, 99_000_000_000);
+
+        // 10) Shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_non_canonical_coinbase_only() {
+        // 1) Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Create the sink node, add to DAG, link from AccountingActor
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) Wrap + spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) Build a MainnetBlockPayload that has only coinbase reward, but canonical=false, was_canonical=true => reversed coinbase
+        let test_block = MainnetBlockPayload {
+            height: 2222,
+            state_hash: "hash_non_canonical_coinbase_only".to_string(),
+            previous_state_hash: "some_prev_hash2".to_string(),
+            last_vrf_output: "vrf_output_other".to_string(),
+            user_command_count: 0,
+            internal_command_count: 0,
+            user_commands: vec![],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 987654,
+            coinbase_receiver: "B62qNonCanonCoinbaseReceiver".to_string(),
+            coinbase_reward_nanomina: 88_000_000_000, // e.g. 88 Mina
+            global_slot_since_genesis: 2222,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 2222,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: false,    // reversed
+            was_canonical: true, // previously canonical
+        };
+
+        // 7) Send the event
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send non-canonical coinbase-only event");
+
+        // Wait a bit
+        sleep(Duration::from_millis(200)).await;
+
+        // 8) Read from the sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(
+            transactions.len(),
+            1,
+            "Expected exactly 1 DoubleEntryTransaction for non-canonical coinbase-only"
+        );
+
+        // 9) Parse & verify
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+
+        assert_eq!(record.height, 2222);
+        assert_eq!(record.state_hash, "hash_non_canonical_coinbase_only");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // Non-canonical => 1 LHS + 1 RHS, reversed
+        assert_eq!(record.lhs.len(), 1, "Expected exactly 1 reversed debit/credit in LHS");
+        assert_eq!(record.rhs.len(), 1, "Expected exactly 1 reversed debit/credit in RHS");
+
+        let lhs_0 = &record.lhs[0];
+        let rhs_0 = &record.rhs[0];
+
+        // In canonical, coinbase => LHS: Debit "MinaCoinbasePayment#...", RHS: Credit coinbaseReceiver
+        // Now reversed => LHS is a credit entry for "MinaCoinbasePayment#...", RHS is a debit to coinbaseReceiver
+        assert_eq!(lhs_0.transfer_type, "Coinbase");
+        assert_eq!(lhs_0.entry_type, AccountingEntryType::Credit);
+        assert_eq!(lhs_0.account, "MinaCoinbasePayment#hash_non_canonical_coinbase_only");
+        assert_eq!(lhs_0.amount_nanomina, 88_000_000_000);
+
+        assert_eq!(rhs_0.transfer_type, "Coinbase");
+        assert_eq!(rhs_0.entry_type, AccountingEntryType::Debit);
+        assert_eq!(rhs_0.account, "B62qNonCanonCoinbaseReceiver");
+        assert_eq!(rhs_0.amount_nanomina, 88_000_000_000);
+
+        // 10) Shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
 }
