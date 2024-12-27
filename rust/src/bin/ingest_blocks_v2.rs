@@ -29,13 +29,37 @@ async fn main() {
     let mut entries = get_block_entries(&blocks_dir).await.unwrap();
     sort_entries(&mut entries);
 
-    // 6) We'll spawn the actual processing in a task
-    let process_handle = tokio::spawn({
-        let sender_clone = sender.clone();
-        async move {
-            for file in entries {
-                // If the actor DAG fails to accept the event, log and continue
-                if let Err(err) = sender_clone
+    // 6) Convert entries into an iterator, so we can pick them one-by-one
+    let mut entries_iter = entries.into_iter();
+
+    // 7) Prepare ctrl-c future. We'll pin it so we can poll it repeatedly.
+    let mut ctrl_c_fut = Box::pin(tokio::signal::ctrl_c());
+
+    // 8) For each file, we `tokio::select!` between:
+    //    - sending the file event
+    //    - or receiving SIGINT
+    loop {
+        // Move to the next file or break if none left
+        let file = match entries_iter.next() {
+            Some(f) => f,
+            None => {
+                info!("Done processing all block entries.");
+                break;
+            }
+        };
+
+        tokio::select! {
+            // If SIGINT arrives first, we break out.
+            _ = &mut ctrl_c_fut => {
+                error!("Received Ctrl-C. Stopping block iteration early.");
+                break;
+            }
+
+            // Otherwise, we proceed to send the file event.
+            // The `default` branch means "no other future to poll" is ready,
+            // so continue to send the file.
+            _ = async {
+                if let Err(err) = sender
                     .send(Event {
                         event_type: EventType::PrecomputedBlockPath,
                         payload: file.to_str().unwrap().to_string(),
@@ -44,30 +68,15 @@ async fn main() {
                 {
                     error!("Failed to send file {}: {}", file.display(), err);
                 }
+            } => {
+                // do nothing here, just loop again
             }
-            info!("Done processing all block entries.");
-        }
-    });
-
-    // 8) Race them using select!
-    tokio::select! {
-        // If the block-processing finishes first, great!
-        _ = process_handle => {
-            info!("All blocks processed without interruption.");
-        }
-
-        // If SIGINT arrives first, we log and break
-        _ = Box::pin(tokio::signal::ctrl_c()) => {
-            error!("Received Ctrl-C. Stopping block iteration early.");
-            // (The for-loop ends because 'process_handle' is still running,
-            // but we won't kill it forcibly. We do rely on the lines below
-            // to let the DAG flush.)
         }
     }
 
     // 9) Give the DAG time to flush any in-flight operations
     info!("Giving some time for the DAG to flush...");
-    tokio::time::sleep(Duration::from_secs(3)).await;
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     info!("Shutting down gracefully. Goodbye!");
 }
