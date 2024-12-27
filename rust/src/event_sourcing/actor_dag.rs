@@ -64,7 +64,6 @@ impl ActorNode {
 pub struct ActorNodeBuilder {
     id: ActorID,
     event_processor: Option<EP<ActorStore>>,
-    children: Vec<ActorNode>,
     initial_state: Option<ActorStore>,
 }
 
@@ -74,7 +73,6 @@ impl ActorNodeBuilder {
         Self {
             id,
             event_processor: None,
-            children: Vec::new(),
             initial_state: None,
         }
     }
@@ -272,5 +270,280 @@ mod actor_dag_tests_v2 {
 
         // Wait a bit to ensure the tasks shut down cleanly
         assert_eq!(state.lock().await.remove::<u64>("i").unwrap(), 1u64);
+    }
+
+    #[tokio::test]
+    async fn test_mutate_and_inspect_state() {
+        // Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // Create the DAG
+        let mut dag = ActorDAG::new();
+
+        // Create and configure the root node
+        let root_node_id = "RootNodeActor".to_string();
+        let mut store = ActorStore::new();
+        store.insert("count", 0u64);
+
+        let root_node = ActorNodeBuilder::new(root_node_id.clone())
+            .with_state(store)
+            .with_processor(|_event, state, _requeue| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    let count: u64 = state.remove("count").unwrap();
+                    state.insert("count", count + 1);
+                    None
+                })
+            })
+            .build();
+
+        // Set the root node and obtain the sender
+        let root_sender = dag.set_root(root_node);
+
+        // Wrap the ActorDAG in an Arc<Mutex<>> to allow mutable access
+        let dag = Arc::new(Mutex::new(dag));
+
+        // Spawn the DAG after all setup is complete
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // Send events to the root node
+        root_sender
+            .send(Event {
+                event_type: EventType::GenesisBlock,
+                payload: "Event 1".to_string(),
+            })
+            .await
+            .expect("Message should send");
+        root_sender
+            .send(Event {
+                event_type: EventType::GenesisBlock,
+                payload: "Event 2".to_string(),
+            })
+            .await
+            .expect("Message should send");
+
+        // Allow processing time
+        sleep(Duration::from_millis(100)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+
+        // Verify state has been updated
+        let dag = dag.lock().await;
+        let node = dag.read_node(root_node_id).unwrap();
+        let state = node.lock().await.get_state();
+
+        assert_eq!(state.lock().await.get::<u64>("count"), Some(&2));
+    }
+
+    #[tokio::test]
+    async fn test_event_propagation_between_nodes() {
+        // Create the shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // Create the DAG
+        let mut dag = ActorDAG::new();
+
+        // Create the root node
+        let root_node_id = "RootNodeActor".to_string();
+        let root_node = ActorNodeBuilder::new(root_node_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    debug!("Root processing: {}", event.payload);
+                    let mut state = state.lock().await;
+                    state.insert("last_event", event.payload.clone());
+                    Some(vec![Event {
+                        event_type: EventType::NewBlock,
+                        payload: "Propagated Event".to_string(),
+                    }])
+                })
+            })
+            .build();
+
+        // Create the child node
+        let child_node_id = "ChildNodeActor".to_string();
+        let child_node = ActorNodeBuilder::new(child_node_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    debug!("Child processing: {}", event.payload);
+                    let mut state = state.lock().await;
+                    state.insert("received_event", event.payload.clone());
+                    None
+                })
+            })
+            .build();
+
+        // Add nodes to the DAG
+        let root_sender = dag.set_root(root_node);
+        dag.add_node(child_node);
+
+        // Link the root node to the child node
+        dag.link_parent(&root_node_id, &child_node_id);
+
+        // Wrap the ActorDAG in an Arc<Mutex<>> to allow mutable access
+        let dag = Arc::new(Mutex::new(dag));
+
+        // Spawn the DAG after all setup is complete
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        root_sender
+            .send(Event {
+                event_type: EventType::GenesisBlock,
+                payload: "Root Event".to_string(),
+            })
+            .await
+            .expect("Message should send");
+
+        // Allow processing time
+        sleep(Duration::from_millis(100)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+
+        // Verify the child node received the propagated event
+        let dag = dag.lock().await;
+        let node = dag.read_node(child_node_id).unwrap();
+        let child_state = node.lock().await.get_state();
+
+        assert_eq!(child_state.lock().await.get::<String>("received_event"), Some(&"Propagated Event".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_multi_parent_with_common_ancestor() {
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        let mut dag = ActorDAG::new();
+
+        // Node IDs
+        let common_parent_id = "CommonParent".to_string();
+        let parent1_id = "Parent1".to_string();
+        let parent2_id = "Parent2".to_string();
+        let grandchild_id = "GrandChild".to_string();
+
+        // Create Common Parent node
+        let common_parent_node = ActorNodeBuilder::new(common_parent_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|_event, _state, _requeue| {
+                Box::pin(async {
+                    Some(vec![Event {
+                        event_type: EventType::NewBlock,
+                        payload: "From CommonParent".to_string(),
+                    }])
+                })
+            })
+            .build();
+
+        // Create Parent1 node
+        let parent1_node = ActorNodeBuilder::new(parent1_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    state.insert("last_event_parent1", event.payload.clone());
+                    Some(vec![Event {
+                        event_type: EventType::NewBlock,
+                        payload: "From Parent1".to_string(),
+                    }])
+                })
+            })
+            .build();
+
+        // Create Parent2 node
+        let parent2_node = ActorNodeBuilder::new(parent2_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    state.insert("last_event_parent2", event.payload.clone());
+                    Some(vec![Event {
+                        event_type: EventType::NewBlock,
+                        payload: "From Parent2".to_string(),
+                    }])
+                })
+            })
+            .build();
+
+        // Create Grandchild node
+        let grandchild_node = ActorNodeBuilder::new(grandchild_id.clone())
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    let mut state = state.lock().await;
+                    let events_received: u64 = state.get("events_received").cloned().unwrap_or(0);
+                    state.insert("events_received", events_received + 1);
+                    state.insert("last_event_grandchild", event.payload.clone());
+                    None
+                })
+            })
+            .build();
+
+        // Add nodes to the DAG
+        let sender = dag.set_root(common_parent_node);
+        dag.add_node(parent1_node);
+        dag.add_node(parent2_node);
+        dag.add_node(grandchild_node);
+
+        // Link CommonParent to Parent1 and Parent2
+        dag.link_parent(&common_parent_id, &parent1_id);
+        dag.link_parent(&common_parent_id, &parent2_id);
+
+        // Link Parent1 and Parent2 to Grandchild
+        dag.link_parent(&parent1_id, &grandchild_id);
+        dag.link_parent(&parent2_id, &grandchild_id);
+
+        // Wrap the DAG in Arc<Mutex<>> for shared access
+        let dag = Arc::new(Mutex::new(dag));
+
+        // Spawn the DAG
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // Send an event to the CommonParent
+        sender
+            .send(Event {
+                event_type: EventType::GenesisBlock,
+                payload: "Root Event".to_string(),
+            })
+            .await
+            .expect("Message should send");
+
+        // Allow processing time
+        sleep(Duration::from_millis(100)).await;
+
+        // Trigger shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+
+        // Verify the state of the GrandChild
+        let dag = dag.lock().await;
+        let node = dag.read_node(grandchild_id.clone()).unwrap();
+        let state = node.lock().await.get_state();
+        let state = state.lock().await;
+
+        assert_eq!(
+            state.get::<u64>("events_received"),
+            Some(&2),
+            "Grandchild should receive one event from each parent"
+        );
+        assert_eq!(
+            state.get::<String>("last_event_grandchild"),
+            Some(&"From Parent2".to_string()),
+            "Last event should be from Parent2"
+        );
     }
 }
