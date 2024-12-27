@@ -1,6 +1,6 @@
 use super::{
-    actor_dag::{ActorFactory, ActorNode},
-    events::{Event, EventType},
+    actor_dag::{ActorDAG, ActorFactory},
+    events::Event,
 };
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
@@ -10,8 +10,7 @@ use canonical_mainnet_block_actor::CanonicalMainnetBlockActor;
 use mainnet_block_actor::MainnetBlockParserActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
-use std::sync::Arc;
-use tokio::sync::{mpsc::Sender, watch::Receiver, Mutex};
+use tokio::sync::watch;
 
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
@@ -22,40 +21,83 @@ pub(crate) mod mainnet_block_actor;
 pub(crate) mod new_block_actor;
 pub(crate) mod pcb_file_path_actor;
 
-pub fn spawn_actor_dag(shutdown_rx: &Receiver<bool>) -> Sender<Event> {
-    // Setup root
-    let mut root = PcbFilePathActor::create_actor(shutdown_rx.clone());
-    let root_sender = root.get_sender().unwrap();
+/// Spawns a DAG of interlinked actors and returns the `Sender<Event>` for the root actor (`PcbFilePathActor`).
+pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc::Sender<Event> {
+    // 1. Create a new DAG.
+    let mut dag = ActorDAG::new();
 
-    let mut mainnet_block = MainnetBlockParserActor::create_actor(shutdown_rx.clone());
-    let mut berkeley_block = BerkeleyBlockActor::create_actor(shutdown_rx.clone());
+    // 2. Create each actor node and capture IDs before adding them to the DAG.
+    let pcb_node = PcbFilePathActor::create_actor();
+    let pcb_id = pcb_node.id(); // Root node ID
 
-    let mut block_ancestor = BlockAncestorActor::create_actor(shutdown_rx.clone());
-    block_ancestor.add_parent(EventType::BerkeleyBlock, &mut berkeley_block);
-    block_ancestor.add_parent(EventType::MainnetBlock, &mut mainnet_block);
+    let mainnet_block_node = MainnetBlockParserActor::create_actor();
+    let mainnet_block_id = mainnet_block_node.id();
 
-    root.add_child(mainnet_block);
-    root.add_child(berkeley_block);
+    let berkeley_block_node = BerkeleyBlockActor::create_actor();
+    let berkeley_block_id = berkeley_block_node.id();
 
-    let mut new_block = NewBlockActor::create_actor(shutdown_rx.clone());
-    let mut block_canonicity = BlockCanonicityActor::create_actor(shutdown_rx.clone());
-    let canonical_mainnet_block = CanonicalMainnetBlockActor::create_actor(shutdown_rx.clone());
-    let canonical_berkeley_block = CanonicalBerkeleyBlockActor::create_actor(shutdown_rx.clone());
-    block_canonicity.add_child(canonical_mainnet_block);
-    block_canonicity.add_child(canonical_berkeley_block);
-    new_block.add_child(block_canonicity);
-    block_ancestor.add_child(new_block);
+    let block_ancestor_node = BlockAncestorActor::create_actor();
+    let block_ancestor_id = block_ancestor_node.id();
 
-    // actors with multiple parents require individual spawning of DAG
-    tokio::spawn(async move {
-        let block_ancestor = Arc::new(Mutex::new(block_ancestor));
-        ActorNode::spawn_all(block_ancestor).await;
+    let new_block_node = NewBlockActor::create_actor();
+    let new_block_id = new_block_node.id();
+
+    let block_canonicity_node = BlockCanonicityActor::create_actor();
+    let block_canonicity_id = block_canonicity_node.id();
+
+    let canonical_mainnet_block_node = CanonicalMainnetBlockActor::create_actor();
+    let canonical_mainnet_block_id = canonical_mainnet_block_node.id();
+
+    let canonical_berkeley_block_node = CanonicalBerkeleyBlockActor::create_actor();
+    let canonical_berkeley_block_id = canonical_berkeley_block_node.id();
+
+    // 3. Set the root node, returning a Sender<Event> for external events
+    let pcb_sender = dag.set_root(pcb_node);
+
+    // 4. Add the other nodes (non-root) to the DAG
+    dag.add_node(mainnet_block_node);
+    dag.add_node(berkeley_block_node);
+    dag.add_node(block_ancestor_node);
+    dag.add_node(new_block_node);
+    dag.add_node(block_canonicity_node);
+    dag.add_node(canonical_mainnet_block_node);
+    dag.add_node(canonical_berkeley_block_node);
+
+    // 5. Link parents/children using captured IDs pcb_node => mainnet_block_node
+    dag.link_parent(&pcb_id, &mainnet_block_id);
+    //    pcb_node => berkeley_block_node
+    dag.link_parent(&pcb_id, &berkeley_block_id);
+
+    //    mainnet_block_node => block_ancestor_node
+    dag.link_parent(&mainnet_block_id, &block_ancestor_id);
+    //    berkeley_block_node => block_ancestor_node
+    dag.link_parent(&berkeley_block_id, &block_ancestor_id);
+
+    // //    block_ancestor_node => new_block_node
+    dag.link_parent(&block_ancestor_id, &new_block_id);
+
+    // //    new_block_node => block_canonicity_node
+    dag.link_parent(&new_block_id, &block_canonicity_id);
+
+    //    block_canonicity_node => canonical_mainnet_block_node
+    dag.link_parent(&block_canonicity_id, &canonical_mainnet_block_id);
+    //    mainnet_block_node => canonical_mainnet_block_node
+    dag.link_parent(&mainnet_block_id, &canonical_mainnet_block_id);
+
+    // //    block_canonicity_node => canonical_berkeley_block_node
+    dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
+    //    berkeley_block_node => canonical_mainnet_block_node
+    dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
+
+    // 6. Wrap the DAG in Arc<Mutex<>> and spawn the entire DAG in one go
+
+    tokio::spawn({
+        let mut dag = dag;
+        async move {
+            dag.spawn_all(shutdown_rx).await;
+        }
     });
 
-    tokio::spawn(async move {
-        let root = Arc::new(Mutex::new(root));
-        ActorNode::spawn_all(root).await;
-    });
-
-    root_sender
+    // 7. Return the root actor’s Sender<Event>.
+    pcb_sender
 }

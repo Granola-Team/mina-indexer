@@ -20,7 +20,9 @@ async fn main() {
         .map(PathBuf::from)
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
-    let sender = spawn_actor_dag(&shutdown_rx);
+    let sender = spawn_actor_dag(shutdown_rx);
+
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     let mut entries = get_block_entries(&blocks_dir).await.unwrap();
     sort_entries(&mut entries);

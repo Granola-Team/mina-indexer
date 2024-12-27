@@ -8,21 +8,21 @@ use crate::{
     },
 };
 use std::sync::Arc;
-use tokio::sync::{watch, Mutex};
+use tokio::sync::Mutex;
 
 pub struct CanonicalBerkeleyBlockActor;
 
 const CANONICAL_MANAGER_KEY: &str = "canonical_manager";
 
 impl ActorFactory for CanonicalBerkeleyBlockActor {
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
+    fn create_actor() -> ActorNode {
         let mut actor_store = ActorStore::new();
         actor_store.insert(
             CANONICAL_MANAGER_KEY,
             CanonicalItemsManager::<CanonicalBerkeleyBlockPayload>::new(TRANSITION_FRONTIER_DISTANCE as u64),
         );
 
-        ActorNodeBuilder::new(EventType::BlockCanonicityUpdate)
+        ActorNodeBuilder::new("CanonicalBerkeleyBlockActor".to_string())
             .with_state(actor_store)
             .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
@@ -103,46 +103,113 @@ impl ActorFactory for CanonicalBerkeleyBlockActor {
                     }
                 })
             })
-            .build(shutdown_rx)
+            .build()
     }
 }
 
 #[cfg(test)]
 mod canonical_berkeley_block_actor_tests_v2 {
-    use super::*;
+    use super::CanonicalBerkeleyBlockActor;
     use crate::{
         constants::GENESIS_STATE_HASH,
         event_sourcing::{
-            actor_dag::{ActorFactory, ActorNode},
+            actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
             events::{Event, EventType},
             payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, CanonicalBerkeleyBlockPayload},
         },
     };
+    use sonic_rs;
     use std::sync::Arc;
-    use tokio::sync::{watch, Mutex};
+    use tokio::{
+        sync::{watch, Mutex},
+        time::{sleep, Duration, Instant},
+    };
+
+    // ----------------------------------------------------------------
+    // SINK NODE + HELPER FUNCTIONS
+    // ----------------------------------------------------------------
+
+    /// Creates a sink node to capture `CanonicalBerkeleyBlock` events in its internal store.
+    fn create_canonical_berkeley_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
+        let sink_node_id = id.to_string();
+        move || {
+            ActorNodeBuilder::new(sink_node_id)
+                .with_state(ActorStore::new())
+                .with_processor(|event, state, _requeue| {
+                    Box::pin(async move {
+                        if event.event_type == EventType::CanonicalBerkeleyBlock {
+                            let mut store = state.lock().await;
+                            let mut captured: Vec<String> = store.get("captured_blocks").cloned().unwrap_or_default();
+                            captured.push(event.payload.clone());
+                            store.insert("captured_blocks", captured);
+                        }
+                        None
+                    })
+                })
+                .build()
+        }
+    }
+
+    /// Reads all captured `CanonicalBerkeleyBlock` payloads (as JSON strings) from the sink node.
+    async fn read_captured_blocks(dag: &Arc<Mutex<ActorDAG>>, sink_node_id: &str) -> Vec<String> {
+        let dag_locked = dag.lock().await;
+        let sink_node_locked = dag_locked.read_node(sink_node_id.to_string()).expect("Sink node not found").lock().await;
+
+        let store = sink_node_locked.get_state();
+        let store_locked = store.lock().await;
+        store_locked.get::<Vec<String>>("captured_blocks").cloned().unwrap_or_default()
+    }
+
+    /// Polls the sink node up to `timeout` until it has at least one `CanonicalBerkeleyBlock`.
+    /// Returns the first captured block if found, otherwise `None`.
+    async fn poll_for_canonical_berkeley_block(dag: &Arc<Mutex<ActorDAG>>, sink_node_id: &str, timeout: Duration) -> Option<CanonicalBerkeleyBlockPayload> {
+        let start = Instant::now();
+        while start.elapsed() < timeout {
+            let blocks = read_captured_blocks(dag, sink_node_id).await;
+            if !blocks.is_empty() {
+                // parse the first block
+                return Some(sonic_rs::from_str(&blocks[0]).expect("Failed to parse CanonicalBerkeleyBlockPayload"));
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
+        None
+    }
+
+    // ----------------------------------------------------------------
+    // TESTS
+    // ----------------------------------------------------------------
 
     #[tokio::test]
     async fn test_block_canonicity_update_first() {
-        // Create the shutdown signal
+        // 1. Create a shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        // Create the CanonicalBerkeleyBlockActor
-        let mut actor = CanonicalBerkeleyBlockActor::create_actor(shutdown_rx);
+        // 2. Build an ActorDAG
+        let mut dag = ActorDAG::new();
 
-        // Add a receiver for capturing CanonicalBerkeleyBlock events
-        let mut receiver = actor.add_receiver(EventType::CanonicalBerkeleyBlock);
+        // 3. Create the root actor (CanonicalBerkeleyBlockActor) using ActorFactory
+        let actor_node = CanonicalBerkeleyBlockActor::create_actor();
+        let actor_id = actor_node.id();
 
-        // Wrap the actor in an Arc<Mutex> for shared ownership
-        let actor = Arc::new(Mutex::new(actor));
+        // 4. Set it as root; get a Sender<Event>
+        let actor_sender = dag.set_root(actor_node);
 
-        // Spawn the actor
+        // 5. Create the sink node for capturing `CanonicalBerkeleyBlock` events
+        let sink_node_id = &"BerkeleySinkCanonicityFirst".to_string();
+        let sink_node = create_canonical_berkeley_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 6. Wrap the DAG in Arc<Mutex<>> so we can spawn it
+        let dag = Arc::new(Mutex::new(dag));
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let dag = Arc::clone(&dag);
             async move {
-                ActorNode::spawn_all(actor_clone).await;
+                dag.lock().await.spawn_all(shutdown_rx).await;
             }
         });
 
+        // 7. Create test data
         let block_payload = BerkeleyBlockPayload {
             height: 100,
             state_hash: "state_hash_100".to_string(),
@@ -169,33 +236,22 @@ mod canonical_berkeley_block_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // Send BlockCanonicityUpdate first
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 8. Send the canonicity update first
+        actor_sender
             .send(Event {
                 event_type: EventType::BlockCanonicityUpdate,
                 payload: sonic_rs::to_string(&canonicity_update).unwrap(),
             })
             .await
             .expect("Failed to send BlockCanonicityUpdate event");
+        sleep(Duration::from_millis(100)).await;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Confirm no canonical block is produced yet
+        let blocks = read_captured_blocks(&dag, sink_node_id).await;
+        assert!(blocks.is_empty(), "Unexpected CanonicalBerkeleyBlock event before BerkeleyBlock");
 
-        // Confirm no event is emitted yet
-        assert!(
-            tokio::time::timeout(tokio::time::Duration::from_millis(100), receiver.recv()).await.is_err(),
-            "Unexpected event emitted before BerkeleyBlock"
-        );
-
-        // Send BerkeleyBlock
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 9. Send the BerkeleyBlock
+        actor_sender
             .send(Event {
                 event_type: EventType::BerkeleyBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
@@ -203,46 +259,50 @@ mod canonical_berkeley_block_actor_tests_v2 {
             .await
             .expect("Failed to send BerkeleyBlock event");
 
-        // Confirm the event is emitted now
-        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver.recv()).await {
-            assert_eq!(received_event.event_type, EventType::CanonicalBerkeleyBlock);
-
-            // Deserialize the payload and verify it matches expectations
-            let payload: CanonicalBerkeleyBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-            assert_eq!(payload.block.height, block_payload.height);
-            assert_eq!(payload.block.state_hash, block_payload.state_hash);
-            assert!(payload.canonical);
-            assert!(!payload.was_canonical);
+        // 10. Wait up to 2s for the canonical block to appear
+        let canonical_block = poll_for_canonical_berkeley_block(&dag, sink_node_id, Duration::from_secs(2)).await;
+        if let Some(cblock) = canonical_block {
+            assert_eq!(cblock.block.height, block_payload.height);
+            assert_eq!(cblock.block.state_hash, block_payload.state_hash);
+            assert!(cblock.canonical);
+            assert!(!cblock.was_canonical);
         } else {
-            panic!("Expected CanonicalBerkeleyBlock event not received.");
+            panic!("Expected CanonicalBerkeleyBlock event not received within 2s timeout.");
         }
 
-        // Signal shutdown
+        // 11. Shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
     #[tokio::test]
     async fn test_berkeley_block_first() {
-        // Create the shutdown signal
+        // 1. Shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        // Create the CanonicalBerkeleyBlockActor
-        let mut actor = CanonicalBerkeleyBlockActor::create_actor(shutdown_rx);
+        // 2. Build an ActorDAG
+        let mut dag = ActorDAG::new();
 
-        // Add a receiver for capturing CanonicalBerkeleyBlock events
-        let mut receiver = actor.add_receiver(EventType::CanonicalBerkeleyBlock);
+        // 3. Create the root actor
+        let actor_node = CanonicalBerkeleyBlockActor::create_actor();
+        let actor_id = actor_node.id();
+        let actor_sender = dag.set_root(actor_node);
 
-        // Wrap the actor in an Arc<Mutex> for shared ownership
-        let actor = Arc::new(Mutex::new(actor));
+        // 4. Create the sink node for capturing CanonicalBerkeleyBlock
+        let sink_node_id = &"BerkeleySinkBlockFirst".to_string();
+        let sink_node = create_canonical_berkeley_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
 
-        // Spawn the actor
+        // 5. Spawn the DAG
+        let dag = Arc::new(Mutex::new(dag));
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let dag = Arc::clone(&dag);
             async move {
-                ActorNode::spawn_all(actor_clone).await;
+                dag.lock().await.spawn_all(shutdown_rx).await;
             }
         });
 
+        // 6. Data
         let block_payload = BerkeleyBlockPayload {
             height: 100,
             state_hash: "state_hash_100".to_string(),
@@ -269,33 +329,22 @@ mod canonical_berkeley_block_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // Send BerkeleyBlock first
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 7. Send the BerkeleyBlock first
+        actor_sender
             .send(Event {
                 event_type: EventType::BerkeleyBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
             })
             .await
             .expect("Failed to send BerkeleyBlock event");
+        sleep(Duration::from_millis(100)).await;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Confirm no canonical block is emitted yet
+        let blocks = read_captured_blocks(&dag, sink_node_id).await;
+        assert!(blocks.is_empty(), "Unexpected CanonicalBerkeleyBlock event before canonicity update");
 
-        // Confirm no event is emitted yet
-        assert!(
-            tokio::time::timeout(tokio::time::Duration::from_millis(100), receiver.recv()).await.is_err(),
-            "Unexpected event emitted before BlockCanonicityUpdate"
-        );
-
-        // Send BlockCanonicityUpdate
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 8. Then send the canonicity update
+        actor_sender
             .send(Event {
                 event_type: EventType::BlockCanonicityUpdate,
                 payload: sonic_rs::to_string(&canonicity_update).unwrap(),
@@ -303,21 +352,18 @@ mod canonical_berkeley_block_actor_tests_v2 {
             .await
             .expect("Failed to send BlockCanonicityUpdate event");
 
-        // Confirm the event is emitted now
-        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver.recv()).await {
-            assert_eq!(received_event.event_type, EventType::CanonicalBerkeleyBlock);
-
-            // Deserialize the payload and verify it matches expectations
-            let payload: CanonicalBerkeleyBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
-            assert_eq!(payload.block.height, block_payload.height);
-            assert_eq!(payload.block.state_hash, block_payload.state_hash);
-            assert!(payload.canonical);
-            assert!(!payload.was_canonical);
+        // Wait for the canonical block to appear
+        let canonical_block = poll_for_canonical_berkeley_block(&dag, sink_node_id, Duration::from_secs(2)).await;
+        if let Some(cblock) = canonical_block {
+            assert_eq!(cblock.block.height, block_payload.height);
+            assert_eq!(cblock.block.state_hash, block_payload.state_hash);
+            assert!(cblock.canonical);
+            assert!(!cblock.was_canonical);
         } else {
-            panic!("Expected CanonicalBerkeleyBlock event not received.");
+            panic!("Expected CanonicalBerkeleyBlock event not received within 2s timeout.");
         }
 
-        // Signal shutdown
+        // 9. Shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 }

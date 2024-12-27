@@ -111,6 +111,12 @@ pub struct ActorDAG {
     nodes: HashMap<ActorID, Arc<Mutex<ActorNode>>>,
 }
 
+impl Default for ActorDAG {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActorDAG {
     pub fn new() -> Self {
         Self {
@@ -126,7 +132,7 @@ impl ActorDAG {
 
     pub fn set_root(&mut self, node: ActorNode) -> Sender<Event> {
         let (tx, rx) = mpsc::channel(1);
-        self.parent_edges.entry(node.id().to_string()).or_insert_with(Vec::new).push((tx.clone(), rx));
+        self.parent_edges.entry(node.id().to_string()).or_default().push((tx.clone(), rx));
         self.add_node(node);
         tx
     }
@@ -137,8 +143,8 @@ impl ActorDAG {
 
     pub fn link_parent(&mut self, parent_id: &ActorID, child_id: &ActorID) {
         let (tx, rx) = mpsc::channel(1);
-        self.child_edges.entry(parent_id.to_string()).or_insert_with(Vec::new).push(tx.clone());
-        self.parent_edges.entry(child_id.to_string()).or_insert_with(Vec::new).push((tx, rx));
+        self.child_edges.entry(parent_id.to_string()).or_default().push(tx.clone());
+        self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
 
     pub async fn spawn_all(&mut self, shutdown_receiver: watch::Receiver<bool>) {
@@ -148,6 +154,10 @@ impl ActorDAG {
         // Spawn each node in turn
         for node_id in node_ids {
             self.spawn(&node_id, shutdown_receiver.clone()).await;
+        }
+
+        while *shutdown_receiver.borrow() {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
     }
 
@@ -200,7 +210,7 @@ impl ActorDAG {
 }
 
 pub trait ActorFactory {
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode;
+    fn create_actor() -> ActorNode;
 }
 
 #[cfg(test)]

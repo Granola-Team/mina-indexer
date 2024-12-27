@@ -8,21 +8,21 @@ use crate::{
     },
 };
 use std::sync::Arc;
-use tokio::sync::{watch, Mutex};
+use tokio::sync::Mutex;
 
 pub struct CanonicalMainnetBlockActor;
 
 const CANONICAL_MANAGER_KEY: &str = "canonical_manager";
 
 impl ActorFactory for CanonicalMainnetBlockActor {
-    fn create_actor(shutdown_rx: watch::Receiver<bool>) -> ActorNode {
+    fn create_actor() -> ActorNode {
         let mut actor_store = ActorStore::new();
         actor_store.insert(
             CANONICAL_MANAGER_KEY,
             CanonicalItemsManager::<CanonicalMainnetBlockPayload>::new(TRANSITION_FRONTIER_DISTANCE as u64),
         );
 
-        ActorNodeBuilder::new(EventType::BlockCanonicityUpdate)
+        ActorNodeBuilder::new("CanonicalMainnetBlockActor".to_string())
             .with_state(actor_store)
             .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
@@ -103,46 +103,114 @@ impl ActorFactory for CanonicalMainnetBlockActor {
                     }
                 })
             })
-            .build(shutdown_rx)
+            .build()
     }
 }
 
 #[cfg(test)]
 mod canonical_block_actor_tests_v2 {
-    use super::*;
+    use super::CanonicalMainnetBlockActor;
     use crate::{
         constants::GENESIS_STATE_HASH,
         event_sourcing::{
-            actor_dag::{ActorFactory, ActorNode},
+            actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
             events::{Event, EventType},
             payloads::{BlockCanonicityUpdatePayload, CanonicalMainnetBlockPayload, MainnetBlockPayload},
         },
     };
+    use sonic_rs;
     use std::sync::Arc;
-    use tokio::sync::{watch, Mutex};
+    use tokio::{
+        sync::{watch, Mutex},
+        time::{sleep, Duration, Instant},
+    };
+
+    // ----------------------------------------------------------------
+    // SINK NODE + HELPER FUNCTIONS
+    // ----------------------------------------------------------------
+
+    /// Creates a sink node that captures `CanonicalMainnetBlock` events in its state.
+    fn create_canonical_block_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
+        let sink_node_id = id.to_string();
+        move || {
+            ActorNodeBuilder::new(sink_node_id)
+                .with_state(ActorStore::new())
+                .with_processor(|event, state, _requeue| {
+                    Box::pin(async move {
+                        // Only capture CanonicalMainnetBlock events
+                        if event.event_type == EventType::CanonicalMainnetBlock {
+                            let mut locked_state = state.lock().await;
+                            let mut captured_blocks: Vec<String> = locked_state.get("captured_blocks").cloned().unwrap_or_default();
+                            captured_blocks.push(event.payload.clone());
+                            locked_state.insert("captured_blocks", captured_blocks);
+                        }
+                        None
+                    })
+                })
+                .build()
+        }
+    }
+
+    /// Reads all captured `CanonicalMainnetBlock` payloads from the sink node.
+    async fn read_canonical_blocks(dag: &Arc<Mutex<ActorDAG>>, sink_node_id: &str) -> Vec<String> {
+        let dag_locked = dag.lock().await;
+        let sink_node_locked = dag_locked.read_node(sink_node_id.to_string()).expect("Sink node not found").lock().await;
+        let store = sink_node_locked.get_state();
+        let store_locked = store.lock().await;
+
+        store_locked.get::<Vec<String>>("captured_blocks").cloned().unwrap_or_default()
+    }
+
+    /// Polls the sink node for `CanonicalMainnetBlock` events until one arrives or `deadline` elapses.
+    /// Returns `Some(CanonicalMainnetBlockPayload)` if found, otherwise `None`.
+    async fn poll_for_canonical_block(dag: &Arc<Mutex<ActorDAG>>, sink_node_id: &str, deadline: Duration) -> Option<CanonicalMainnetBlockPayload> {
+        let start = Instant::now();
+        while start.elapsed() < deadline {
+            let updates = read_canonical_blocks(dag, sink_node_id).await;
+            if !updates.is_empty() {
+                // For simplicity, let’s just parse the first captured update
+                return Some(sonic_rs::from_str(&updates[0]).expect("Failed to parse CanonicalMainnetBlockPayload"));
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
+        None
+    }
+
+    // ----------------------------------------------------------------
+    // TESTS
+    // ----------------------------------------------------------------
 
     #[tokio::test]
     async fn test_block_canonicity_update_first() {
-        // Create the shutdown signal
+        // 1. Create the shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        // Create the CanonicalBlockActor
-        let mut actor = CanonicalMainnetBlockActor::create_actor(shutdown_rx);
+        // 2. Create an ActorDAG
+        let mut dag = ActorDAG::new();
 
-        // Add a receiver for capturing CanonicalMainnetBlock events
-        let mut receiver = actor.add_receiver(EventType::CanonicalMainnetBlock);
+        // 3. Create the CanonicalMainnetBlockActor node (root)
+        let actor_node = CanonicalMainnetBlockActor::create_actor();
+        let actor_id = actor_node.id();
 
-        // Wrap the actor in an Arc<Mutex> for shared ownership
-        let actor = Arc::new(Mutex::new(actor));
+        // 4. Set as root, obtaining a `Sender<Event>` for sending events
+        let actor_sender = dag.set_root(actor_node);
 
-        // Spawn the actor
+        // 5. Create a sink node to capture `CanonicalMainnetBlock` events
+        let sink_node_id = &"CanonicalSinkTestUpdateFirst".to_string();
+        let sink_node = create_canonical_block_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 6. Wrap the DAG in Arc<Mutex<>> and spawn
+        let dag = Arc::new(Mutex::new(dag));
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let dag = Arc::clone(&dag);
             async move {
-                ActorNode::spawn_all(actor_clone).await;
+                dag.lock().await.spawn_all(shutdown_rx).await;
             }
         });
 
+        // 7. Prepare data
         let block_payload = MainnetBlockPayload {
             height: 100,
             state_hash: "state_hash_100".to_string(),
@@ -169,33 +237,22 @@ mod canonical_block_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // Send BlockCanonicityUpdate first
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 8. Send BlockCanonicityUpdate first
+        actor_sender
             .send(Event {
                 event_type: EventType::BlockCanonicityUpdate,
                 payload: sonic_rs::to_string(&canonicity_update).unwrap(),
             })
             .await
             .expect("Failed to send BlockCanonicityUpdate event");
+        sleep(Duration::from_millis(100)).await;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Confirm no `CanonicalMainnetBlock` event is emitted yet
+        let updates = read_canonical_blocks(&dag, sink_node_id).await;
+        assert!(updates.is_empty(), "Unexpected CanonicalMainnetBlock event emitted before MainnetBlock");
 
-        // Confirm no event is emitted yet
-        assert!(
-            tokio::time::timeout(tokio::time::Duration::from_millis(100), receiver.recv()).await.is_err(),
-            "Unexpected event emitted before MainnetBlock"
-        );
-
-        // Send MainnetBlock
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 9. Send the MainnetBlock
+        actor_sender
             .send(Event {
                 event_type: EventType::MainnetBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
@@ -203,46 +260,50 @@ mod canonical_block_actor_tests_v2 {
             .await
             .expect("Failed to send MainnetBlock event");
 
-        // Confirm the event is emitted now
-        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver.recv()).await {
-            assert_eq!(received_event.event_type, EventType::CanonicalMainnetBlock);
-
-            // Deserialize the payload and verify it matches expectations
-            let payload: CanonicalMainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        // 10. Wait (up to 2 seconds) for the `CanonicalMainnetBlock` event
+        let update = poll_for_canonical_block(&dag, sink_node_id, Duration::from_secs(2)).await;
+        if let Some(payload) = update {
             assert_eq!(payload.block.height, block_payload.height);
             assert_eq!(payload.block.state_hash, block_payload.state_hash);
             assert!(payload.canonical);
             assert!(!payload.was_canonical);
         } else {
-            panic!("Expected CanonicalMainnetBlock event not received.");
+            panic!("Expected CanonicalMainnetBlock event not received within 2s timeout.");
         }
 
-        // Signal shutdown
+        // 11. Shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
     #[tokio::test]
     async fn test_mainnet_block_first() {
-        // Create the shutdown signal
+        // 1. Create the shutdown signal
         let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-        // Create the CanonicalBlockActor
-        let mut actor = CanonicalMainnetBlockActor::create_actor(shutdown_rx);
+        // 2. Create an ActorDAG
+        let mut dag = ActorDAG::new();
 
-        // Add a receiver for capturing CanonicalMainnetBlock events
-        let mut receiver = actor.add_receiver(EventType::CanonicalMainnetBlock);
+        // 3. Create the CanonicalMainnetBlockActor node (root)
+        let actor_node = CanonicalMainnetBlockActor::create_actor();
+        let actor_id = actor_node.id();
+        let actor_sender = dag.set_root(actor_node);
 
-        // Wrap the actor in an Arc<Mutex> for shared ownership
-        let actor = Arc::new(Mutex::new(actor));
+        // 4. Create a sink node to capture `CanonicalMainnetBlock` events
+        let sink_node_id = &"CanonicalSinkTestMainnetFirst".to_string();
+        let sink_node = create_canonical_block_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
 
-        // Spawn the actor
+        // 5. Spawn the DAG
+        let dag = Arc::new(Mutex::new(dag));
         tokio::spawn({
-            let actor_clone = Arc::clone(&actor);
+            let dag = Arc::clone(&dag);
             async move {
-                ActorNode::spawn_all(actor_clone).await;
+                dag.lock().await.spawn_all(shutdown_rx).await;
             }
         });
 
+        // 6. Prepare data
         let block_payload = MainnetBlockPayload {
             height: 100,
             state_hash: "state_hash_100".to_string(),
@@ -269,55 +330,45 @@ mod canonical_block_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // Send MainnetBlock first
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 7. Send MainnetBlock first
+        actor_sender
             .send(Event {
                 event_type: EventType::MainnetBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
             })
             .await
             .expect("Failed to send MainnetBlock event");
+        sleep(Duration::from_millis(100)).await;
 
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-
-        // Confirm no event is emitted yet
+        // Confirm no event is emitted yet (no canonicity info)
+        let updates = read_canonical_blocks(&dag, sink_node_id).await;
         assert!(
-            tokio::time::timeout(tokio::time::Duration::from_millis(100), receiver.recv()).await.is_err(),
-            "Unexpected event emitted before BlockCanonicityUpdate"
+            updates.is_empty(),
+            "Unexpected CanonicalMainnetBlock event emitted before BlockCanonicityUpdate"
         );
 
-        // Send BlockCanonicityUpdate
-        actor
-            .lock()
-            .await
-            .get_sender()
-            .unwrap()
+        // 8. Send the canonicity update
+        actor_sender
             .send(Event {
                 event_type: EventType::BlockCanonicityUpdate,
                 payload: sonic_rs::to_string(&canonicity_update).unwrap(),
             })
             .await
             .expect("Failed to send BlockCanonicityUpdate event");
+        sleep(Duration::from_millis(100)).await;
 
-        // Confirm the event is emitted now
-        if let Ok(Some(received_event)) = tokio::time::timeout(tokio::time::Duration::from_secs(2), receiver.recv()).await {
-            assert_eq!(received_event.event_type, EventType::CanonicalMainnetBlock);
-
-            // Deserialize the payload and verify it matches expectations
-            let payload: CanonicalMainnetBlockPayload = sonic_rs::from_str(&received_event.payload).unwrap();
+        // 9. Expect the `CanonicalMainnetBlock` event now
+        let update = poll_for_canonical_block(&dag, sink_node_id, Duration::from_secs(2)).await;
+        if let Some(payload) = update {
             assert_eq!(payload.block.height, block_payload.height);
             assert_eq!(payload.block.state_hash, block_payload.state_hash);
             assert!(payload.canonical);
             assert!(!payload.was_canonical);
         } else {
-            panic!("Expected CanonicalMainnetBlock event not received.");
+            panic!("Expected CanonicalMainnetBlock event not received within 2s timeout.");
         }
 
-        // Signal shutdown
+        // 10. Shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 }
