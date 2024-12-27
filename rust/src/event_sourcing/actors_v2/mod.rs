@@ -2,6 +2,7 @@ use super::{
     actor_dag::{ActorDAG, ActorFactory},
     events::Event,
 };
+use accounting_actor::AccountingActor;
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
 use block_canonicity_actor::BlockCanonicityActor;
@@ -52,6 +53,9 @@ pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc:
     let canonical_berkeley_block_node = CanonicalBerkeleyBlockActor::create_actor();
     let canonical_berkeley_block_id = canonical_berkeley_block_node.id();
 
+    let accounting_node = AccountingActor::create_actor();
+    let accounting_node_id = accounting_node.id();
+
     let pcb_sender = dag.set_root(pcb_node);
 
     dag.add_node(mainnet_block_node);
@@ -77,6 +81,10 @@ pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc:
     dag.add_node(canonical_berkeley_block_node);
     dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
     dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
+
+    dag.add_node(accounting_node);
+    dag.link_parent(&canonical_mainnet_block_id, &accounting_node_id);
+    dag.link_parent(&canonical_berkeley_block_id, &accounting_node_id);
 
     tokio::spawn({
         let mut dag = dag;

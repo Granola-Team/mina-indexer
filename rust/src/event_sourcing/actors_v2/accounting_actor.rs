@@ -400,7 +400,7 @@ impl AccountingActor {
 
 impl ActorFactory for AccountingActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("BlockCanonicityActor".to_string())
+        ActorNodeBuilder::new("AccountingActor".to_string())
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -434,6 +434,7 @@ impl ActorFactory for AccountingActor {
                                 event_type: EventType::DoubleEntryTransaction,
                                 payload: sonic_rs::to_string(&record).unwrap(),
                             };
+
                             Some(vec![new_event])
                         }
 
