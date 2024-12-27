@@ -1,9 +1,12 @@
 use env_logger::Builder;
 use log::{error, info};
-use mina_indexer::event_sourcing::{
-    actors_v2::spawn_actor_dag,
-    events::{Event, EventType},
-    sourcing::{get_block_entries, sort_entries},
+use mina_indexer::{
+    event_sourcing::{
+        actors_v2::spawn_actor_dag,
+        events::{Event, EventType},
+        sourcing::{get_block_entries, sort_entries},
+    },
+    utility::extract_height_and_hash,
 };
 use std::{env, path::PathBuf, time::Duration};
 
@@ -67,6 +70,10 @@ async fn main() {
                     .await
                 {
                     error!("Failed to send file {}: {}", file.display(), err);
+                }
+                let (height, _) = extract_height_and_hash(&file);
+                if height % 1000 == 0 {
+                    info!("Processed up to height {height}");
                 }
             } => {
                 // do nothing here, just loop again
