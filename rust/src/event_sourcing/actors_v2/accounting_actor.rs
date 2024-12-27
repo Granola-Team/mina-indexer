@@ -473,7 +473,7 @@ mod accounting_actor_tests_v2 {
         event_sourcing::{
             actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
             events::{Event, EventType},
-            models::{FeeTransfer, FeeTransferViaCoinbase},
+            models::{CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
             payloads::{AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, LedgerDestination, MainnetBlockPayload},
         },
     };
@@ -1238,6 +1238,267 @@ mod accounting_actor_tests_v2 {
         assert_eq!(rhs_0.amount_nanomina, 88_000_000_000);
 
         // 10) Shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_canonical_user_command_payment() {
+        // 1) Create shutdown signal
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Create and link the sink node
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) Wrap + spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) Build a single user command (Applied Payment):
+        //    - sender pays 100_000_000_000 to receiver
+        //    - fee payer = sender, fee_nanomina = 2_000_000_000
+        //    - canonical = true => normal arrangement
+        let test_command = CommandSummary {
+            sender: "B62qSenderCmd".to_string(),
+            receiver: "B62qReceiverCmd".to_string(),
+            fee_payer: "B62qFeePayerCmd".to_string(),
+            amount_nanomina: 100_000_000_000,
+            fee_nanomina: 2_000_000_000,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
+            status: crate::event_sourcing::models::CommandStatus::Applied,
+            // other fields like nonce/memo omitted for brevity
+            ..Default::default()
+        };
+
+        let test_block = MainnetBlockPayload {
+            height: 500,
+            state_hash: "hash_cmd_payment_canonical".to_string(),
+            previous_state_hash: "prev_cmd_hash".to_string(),
+            last_vrf_output: "vrf_output_cmd".to_string(),
+            user_command_count: 1,
+            internal_command_count: 0,
+            user_commands: vec![test_command],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 111_222_333,
+            coinbase_receiver: "B62qNoCoinbase".to_string(),
+            coinbase_reward_nanomina: 0,
+            global_slot_since_genesis: 100,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 100,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: true, // canonical
+            was_canonical: false,
+        };
+
+        // 7) Send the event
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send canonical user_command event");
+
+        // Wait a bit
+        sleep(Duration::from_millis(200)).await;
+
+        // 8) Read from sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(transactions.len(), 1, "Expected 1 DoubleEntryTransaction for canonical user command");
+
+        // 9) Parse & check
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+        assert_eq!(record.height, 500);
+        assert_eq!(record.state_hash, "hash_cmd_payment_canonical");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // The partial logic for user commands says:
+        //   - If Applied + not StakeDelegation => we do sender->receiver
+        //   - We always do fee payer->block reward pool
+        // So we expect 2 pairs => 2 LHS, 2 RHS
+        assert_eq!(record.lhs.len(), 3, "Expected 2 debits: payment, fee (+ FTVC)");
+        assert_eq!(record.rhs.len(), 3, "Expected 2 credits: payment, fee (+ FTVC)");
+
+        // Payment pair:
+        //   LHS => Debit from sender
+        //   RHS => Credit to receiver
+        let lhs_payment = &record.lhs[0];
+        let rhs_payment = &record.rhs[0];
+
+        assert_eq!(lhs_payment.transfer_type, "Payment");
+        assert_eq!(lhs_payment.entry_type, AccountingEntryType::Debit);
+        assert_eq!(lhs_payment.account, "B62qSenderCmd");
+        assert_eq!(lhs_payment.amount_nanomina, 100_000_000_000);
+
+        assert_eq!(rhs_payment.transfer_type, "Payment");
+        assert_eq!(rhs_payment.entry_type, AccountingEntryType::Credit);
+        assert_eq!(rhs_payment.account, "B62qReceiverCmd");
+        assert_eq!(rhs_payment.amount_nanomina, 100_000_000_000);
+
+        // Fee pair:
+        //   LHS => Debit from fee_payer
+        //   RHS => Credit to BlockRewardPool#[state_hash]
+        let lhs_fee = &record.lhs[1];
+        let rhs_fee = &record.rhs[1];
+
+        assert_eq!(lhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(lhs_fee.entry_type, AccountingEntryType::Debit);
+        assert_eq!(lhs_fee.account, "B62qFeePayerCmd");
+        assert_eq!(lhs_fee.amount_nanomina, 2_000_000_000);
+
+        assert_eq!(rhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(rhs_fee.entry_type, AccountingEntryType::Credit);
+        assert_eq!(rhs_fee.account, "BlockRewardPool#hash_cmd_payment_canonical");
+        assert_eq!(rhs_fee.amount_nanomina, 2_000_000_000);
+
+        // 10) Shutdown
+        shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_non_canonical_user_command_payment() {
+        // 1) Create shutdown
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+        // 2) DAG
+        let mut dag = ActorDAG::new();
+
+        // 3) Root
+        let accounting_actor = AccountingActor::create_actor();
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 4) Sink
+        let sink_node_id = &"DoubleEntrySink".to_string();
+        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, sink_node_id);
+
+        // 5) spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all(shutdown_rx).await;
+            }
+        });
+
+        // 6) Non-canonical scenario => canonical=false, was_canonical=true 1 user command => Payment, status=Applied => reversed
+        let test_command = CommandSummary {
+            sender: "B62qSenderCmd".to_string(),
+            receiver: "B62qReceiverCmd".to_string(),
+            fee_payer: "B62qFeePayerCmd".to_string(),
+            amount_nanomina: 77_000_000_000,
+            fee_nanomina: 3_000_000_000,
+            txn_type: crate::event_sourcing::models::CommandType::Payment,
+            status: crate::event_sourcing::models::CommandStatus::Applied,
+            ..Default::default()
+        };
+
+        let test_block = MainnetBlockPayload {
+            height: 501,
+            state_hash: "hash_cmd_payment_noncan".to_string(),
+            previous_state_hash: "prev_cmd_hash_noncan".to_string(),
+            last_vrf_output: "vrf_output_cmd_noncan".to_string(),
+            user_command_count: 1,
+            internal_command_count: 0,
+            user_commands: vec![test_command],
+            snark_work_count: 0,
+            snark_work: vec![],
+            timestamp: 111_222_444,
+            coinbase_receiver: "B62qNoCoinbaseNoncan".to_string(),
+            coinbase_reward_nanomina: 0,
+            global_slot_since_genesis: 101,
+            fee_transfer_via_coinbase: None,
+            fee_transfers: vec![],
+            global_slot: 101,
+        };
+
+        let payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: false,    // reversed
+            was_canonical: true, // was canonical before
+        };
+
+        // 7) Send
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send non-canonical user_command event");
+
+        // wait
+        sleep(Duration::from_millis(200)).await;
+
+        // 8) read sink
+        let transactions = read_captured_transactions(&dag, sink_node_id).await;
+        assert_eq!(transactions.len(), 1, "Expected 1 DoubleEntryTransaction for non-canonical user command");
+
+        // 9) parse
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DoubleEntryRecordPayload");
+        assert_eq!(record.height, 501);
+        assert_eq!(record.state_hash, "hash_cmd_payment_noncan");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // We expect 2 pairs => reversed
+        assert_eq!(record.lhs.len(), 3, "Expected 2 debits: payment, fee (+ FTVC)");
+        assert_eq!(record.rhs.len(), 3, "Expected 2 credits: payment, fee (+ FTVC)");
+
+        // Payment reversal
+        // canonical => LHS: Debit from sender, RHS: Credit to receiver
+        // reversed => LHS: Credit to sender, RHS: Debit from receiver
+        let lhs_pay = &record.lhs[0];
+        let rhs_pay = &record.rhs[0];
+
+        assert_eq!(lhs_pay.transfer_type, "Payment");
+        assert_eq!(lhs_pay.entry_type, AccountingEntryType::Credit);
+        assert_eq!(lhs_pay.account, "B62qSenderCmd");
+        assert_eq!(lhs_pay.amount_nanomina, 77_000_000_000);
+
+        assert_eq!(rhs_pay.transfer_type, "Payment");
+        assert_eq!(rhs_pay.entry_type, AccountingEntryType::Debit);
+        assert_eq!(rhs_pay.account, "B62qReceiverCmd");
+        assert_eq!(rhs_pay.amount_nanomina, 77_000_000_000);
+
+        // Fee reversal
+        // canonical => LHS: Debit from fee_payer, RHS: Credit to BlockRewardPool#[state_hash]
+        // reversed => LHS: Credit to fee_payer, RHS: Debit from reward pool
+        let lhs_fee = &record.lhs[1];
+        let rhs_fee = &record.rhs[1];
+
+        assert_eq!(lhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(lhs_fee.entry_type, AccountingEntryType::Credit);
+        assert_eq!(lhs_fee.account, "B62qFeePayerCmd");
+        assert_eq!(lhs_fee.amount_nanomina, 3_000_000_000);
+
+        assert_eq!(rhs_fee.transfer_type, "BlockRewardPool");
+        assert_eq!(rhs_fee.entry_type, AccountingEntryType::Debit);
+        assert_eq!(rhs_fee.account, "BlockRewardPool#hash_cmd_payment_noncan");
+        assert_eq!(rhs_fee.amount_nanomina, 3_000_000_000);
+
+        // 10) shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 }
