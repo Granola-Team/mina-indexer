@@ -514,7 +514,7 @@ mod mainnet_block_parsing_tests {
         let fee_transfer_via_coinbase = mainnet_block.get_fee_transfers_via_coinbase().unwrap();
         let first_ftva = fee_transfer_via_coinbase.first().unwrap();
         assert_eq!(first_ftva.receiver, "B62qmwvcwk2vFwAA4DUtRE5QtPDnhJgNQUwxiZmidiqm6QK63v82vKP");
-        assert_eq!(first_ftva.fee, 0.00005f64);
+        assert_eq!(first_ftva.fee_nanomina, 50000);
 
         // Excess block fees are returned to coinbase receiver in the form of internal command
         let internal_commands = mainnet_block.get_fee_transfers();
@@ -562,7 +562,7 @@ mod mainnet_block_parsing_tests {
             .get_fee_transfers_via_coinbase()
             .unwrap()
             .iter()
-            .any(|ft| { ft.receiver == *"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h" && (ft.fee * 1_000_000_000f64) as u64 == 8 }));
+            .any(|ft| { ft.receiver == *"B62qrCz3ehCqi8Pn8y3vWC9zYEB9RKsidauv15DeZxhzkxL3bKeba5h" && ft.fee_nanomina == 8 }));
         assert!(mainnet_block
             .get_fee_transfers()
             .iter()

@@ -44,7 +44,7 @@ impl Actor for FeeTransferViaCoinbaseActor {
                             state_hash: block_payload.state_hash.to_string(),
                             timestamp: block_payload.timestamp,
                             recipient: fee_transfer_via_coinbase.receiver.to_string(),
-                            amount_nanomina: (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64,
+                            amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
                             source: Some(block_payload.coinbase_receiver.to_string()),
                         };
                         self.publish(Event {
@@ -64,7 +64,7 @@ impl Actor for FeeTransferViaCoinbaseActor {
                             state_hash: block_payload.state_hash.to_string(),
                             timestamp: block_payload.timestamp,
                             recipient: fee_transfer_via_coinbase.receiver.to_string(),
-                            amount_nanomina: (fee_transfer_via_coinbase.fee * 1_000_000_000f64) as u64,
+                            amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
                             source: Some(block_payload.coinbase_receiver.to_string()),
                         };
                         self.publish(Event {
@@ -176,7 +176,7 @@ mod fee_transfer_via_coinbase_actor_tests {
             timestamp: 123456789,
             fee_transfer_via_coinbase: Some(vec![FeeTransferViaCoinbase {
                 receiver: "receiver_example".to_string(),
-                fee: 0.00005,
+                fee_nanomina: 50000,
             }]),
             ..Default::default()
         };

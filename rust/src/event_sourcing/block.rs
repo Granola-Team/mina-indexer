@@ -1,6 +1,7 @@
 use super::models::{CommandSummary, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase};
+use bigdecimal::{BigDecimal, ToPrimitive};
 use sonic_rs::{JsonValueTrait, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 pub trait BlockTrait {
     fn get_snark_work(&self) -> Vec<CompletedWorksNanomina>;
@@ -21,7 +22,7 @@ pub trait BlockTrait {
 
         let mut total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
         for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
-            total_fees_paid_into_block_pool += (ftvc.fee * 1_000_000_000f64) as u64;
+            total_fees_paid_into_block_pool += ftvc.fee_nanomina;
         }
         total_fees_paid_into_block_pool.saturating_sub(total_snark_fees)
     }
@@ -39,11 +40,9 @@ pub trait BlockTrait {
         // If the fee for a completed work is higher than the available fees, the remainder
         // is allotted out of the coinbase via a fee transfer via coinbase
         for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
-            let ftvc_fee_nanomina = (ftvc.fee * 1_000_000_000f64) as u64;
-
             if let Some(current_fee) = fee_transfers.get_mut(&ftvc.receiver) {
-                if *current_fee > ftvc_fee_nanomina {
-                    *current_fee -= ftvc_fee_nanomina;
+                if *current_fee > ftvc.fee_nanomina {
+                    *current_fee -= ftvc.fee_nanomina;
                 } else {
                     fee_transfers.remove(&ftvc.receiver);
                 }
@@ -85,9 +84,12 @@ pub trait BlockTrait {
 
                     // Try to extract "receiver_pk" and "fee"
                     let receiver = v2.get("receiver_pk")?.as_str()?.to_string();
-                    let fee = v2.get("fee")?.as_str()?.parse::<f64>().ok()?;
+                    let fee_decimal = BigDecimal::from_str(v2.get("fee")?.as_str()?).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
 
-                    Some(FeeTransferViaCoinbase { receiver, fee })
+                    Some(FeeTransferViaCoinbase {
+                        receiver,
+                        fee_nanomina: fee_decimal.to_u64().unwrap(),
+                    })
                 } else {
                     None
                 }
