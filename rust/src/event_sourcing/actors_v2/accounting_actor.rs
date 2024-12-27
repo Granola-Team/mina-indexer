@@ -3,12 +3,94 @@ use crate::event_sourcing::{
     events::{Event, EventType},
     models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
     payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload,
-        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination,
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload,
+        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload,
     },
 };
 
 pub struct AccountingActor;
+
+/// A trait that unifies the data needed to do accounting:
+///   - state_hash
+///   - timestamp
+///   - coinbase receiver + reward
+///   - user commands
+///   - fee transfers
+///   - fee_transfer_via_coinbase
+///   - plus (for Berkeley) optional zk_app_commands
+pub trait AccountingBlock {
+    fn get_state_hash(&self) -> &str;
+    fn get_timestamp(&self) -> u64;
+    fn get_coinbase_receiver(&self) -> &str;
+    fn get_coinbase_reward(&self) -> u64;
+    fn get_user_commands(&self) -> &[CommandSummary];
+    fn get_fee_transfers(&self) -> &[FeeTransfer];
+    fn get_fee_transfer_via_coinbase(&self) -> Option<&[FeeTransferViaCoinbase]>;
+
+    // For Berkeley blocks, if you have zk_app_commands:
+    fn get_zk_app_commands(&self) -> Option<&[ZkAppCommandSummary]> {
+        None // default
+    }
+}
+
+// --------------------------------------
+// 2) Implement the trait for MainnetBlockPayload
+// --------------------------------------
+
+impl AccountingBlock for MainnetBlockPayload {
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+    fn get_timestamp(&self) -> u64 {
+        self.timestamp
+    }
+    fn get_coinbase_receiver(&self) -> &str {
+        &self.coinbase_receiver
+    }
+    fn get_coinbase_reward(&self) -> u64 {
+        self.coinbase_reward_nanomina
+    }
+    fn get_user_commands(&self) -> &[CommandSummary] {
+        &self.user_commands
+    }
+    fn get_fee_transfers(&self) -> &[FeeTransfer] {
+        &self.fee_transfers
+    }
+    fn get_fee_transfer_via_coinbase(&self) -> Option<&[FeeTransferViaCoinbase]> {
+        self.fee_transfer_via_coinbase.as_deref()
+    }
+}
+
+// --------------------------------------
+// 3) Implement the trait for BerkeleyBlockPayload
+// --------------------------------------
+
+impl AccountingBlock for BerkeleyBlockPayload {
+    fn get_state_hash(&self) -> &str {
+        &self.state_hash
+    }
+    fn get_timestamp(&self) -> u64 {
+        self.timestamp
+    }
+    fn get_coinbase_receiver(&self) -> &str {
+        &self.coinbase_receiver
+    }
+    fn get_coinbase_reward(&self) -> u64 {
+        self.coinbase_reward_nanomina
+    }
+    fn get_user_commands(&self) -> &[CommandSummary] {
+        &self.user_commands
+    }
+    fn get_fee_transfers(&self) -> &[FeeTransfer] {
+        &self.fee_transfers
+    }
+    fn get_fee_transfer_via_coinbase(&self) -> Option<&[FeeTransferViaCoinbase]> {
+        self.fee_transfer_via_coinbase.as_deref()
+    }
+    fn get_zk_app_commands(&self) -> Option<&[ZkAppCommandSummary]> {
+        Some(&self.zk_app_commands)
+    }
+}
 
 impl AccountingActor {
     /// Your partial method #1
@@ -255,6 +337,65 @@ impl AccountingActor {
 
         (lhs, rhs)
     }
+
+    async fn process_generic_block<B: AccountingBlock>(block: &B, canonical: bool) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
+        let mut total_lhs = Vec::new();
+        let mut total_rhs = Vec::new();
+
+        // 4a) user commands
+        for cmd in block.get_user_commands() {
+            let (lhs, rhs) = Self::process_user_command(block.get_state_hash(), block.get_timestamp(), cmd, canonical).await;
+            total_lhs.extend(lhs);
+            total_rhs.extend(rhs);
+        }
+
+        // 4b) possible zk_app_commands (only meaningful for Berkeley)
+        if let Some(zk_cmds) = block.get_zk_app_commands() {
+            for cmd in zk_cmds {
+                let (lhs, rhs) = Self::process_batch_zk_app_commands(block.get_state_hash(), block.get_timestamp(), cmd, canonical).await;
+                total_lhs.extend(lhs);
+                total_rhs.extend(rhs);
+            }
+        }
+
+        // 4c) fee transfers
+        for ft in block.get_fee_transfers() {
+            let (lhs, rhs) = Self::process_fee_transfer(
+                block.get_state_hash(),
+                block.get_timestamp(),
+                ft.clone(), // FeeTransfer is Copy or clone it
+                canonical,
+            )
+            .await;
+            total_lhs.extend(lhs);
+            total_rhs.extend(rhs);
+        }
+
+        // 4d) fee_transfer_via_coinbase
+        if let Some(ftvc) = block.get_fee_transfer_via_coinbase() {
+            for xfer in ftvc {
+                let (lhs, rhs) =
+                    Self::process_fee_transfer_via_coinbase(block.get_state_hash(), block.get_timestamp(), block.get_coinbase_receiver(), xfer, canonical)
+                        .await;
+                total_lhs.extend(lhs);
+                total_rhs.extend(rhs);
+            }
+        }
+
+        // 4e) coinbase
+        let (lhs_coinbase, rhs_coinbase) = Self::process_coinbase(
+            block.get_state_hash(),
+            block.get_timestamp(),
+            block.get_coinbase_receiver(),
+            block.get_coinbase_reward(),
+            canonical,
+        )
+        .await;
+        total_lhs.extend(lhs_coinbase);
+        total_rhs.extend(rhs_coinbase);
+
+        (total_lhs, total_rhs)
+    }
 }
 
 impl ActorFactory for AccountingActor {
@@ -265,198 +406,67 @@ impl ActorFactory for AccountingActor {
                 Box::pin(async move {
                     match event.event_type {
                         EventType::CanonicalMainnetBlock => {
-                            // 1) Parse the block payload
-                            let payload: CanonicalMainnetBlockPayload =
-                                sonic_rs::from_str(&event.payload).expect("Failed to parse CanonicalMainnetBlockPayload");
+                            // parse payload
+                            let payload: CanonicalMainnetBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse MainnetBlockPayload");
 
-                            // 2) If neither canonical nor was_canonical => no reversal or forward needed
+                            // check (canonical, was_canonical)
                             if !payload.canonical && !payload.was_canonical {
                                 return None;
                             }
 
-                            // 3) Extract the underlying MainnetBlockPayload
-                            let mainnet_block = payload.block;
+                            // unify logic
+                            let (lhs, rhs) = Self::process_generic_block(&payload.block, payload.canonical).await;
 
-                            // We'll collect **all** LHS (debit) and RHS (credit) entries
-                            // in two vectors, then produce one single event at the end.
-                            let mut total_lhs: Vec<AccountingEntry> = Vec::new();
-                            let mut total_rhs: Vec<AccountingEntry> = Vec::new();
-
-                            // ----- USER COMMANDS -----
-                            for cmd in mainnet_block.user_commands {
-                                let (lhs, rhs) = Self::process_user_command(&mainnet_block.state_hash, mainnet_block.timestamp, &cmd, payload.canonical).await;
-
-                                // Merge them into the big lists
-                                total_lhs.extend(lhs);
-                                total_rhs.extend(rhs);
-                            }
-
-                            // ----- FEE TRANSFERS -----
-                            for fee_transfer in mainnet_block.fee_transfers {
-                                let (lhs, rhs) =
-                                    Self::process_fee_transfer(&mainnet_block.state_hash, mainnet_block.timestamp, fee_transfer, payload.canonical).await;
-
-                                total_lhs.extend(lhs);
-                                total_rhs.extend(rhs);
-                            }
-
-                            // ----- FEE TRANSFER VIA COINBASE -----
-                            if let Some(fee_via_coinbase) = mainnet_block.fee_transfer_via_coinbase {
-                                for xfer in fee_via_coinbase {
-                                    let (lhs, rhs) = Self::process_fee_transfer_via_coinbase(
-                                        &mainnet_block.state_hash,
-                                        mainnet_block.timestamp,
-                                        &mainnet_block.coinbase_receiver,
-                                        &xfer,
-                                        payload.canonical,
-                                    )
-                                    .await;
-
-                                    total_lhs.extend(lhs);
-                                    total_rhs.extend(rhs);
-                                }
-                            }
-
-                            // ----- COINBASE -----
-                            let (lhs, rhs) = Self::process_coinbase(
-                                &mainnet_block.state_hash,
-                                mainnet_block.timestamp,
-                                &mainnet_block.coinbase_receiver,
-                                mainnet_block.coinbase_reward_nanomina,
-                                payload.canonical,
-                            )
-                            .await;
-
-                            total_lhs.extend(lhs);
-                            total_rhs.extend(rhs);
-
-                            // If we ended up with zero total LHS and RHS, produce no event
-                            if total_lhs.is_empty() && total_rhs.is_empty() {
+                            if lhs.is_empty() && rhs.is_empty() {
                                 return None;
                             }
 
-                            // Otherwise, produce one single DoubleEntryRecordPayload event
                             let record = DoubleEntryRecordPayload {
-                                height: mainnet_block.height,
-                                state_hash: mainnet_block.state_hash.clone(),
+                                height: payload.block.height,
+                                state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
-                                lhs: total_lhs,
-                                rhs: total_rhs,
+                                lhs,
+                                rhs,
                             };
-
-                            // Runtime check to verify LHS and RHS balance
                             record.verify();
 
                             let new_event = Event {
                                 event_type: EventType::DoubleEntryTransaction,
                                 payload: sonic_rs::to_string(&record).unwrap(),
                             };
-
-                            // Return a single-event vector
                             Some(vec![new_event])
                         }
+
                         EventType::CanonicalBerkeleyBlock => {
-                            // 1) Parse the block payload
-                            let payload: CanonicalBerkeleyBlockPayload =
-                                sonic_rs::from_str(&event.payload).expect("Failed to parse CanonicalMainnetBlockPayload");
+                            let payload: CanonicalBerkeleyBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse BerkeleyBlockPayload");
 
-                            // 2) If neither canonical nor was_canonical => no reversal or forward needed
                             if !payload.canonical && !payload.was_canonical {
                                 return None;
                             }
 
-                            // 3) Extract the underlying BerkeleyBlockPayload
-                            let berkeley_block = payload.block;
+                            // also calls the same function
+                            let (lhs, rhs) = Self::process_generic_block(&payload.block, payload.canonical).await;
 
-                            // We'll collect **all** LHS (debit) and RHS (credit) entries
-                            // in two vectors, then produce one single event at the end.
-                            let mut total_lhs: Vec<AccountingEntry> = Vec::new();
-                            let mut total_rhs: Vec<AccountingEntry> = Vec::new();
-
-                            // ----- USER COMMANDS -----
-                            for cmd in berkeley_block.user_commands {
-                                let (lhs, rhs) =
-                                    Self::process_user_command(&berkeley_block.state_hash, berkeley_block.timestamp, &cmd, payload.canonical).await;
-
-                                // Merge them into the big lists
-                                total_lhs.extend(lhs);
-                                total_rhs.extend(rhs);
-                            }
-
-                            // ----- ZK APP COMMANDS -----
-                            for cmd in berkeley_block.zk_app_commands {
-                                let (lhs, rhs) =
-                                    Self::process_batch_zk_app_commands(&berkeley_block.state_hash, berkeley_block.timestamp, &cmd, payload.canonical).await;
-
-                                // Merge them into the big lists
-                                total_lhs.extend(lhs);
-                                total_rhs.extend(rhs);
-                            }
-
-                            // ----- FEE TRANSFERS -----
-                            for fee_transfer in berkeley_block.fee_transfers {
-                                let (lhs, rhs) =
-                                    Self::process_fee_transfer(&berkeley_block.state_hash, berkeley_block.timestamp, fee_transfer, payload.canonical).await;
-
-                                total_lhs.extend(lhs);
-                                total_rhs.extend(rhs);
-                            }
-
-                            // ----- FEE TRANSFER VIA COINBASE -----
-                            if let Some(fee_via_coinbase) = berkeley_block.fee_transfer_via_coinbase {
-                                for xfer in fee_via_coinbase {
-                                    let (lhs, rhs) = Self::process_fee_transfer_via_coinbase(
-                                        &berkeley_block.state_hash,
-                                        berkeley_block.timestamp,
-                                        &berkeley_block.coinbase_receiver,
-                                        &xfer,
-                                        payload.canonical,
-                                    )
-                                    .await;
-
-                                    total_lhs.extend(lhs);
-                                    total_rhs.extend(rhs);
-                                }
-                            }
-
-                            // ----- COINBASE -----
-                            let (lhs, rhs) = Self::process_coinbase(
-                                &berkeley_block.state_hash,
-                                berkeley_block.timestamp,
-                                &berkeley_block.coinbase_receiver,
-                                berkeley_block.coinbase_reward_nanomina,
-                                payload.canonical,
-                            )
-                            .await;
-
-                            total_lhs.extend(lhs);
-                            total_rhs.extend(rhs);
-
-                            // If we ended up with zero total LHS and RHS, produce no event
-                            if total_lhs.is_empty() && total_rhs.is_empty() {
+                            if lhs.is_empty() && rhs.is_empty() {
                                 return None;
                             }
 
-                            // Otherwise, produce one single DoubleEntryRecordPayload event
                             let record = DoubleEntryRecordPayload {
-                                height: berkeley_block.height,
-                                state_hash: berkeley_block.state_hash.clone(),
+                                height: payload.block.height,
+                                state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
-                                lhs: total_lhs,
-                                rhs: total_rhs,
+                                lhs,
+                                rhs,
                             };
-
-                            // Runtime check to verify LHS and RHS balance
                             record.verify();
 
                             let new_event = Event {
                                 event_type: EventType::DoubleEntryTransaction,
                                 payload: sonic_rs::to_string(&record).unwrap(),
                             };
-
-                            // Return a single-event vector
                             Some(vec![new_event])
                         }
+
                         _ => None,
                     }
                 })
