@@ -51,45 +51,31 @@ pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc:
     let canonical_berkeley_block_node = CanonicalBerkeleyBlockActor::create_actor();
     let canonical_berkeley_block_id = canonical_berkeley_block_node.id();
 
-    // 3. Set the root node, returning a Sender<Event> for external events
     let pcb_sender = dag.set_root(pcb_node);
 
-    // 4. Add the other nodes (non-root) to the DAG
     dag.add_node(mainnet_block_node);
-    dag.add_node(berkeley_block_node);
-    dag.add_node(block_ancestor_node);
-    dag.add_node(new_block_node);
-    dag.add_node(block_canonicity_node);
-    dag.add_node(canonical_mainnet_block_node);
-    dag.add_node(canonical_berkeley_block_node);
-
-    // 5. Link parents/children using captured IDs pcb_node => mainnet_block_node
     dag.link_parent(&pcb_id, &mainnet_block_id);
-    //    pcb_node => berkeley_block_node
+
+    dag.add_node(berkeley_block_node);
     dag.link_parent(&pcb_id, &berkeley_block_id);
 
-    //    mainnet_block_node => block_ancestor_node
+    dag.add_node(block_ancestor_node);
     dag.link_parent(&mainnet_block_id, &block_ancestor_id);
-    //    berkeley_block_node => block_ancestor_node
     dag.link_parent(&berkeley_block_id, &block_ancestor_id);
 
-    // //    block_ancestor_node => new_block_node
+    dag.add_node(new_block_node);
     dag.link_parent(&block_ancestor_id, &new_block_id);
 
-    // //    new_block_node => block_canonicity_node
+    dag.add_node(block_canonicity_node);
     dag.link_parent(&new_block_id, &block_canonicity_id);
 
-    //    block_canonicity_node => canonical_mainnet_block_node
+    dag.add_node(canonical_mainnet_block_node);
     dag.link_parent(&block_canonicity_id, &canonical_mainnet_block_id);
-    //    mainnet_block_node => canonical_mainnet_block_node
     dag.link_parent(&mainnet_block_id, &canonical_mainnet_block_id);
 
-    // //    block_canonicity_node => canonical_berkeley_block_node
+    dag.add_node(canonical_berkeley_block_node);
     dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
-    //    berkeley_block_node => canonical_mainnet_block_node
     dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
-
-    // 6. Wrap the DAG in Arc<Mutex<>> and spawn the entire DAG in one go
 
     tokio::spawn({
         let mut dag = dag;
