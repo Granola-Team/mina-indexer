@@ -191,7 +191,7 @@ mod block_canonicity_actor_tests_v2 {
     #[tokio::test]
     async fn test_new_block_becomes_canonical_over_existing_block() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -214,7 +214,7 @@ mod block_canonicity_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -318,7 +318,7 @@ mod block_canonicity_actor_tests_v2 {
     #[tokio::test]
     async fn test_non_canonical_block_with_vrf_info() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -339,7 +339,7 @@ mod block_canonicity_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -415,7 +415,7 @@ mod block_canonicity_actor_tests_v2 {
     #[tokio::test]
     async fn test_longer_branch_outcompetes_canonical_branch_with_tiebreaker() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -438,7 +438,7 @@ mod block_canonicity_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -620,7 +620,7 @@ mod block_canonicity_actor_tests_v2 {
     #[tokio::test]
     async fn test_block_with_different_parent_at_same_height() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -641,7 +641,7 @@ mod block_canonicity_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 

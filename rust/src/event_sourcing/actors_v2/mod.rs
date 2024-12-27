@@ -11,7 +11,6 @@ use canonical_mainnet_block_actor::CanonicalMainnetBlockActor;
 use mainnet_block_actor::MainnetBlockParserActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
-use tokio::sync::watch;
 
 pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
@@ -24,7 +23,7 @@ pub(crate) mod new_block_actor;
 pub(crate) mod pcb_file_path_actor;
 
 /// Spawns a DAG of interlinked actors and returns the `Sender<Event>` for the root actor (`PcbFilePathActor`).
-pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc::Sender<Event> {
+pub fn spawn_actor_dag() -> tokio::sync::mpsc::Sender<Event> {
     // 1. Create a new DAG.
     let mut dag = ActorDAG::new();
 
@@ -89,7 +88,7 @@ pub fn spawn_actor_dag(shutdown_rx: watch::Receiver<bool>) -> tokio::sync::mpsc:
     tokio::spawn({
         let mut dag = dag;
         async move {
-            dag.spawn_all(shutdown_rx).await;
+            dag.spawn_all().await;
         }
     });
 

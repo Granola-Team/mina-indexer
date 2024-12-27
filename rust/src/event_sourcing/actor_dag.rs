@@ -4,7 +4,7 @@ use log::error;
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
-    watch, Mutex,
+    Mutex,
 };
 use tracing::debug;
 use uuid::Uuid;
@@ -154,21 +154,17 @@ impl ActorDAG {
         self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
 
-    pub async fn spawn_all(&mut self, shutdown_receiver: watch::Receiver<bool>) {
+    pub async fn spawn_all(&mut self) {
         // Collect all node IDs to avoid borrowing issues while we mutate self
         let node_ids: Vec<_> = self.nodes.keys().cloned().collect();
 
         // Spawn each node in turn
         for node_id in node_ids {
-            self.spawn(&node_id, shutdown_receiver.clone()).await;
-        }
-
-        while *shutdown_receiver.borrow() {
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            self.spawn(&node_id).await;
         }
     }
 
-    pub async fn spawn(&mut self, node_id: &ActorID, shutdown_receiver: watch::Receiver<bool>) {
+    pub async fn spawn(&mut self, node_id: &ActorID) {
         let node = self.nodes.get(node_id).unwrap();
         let node_id = { node.lock().await.id() };
         let receivers: Vec<(Sender<Event>, Receiver<Event>)> = self.parent_edges.remove(&node_id).unwrap();
@@ -178,15 +174,9 @@ impl ActorDAG {
             tokio::spawn({
                 let senders = senders.clone();
                 let node = node.clone();
-                let shutdown_receiver = shutdown_receiver.clone();
 
                 async move {
                     loop {
-                        // check for shutdown signal
-                        if *shutdown_receiver.borrow() {
-                            break;
-                        }
-
                         if let Some(event) = receiver.recv().await {
                             let processed_events = {
                                 let locked_node = node.lock().await;
@@ -228,15 +218,12 @@ mod actor_dag_tests_v2 {
     /// spawns it, and ensures no errors occur.
     use std::sync::Arc;
     use tokio::{
-        sync::{watch, Mutex},
+        sync::Mutex,
         time::{sleep, Duration},
     };
 
     #[tokio::test]
     async fn test_single_node_dag() {
-        // Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         let mut dag = ActorDAG::new();
 
         // Build a simple root node that does nothing
@@ -259,10 +246,9 @@ mod actor_dag_tests_v2 {
 
         // Spawn the entire DAG in the background
         tokio::spawn({
-            let shutdown_rx = shutdown_rx.clone();
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -278,9 +264,6 @@ mod actor_dag_tests_v2 {
         // Give it some time to process
         sleep(Duration::from_millis(50)).await;
 
-        // Trigger shutdown
-        shutdown_tx.send(true).unwrap();
-
         let dag = dag.lock().await;
         let node = dag.read_node(root_node_id).unwrap();
         let state = node.lock().await.get_state();
@@ -291,9 +274,6 @@ mod actor_dag_tests_v2 {
 
     #[tokio::test]
     async fn test_mutate_and_inspect_state() {
-        // Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         // Create the DAG
         let mut dag = ActorDAG::new();
 
@@ -324,7 +304,7 @@ mod actor_dag_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -347,9 +327,6 @@ mod actor_dag_tests_v2 {
         // Allow processing time
         sleep(Duration::from_millis(100)).await;
 
-        // Trigger shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
-
         // Verify state has been updated
         let dag = dag.lock().await;
         let node = dag.read_node(root_node_id).unwrap();
@@ -360,9 +337,6 @@ mod actor_dag_tests_v2 {
 
     #[tokio::test]
     async fn test_event_propagation_between_nodes() {
-        // Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         // Create the DAG
         let mut dag = ActorDAG::new();
 
@@ -411,7 +385,7 @@ mod actor_dag_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -426,9 +400,6 @@ mod actor_dag_tests_v2 {
         // Allow processing time
         sleep(Duration::from_millis(100)).await;
 
-        // Trigger shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
-
         // Verify the child node received the propagated event
         let dag = dag.lock().await;
         let node = dag.read_node(child_node_id).unwrap();
@@ -439,8 +410,6 @@ mod actor_dag_tests_v2 {
 
     #[tokio::test]
     async fn test_multi_parent_with_common_ancestor() {
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         let mut dag = ActorDAG::new();
 
         // Create Common Parent node
@@ -525,7 +494,7 @@ mod actor_dag_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -540,9 +509,6 @@ mod actor_dag_tests_v2 {
 
         // Allow processing time
         sleep(Duration::from_millis(100)).await;
-
-        // Trigger shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
 
         // Verify the state of the GrandChild
         let dag = dag.lock().await;

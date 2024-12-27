@@ -180,7 +180,7 @@ mod canonical_block_actor_tests_v2 {
     #[tokio::test]
     async fn test_block_canonicity_update_first() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -203,7 +203,7 @@ mod canonical_block_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -275,7 +275,7 @@ mod canonical_block_actor_tests_v2 {
     #[tokio::test]
     async fn test_mainnet_block_first() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -296,7 +296,7 @@ mod canonical_block_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 

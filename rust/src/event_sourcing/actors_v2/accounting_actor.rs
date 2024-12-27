@@ -532,9 +532,6 @@ mod accounting_actor_tests_v2 {
 
     #[tokio::test]
     async fn test_accounting_actor_single_fee_transfer_with_sink() {
-        // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
 
@@ -555,7 +552,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -628,15 +625,12 @@ mod accounting_actor_tests_v2 {
         assert_eq!(rhs.entry_type, AccountingEntryType::Credit);
         assert_eq!(rhs.account, "B62qtestrecipient");
         assert_eq!(rhs.amount_nanomina, 42_000_000_000);
-
-        // 10) Shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
     #[tokio::test]
     async fn test_non_canonical_fee_transfer_with_coinbase() {
         // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (_shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -659,7 +653,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -780,15 +774,12 @@ mod accounting_actor_tests_v2 {
         // check amounts match your MAINNET_COINBASE_REWARD
         assert_eq!(lhs_coinbase.amount_nanomina, MAINNET_COINBASE_REWARD);
         assert_eq!(rhs_coinbase.amount_nanomina, MAINNET_COINBASE_REWARD);
-
-        // 10) Shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
     #[tokio::test]
     async fn test_canonical_fee_transfer_via_coinbase() {
         // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = tokio::sync::watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -810,7 +801,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = std::sync::Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -920,7 +911,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_non_canonical_fee_transfer_via_coinbase() {
         // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+        let (_shutdown_tx, _shutdown_rx) = tokio::sync::watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -941,7 +932,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = std::sync::Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1040,15 +1031,12 @@ mod accounting_actor_tests_v2 {
         assert_eq!(rhs_1.entry_type, AccountingEntryType::Debit);
         assert_eq!(rhs_1.account, "B62TestReceiverOfFTVC");
         assert_eq!(rhs_1.amount_nanomina, 2_345_678_000);
-
-        // 10) Shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
     #[tokio::test]
     async fn test_canonical_coinbase_only() {
         // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -1069,7 +1057,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1148,7 +1136,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_non_canonical_coinbase_only() {
         // 1) Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -1169,7 +1157,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1252,7 +1240,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_canonical_user_command_payment() {
         // 1) Create shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -1273,7 +1261,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1386,7 +1374,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_non_canonical_user_command_payment() {
         // 1) Create shutdown
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) DAG
         let mut dag = ActorDAG::new();
@@ -1407,7 +1395,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1513,7 +1501,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_canonical_user_command_failed_payment() {
         // 1) Create shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) Build the ActorDAG
         let mut dag = ActorDAG::new();
@@ -1534,7 +1522,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -1624,7 +1612,7 @@ mod accounting_actor_tests_v2 {
     #[tokio::test]
     async fn test_canonical_user_command_stake_delegation() {
         // 1) Create shutdown
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2) DAG
         let mut dag = ActorDAG::new();
@@ -1645,7 +1633,7 @@ mod accounting_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 

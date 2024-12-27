@@ -120,7 +120,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
     #[tokio::test]
     async fn test_add_root_to_empty_tree() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create the DAG
         let mut dag = ActorDAG::new();
@@ -147,7 +147,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -183,7 +183,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
     #[tokio::test]
     async fn test_add_node_with_existing_parent() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create the DAG
         let mut dag = ActorDAG::new();
@@ -206,7 +206,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -261,7 +261,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
     #[tokio::test]
     async fn test_requeue_unconnected_node() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create the DAG
         let mut dag = ActorDAG::new();
@@ -284,7 +284,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 

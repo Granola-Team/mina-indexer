@@ -71,7 +71,7 @@ mod block_ancestor_actor_tests_v2 {
     #[tokio::test]
     async fn test_block_ancestor_actor_with_berkeley_block() {
         // 1. Create the shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -112,7 +112,7 @@ mod block_ancestor_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
@@ -162,7 +162,7 @@ mod block_ancestor_actor_tests_v2 {
     #[tokio::test]
     async fn test_block_ancestor_actor_with_mainnet_block() {
         // 1. Create a shutdown signal
-        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
         // 2. Create an ActorDAG
         let mut dag = ActorDAG::new();
@@ -202,7 +202,7 @@ mod block_ancestor_actor_tests_v2 {
         tokio::spawn({
             let dag = Arc::clone(&dag);
             async move {
-                dag.lock().await.spawn_all(shutdown_rx).await;
+                dag.lock().await.spawn_all().await;
             }
         });
 
