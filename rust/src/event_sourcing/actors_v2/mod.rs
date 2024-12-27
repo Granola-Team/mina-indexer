@@ -12,6 +12,7 @@ use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
 use tokio::sync::watch;
 
+pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
 pub(crate) mod block_canonicity_actor;
