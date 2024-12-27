@@ -22,7 +22,7 @@ impl ActorFactory for CanonicalBerkeleyBlockActor {
             CanonicalItemsManager::<CanonicalBerkeleyBlockPayload>::new(TRANSITION_FRONTIER_DISTANCE as u64),
         );
 
-        ActorNodeBuilder::new("CanonicalBerkeleyBlockActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(actor_store)
             .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
@@ -130,24 +130,21 @@ mod canonical_berkeley_block_actor_tests_v2 {
     // ----------------------------------------------------------------
 
     /// Creates a sink node to capture `CanonicalBerkeleyBlock` events in its internal store.
-    fn create_canonical_berkeley_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
-        let sink_node_id = id.to_string();
-        move || {
-            ActorNodeBuilder::new(sink_node_id)
-                .with_state(ActorStore::new())
-                .with_processor(|event, state, _requeue| {
-                    Box::pin(async move {
-                        if event.event_type == EventType::CanonicalBerkeleyBlock {
-                            let mut store = state.lock().await;
-                            let mut captured: Vec<String> = store.get("captured_blocks").cloned().unwrap_or_default();
-                            captured.push(event.payload.clone());
-                            store.insert("captured_blocks", captured);
-                        }
-                        None
-                    })
+    fn create_canonical_berkeley_sink_node() -> ActorNode {
+        ActorNodeBuilder::new()
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    if event.event_type == EventType::CanonicalBerkeleyBlock {
+                        let mut store = state.lock().await;
+                        let mut captured: Vec<String> = store.get("captured_blocks").cloned().unwrap_or_default();
+                        captured.push(event.payload.clone());
+                        store.insert("captured_blocks", captured);
+                    }
+                    None
                 })
-                .build()
-        }
+            })
+            .build()
     }
 
     /// Reads all captured `CanonicalBerkeleyBlock` payloads (as JSON strings) from the sink node.
@@ -195,8 +192,8 @@ mod canonical_berkeley_block_actor_tests_v2 {
         let actor_sender = dag.set_root(actor_node);
 
         // 5. Create the sink node for capturing `CanonicalBerkeleyBlock` events
-        let sink_node_id = &"BerkeleySinkCanonicityFirst".to_string();
-        let sink_node = create_canonical_berkeley_sink_node(sink_node_id)();
+        let sink_node = create_canonical_berkeley_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -288,8 +285,8 @@ mod canonical_berkeley_block_actor_tests_v2 {
         let actor_sender = dag.set_root(actor_node);
 
         // 4. Create the sink node for capturing CanonicalBerkeleyBlock
-        let sink_node_id = &"BerkeleySinkBlockFirst".to_string();
-        let sink_node = create_canonical_berkeley_sink_node(sink_node_id)();
+        let sink_node = create_canonical_berkeley_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 

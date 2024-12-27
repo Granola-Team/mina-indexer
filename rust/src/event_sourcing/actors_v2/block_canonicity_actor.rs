@@ -78,7 +78,7 @@ impl ActorFactory for BlockCanonicityActor {
         let mut actor_store = ActorStore::new();
         actor_store.insert(BLOCKCHAIN_TREE_KEY, BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE));
 
-        ActorNodeBuilder::new("BlockCanonicityActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(actor_store)
             .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
@@ -156,25 +156,22 @@ mod block_canonicity_actor_tests_v2 {
     // ---------------------------------------------------------
 
     /// Creates a sink node to capture all `BlockCanonicityUpdate` events.
-    fn create_canonicity_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
-        let sink_node_id = id.to_string();
-        move || {
-            ActorNodeBuilder::new(sink_node_id)
-                .with_state(ActorStore::new())
-                .with_processor(|event, state, _requeue| {
-                    Box::pin(async move {
-                        if event.event_type == EventType::BlockCanonicityUpdate {
-                            let mut locked_state = state.lock().await;
-                            // Keep a vector of all canonicity updates
-                            let mut captured_updates: Vec<String> = locked_state.get("captured_canonicity_updates").cloned().unwrap_or_default();
-                            captured_updates.push(event.payload.clone());
-                            locked_state.insert("captured_canonicity_updates", captured_updates);
-                        }
-                        None
-                    })
+    fn create_canonicity_sink_node() -> ActorNode {
+        ActorNodeBuilder::new()
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    if event.event_type == EventType::BlockCanonicityUpdate {
+                        let mut locked_state = state.lock().await;
+                        // Keep a vector of all canonicity updates
+                        let mut captured_updates: Vec<String> = locked_state.get("captured_canonicity_updates").cloned().unwrap_or_default();
+                        captured_updates.push(event.payload.clone());
+                        locked_state.insert("captured_canonicity_updates", captured_updates);
+                    }
+                    None
                 })
-                .build()
-        }
+            })
+            .build()
     }
 
     /// Reads all `BlockCanonicityUpdate` payloads (as strings) from the sink node's state.
@@ -207,10 +204,10 @@ mod block_canonicity_actor_tests_v2 {
         let canonicity_sender = dag.set_root(canonicity_actor);
 
         // 5. Create a sink node to capture `BlockCanonicityUpdate` events
-        let sink_node_id = "CanonicitySinkTest1".to_string();
-        let sink_node = create_canonicity_sink_node(&sink_node_id)();
+        let sink_node = create_canonicity_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
-        dag.link_parent(&canonicity_actor_id, &sink_node_id);
+        dag.link_parent(&canonicity_actor_id, sink_node_id);
 
         // 6. Wrap the DAG in Arc<Mutex<>> and spawn
         let dag = Arc::new(Mutex::new(dag));
@@ -238,7 +235,7 @@ mod block_canonicity_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // Check that the genesis block was marked canonical
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         assert_eq!(updates.len(), 1, "Expected 1 canonicity update for genesis");
 
         let genesis_update: BlockCanonicityUpdatePayload = sonic_rs::from_str(&updates[0]).expect("Failed to parse genesis update");
@@ -262,7 +259,7 @@ mod block_canonicity_actor_tests_v2 {
             .expect("Failed to send initial block event");
         sleep(Duration::from_millis(100)).await;
 
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         // We expect 2 total updates now: genesis + newly canonical block
         assert_eq!(updates.len(), 2, "Expected 2 total canonicity updates");
 
@@ -288,7 +285,7 @@ mod block_canonicity_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // Expect the new block to be canonical and old block to be non-canonical
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         // We had 2 from before + 2 more for the shift in canonicity
         assert_eq!(updates.len(), 4, "Expected 4 total canonicity updates");
 
@@ -332,10 +329,10 @@ mod block_canonicity_actor_tests_v2 {
         let canonicity_sender = dag.set_root(canonicity_actor);
 
         // 4. Create a sink node
-        let sink_node_id = "CanonicitySinkTest2".to_string();
-        let sink_node = create_canonicity_sink_node(&sink_node_id)();
+        let sink_node = create_canonicity_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
-        dag.link_parent(&canonicity_actor_id, &sink_node_id);
+        dag.link_parent(&canonicity_actor_id, sink_node_id);
 
         // 5. Wrap + spawn
         let dag = Arc::new(Mutex::new(dag));
@@ -362,7 +359,7 @@ mod block_canonicity_actor_tests_v2 {
             .expect("Failed to send GenesisBlock");
         sleep(Duration::from_millis(100)).await;
 
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         assert_eq!(updates.len(), 1, "Genesis block should be canonical");
 
         // 7. Define canonical and non-canonical blocks
@@ -389,7 +386,7 @@ mod block_canonicity_actor_tests_v2 {
             .expect("Failed to send canonical block");
         sleep(Duration::from_millis(100)).await;
 
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         assert_eq!(updates.len(), 2, "We now have genesis + canonical block updates");
         let canonical_update: BlockCanonicityUpdatePayload = sonic_rs::from_str(&updates[1]).expect("Failed to parse canonical update");
         assert_eq!(canonical_update.state_hash, "canonical_hash");
@@ -405,7 +402,7 @@ mod block_canonicity_actor_tests_v2 {
             .expect("Failed to send non-canonical block");
         sleep(Duration::from_millis(100)).await;
 
-        let updates = read_canonicity_updates(&dag, &sink_node_id).await;
+        let updates = read_canonicity_updates(&dag, sink_node_id).await;
         assert_eq!(updates.len(), 3, "One more update for the non-canonical block");
         let last_update: BlockCanonicityUpdatePayload = sonic_rs::from_str(&updates[2]).expect("Failed to parse last update");
         assert_eq!(last_update.state_hash, "non_canonical_hash");
@@ -431,8 +428,8 @@ mod block_canonicity_actor_tests_v2 {
         let canonicity_sender = dag.set_root(canonicity_actor);
 
         // 5. Create a sink node to capture `BlockCanonicityUpdate` events
-        let sink_node_id = &"CanonicitySinkLongerBranch".to_string();
-        let sink_node = create_canonicity_sink_node(sink_node_id)();
+        let sink_node = create_canonicity_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&canonicity_actor_id, sink_node_id);
 
@@ -634,8 +631,8 @@ mod block_canonicity_actor_tests_v2 {
         let canonicity_sender = dag.set_root(canonicity_actor);
 
         // 4. Create a sink node
-        let sink_node_id = &"CanonicitySinkSameHeight".to_string();
-        let sink_node = create_canonicity_sink_node(sink_node_id)();
+        let sink_node = create_canonicity_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&canonicity_actor_id, sink_node_id);
 

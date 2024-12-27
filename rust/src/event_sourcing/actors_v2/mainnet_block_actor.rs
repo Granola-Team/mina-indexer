@@ -14,7 +14,7 @@ pub struct MainnetBlockParserActor;
 
 impl ActorFactory for MainnetBlockParserActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("MainnetBlockParserActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -89,8 +89,7 @@ mod mainnet_block_actor_tests_v2 {
         let parser_sender = dag.set_root(parser_node);
 
         // 5. Create a "sink" node that captures `MainnetBlock` events by storing payloads in its ActorStore.
-        let sink_node_id = "TestSinkNode".to_string();
-        let sink_node = ActorNodeBuilder::new(sink_node_id.clone())
+        let sink_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -105,6 +104,7 @@ mod mainnet_block_actor_tests_v2 {
                 })
             })
             .build();
+        let sink_node_id = sink_node.id();
 
         // 6. Add the sink node and link it to the parser node
         dag.add_node(sink_node);

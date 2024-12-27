@@ -14,7 +14,7 @@ pub struct BerkeleyBlockActor;
 
 impl ActorFactory for BerkeleyBlockActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("BerkeleyBlockActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -89,8 +89,7 @@ mod berkeley_block_actor_tests_v2 {
         let parser_sender = dag.set_root(parser_node);
 
         // 5. Create a "sink node" that captures `BerkeleyBlock` events by storing them in a `Vec<String>`.
-        let sink_node_id = "BerkeleyTestSink".to_string();
-        let sink_node = ActorNodeBuilder::new(sink_node_id.clone())
+        let sink_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -105,6 +104,7 @@ mod berkeley_block_actor_tests_v2 {
                 })
             })
             .build();
+        let sink_node_id = sink_node.id();
 
         // 6. Add the sink node to the DAG and link it to the parser node
         dag.add_node(sink_node);

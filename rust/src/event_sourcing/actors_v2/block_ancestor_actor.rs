@@ -9,7 +9,7 @@ pub struct BlockAncestorActor;
 
 impl ActorFactory for BlockAncestorActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("BlockAncestorActor".to_string()) // Node listens for BerkeleyBlock and MainnetBlock
+        ActorNodeBuilder::new() // Node listens for BerkeleyBlock and MainnetBlock
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -84,8 +84,7 @@ mod block_ancestor_actor_tests_v2 {
         let block_ancestor_sender = dag.set_root(block_ancestor_node);
 
         // 5. Create a sink node to capture `BlockAncestor` events
-        let sink_node_id = "BlockAncestorSinkBerkeley".to_string();
-        let sink_node = ActorNodeBuilder::new(sink_node_id.clone())
+        let sink_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -100,6 +99,7 @@ mod block_ancestor_actor_tests_v2 {
                 })
             })
             .build();
+        let sink_node_id = sink_node.id();
 
         // 6. Add the sink node to the DAG and link it to the BlockAncestorActor
         dag.add_node(sink_node);
@@ -175,8 +175,7 @@ mod block_ancestor_actor_tests_v2 {
         let block_ancestor_sender = dag.set_root(block_ancestor_node);
 
         // 5. Create a sink node for capturing BlockAncestor events
-        let sink_node_id = "BlockAncestorSinkMainnet".to_string();
-        let sink_node = ActorNodeBuilder::new(sink_node_id.clone())
+        let sink_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -190,6 +189,7 @@ mod block_ancestor_actor_tests_v2 {
                 })
             })
             .build();
+        let sink_node_id = sink_node.id();
 
         // 6. Add the sink node, link it to the actor
         dag.add_node(sink_node);

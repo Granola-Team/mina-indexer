@@ -7,6 +7,7 @@ use tokio::sync::{
     watch, Mutex,
 };
 use tracing::debug;
+use uuid::Uuid;
 
 pub struct ActorStore {
     pub data: HashMap<String, Box<dyn Any + Send + Sync>>,
@@ -67,11 +68,17 @@ pub struct ActorNodeBuilder {
     initial_state: Option<ActorStore>,
 }
 
+impl Default for ActorNodeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActorNodeBuilder {
     /// Creates a new builder with the specified ID
-    pub fn new(id: ActorID) -> Self {
+    pub fn new() -> Self {
         Self {
-            id,
+            id: Uuid::new_v4().to_string(),
             event_processor: None,
             initial_state: None,
         }
@@ -233,8 +240,7 @@ mod actor_dag_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // Build a simple root node that does nothing
-        let root_node_id = "RootNodeActor".to_string();
-        let root_node = ActorNodeBuilder::new(root_node_id.to_string())
+        let root_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|_event, state, _requeue| {
                 Box::pin(async move {
@@ -243,6 +249,7 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let root_node_id = root_node.id();
 
         // Set the root node in the DAG, which returns a Sender<Event>
         let root_tx = dag.set_root(root_node);
@@ -291,11 +298,10 @@ mod actor_dag_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // Create and configure the root node
-        let root_node_id = "RootNodeActor".to_string();
         let mut store = ActorStore::new();
         store.insert("count", 0u64);
 
-        let root_node = ActorNodeBuilder::new(root_node_id.clone())
+        let root_node = ActorNodeBuilder::new()
             .with_state(store)
             .with_processor(|_event, state, _requeue| {
                 Box::pin(async move {
@@ -306,6 +312,7 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let root_node_id = root_node.id();
 
         // Set the root node and obtain the sender
         let root_sender = dag.set_root(root_node);
@@ -360,8 +367,7 @@ mod actor_dag_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // Create the root node
-        let root_node_id = "RootNodeActor".to_string();
-        let root_node = ActorNodeBuilder::new(root_node_id.clone())
+        let root_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -375,10 +381,10 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let root_node_id = root_node.id();
 
         // Create the child node
-        let child_node_id = "ChildNodeActor".to_string();
-        let child_node = ActorNodeBuilder::new(child_node_id.clone())
+        let child_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -389,6 +395,7 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let child_node_id = child_node.id();
 
         // Add nodes to the DAG
         let root_sender = dag.set_root(root_node);
@@ -436,14 +443,8 @@ mod actor_dag_tests_v2 {
 
         let mut dag = ActorDAG::new();
 
-        // Node IDs
-        let common_parent_id = "CommonParent".to_string();
-        let parent1_id = "Parent1".to_string();
-        let parent2_id = "Parent2".to_string();
-        let grandchild_id = "GrandChild".to_string();
-
         // Create Common Parent node
-        let common_parent_node = ActorNodeBuilder::new(common_parent_id.clone())
+        let common_parent_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|_event, _state, _requeue| {
                 Box::pin(async {
@@ -454,9 +455,10 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let common_parent_id = common_parent_node.id();
 
         // Create Parent1 node
-        let parent1_node = ActorNodeBuilder::new(parent1_id.clone())
+        let parent1_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -469,9 +471,10 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let parent1_id = parent1_node.id();
 
         // Create Parent2 node
-        let parent2_node = ActorNodeBuilder::new(parent2_id.clone())
+        let parent2_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -484,9 +487,10 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let parent2_id = parent2_node.id();
 
         // Create Grandchild node
-        let grandchild_node = ActorNodeBuilder::new(grandchild_id.clone())
+        let grandchild_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -498,6 +502,7 @@ mod actor_dag_tests_v2 {
                 })
             })
             .build();
+        let grandchild_id = grandchild_node.id();
 
         // Add nodes to the DAG
         let sender = dag.set_root(common_parent_node);

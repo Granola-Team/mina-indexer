@@ -19,7 +19,7 @@ impl ActorFactory for NewBlockActor {
     fn create_actor() -> ActorNode {
         let mut state = ActorStore::new();
         state.insert("blockchain_tree", BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE));
-        ActorNodeBuilder::new("NewBlockActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(state)
             .with_processor(|event, state: Arc<Mutex<ActorStore>>, requeue| {
                 Box::pin(async move {
@@ -89,25 +89,22 @@ mod blockchain_tree_builder_actor_tests_v2 {
     };
 
     /// Helper function to create a sink node that captures `BlockAncestor` events.
-    fn create_new_block_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
-        let sink_node_id = id.to_string();
-        move || {
-            ActorNodeBuilder::new(sink_node_id)
-                .with_state(ActorStore::new())
-                .with_processor(|event, state, _requeue| {
-                    Box::pin(async move {
-                        if event.event_type == EventType::NewBlock {
-                            // Store all `BlockAncestor` payloads in a vector.
-                            let mut locked_state = state.lock().await;
-                            let mut captured_blocks: Vec<String> = locked_state.get("captured_blocks").cloned().unwrap_or_default();
-                            captured_blocks.push(event.payload.clone());
-                            locked_state.insert("captured_blocks", captured_blocks);
-                        }
-                        None
-                    })
+    fn create_new_block_sink_node() -> ActorNode {
+        ActorNodeBuilder::new()
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    if event.event_type == EventType::NewBlock {
+                        // Store all `BlockAncestor` payloads in a vector.
+                        let mut locked_state = state.lock().await;
+                        let mut captured_blocks: Vec<String> = locked_state.get("captured_blocks").cloned().unwrap_or_default();
+                        captured_blocks.push(event.payload.clone());
+                        locked_state.insert("captured_blocks", captured_blocks);
+                    }
+                    None
                 })
-                .build()
-        }
+            })
+            .build()
     }
 
     /// Reads and returns all captured `BlockAncestor` payloads from the sink node state.
@@ -136,12 +133,12 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let new_block_sender = dag.set_root(new_block_actor);
 
         // 5. Create a sink node to capture `BlockAncestor` events
-        let sink_node_id = "BlockAncestorSinkRootTest".to_string();
-        let sink_node = create_new_block_sink_node(&sink_node_id)();
+        let sink_node = create_new_block_sink_node();
+        let sink_node_id = &sink_node.id();
 
         // 6. Add the sink node and link it to the actor
         dag.add_node(sink_node);
-        dag.link_parent(&new_block_actor_id, &sink_node_id);
+        dag.link_parent(&new_block_actor_id, sink_node_id);
 
         // 7. Wrap the DAG in an `Arc<Mutex<>>`
         let dag = Arc::new(Mutex::new(dag));
@@ -171,7 +168,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // 11. Read the sink node's captured blocks
-        let captured_blocks = read_new_block_payloads(&dag, &sink_node_id).await;
+        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
         assert_eq!(captured_blocks.len(), 1, "Should have 1 BlockAncestor event");
 
         // 12. Deserialize and verify the BlockAncestorPayload
@@ -199,10 +196,10 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let new_block_sender = dag.set_root(new_block_actor);
 
         // 5. Create a sink node
-        let sink_node_id = "BlockAncestorSinkChildTest".to_string();
-        let sink_node = create_new_block_sink_node(&sink_node_id)();
+        let sink_node = create_new_block_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
-        dag.link_parent(&new_block_actor_id, &sink_node_id);
+        dag.link_parent(&new_block_actor_id, sink_node_id);
 
         // 6. Wrap and spawn
         let dag = Arc::new(Mutex::new(dag));
@@ -246,7 +243,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // 9. Now we expect two captured BlockAncestor payloads in order: height=1, then height=2
-        let captured_blocks = read_new_block_payloads(&dag, &sink_node_id).await;
+        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
         assert_eq!(captured_blocks.len(), 2, "Should have 2 BlockAncestor events");
 
         // Check the first event
@@ -277,10 +274,10 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let new_block_sender = dag.set_root(new_block_actor);
 
         // 5. Create a sink node for BlockAncestor
-        let sink_node_id = "BlockAncestorSinkUnconnectedTest".to_string();
-        let sink_node = create_new_block_sink_node(&sink_node_id)();
+        let sink_node = create_new_block_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
-        dag.link_parent(&new_block_actor_id, &sink_node_id);
+        dag.link_parent(&new_block_actor_id, sink_node_id);
 
         // 6. Wrap the DAG and spawn
         let dag = Arc::new(Mutex::new(dag));
@@ -308,7 +305,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // Verify we got one BlockAncestor event
-        let captured_blocks = read_new_block_payloads(&dag, &sink_node_id).await;
+        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
         assert_eq!(captured_blocks.len(), 1, "Root block should produce 1 BlockAncestor");
 
         // 8. Step 2: Send an unconnected block at height=3 referencing a non-existent parent
@@ -328,7 +325,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         sleep(Duration::from_millis(100)).await;
 
         // 9. Verify that no new block event was added (still only 1 in total)
-        let captured_blocks = read_new_block_payloads(&dag, &sink_node_id).await;
+        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
         assert_eq!(captured_blocks.len(), 1, "Expected no BlockAncestor event for the unconnected block");
 
         // 10. Shutdown

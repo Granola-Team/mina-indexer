@@ -400,7 +400,7 @@ impl AccountingActor {
 
 impl ActorFactory for AccountingActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("AccountingActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -500,24 +500,21 @@ mod accounting_actor_tests_v2 {
 
     /// This node captures `DoubleEntryTransaction` events, storing them in a vector
     /// under the key `"captured_transactions"` in its ActorStore.
-    fn create_double_entry_sink_node(id: &str) -> impl FnOnce() -> ActorNode {
-        let sink_node_id = id.to_string();
-        move || {
-            ActorNodeBuilder::new(sink_node_id)
-                .with_state(ActorStore::new())
-                .with_processor(|event, state, _requeue| {
-                    Box::pin(async move {
-                        if event.event_type == EventType::DoubleEntryTransaction {
-                            let mut store = state.lock().await;
-                            let mut captured: Vec<String> = store.get("captured_transactions").cloned().unwrap_or_default();
-                            captured.push(event.payload.clone());
-                            store.insert("captured_transactions", captured);
-                        }
-                        None
-                    })
+    fn create_double_entry_sink_node() -> ActorNode {
+        ActorNodeBuilder::new()
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    if event.event_type == EventType::DoubleEntryTransaction {
+                        let mut store = state.lock().await;
+                        let mut captured: Vec<String> = store.get("captured_transactions").cloned().unwrap_or_default();
+                        captured.push(event.payload.clone());
+                        store.insert("captured_transactions", captured);
+                    }
+                    None
                 })
-                .build()
-        }
+            })
+            .build()
     }
 
     /// Helper to read the sink node’s captured DoubleEntryTransaction events (as JSON).
@@ -548,8 +545,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -652,8 +649,8 @@ mod accounting_actor_tests_v2 {
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
         // Assume you already have a create_double_entry_sink_node(...) function
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -803,8 +800,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -934,8 +931,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1062,8 +1059,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1162,8 +1159,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create the sink node, add to DAG, link from AccountingActor
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1266,8 +1263,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create and link the sink node
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1400,8 +1397,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Sink
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1527,8 +1524,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Create and link the sink node
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 
@@ -1638,8 +1635,8 @@ mod accounting_actor_tests_v2 {
         let actor_sender = dag.set_root(accounting_actor);
 
         // 4) Sink
-        let sink_node_id = &"DoubleEntrySink".to_string();
-        let sink_node = create_double_entry_sink_node(sink_node_id)();
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = &sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, sink_node_id);
 

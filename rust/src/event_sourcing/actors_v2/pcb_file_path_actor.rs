@@ -10,7 +10,7 @@ pub struct PcbFilePathActor;
 
 impl ActorFactory for PcbFilePathActor {
     fn create_actor() -> ActorNode {
-        ActorNodeBuilder::new("PcbFilePathActor".to_string())
+        ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
@@ -65,8 +65,7 @@ mod pcb_file_path_actor_tests_v2 {
         let pcb_actor_sender = dag.set_root(pcb_actor_node);
 
         // 5. Create a "TestSinkNode" to listen for BerkeleyBlockPath events coming from the actor
-        let sink_node_id = "TestSinkNode".to_string();
-        let sink_node = ActorNodeBuilder::new(sink_node_id.clone())
+        let sink_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
@@ -79,10 +78,11 @@ mod pcb_file_path_actor_tests_v2 {
                 })
             })
             .build();
+        let sink_node_id = &sink_node.id();
 
         // 6. Add the sink node to the DAG, and link the PcbFilePathActor node to it
         dag.add_node(sink_node);
-        dag.link_parent(&pcb_actor_node_id, &sink_node_id);
+        dag.link_parent(&pcb_actor_node_id, sink_node_id);
 
         // 7. Wrap the DAG in Arc<Mutex<>> to allow spawning in the background
         let dag = Arc::new(Mutex::new(dag));
