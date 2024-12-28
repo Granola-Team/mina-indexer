@@ -5,11 +5,13 @@ use crate::{
     },
     utility::get_top_level_keys_from_json_file,
 };
+use async_trait::async_trait;
 
 pub struct PcbFilePathActor;
 
+#[async_trait]
 impl ActorFactory for PcbFilePathActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
@@ -58,7 +60,7 @@ mod pcb_file_path_actor_tests_v2 {
 
         // 3. Create your PcbFilePathActor node using its ActorFactory implementation (Assuming it has an ID like "PcbFilePathActor" inside `create_actor`, or
         //    you can rename the node ID if needed.)
-        let pcb_actor_node = PcbFilePathActor::create_actor();
+        let pcb_actor_node = PcbFilePathActor::create_actor().await;
         let pcb_actor_node_id = pcb_actor_node.id();
 
         // 4. Add the PcbFilePathActor to the DAG as the root. This returns a Sender<Event>.

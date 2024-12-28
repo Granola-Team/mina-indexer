@@ -3,12 +3,14 @@ use crate::event_sourcing::{
     events::{Event, EventType},
     payloads::{BerkeleyBlockPayload, BlockAncestorPayload, MainnetBlockPayload},
 };
+use async_trait::async_trait;
 use sonic_rs::from_str;
 
 pub struct BlockAncestorActor;
 
+#[async_trait]
 impl ActorFactory for BlockAncestorActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         ActorNodeBuilder::new() // Node listens for BerkeleyBlock and MainnetBlock
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
@@ -77,7 +79,7 @@ mod block_ancestor_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your BlockAncestorActor node (root) using the ActorFactory
-        let block_ancestor_node = BlockAncestorActor::create_actor();
+        let block_ancestor_node = BlockAncestorActor::create_actor().await;
         let block_ancestor_node_id = block_ancestor_node.id();
 
         // 4. Set the root in the DAG. This returns a Sender<Event> for sending events.
@@ -168,7 +170,7 @@ mod block_ancestor_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your BlockAncestorActor node (root)
-        let block_ancestor_node = BlockAncestorActor::create_actor();
+        let block_ancestor_node = BlockAncestorActor::create_actor().await;
         let block_ancestor_node_id = block_ancestor_node.id();
 
         // 4. Set the root in the DAG. This returns a Sender<Event> for sending events.

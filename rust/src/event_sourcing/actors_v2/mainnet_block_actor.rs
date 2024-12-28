@@ -8,12 +8,14 @@ use crate::{
     },
     utility::{extract_height_and_hash, get_cleaned_pcb},
 };
+use async_trait::async_trait;
 use std::path::Path;
 
 pub struct MainnetBlockParserActor;
 
+#[async_trait]
 impl ActorFactory for MainnetBlockParserActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
@@ -82,7 +84,7 @@ mod mainnet_block_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your parser actor node (root) using the ActorFactory
-        let parser_node = MainnetBlockParserActor::create_actor();
+        let parser_node = MainnetBlockParserActor::create_actor().await;
         let parser_node_id = parser_node.id();
 
         // 4. Add the parser node as the root. This returns a Sender<Event> for sending events.

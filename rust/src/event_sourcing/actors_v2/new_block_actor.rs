@@ -7,6 +7,7 @@ use crate::{
         payloads::BlockAncestorPayload,
     },
 };
+use async_trait::async_trait;
 use log::warn;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -15,8 +16,9 @@ pub struct NewBlockActor;
 
 const BLOCKCHAIN_TREE_KEY: &str = "blockchain_tree";
 
+#[async_trait]
 impl ActorFactory for NewBlockActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         let mut state = ActorStore::new();
         state.insert("blockchain_tree", BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE));
         ActorNodeBuilder::new()
@@ -126,7 +128,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your BlockAncestorActor node (root)
-        let new_block_actor = NewBlockActor::create_actor();
+        let new_block_actor = NewBlockActor::create_actor().await;
         let new_block_actor_id = new_block_actor.id();
 
         // 4. Add it as root, which returns a `Sender<Event>`
@@ -189,7 +191,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your BlockAncestorActor node (root)
-        let new_block_actor = NewBlockActor::create_actor();
+        let new_block_actor = NewBlockActor::create_actor().await;
         let new_block_actor_id = new_block_actor.id();
 
         // 4. Add it as root to get a `Sender<Event>`
@@ -267,7 +269,7 @@ mod blockchain_tree_builder_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create your BlockAncestorActor node (root)
-        let new_block_actor = NewBlockActor::create_actor();
+        let new_block_actor = NewBlockActor::create_actor().await;
         let new_block_actor_id = new_block_actor.id();
 
         // 4. Add it as root

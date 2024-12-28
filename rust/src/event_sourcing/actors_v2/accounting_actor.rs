@@ -7,6 +7,7 @@ use crate::event_sourcing::{
         DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload,
     },
 };
+use async_trait::async_trait;
 
 pub struct AccountingActor;
 
@@ -398,8 +399,9 @@ impl AccountingActor {
     }
 }
 
+#[async_trait]
 impl ActorFactory for AccountingActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, _state, _requeue| {
@@ -536,7 +538,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         // set_root returns a Sender<Event>
         let actor_sender = dag.set_root(accounting_actor);
@@ -636,7 +638,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         // set_root returns a Sender<Event>
         let actor_sender = dag.set_root(accounting_actor);
@@ -785,7 +787,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         // set_root => returns a Sender<Event>
         let actor_sender = dag.set_root(accounting_actor);
@@ -917,7 +919,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1042,7 +1044,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1142,7 +1144,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1246,7 +1248,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1380,7 +1382,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Root
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1507,7 +1509,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 
@@ -1618,7 +1620,7 @@ mod accounting_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3) Root
-        let accounting_actor = AccountingActor::create_actor();
+        let accounting_actor = AccountingActor::create_actor().await;
         let actor_id = accounting_actor.id();
         let actor_sender = dag.set_root(accounting_actor);
 

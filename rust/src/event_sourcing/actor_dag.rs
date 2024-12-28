@@ -1,4 +1,5 @@
 use super::events::Event;
+use async_trait::async_trait;
 use futures::future::BoxFuture;
 use log::error;
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
@@ -149,7 +150,7 @@ impl ActorDAG {
     }
 
     pub fn link_parent(&mut self, parent_id: &ActorID, child_id: &ActorID) {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         self.child_edges.entry(parent_id.to_string()).or_default().push(tx.clone());
         self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
@@ -206,8 +207,9 @@ impl ActorDAG {
     }
 }
 
+#[async_trait]
 pub trait ActorFactory {
-    fn create_actor() -> ActorNode;
+    async fn create_actor() -> ActorNode;
 }
 
 #[cfg(test)]

@@ -23,7 +23,7 @@ async fn main() {
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
     // 3) Spawn your actor DAG, which returns a Sender<Event>
-    let sender = spawn_actor_dag();
+    let sender = spawn_actor_dag().await;
 
     // 4) Give the DAG a moment to start
     tokio::time::sleep(Duration::from_millis(500)).await;

@@ -7,6 +7,7 @@ use crate::{
         payloads::{BerkeleyBlockPayload, BlockCanonicityUpdatePayload, CanonicalBerkeleyBlockPayload},
     },
 };
+use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -14,8 +15,9 @@ pub struct CanonicalBerkeleyBlockActor;
 
 const CANONICAL_MANAGER_KEY: &str = "canonical_manager";
 
+#[async_trait]
 impl ActorFactory for CanonicalBerkeleyBlockActor {
-    fn create_actor() -> ActorNode {
+    async fn create_actor() -> ActorNode {
         let mut actor_store = ActorStore::new();
         actor_store.insert(
             CANONICAL_MANAGER_KEY,
@@ -185,7 +187,7 @@ mod canonical_berkeley_block_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create the root actor (CanonicalBerkeleyBlockActor) using ActorFactory
-        let actor_node = CanonicalBerkeleyBlockActor::create_actor();
+        let actor_node = CanonicalBerkeleyBlockActor::create_actor().await;
         let actor_id = actor_node.id();
 
         // 4. Set it as root; get a Sender<Event>
@@ -280,7 +282,7 @@ mod canonical_berkeley_block_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create the root actor
-        let actor_node = CanonicalBerkeleyBlockActor::create_actor();
+        let actor_node = CanonicalBerkeleyBlockActor::create_actor().await;
         let actor_id = actor_node.id();
         let actor_sender = dag.set_root(actor_node);
 
