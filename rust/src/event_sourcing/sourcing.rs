@@ -83,7 +83,7 @@ pub fn publish_exempt_accounts(shared_publisher: &Arc<SharedPublisher>) -> Resul
     Ok(())
 }
 
-fn get_genesis_ledger() -> GenesisLedger {
+pub fn get_genesis_ledger() -> GenesisLedger {
     let file_path = PathBuf::from("./src/data/genesis_ledger.json");
 
     // Ensure the file exists before testing

@@ -45,9 +45,16 @@ task ingest: [:build] do
 end
 
 desc "Ingest blocks (v2)"
-task ingest_v2: [:build] do
+task ingest_blocks: [:build] do
   chdir "rust"
-  sh "cargo run --bin ingest"
+  sh "cargo run --bin ingest_blocks"
+  chdir root_dir
+end
+
+desc "Ingest Genesis Ledger"
+task ingest_genesis_ledger: [:build] do
+  chdir "rust"
+  sh "cargo run --bin ingest_genesis_ledger"
   chdir root_dir
 end
 

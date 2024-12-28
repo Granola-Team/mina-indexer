@@ -33,8 +33,12 @@ name = "staking"
 path = "src/bin/ingest_staking_ledgers.rs"
 
 [[bin]]
-name = "ingest"
+name = "ingest_blocks"
 path = "src/bin/ingest_blocks_v2.rs"
+
+[[bin]]
+name = "ingest_genesis_ledger"
+path = "src/bin/ingest_genesis_ledger.rs"
 
 [[bin]]
 name = "ingestion"
