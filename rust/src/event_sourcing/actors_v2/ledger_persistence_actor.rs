@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tokio_postgres::{types::ToSql, NoTls};
 
 pub struct LedgerPersistenceActor;
+type LedgerRow = (String, String, i64, String, String, i64, String, i64);
 
 const LEDGER_TABLE_KEY: &str = "ledger_table";
 
@@ -29,7 +30,7 @@ impl LedgerPersistenceActor {
 
         // 2) Convert each AccountingEntry into a tuple of your desired columns (address, address_type, balance_delta, counterparty, transfer_type, height,
         //    state_hash, timestamp, ...)
-        let values: Vec<(String, String, i64, String, String, i64, String, i64)> = combined_entries
+        let values: Vec<LedgerRow> = combined_entries
             .iter()
             .map(|entry| {
                 let balance_delta: i64 = match entry.entry_type {
