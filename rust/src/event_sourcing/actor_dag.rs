@@ -150,7 +150,7 @@ impl ActorDAG {
     }
 
     pub fn link_parent(&mut self, parent_id: &ActorID, child_id: &ActorID) {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = mpsc::channel(1);
         self.child_edges.entry(parent_id.to_string()).or_default().push(tx.clone());
         self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
@@ -414,11 +414,14 @@ mod actor_dag_tests_v2 {
     async fn test_multi_parent_with_common_ancestor() {
         let mut dag = ActorDAG::new();
 
-        // Create Common Parent node
+        // ------------------------------
+        // Common Parent node
+        // ------------------------------
         let common_parent_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|_event, _state, _requeue| {
                 Box::pin(async {
+                    // Always emit a new "NewBlock" event
                     Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: "From CommonParent".to_string(),
@@ -428,13 +431,17 @@ mod actor_dag_tests_v2 {
             .build();
         let common_parent_id = common_parent_node.id();
 
-        // Create Parent1 node
+        // ------------------------------
+        // Parent1 node
+        // ------------------------------
         let parent1_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
-                    let mut state = state.lock().await;
-                    state.insert("last_event_parent1", event.payload.clone());
+                    // Record the parent's last event
+                    let mut locked_state = state.lock().await;
+                    locked_state.insert("last_event_parent1", event.payload.clone());
+                    // Emit a new event
                     Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: "From Parent1".to_string(),
@@ -444,13 +451,17 @@ mod actor_dag_tests_v2 {
             .build();
         let parent1_id = parent1_node.id();
 
-        // Create Parent2 node
+        // ------------------------------
+        // Parent2 node
+        // ------------------------------
         let parent2_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
-                    let mut state = state.lock().await;
-                    state.insert("last_event_parent2", event.payload.clone());
+                    // Record the parent's last event
+                    let mut locked_state = state.lock().await;
+                    locked_state.insert("last_event_parent2", event.payload.clone());
+                    // Emit a new event
                     Some(vec![Event {
                         event_type: EventType::NewBlock,
                         payload: "From Parent2".to_string(),
@@ -460,28 +471,37 @@ mod actor_dag_tests_v2 {
             .build();
         let parent2_id = parent2_node.id();
 
-        // Create Grandchild node
+        // ------------------------------
+        // Grandchild node
+        // ------------------------------
         let grandchild_node = ActorNodeBuilder::new()
             .with_state(ActorStore::new())
             .with_processor(|event, state, _requeue| {
                 Box::pin(async move {
-                    let mut state = state.lock().await;
-                    let events_received: u64 = state.get("events_received").cloned().unwrap_or(0);
-                    state.insert("events_received", events_received + 1);
-                    state.insert("last_event_grandchild", event.payload.clone());
-                    None
+                    // We'll keep track of *all* payloads we've received
+                    let mut locked_state = state.lock().await;
+                    let mut all_payloads: Vec<String> = locked_state.get("all_parent_payloads").cloned().unwrap_or_default();
+                    all_payloads.push(event.payload.clone());
+                    locked_state.insert("all_parent_payloads", all_payloads);
+
+                    None // Does not emit new events
                 })
             })
             .build();
         let grandchild_id = grandchild_node.id();
 
-        // Add nodes to the DAG
+        // ------------------------------
+        // DAG Setup
+        // ------------------------------
+        // Set the CommonParent as root
         let sender = dag.set_root(common_parent_node);
+
+        // Add the other nodes
         dag.add_node(parent1_node);
         dag.add_node(parent2_node);
         dag.add_node(grandchild_node);
 
-        // Link CommonParent to Parent1 and Parent2
+        // Link the CommonParent to Parent1 and Parent2
         dag.link_parent(&common_parent_id, &parent1_id);
         dag.link_parent(&common_parent_id, &parent2_id);
 
@@ -500,7 +520,9 @@ mod actor_dag_tests_v2 {
             }
         });
 
+        // ------------------------------
         // Send an event to the CommonParent
+        // ------------------------------
         sender
             .send(Event {
                 event_type: EventType::GenesisBlock,
@@ -510,23 +532,32 @@ mod actor_dag_tests_v2 {
             .expect("Message should send");
 
         // Allow processing time
-        sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        // Verify the state of the GrandChild
-        let dag = dag.lock().await;
-        let node = dag.read_node(grandchild_id.clone()).unwrap();
-        let state = node.lock().await.get_state();
-        let state = state.lock().await;
+        // ------------------------------
+        // Verify the Grandchild's state
+        // ------------------------------
+        let dag_locked = dag.lock().await;
+        let node = dag_locked.read_node(grandchild_id.clone()).expect("Grandchild node not found");
+        let grandchild_actor = node.lock().await;
+        let state = grandchild_actor.get_state();
+        let locked_state = state.lock().await;
 
-        assert_eq!(
-            state.get::<u64>("events_received"),
-            Some(&2),
-            "Grandchild should receive one event from each parent"
+        // We recorded each parent's "From ParentX" payload in "all_parent_payloads"
+        let all_parent_payloads: Vec<String> = locked_state.get("all_parent_payloads").cloned().unwrap_or_default();
+
+        // We expect exactly 2 "NewBlock" events from the two parents
+        assert_eq!(all_parent_payloads.len(), 2, "Grandchild should receive one NewBlock from each parent");
+
+        // Ensure that the list has "From Parent1" and "From Parent2", in *any* order
+        // (If you want to check order, you'd do a direct eq check against e.g. ["From Parent1", "From Parent2"])
+        assert!(
+            all_parent_payloads.contains(&"From Parent1".to_string()),
+            "Should contain the payload from Parent1"
         );
-        assert_eq!(
-            state.get::<String>("last_event_grandchild"),
-            Some(&"From Parent2".to_string()),
-            "Last event should be from Parent2"
+        assert!(
+            all_parent_payloads.contains(&"From Parent2".to_string()),
+            "Should contain the payload from Parent2"
         );
     }
 }
