@@ -142,3 +142,22 @@ pub async fn spawn_genesis_ledger_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::m
     // 7. Return the root actor’s Sender<Event>.
     (dag, sender)
 }
+
+pub async fn spawn_preexisting_account_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
+    // 1. Create a new DAG.
+    let mut dag = ActorDAG::new();
+
+    let new_account_node = NewAccountActor::create_actor().await;
+    let sender = dag.set_root(new_account_node);
+
+    let dag = Arc::new(Mutex::new(dag));
+    tokio::spawn({
+        let dag = Arc::clone(&dag);
+        async move {
+            dag.lock().await.spawn_all().await;
+        }
+    });
+
+    // 7. Return the root actor’s Sender<Event>.
+    (dag, sender)
+}

@@ -118,9 +118,9 @@ impl ManagedTableBuilder {
         }
 
         // Drop the table
-        if root.is_none() {
-            self.drop_table(&table_name).await?;
-        }
+        // if root.is_none() {
+        //     self.drop_table(&table_name).await?;
+        // }
 
         // Create the table
         self.create_table(&table_name).await?;
@@ -139,11 +139,11 @@ impl ManagedTableBuilder {
     }
 
     // Drop the table
-    async fn drop_table(&self, table_name: &str) -> Result<()> {
-        let drop_table = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
-        self.client.execute(&drop_table, &[]).await?;
-        Ok(())
-    }
+    // async fn drop_table(&self, table_name: &str) -> Result<()> {
+    //     let drop_table = format!("DROP TABLE IF EXISTS {} CASCADE;", table_name);
+    //     self.client.execute(&drop_table, &[]).await?;
+    //     Ok(())
+    // }
 
     // Create the table
     async fn create_table(&self, table_name: &str) -> Result<()> {
