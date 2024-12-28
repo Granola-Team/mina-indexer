@@ -112,6 +112,9 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.link_parent(&mainnet_block_id, &new_account_node_id);
     dag.link_parent(&block_confirmations_node_id, &new_account_node_id);
 
+    // Introduce a Cycle into the graph
+    dag.link_parent(&new_account_node_id, &accounting_node_id);
+
     let dag = Arc::new(Mutex::new(dag));
     tokio::spawn({
         let dag = Arc::clone(&dag);

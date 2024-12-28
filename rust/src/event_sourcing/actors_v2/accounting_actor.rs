@@ -4,7 +4,7 @@ use crate::event_sourcing::{
     models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
     payloads::{
         AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload,
-        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload,
+        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
     },
 };
 use async_trait::async_trait;
@@ -407,6 +407,44 @@ impl ActorFactory for AccountingActor {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     match event.event_type {
+                        EventType::NewAccount => {
+                            let payload: NewAccountPayload = sonic_rs::from_str(&event.payload).unwrap();
+                            if payload.height < 2 {
+                                // genesis ledger accounts pay no account creation fees
+                                // magic mina receiver in block 1 is also no subject to account creation fee
+                                return None;
+                            }
+                            let record = DoubleEntryRecordPayload {
+                                height: payload.height,
+                                state_hash: payload.state_hash.to_string(),
+                                ledger_destination: LedgerDestination::BlockchainLedger,
+                                lhs: vec![AccountingEntry {
+                                    counterparty: format!("AccountCreationFee#{}", payload.state_hash),
+                                    transfer_type: "AccountCreationFee".to_string(),
+                                    entry_type: AccountingEntryType::Debit,
+                                    account: payload.account.to_string(),
+                                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                                    amount_nanomina: 1_000_000_000,
+                                    timestamp: 0,
+                                }],
+                                rhs: vec![AccountingEntry {
+                                    counterparty: payload.account,
+                                    transfer_type: "AccountCreationFee".to_string(),
+                                    entry_type: AccountingEntryType::Credit,
+                                    account: format!("AccountCreationFee#{}", payload.state_hash),
+                                    account_type: AccountingEntryAccountType::VirtualAddess,
+                                    amount_nanomina: 1_000_000_000,
+                                    timestamp: 0,
+                                }],
+                            };
+
+                            let new_event = Event {
+                                event_type: EventType::DoubleEntryTransaction,
+                                payload: sonic_rs::to_string(&record).unwrap(),
+                            };
+
+                            Some(vec![new_event])
+                        }
                         EventType::CanonicalMainnetBlock => {
                             // parse payload
                             let payload: CanonicalMainnetBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse MainnetBlockPayload");
