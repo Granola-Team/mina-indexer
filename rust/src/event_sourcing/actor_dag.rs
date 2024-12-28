@@ -119,6 +119,8 @@ pub struct ActorDAG {
     nodes: HashMap<ActorID, Arc<Mutex<ActorNode>>>,
 }
 
+const INCR_KEY: &str = "incr_key";
+
 impl Default for ActorDAG {
     fn default() -> Self {
         Self::new()
@@ -131,6 +133,35 @@ impl ActorDAG {
             parent_edges: HashMap::new(),
             child_edges: HashMap::new(),
             nodes: HashMap::new(),
+        }
+    }
+
+    /// Polls each node’s INCR_KEY sum and waits until it stabilizes
+    pub async fn wait_until_quiesced(&self) {
+        use tokio::time::{sleep, Duration};
+
+        let mut last_sum = 0u64;
+
+        loop {
+            // 1) Compute the sum of increments across all nodes
+            let mut current_sum = 0u64;
+            for node_arc in self.nodes.values() {
+                let node = node_arc.lock().await;
+                let store_arc = node.get_state();
+                let store = store_arc.lock().await;
+                // Add whatever is in INCR_KEY for this node (defaults to 0 if absent)
+                current_sum += store.get::<u64>(INCR_KEY).copied().unwrap_or(0_u64);
+            }
+
+            // 2) Check if it’s unchanged from the last loop
+            if current_sum == last_sum {
+                // The total hasn't moved; assume the DAG is quiesced
+                break;
+            }
+
+            // 3) Otherwise, update `last_sum` and wait a bit before re-checking
+            last_sum = current_sum;
+            sleep(Duration::from_millis(500)).await;
         }
     }
 
@@ -150,7 +181,7 @@ impl ActorDAG {
     }
 
     pub fn link_parent(&mut self, parent_id: &ActorID, child_id: &ActorID) {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(100);
         self.child_edges.entry(parent_id.to_string()).or_default().push(tx.clone());
         self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
@@ -183,6 +214,11 @@ impl ActorDAG {
                                 let locked_node = node.lock().await;
                                 let event_processor = &locked_node.event_processor;
                                 let state = Arc::clone(&locked_node.state);
+                                {
+                                    let mut locked_state = state.lock().await;
+                                    let incr = locked_state.remove::<u64>(INCR_KEY).unwrap_or(0_u64);
+                                    locked_state.insert(INCR_KEY, incr + 1);
+                                }
                                 event_processor(event, state, requeue.clone()).await
                             };
 
@@ -218,11 +254,8 @@ mod actor_dag_tests_v2 {
     use crate::event_sourcing::events::EventType;
     /// A very simple test that creates a DAG with a single node (root),
     /// spawns it, and ensures no errors occur.
-    use std::sync::Arc;
-    use tokio::{
-        sync::Mutex,
-        time::{sleep, Duration},
-    };
+    use std::{sync::Arc, time::Duration};
+    use tokio::{sync::Mutex, time::sleep};
 
     #[tokio::test]
     async fn test_single_node_dag() {
@@ -267,6 +300,7 @@ mod actor_dag_tests_v2 {
         sleep(Duration::from_millis(50)).await;
 
         let dag = dag.lock().await;
+        dag.wait_until_quiesced().await;
         let node = dag.read_node(root_node_id).unwrap();
         let state = node.lock().await.get_state();
 
@@ -331,6 +365,7 @@ mod actor_dag_tests_v2 {
 
         // Verify state has been updated
         let dag = dag.lock().await;
+        dag.wait_until_quiesced().await;
         let node = dag.read_node(root_node_id).unwrap();
         let state = node.lock().await.get_state();
 
@@ -404,6 +439,7 @@ mod actor_dag_tests_v2 {
 
         // Verify the child node received the propagated event
         let dag = dag.lock().await;
+        dag.wait_until_quiesced().await;
         let node = dag.read_node(child_node_id).unwrap();
         let child_state = node.lock().await.get_state();
 
@@ -538,6 +574,7 @@ mod actor_dag_tests_v2 {
         // Verify the Grandchild's state
         // ------------------------------
         let dag_locked = dag.lock().await;
+        dag_locked.wait_until_quiesced().await;
         let node = dag_locked.read_node(grandchild_id.clone()).expect("Grandchild node not found");
         let grandchild_actor = node.lock().await;
         let state = grandchild_actor.get_state();

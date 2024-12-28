@@ -12,6 +12,8 @@ use ledger_persistence_actor::LedgerPersistenceActor;
 use mainnet_block_actor::MainnetBlockParserActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
@@ -25,7 +27,7 @@ pub(crate) mod new_block_actor;
 pub(crate) mod pcb_file_path_actor;
 
 /// Spawns a DAG of interlinked actors and returns the `Sender<Event>` for the root actor (`PcbFilePathActor`).
-pub async fn spawn_actor_dag() -> tokio::sync::mpsc::Sender<Event> {
+pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
     // 1. Create a new DAG.
     let mut dag = ActorDAG::new();
 
@@ -93,13 +95,14 @@ pub async fn spawn_actor_dag() -> tokio::sync::mpsc::Sender<Event> {
     dag.add_node(ledger_persistence_node);
     dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
 
+    let dag = Arc::new(Mutex::new(dag));
     tokio::spawn({
-        let mut dag = dag;
+        let dag = Arc::clone(&dag);
         async move {
-            dag.spawn_all().await;
+            dag.lock().await.spawn_all().await;
         }
     });
 
     // 7. Return the root actor’s Sender<Event>.
-    pcb_sender
+    (dag, pcb_sender)
 }
