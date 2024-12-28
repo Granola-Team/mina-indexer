@@ -8,6 +8,7 @@ use block_ancestor_actor::BlockAncestorActor;
 use block_canonicity_actor::BlockCanonicityActor;
 use canonical_berkeley_block_actor::CanonicalBerkeleyBlockActor;
 use canonical_mainnet_block_actor::CanonicalMainnetBlockActor;
+use ledger_persistence_actor::LedgerPersistenceActor;
 use mainnet_block_actor::MainnetBlockParserActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
@@ -56,6 +57,9 @@ pub async fn spawn_actor_dag() -> tokio::sync::mpsc::Sender<Event> {
     let accounting_node = AccountingActor::create_actor().await;
     let accounting_node_id = accounting_node.id();
 
+    let ledger_persistence_node = LedgerPersistenceActor::create_actor().await;
+    let ledger_persistence_node_id = ledger_persistence_node.id();
+
     let pcb_sender = dag.set_root(pcb_node);
 
     dag.add_node(mainnet_block_node);
@@ -85,6 +89,9 @@ pub async fn spawn_actor_dag() -> tokio::sync::mpsc::Sender<Event> {
     dag.add_node(accounting_node);
     dag.link_parent(&canonical_mainnet_block_id, &accounting_node_id);
     dag.link_parent(&canonical_berkeley_block_id, &accounting_node_id);
+
+    dag.add_node(ledger_persistence_node);
+    dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
 
     tokio::spawn({
         let mut dag = dag;

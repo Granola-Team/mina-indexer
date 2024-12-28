@@ -41,6 +41,7 @@ async fn main() {
     // 8) For each file, we `tokio::select!` between:
     //    - sending the file event
     //    - or receiving SIGINT
+    info!("Ingesting blocks...");
     loop {
         // Move to the next file or break if none left
         let file = match entries_iter.next() {

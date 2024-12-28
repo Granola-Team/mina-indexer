@@ -23,6 +23,7 @@ tracing = "0.1.40"
 bs58 = { version = "0.5.1", features = ["check"] }
 strum_macros = "0.26"
 uuid = { version = "1.11.0", features = ["v4"] }
+itertools = "0.13.0"
 
 [dev-dependencies]
 tempfile = "3.14.0"
