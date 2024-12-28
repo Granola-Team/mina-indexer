@@ -35,7 +35,6 @@ impl BlockConfirmationsActor {
             previous_state_hash: Hash(payload.previous_state_hash),
             last_vrf_output: payload.last_vrf_output,
             metadata_str: Some("0".to_string()),
-            ..Default::default()
         };
 
         let mut out_events = Vec::new();
