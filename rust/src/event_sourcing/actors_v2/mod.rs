@@ -6,6 +6,7 @@ use accounting_actor::AccountingActor;
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
 use block_canonicity_actor::BlockCanonicityActor;
+use block_confirmations_actor::BlockConfirmationsActor;
 use canonical_berkeley_block_actor::CanonicalBerkeleyBlockActor;
 use canonical_mainnet_block_actor::CanonicalMainnetBlockActor;
 use ledger_persistence_actor::LedgerPersistenceActor;
@@ -19,6 +20,7 @@ pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
 pub(crate) mod block_canonicity_actor;
+pub(crate) mod block_confirmations_actor;
 pub(crate) mod canonical_berkeley_block_actor;
 pub(crate) mod canonical_mainnet_block_actor;
 pub(crate) mod ledger_persistence_actor;
@@ -62,6 +64,9 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     let ledger_persistence_node = LedgerPersistenceActor::create_actor().await;
     let ledger_persistence_node_id = ledger_persistence_node.id();
 
+    let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
+    let block_confirmations_node_id = block_confirmations_node.id();
+
     let pcb_sender = dag.set_root(pcb_node);
 
     dag.add_node(mainnet_block_node);
@@ -94,6 +99,9 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
 
     dag.add_node(ledger_persistence_node);
     dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
+
+    dag.add_node(block_confirmations_node);
+    dag.link_parent(&new_block_id, &block_confirmations_node_id);
 
     let dag = Arc::new(Mutex::new(dag));
     tokio::spawn({
