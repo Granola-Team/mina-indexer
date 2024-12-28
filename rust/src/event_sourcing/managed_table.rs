@@ -26,6 +26,7 @@ impl ManagedTable {
             client,
             name: String::new(),
             columns: Vec::new(),
+            preserve_table_data: false,
         }
     }
 
@@ -87,6 +88,7 @@ pub struct ManagedTableBuilder {
     client: Client,
     name: String,
     columns: Vec<String>,
+    preserve_table_data: bool,
 }
 
 impl ManagedTableBuilder {
@@ -108,6 +110,11 @@ impl ManagedTableBuilder {
         self
     }
 
+    pub fn preserve_table_data(mut self) -> Self {
+        self.preserve_table_data = true;
+        self
+    }
+
     /// Build and initialize the table, optionally deleting rows based on root node
     pub async fn build(self, root: &Option<(u64, String)>) -> Result<ManagedTable> {
         let table_name = self.name.to_string();
@@ -119,7 +126,9 @@ impl ManagedTableBuilder {
 
         // Drop the table
         if root.is_none() {
-            self.drop_table(&table_name).await?;
+            if !self.preserve_table_data {
+                self.drop_table(&table_name).await?;
+            }
         }
 
         // Create the table
@@ -127,7 +136,9 @@ impl ManagedTableBuilder {
 
         // Handle root node deletion if provided
         if let Some((height, state_hash)) = root {
-            self.handle_root_node_deletion(&table_name, height.to_owned(), state_hash).await?;
+            if !self.preserve_table_data {
+                self.handle_root_node_deletion(&table_name, height.to_owned(), state_hash).await?;
+            }
         }
 
         // Return the ManagedTable instance
@@ -409,5 +420,83 @@ mod test_table_tests {
         assert_eq!(rows.len(), 3, "Expected 3 rows in the table");
         let heights: Vec<i64> = rows.iter().map(|row| row.get("height")).collect();
         assert_eq!(heights, vec![1, 2, 3], "Heights do not match expected values");
+    }
+
+    #[tokio::test]
+    async fn test_preserve_table_data() {
+        // 1) Connect to the database
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to the database");
+        // Spawn the connection handler
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        // 2) First build with `preserve_table_data = false` (the default). Then insert some rows.
+        let table_name = "test_preserve_table_data";
+        {
+            let managed_table = ManagedTable::builder(client)
+                .name(table_name)
+                .add_column("height BIGINT")
+                .add_column("some_value TEXT")
+                // not calling .preserve_table_data(), so it's `false` by default
+                .build(&None) // no root pruning
+                .await
+                .expect("Failed to build table for the first time");
+
+            // Insert a couple of rows
+            managed_table.insert(&[&1_i64, &"some_value_1"]).await.expect("Failed to insert row #1");
+            managed_table.insert(&[&2_i64, &"some_value_2"]).await.expect("Failed to insert row #2");
+
+            // Verify we have 2 rows
+            let rows = managed_table
+                .get_client()
+                .query(&format!("SELECT * FROM {} ORDER BY height", table_name), &[])
+                .await
+                .expect("Failed to query test table");
+            assert_eq!(rows.len(), 2, "Expected 2 rows in the first pass");
+        } // The `managed_table` goes out of scope here, but table remains in DB.
+
+        // 3) Build again, but now call `.preserve_table_data()`. We expect the table is NOT dropped or truncated, so the prior rows remain.
+        {
+            let (client2, connection2) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+                .await
+                .expect("Failed to connect to the database for second pass");
+            tokio::spawn(async move {
+                if let Err(e) = connection2.await {
+                    eprintln!("Connection2 error: {}", e);
+                }
+            });
+
+            let managed_table_2 = ManagedTable::builder(client2)
+                .name(table_name)
+                .add_column("height BIGINT")
+                .add_column("some_value TEXT")
+                .preserve_table_data() // <--- crucial difference
+                .build(&None)
+                .await
+                .expect("Failed to build table for the second pass with preserve_table_data");
+
+            // Query to see if old rows remain
+            let rows = managed_table_2
+                .get_client()
+                .query(&format!("SELECT * FROM {} ORDER BY height", table_name), &[])
+                .await
+                .expect("Failed to query test table after preserving data");
+            assert_eq!(rows.len(), 2, "Expected old rows to remain with preserve_table_data = true");
+
+            // Insert an additional row now
+            managed_table_2.insert(&[&3_i64, &"new_value_3"]).await.expect("Failed to insert row #3");
+
+            let rows = managed_table_2
+                .get_client()
+                .query(&format!("SELECT * FROM {} ORDER BY height", table_name), &[])
+                .await
+                .expect("Failed to query test table after new insert");
+            assert_eq!(rows.len(), 3, "Expected the table to contain the original 2 rows plus the new one");
+        }
     }
 }
