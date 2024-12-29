@@ -1,5 +1,5 @@
-use anyhow::Result;
-use tokio_postgres::Client;
+use anyhow::{anyhow, Result};
+use tokio_postgres::{types::ToSql, Client};
 
 /// A "key/value" store with user-defined columns, built on top of PostgreSQL.
 ///
@@ -61,6 +61,95 @@ impl ManagedStore {
             columns: Vec::new(),
             preserve_data: false,
         }
+    }
+
+    /// Increments a numeric column named `col_name` by `amount` on the row with `key`.
+    ///
+    /// - If the row doesn't exist, we insert it (with defaults for all other columns) and set the numeric column to `0 + amount`.
+    /// - If the row exists, we add `amount` to its existing value in that column.
+    /// - Other columns in that row are left untouched.
+    /// - If `col_name` is not defined or is not numeric, we return an error.
+    ///
+    /// Returns the number of rows affected (0 or 1).
+    pub async fn incr(&self, key: &str, col_name: &str, amount: i64) -> Result<u64> {
+        // 1) Ensure col_name is actually a numeric column in self.columns
+        let maybe_col = self.columns.iter().find(|c| c.name == col_name);
+        let col_def = match maybe_col {
+            Some(cdef) => cdef,
+            None => return Err(anyhow!("Column '{}' not found in store '{}'", col_name, self.store_name)),
+        };
+        match col_def.col_type {
+            StoreColumnType::Numeric => { /* ok */ }
+            StoreColumnType::Text => return Err(anyhow!("Column '{}' in store '{}' is TEXT, cannot increment", col_def.name, self.store_name)),
+        }
+
+        // 2) We need to supply values for `key` and for `col_name` only, and use DEFAULT for all other columns. Then in the ON CONFLICT, we do: `col_name =
+        //    {table}.col_name + EXCLUDED.col_name`
+        //
+        // For the insert we want something like:
+        //   INSERT INTO store_name (key, col_incr, other_col1, other_col2, ...)
+        //   VALUES ($1, $2, DEFAULT, DEFAULT, ...)
+        //   ON CONFLICT (key) DO UPDATE SET col_incr = store_name.col_incr + EXCLUDED.col_incr;
+        //
+        // So we build:
+        //   - `insert_cols` => ["key", "col_incr", "colX", "colY", ...] with `DEFAULT` placeholders for the others
+        //   - for each numeric/text col != col_incr => we place "DEFAULT"
+        //   - The `ON CONFLICT` clause only updates `col_incr`.
+
+        let mut insert_cols = Vec::new();
+        let mut insert_placeholders = Vec::new();
+        let mut params: Vec<&(dyn ToSql + Sync)> = Vec::new();
+
+        // We'll start param index from 1 for "key"
+        insert_cols.push("key".to_string());
+        insert_placeholders.push("$1".to_string());
+        params.push(&key);
+
+        // Next param for the increment column
+        //   insert => amount
+        //   conflict => "col_name = col_name + EXCLUDED.col_name"
+        insert_cols.push(col_name.to_string());
+        insert_placeholders.push("$2".to_string());
+        params.push(&amount);
+
+        // We build the conflict clause (we only update col_name)
+        let conflict_update = format!(
+            "{col_name} = {tbl}.{col_name} + EXCLUDED.{col_name}",
+            col_name = col_name,
+            tbl = self.store_name
+        );
+
+        // For all other columns, we do "DEFAULT"
+        // The skip columns are: "key" and `col_name`.
+        // So for each col in self.columns, if col is not key & not col_name => "DEFAULT"
+        for c in &self.columns {
+            if c.name == "key" || c.name == col_name {
+                continue;
+            }
+            insert_cols.push(c.name.clone());
+            insert_placeholders.push("DEFAULT".to_string());
+        }
+
+        // Build the final INSERT statement
+        let insert_cols_str = insert_cols.join(", ");
+        let insert_placeholders_str = insert_placeholders.join(", ");
+
+        // e.g.
+        //   INSERT INTO store_name (key, col_name, other1, other2)
+        //   VALUES ($1, $2, DEFAULT, DEFAULT)
+        //   ON CONFLICT (key) DO UPDATE SET col_name = store_name.col_name + EXCLUDED.col_name;
+        let stmt = format!(
+            "INSERT INTO {tbl} ({cols}) VALUES ({vals}) \
+                 ON CONFLICT (key) DO UPDATE SET {conf};",
+            tbl = self.store_name,
+            cols = insert_cols_str,
+            vals = insert_placeholders_str,
+            conf = conflict_update,
+        );
+
+        // 3) Execute
+        let rows_affected = self.client.execute(&stmt, &params[..]).await?;
+        Ok(rows_affected)
     }
 
     /// Upsert a set of column-values for the given `key`.
@@ -460,6 +549,54 @@ mod managed_store_tests {
         // Should remain exactly the same
         let row_count2 = row_count_for_key(store.client(), store_name, "keyX").await;
         assert_eq!(row_count2, 1, "Still only one row for keyX after second upsert");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_managed_store_incr() -> anyhow::Result<()> {
+        // 1) Connect to the database
+        let client = connect_to_db().await;
+
+        // 2) Define the store name
+        let store_name = "test_managed_store_incr";
+
+        // 3) Build the store (drops existing table if not preserving data).
+        let store = ManagedStore::builder(client)
+            .name(store_name)
+            .add_numeric_column("balance") // default 0
+            .add_text_column("comment") // default ''
+            .build()
+            .await?;
+
+        // 4) INCR a brand-new key => "acctA" We expect a new row with "balance = 123", "comment" at default ('')
+        store.incr("acctA", "balance", 123).await?;
+
+        // 4a) Check row_count_for_key(...) => 1
+        let row_count = row_count_for_key(store.client(), store_name, "acctA").await;
+        assert_eq!(row_count, 1, "Expected row for 'acctA' after first incr(...)");
+
+        // 4b) Check balance => 123, comment => ""
+        let balance_1: i64 = get_column_value(store.client(), store_name, "acctA", "balance")
+            .await
+            .expect("Missing 'balance' after first incr");
+        assert_eq!(balance_1, 123, "Balance should be 123 after first incr");
+
+        let comment_1: String = get_column_value(store.client(), store_name, "acctA", "comment")
+            .await
+            .expect("Missing 'comment' after first incr");
+        assert_eq!(comment_1, "", "comment should be default empty string for new row");
+
+        // 5) INCR the same key again => +50 => net 173
+        store.incr("acctA", "balance", 50).await?;
+        let balance_2: i64 = get_column_value(store.client(), store_name, "acctA", "balance")
+            .await
+            .expect("Missing 'balance' after second incr");
+        assert_eq!(balance_2, 173, "Balance should be 173 after second incr (+50)");
+
+        // 6) Attempt to increment a TEXT column => expect an error
+        let err = store.incr("acctA", "comment", 10).await.expect_err("Should fail to incr TEXT column");
+        assert!(err.to_string().contains("is TEXT"), "Expected error about TEXT column, got: {}", err);
 
         Ok(())
     }
