@@ -181,7 +181,7 @@ impl ActorDAG {
     }
 
     pub fn link_parent(&mut self, parent_id: &ActorID, child_id: &ActorID) {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(1);
         self.child_edges.entry(parent_id.to_string()).or_default().push(tx.clone());
         self.parent_edges.entry(child_id.to_string()).or_default().push((tx, rx));
     }
