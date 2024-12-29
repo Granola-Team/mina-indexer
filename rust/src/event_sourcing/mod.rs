@@ -30,6 +30,7 @@ pub mod db_logger;
 pub mod events;
 pub mod genesis_ledger_models;
 pub mod mainnet_block_models;
+pub mod managed_store;
 pub mod managed_table;
 pub mod models;
 pub mod payloads;

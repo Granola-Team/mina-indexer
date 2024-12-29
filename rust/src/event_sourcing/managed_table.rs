@@ -125,10 +125,8 @@ impl ManagedTableBuilder {
         }
 
         // Drop the table
-        if root.is_none() {
-            if !self.preserve_table_data {
-                self.drop_table(&table_name).await?;
-            }
+        if root.is_none() && !self.preserve_table_data {
+            self.drop_table(&table_name).await?;
         }
 
         // Create the table
