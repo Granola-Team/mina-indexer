@@ -63,7 +63,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     let accounting_node = AccountingActor::create_actor().await;
     let accounting_node_id = accounting_node.id();
 
-    let ledger_persistence_node = LedgerPersistenceActor::create_actor().await;
+    let ledger_persistence_node = LedgerPersistenceActor::create_actor(true).await;
     let ledger_persistence_node_id = ledger_persistence_node.id();
 
     let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
@@ -131,7 +131,7 @@ pub async fn spawn_genesis_ledger_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::m
     // 1. Create a new DAG.
     let mut dag = ActorDAG::new();
 
-    let ledger_persistence_node = LedgerPersistenceActor::create_actor().await;
+    let ledger_persistence_node = LedgerPersistenceActor::create_actor(false).await;
     let sender = dag.set_root(ledger_persistence_node);
 
     let dag = Arc::new(Mutex::new(dag));

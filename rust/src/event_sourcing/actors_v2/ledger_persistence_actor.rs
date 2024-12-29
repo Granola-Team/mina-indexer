@@ -1,13 +1,12 @@
 use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        actor_dag::{ActorNode, ActorNodeBuilder, ActorStore},
         events::EventType,
         managed_table::ManagedTable,
         payloads::{AccountingEntry, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
     },
 };
-use async_trait::async_trait;
 use itertools::Itertools;
 use log::error;
 use std::sync::Arc;
@@ -76,11 +75,8 @@ impl LedgerPersistenceActor {
             error!("bulk_insert error: {}", e);
         }
     }
-}
 
-#[async_trait]
-impl ActorFactory for LedgerPersistenceActor {
-    async fn create_actor() -> ActorNode {
+    pub async fn create_actor(preserve_data: bool) -> ActorNode {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
             .expect("Unable to connect to database");
@@ -91,7 +87,7 @@ impl ActorFactory for LedgerPersistenceActor {
         });
 
         // 3) Build the ManagedTable (blocking)
-        let table = ManagedTable::builder(client)
+        let table_builder = ManagedTable::builder(client)
             .name("blockchain_ledger")
             .add_column("address TEXT NOT NULL")
             .add_column("address_type TEXT NOT NULL")
@@ -100,10 +96,20 @@ impl ActorFactory for LedgerPersistenceActor {
             .add_column("transfer_type TEXT NOT NULL")
             .add_column("height BIGINT NOT NULL")
             .add_column("state_hash TEXT NOT NULL")
-            .add_column("timestamp BIGINT NOT NULL")
-            .build(&None)
-            .await
-            .expect("Failed building ledger table in LedgerPersistenceActor");
+            .add_column("timestamp BIGINT NOT NULL");
+
+        let table = if preserve_data {
+            table_builder
+                .preserve_table_data()
+                .build(&None)
+                .await
+                .expect("Failed building ledger table in LedgerPersistenceActor")
+        } else {
+            table_builder
+                .build(&None)
+                .await
+                .expect("Failed building ledger table in LedgerPersistenceActor")
+        };
 
         // 4) Put the table in the ActorStore
         let mut store = ActorStore::new();
@@ -146,7 +152,7 @@ mod ledger_persistence_actor_tests_v2 {
     use crate::{
         constants::POSTGRES_CONNECTION_STRING,
         event_sourcing::{
-            actor_dag::{ActorDAG, ActorFactory},
+            actor_dag::ActorDAG,
             events::EventType,
             payloads::{AccountingEntry, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
         },
@@ -190,7 +196,7 @@ mod ledger_persistence_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2) Create the LedgerPersistenceActor node, set it as root
-        let ledger_actor = LedgerPersistenceActor::create_actor().await;
+        let ledger_actor = LedgerPersistenceActor::create_actor(false).await;
         let ledger_sender = dag.set_root(ledger_actor);
 
         // 3) Spawn the DAG
