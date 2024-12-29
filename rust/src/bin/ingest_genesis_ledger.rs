@@ -5,6 +5,7 @@ use mina_indexer::{
     event_sourcing::{
         actors_v2::{spawn_genesis_ledger_dag, spawn_preexisting_account_dag},
         events::{Event, EventType},
+        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
         sourcing::get_genesis_ledger,
     },
 };
@@ -40,15 +41,50 @@ async fn main() {
         let (dag, sender) = spawn_genesis_ledger_dag().await;
 
         for de in get_genesis_ledger().get_accounting_double_entries() {
-            if let Err(_err) = sender
+            if let Err(err) = sender
                 .send(Event {
                     event_type: EventType::DoubleEntryTransaction,
                     payload: sonic_rs::to_string(&de).unwrap(),
                 })
                 .await
             {
-                error!("Failed to process a double entry from the genesis ledger");
+                error!("Failed to process a double entry from the genesis ledger: {err}");
             }
+        }
+
+        // Publish magic mina from genesis block
+        let payload = GenesisBlockPayload::new();
+        let magic_mina = DoubleEntryRecordPayload {
+            height: 1,
+            state_hash: payload.state_hash,
+            ledger_destination: LedgerDestination::BlockchainLedger,
+            lhs: vec![AccountingEntry {
+                counterparty: "MagicMinaForBlock0".to_string(),
+                transfer_type: "BlockReward".to_string(),
+                account: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+                entry_type: AccountingEntryType::Credit,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1000,
+                timestamp: payload.unix_timestamp,
+            }],
+            rhs: vec![AccountingEntry {
+                counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+                transfer_type: "BlockReward".to_string(),
+                account: "MagicMinaForBlock0".to_string(),
+                entry_type: AccountingEntryType::Debit,
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: 1000,
+                timestamp: payload.unix_timestamp,
+            }],
+        };
+        if let Err(err) = sender
+            .send(Event {
+                event_type: EventType::DoubleEntryTransaction,
+                payload: sonic_rs::to_string(&magic_mina).unwrap(),
+            })
+            .await
+        {
+            error!("Failed to process a double entry (magic mina) from the genesis block: {err}");
         }
 
         Arc::clone(&dag)
