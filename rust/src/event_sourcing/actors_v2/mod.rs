@@ -2,6 +2,7 @@ use super::{
     actor_dag::{ActorDAG, ActorFactory},
     events::Event,
 };
+use account_summary_actor::AccountSummaryActor;
 use accounting_actor::AccountingActor;
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
@@ -17,6 +18,7 @@ use pcb_file_path_actor::PcbFilePathActor;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+pub(crate) mod account_summary_actor;
 pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
@@ -72,6 +74,9 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     let new_account_node = NewAccountActor::create_actor().await;
     let new_account_node_id = new_account_node.id();
 
+    let account_summary_node = AccountSummaryActor::create_actor().await;
+    let account_summary_node_id = account_summary_node.id();
+
     let pcb_sender = dag.set_root(pcb_node);
 
     dag.add_node(mainnet_block_node);
@@ -114,6 +119,9 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
 
     // Introduce a Cycle into the graph
     dag.link_parent(&new_account_node_id, &accounting_node_id);
+
+    dag.add_node(account_summary_node);
+    dag.link_parent(&accounting_node_id, &account_summary_node_id);
 
     let dag = Arc::new(Mutex::new(dag));
     tokio::spawn({

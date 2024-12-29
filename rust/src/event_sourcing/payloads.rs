@@ -408,7 +408,10 @@ pub enum InternalCommandType {
     FeeTransfer,
 }
 
-use std::{collections::HashSet, fmt};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+};
 
 impl fmt::Display for InternalCommandType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -648,4 +651,9 @@ impl AccountingEntry {
     pub fn contains(&self, account: &str) -> bool {
         self.account == account
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountBalanceDeltaPayload {
+    pub balance_deltas: HashMap<String, i64>,
 }
