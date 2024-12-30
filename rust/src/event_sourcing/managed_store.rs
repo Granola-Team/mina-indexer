@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use tokio_postgres::{types::ToSql, Client};
+use tokio_postgres::{
+    types::{FromSql, ToSql},
+    Client,
+};
 
 /// A "key/value" store with user-defined columns, built on top of PostgreSQL.
 ///
@@ -249,6 +252,38 @@ impl ManagedStore {
 
         let rows_affected = self.client.execute(&stmt, &all_values).await?;
         Ok(rows_affected)
+    }
+
+    /// Fetches the value of one column for the given `key`.
+    ///
+    /// - If no row for `key`, returns `Ok(None)`.
+    /// - If the row exists but the column is `NULL`, also returns `Ok(None)`.
+    /// - If the column does not exist in the store definition, returns an error.
+    /// - `T` must implement `FromSql` so we can parse it from the Postgres row.
+    pub async fn get<T>(&self, key: &str, col_name: &str) -> Result<Option<T>>
+    where
+        // We need a higher-ranked trait bound so we can parse from row columns.
+        T: for<'a> FromSql<'a> + std::marker::Unpin,
+    {
+        // 1) Ensure `col_name` actually exists in this store:
+        self.columns
+            .iter()
+            .find(|c| c.name == col_name)
+            .ok_or_else(|| anyhow!("Column '{}' not found in store '{}'", col_name, self.store_name))?;
+
+        // 2) Build a simple `SELECT col_name FROM table WHERE key = $1` query
+        let sql = format!("SELECT {col_name} FROM {table} WHERE key = $1", col_name = col_name, table = self.store_name);
+
+        // 3) Execute the query with `key` as the parameter
+        let row_opt = self.client.query_opt(&sql, &[&key]).await?;
+
+        // 4) If no row => Ok(None) If row is found but the column is NULL => also Ok(None). Otherwise parse the column as T
+        if let Some(row) = row_opt {
+            let val = row.try_get::<_, T>(0)?;
+            Ok(Some(val))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -597,6 +632,57 @@ mod managed_store_tests {
         // 6) Attempt to increment a TEXT column => expect an error
         let err = store.incr("acctA", "comment", 10).await.expect_err("Should fail to incr TEXT column");
         assert!(err.to_string().contains("is TEXT"), "Expected error about TEXT column, got: {}", err);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_managed_store_get() -> anyhow::Result<()> {
+        use tokio_postgres::types::ToSql;
+
+        // 1) Connect
+        let client = connect_to_db().await;
+
+        // 2) Build a store
+        let store_name = "test_managed_store_get";
+        let store = ManagedStore::builder(client)
+            .name(store_name)
+            .add_numeric_column("count")
+            .add_text_column("description")
+            .build()
+            .await?;
+
+        // 3) Upsert a couple keys
+        store.upsert("keyA", &[("count", &42_i64 as &(dyn ToSql + Sync))]).await?;
+        store.upsert("keyB", &[]).await?; // no columns => uses defaults
+
+        // 4) Use our new .get<T> to read these columns
+        // For keyA => "count" should be 42
+        let val_a: Option<i64> = store.get("keyA", "count").await?;
+        assert_eq!(val_a, Some(42), "keyA.count should be 42");
+
+        // For keyA => "description" is default => ""
+        let desc_a: Option<String> = store.get("keyA", "description").await?;
+        assert_eq!(desc_a, Some("".to_string()), "keyA.description should default to empty string");
+
+        // For keyB => "count" is default => 0
+        let val_b: Option<i64> = store.get("keyB", "count").await?;
+        assert_eq!(val_b, Some(0), "keyB.count should be default 0");
+
+        // For keyB => "description" => ""
+        let desc_b: Option<String> = store.get("keyB", "description").await?;
+        assert_eq!(desc_b, Some("".into()), "keyB.description should be empty string");
+
+        // 5) If we attempt to get from a row that doesn't exist => Ok(None)
+        let val_c: Option<i64> = store.get("no_such_key", "count").await?;
+        assert_eq!(val_c, None, "Should get None for missing row no_such_key");
+
+        // 6) If we attempt to get a column that isn't in the store => Err
+        let err = store.get::<i64>("keyA", "non_existent_col").await.expect_err("Should fail on unknown column");
+        assert!(
+            err.to_string().contains("Column 'non_existent_col' not found"),
+            "Expected error about unknown column"
+        );
 
         Ok(())
     }
