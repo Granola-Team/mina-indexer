@@ -71,7 +71,7 @@ async fn main() {
 
     sleep(std::time::Duration::from_secs(1)).await;
 
-    let magic_mina = CanonicalMainnetBlockPayload {
+    let canonical_genesis_block = CanonicalMainnetBlockPayload {
         canonical: true,
         was_canonical: false,
         block: MainnetBlockPayload {
@@ -90,7 +90,7 @@ async fn main() {
     if let Err(err) = sender
         .send(Event {
             event_type: EventType::CanonicalMainnetBlock,
-            payload: sonic_rs::to_string(&magic_mina).unwrap(),
+            payload: sonic_rs::to_string(&canonical_genesis_block).unwrap(),
         })
         .await
     {
