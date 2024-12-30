@@ -2,6 +2,7 @@ use super::{
     canonical_items_manager::CanonicalItem,
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
 };
+use crate::constants::MAINNET_COINBASE_REWARD;
 use sonic_rs::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -226,6 +227,9 @@ pub struct GenesisBlockPayload {
     pub previous_state_hash: String,
     pub last_vrf_output: String,
     pub unix_timestamp: u64,
+    pub coinbase_receiver: String,
+    pub coinbase_reward: u64,
+    pub global_slot_since_genesis: u64,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -249,6 +253,9 @@ impl GenesisBlockPayload {
             previous_state_hash: "3NLoKn22eMnyQ7rxh5pxB6vBA3XhSAhhrf7akdqS6HbAKD14Dh1d".to_string(),
             last_vrf_output: "NfThG1r1GxQuhaGLSJWGxcpv24SudtXG4etB0TnGqwg=".to_string(),
             unix_timestamp: 1615939200000,
+            coinbase_receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+            coinbase_reward: MAINNET_COINBASE_REWARD * 2,
+            global_slot_since_genesis: 1,
         }
     }
 }
