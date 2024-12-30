@@ -2,7 +2,7 @@ use crate::{
     blockchain_tree::Height,
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        actor_dag::{ActorNode, ActorNodeBuilder, ActorStore},
         events::EventType,
         managed_store::ManagedStore,
         payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
@@ -114,11 +114,8 @@ impl NewAccountActor {
             Some(out_events)
         }
     }
-}
 
-#[async_trait::async_trait]
-impl ActorFactory for NewAccountActor {
-    async fn create_actor() -> ActorNode {
+    pub async fn create_actor(preserve_data: bool) -> ActorNode {
         // 1) Connect to Postgres
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
@@ -132,20 +129,24 @@ impl ActorFactory for NewAccountActor {
         // 2) Build (or re-build) our ManagedStore for discovered accounts.
         // Suppose we define columns: key TEXT PRIMARY KEY, height BIGINT
         // Non-preserving => we drop the table each time, unless you want to set preserve_data().
-        let discovered_store = ManagedStore::builder(client)
-            .name(ACCOUNTS_STORE_KEY)
-            .add_numeric_column("height") // default=0
-            // .preserve_data() // or not, depending on your needs
-            .build()
-            .await
-            .expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
+        let store_builder = ManagedStore::builder(client).name(ACCOUNTS_STORE_KEY).add_numeric_column("height"); // default=0
+                                                                                                                 // .preserve_data() // or not, depending on your needs
+        if preserve_data {
+            store_builder
+                .preserve_data()
+                .build()
+                .await
+                .expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
+        } else {
+            store_builder.build().await.expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
+        };
 
         // 3) Create an empty HashMap<Height, Vec<MainnetBlockPayload>>
         let blocks_map: HashMap<Height, Vec<MainnetBlockPayload>> = HashMap::new();
 
         // 4) Put them in the actor store
         let mut store = ActorStore::new();
-        store.insert(ACCOUNTS_STORE_KEY, discovered_store);
+        store.insert(ACCOUNTS_STORE_KEY, ());
         store.insert(BLOCKS_KEY, blocks_map);
 
         // 5) Build and return the ActorNode
@@ -267,7 +268,7 @@ mod new_account_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2. Create the NewAccountActor (root)
-        let new_account_actor = NewAccountActor::create_actor().await;
+        let new_account_actor = NewAccountActor::create_actor(false).await;
         let new_account_id = new_account_actor.id();
         let sender = dag.set_root(new_account_actor);
 
@@ -324,7 +325,7 @@ mod new_account_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2. Create the NewAccountActor (root)
-        let new_account_actor = NewAccountActor::create_actor().await;
+        let new_account_actor = NewAccountActor::create_actor(false).await;
         let new_account_id = new_account_actor.id();
         let sender = dag.set_root(new_account_actor);
 
@@ -387,7 +388,7 @@ mod new_account_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2. Create the NewAccountActor + sink node
-        let new_account_actor = NewAccountActor::create_actor().await;
+        let new_account_actor = NewAccountActor::create_actor(false).await;
         let new_account_id = new_account_actor.id();
         let sender = dag.set_root(new_account_actor);
 
@@ -461,7 +462,7 @@ mod new_account_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2. Root node + sink
-        let new_account_actor = NewAccountActor::create_actor().await;
+        let new_account_actor = NewAccountActor::create_actor(false).await;
         let new_account_id = new_account_actor.id();
         let sender = dag.set_root(new_account_actor);
 
@@ -531,7 +532,7 @@ mod new_account_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 2. Root + sink
-        let new_account_actor = NewAccountActor::create_actor().await;
+        let new_account_actor = NewAccountActor::create_actor(false).await;
         let new_account_id = new_account_actor.id();
         let sender = dag.set_root(new_account_actor);
 

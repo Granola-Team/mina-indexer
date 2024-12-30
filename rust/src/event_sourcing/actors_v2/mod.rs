@@ -75,7 +75,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
     let block_confirmations_node_id = block_confirmations_node.id();
 
-    let new_account_node = NewAccountActor::create_actor().await;
+    let new_account_node = NewAccountActor::create_actor(true).await;
     let new_account_node_id = new_account_node.id();
 
     let account_summary_node = AccountSummaryActor::create_actor().await;
@@ -176,7 +176,7 @@ pub async fn spawn_genesis_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Se
 
     // Branch 3: For processing pre-existing accounts
     // Leaf
-    let new_account_node = NewAccountActor::create_actor().await;
+    let new_account_node = NewAccountActor::create_actor(false).await;
     let new_account_node_id = new_account_node.id();
     dag.add_node(new_account_node);
     dag.link_parent(&identity_node_id, &new_account_node_id);
