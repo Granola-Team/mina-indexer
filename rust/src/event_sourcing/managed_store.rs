@@ -254,6 +254,15 @@ impl ManagedStore {
         Ok(rows_affected)
     }
 
+    pub async fn key_exists(&self, key: &str) -> Result<bool> {
+        // Build a simple query: "SELECT 1 FROM table WHERE key = $1 LIMIT 1"
+        let sql = format!("SELECT 1 FROM {} WHERE key = $1 LIMIT 1", self.store_name);
+        let row_opt = self.client.query_opt(&sql, &[&key]).await?;
+
+        // If `row_opt` is Some(...) => row was found => true, else false
+        Ok(row_opt.is_some())
+    }
+
     /// Fetches the value of one column for the given `key`.
     ///
     /// - If no row for `key`, returns `Ok(None)`.
@@ -683,6 +692,46 @@ mod managed_store_tests {
             err.to_string().contains("Column 'non_existent_col' not found"),
             "Expected error about unknown column"
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_managed_store_key_exists() -> anyhow::Result<()> {
+        // 1) Connect to the database
+        let client = connect_to_db().await;
+
+        // 2) Build a store (non-preserving) with some columns, for testing
+        let store_name = "test_managed_store_key_exists";
+        let store = ManagedStore::builder(client)
+            .name(store_name)
+            .add_numeric_column("some_counter")
+            .add_text_column("some_text")
+            .build()
+            .await?; // Will drop/create the table
+
+        // 3) Check that a random key does NOT exist
+        let key = "nonexistent_key";
+        let exists1 = store.key_exists(key).await?;
+        assert!(!exists1, "Expected 'nonexistent_key' to not exist initially");
+
+        // 4) Upsert the key
+        store
+            .upsert(key, &[("some_counter", &123i64 as &(dyn ToSql + Sync)), ("some_text", &"Hello!")])
+            .await?;
+
+        // 5) Now key_exists should return true
+        let exists2 = store.key_exists(key).await?;
+        assert!(exists2, "Expected 'nonexistent_key' to exist after upsert");
+
+        // 6) Upsert again => key_exists stays true
+        store.upsert(key, &[("some_counter", &999i64 as &(dyn ToSql + Sync))]).await?;
+        let exists3 = store.key_exists(key).await?;
+        assert!(exists3, "Key should still exist after second upsert");
+
+        // 7) For completeness, check another random key => false
+        let exists4 = store.key_exists("another_key").await?;
+        assert!(!exists4, "Another random key should not exist");
 
         Ok(())
     }
