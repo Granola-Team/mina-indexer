@@ -321,6 +321,7 @@ impl ManagedStoreBuilder {
 
         // create it
         let create_q = format!("CREATE TABLE IF NOT EXISTS {} ( {} );", store_name, definition_lines.join(", "));
+        println!("{create_q}");
         self.client.execute(&create_q, &[]).await?;
 
         Ok(ManagedStore {

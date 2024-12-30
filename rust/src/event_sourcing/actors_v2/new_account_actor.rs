@@ -105,7 +105,7 @@ impl NewAccountActor {
         }
 
         // Put things back
-        store.insert(ACCOUNTS_STORE_KEY, managed_store);
+        store.insert::<ManagedStore>(ACCOUNTS_STORE_KEY, managed_store);
         store.insert(BLOCKS_KEY, blocks_map);
 
         if out_events.is_empty() {
@@ -130,15 +130,14 @@ impl NewAccountActor {
         // Suppose we define columns: key TEXT PRIMARY KEY, height BIGINT
         // Non-preserving => we drop the table each time, unless you want to set preserve_data().
         let store_builder = ManagedStore::builder(client).name(ACCOUNTS_STORE_KEY).add_numeric_column("height"); // default=0
-                                                                                                                 // .preserve_data() // or not, depending on your needs
-        if preserve_data {
+        let managed_store = if preserve_data {
             store_builder
                 .preserve_data()
                 .build()
                 .await
-                .expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
+                .expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore")
         } else {
-            store_builder.build().await.expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
+            store_builder.build().await.expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore")
         };
 
         // 3) Create an empty HashMap<Height, Vec<MainnetBlockPayload>>
@@ -146,7 +145,7 @@ impl NewAccountActor {
 
         // 4) Put them in the actor store
         let mut store = ActorStore::new();
-        store.insert(ACCOUNTS_STORE_KEY, ());
+        store.insert::<ManagedStore>(ACCOUNTS_STORE_KEY, managed_store);
         store.insert(BLOCKS_KEY, blocks_map);
 
         // 5) Build and return the ActorNode
@@ -193,29 +192,12 @@ mod new_account_actor_tests_v2 {
             payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
         },
     };
-    use log::error;
     use std::{collections::HashMap, sync::Arc};
     use tokio::{
         sync::Mutex,
         time::{sleep, Duration},
     };
     use tokio_postgres::NoTls;
-
-    async fn setup() {
-        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-            .await
-            .expect("Unable to connect to database");
-        // Spawn the connection task
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                error!("Postgres connection error: {}", e);
-            }
-        });
-
-        if let Err(e) = client.execute(format!("DROP TABLE IF EXISTS {};", ACCOUNTS_STORE_KEY).as_str(), &[]).await {
-            error!("Unable to drop user_commands table {:?}", e);
-        }
-    }
 
     /// Connect to Postgres with the standard `POSTGRES_CONNECTION_STRING`.
     /// Spawns the connection handling on a background task.
@@ -263,7 +245,6 @@ mod new_account_actor_tests_v2 {
 
     #[tokio::test]
     async fn test_preexisting_account_inserted() {
-        setup().await;
         // 1. Build the DAG
         let mut dag = ActorDAG::new();
 
@@ -301,26 +282,15 @@ mod new_account_actor_tests_v2 {
         // Wait a bit
         sleep(Duration::from_millis(200)).await;
 
-        // 6. Verify the table directly
-        let dag_locked = dag.lock().await;
-        let node_arc = dag_locked.read_node(new_account_id).expect("Node not found");
-        let node_guard = node_arc.lock().await;
-        let store = node_guard.get_state();
-        let mut locked_store = store.lock().await;
-
         // Grab the Postgres client
         let client = connect_to_db().await;
         let check_query = &format!("SELECT EXISTS (SELECT 1 FROM {} WHERE key = $1)", ACCOUNTS_STORE_KEY);
         let account_exists: bool = client.query_one(check_query, &[&account]).await.unwrap().get(0);
         assert!(account_exists, "Pre-existing account should be inserted into the DB");
-
-        // Reinsert the client so it remains in the store
-        locked_store.insert("new_account_client", client);
     }
 
     #[tokio::test]
     async fn test_mainnet_block_handling() {
-        setup().await;
         // 1. Build the DAG
         let mut dag = ActorDAG::new();
 
@@ -383,7 +353,6 @@ mod new_account_actor_tests_v2 {
 
     #[tokio::test]
     async fn test_block_confirmation_with_new_accounts() {
-        setup().await;
         // 1. Build the DAG
         let mut dag = ActorDAG::new();
 
@@ -457,7 +426,6 @@ mod new_account_actor_tests_v2 {
 
     #[tokio::test]
     async fn test_block_confirmation_with_new_accounts_failed_command() {
-        setup().await;
         // 1. DAG
         let mut dag = ActorDAG::new();
 
@@ -527,7 +495,6 @@ mod new_account_actor_tests_v2 {
 
     #[tokio::test]
     async fn test_block_confirmation_with_existing_account() {
-        setup().await;
         // 1. DAG
         let mut dag = ActorDAG::new();
 
