@@ -26,8 +26,8 @@ impl AccountSummaryActor {
             .lhs
             .iter()
             .interleave(record.rhs.iter())
+            .filter(|&r| r.account_type == AccountingEntryAccountType::BlockchainAddress)
             .cloned()
-            .filter(|r| r.account_type == AccountingEntryAccountType::BlockchainAddress)
             .collect();
 
         // 4) Build a local aggregator: per-account => net balance_delta (signed).
