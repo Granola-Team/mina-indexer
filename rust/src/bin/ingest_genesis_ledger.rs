@@ -1,16 +1,15 @@
 use env_logger::Builder;
 use log::{error, info};
-use mina_indexer::{
-    constants::POSTGRES_CONNECTION_STRING,
-    event_sourcing::{
-        actors_v2::{spawn_genesis_ledger_dag, spawn_preexisting_account_dag},
-        events::{Event, EventType},
-        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
-        sourcing::get_genesis_ledger,
+use mina_indexer::event_sourcing::{
+    actors_v2::spawn_genesis_dag,
+    events::{Event, EventType},
+    payloads::{
+        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, GenesisBlockPayload,
+        LedgerDestination, MainnetBlockPayload,
     },
+    sourcing::get_genesis_ledger,
 };
-use std::sync::Arc;
-use tokio_postgres::NoTls;
+use tokio::time::sleep;
 
 #[tokio::main]
 async fn main() {
@@ -19,99 +18,102 @@ async fn main() {
         .filter_module("tokio_postgres", log::LevelFilter::Warn)
         .init();
 
-    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-        .await
-        .expect("Failed to connect to the database");
+    let (dag, sender) = spawn_genesis_dag().await;
 
-    // Spawn the connection handler
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Connection error: {}", e);
-        }
-    });
-
-    if let Err(e) = client.execute("DROP SCHEMA public CASCADE", &[]).await {
-        error!("Unable to drop/create schema {e}");
-    }
-    if let Err(e) = client.execute("CREATE SCHEMA public", &[]).await {
-        error!("Unable to drop/create schema {e}");
-    }
-
-    let dag1 = {
-        let (dag, sender) = spawn_genesis_ledger_dag().await;
-
-        for de in get_genesis_ledger().get_accounting_double_entries() {
-            if let Err(err) = sender
-                .send(Event {
-                    event_type: EventType::DoubleEntryTransaction,
-                    payload: sonic_rs::to_string(&de).unwrap(),
-                })
-                .await
-            {
-                error!("Failed to process a double entry from the genesis ledger: {err}");
-            }
-        }
-
-        // Publish magic mina from genesis block
-        let payload = GenesisBlockPayload::new();
-        let magic_mina = DoubleEntryRecordPayload {
-            height: 1,
-            state_hash: payload.state_hash,
-            ledger_destination: LedgerDestination::BlockchainLedger,
-            lhs: vec![AccountingEntry {
-                counterparty: "MagicMinaForBlock0".to_string(),
-                transfer_type: "BlockReward".to_string(),
-                account: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
-                entry_type: AccountingEntryType::Credit,
-                account_type: AccountingEntryAccountType::BlockchainAddress,
-                amount_nanomina: 1000,
-                timestamp: payload.unix_timestamp,
-            }],
-            rhs: vec![AccountingEntry {
-                counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
-                transfer_type: "BlockReward".to_string(),
-                account: "MagicMinaForBlock0".to_string(),
-                entry_type: AccountingEntryType::Debit,
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: 1000,
-                timestamp: payload.unix_timestamp,
-            }],
-        };
+    for de in get_genesis_ledger().get_accounting_double_entries() {
         if let Err(err) = sender
             .send(Event {
                 event_type: EventType::DoubleEntryTransaction,
-                payload: sonic_rs::to_string(&magic_mina).unwrap(),
+                payload: sonic_rs::to_string(&de).unwrap(),
             })
             .await
         {
-            error!("Failed to process a double entry (magic mina) from the genesis block: {err}");
+            error!("Failed to process a double entry from the genesis ledger: {err}");
         }
+    }
 
-        Arc::clone(&dag)
+    sleep(std::time::Duration::from_secs(1)).await;
+
+    // Publish magic mina from genesis block
+    let genesis_block = GenesisBlockPayload::new();
+    let magic_mina = DoubleEntryRecordPayload {
+        height: 1,
+        state_hash: genesis_block.state_hash.to_string(),
+        ledger_destination: LedgerDestination::BlockchainLedger,
+        lhs: vec![AccountingEntry {
+            counterparty: "MagicMinaForBlock0".to_string(),
+            transfer_type: "BlockReward".to_string(),
+            account: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+            entry_type: AccountingEntryType::Credit,
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: 1000,
+            timestamp: genesis_block.unix_timestamp,
+        }],
+        rhs: vec![AccountingEntry {
+            counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
+            transfer_type: "BlockReward".to_string(),
+            account: "MagicMinaForBlock0".to_string(),
+            entry_type: AccountingEntryType::Debit,
+            account_type: AccountingEntryAccountType::VirtualAddess,
+            amount_nanomina: 1000,
+            timestamp: genesis_block.unix_timestamp,
+        }],
     };
+    if let Err(err) = sender
+        .send(Event {
+            event_type: EventType::DoubleEntryTransaction,
+            payload: sonic_rs::to_string(&magic_mina).unwrap(),
+        })
+        .await
+    {
+        error!("Failed to process a double entry (magic mina) from the genesis block: {err}");
+    }
 
-    let dag2 = {
-        let (dag, sender) = spawn_preexisting_account_dag().await;
+    sleep(std::time::Duration::from_secs(1)).await;
 
-        for account in get_genesis_ledger().get_accounts() {
-            if let Err(_err) = sender
-                .send(Event {
-                    event_type: EventType::PreExistingAccount,
-                    payload: account,
-                })
-                .await
-            {
-                error!("Failed to process a pre-existing account");
-            };
-        }
-
-        Arc::clone(&dag)
+    let magic_mina = CanonicalMainnetBlockPayload {
+        canonical: true,
+        was_canonical: false,
+        block: MainnetBlockPayload {
+            height: genesis_block.height,
+            state_hash: genesis_block.state_hash,
+            previous_state_hash: genesis_block.previous_state_hash,
+            last_vrf_output: genesis_block.last_vrf_output,
+            timestamp: genesis_block.unix_timestamp,
+            global_slot: genesis_block.global_slot_since_genesis,
+            global_slot_since_genesis: genesis_block.global_slot_since_genesis,
+            coinbase_receiver: genesis_block.coinbase_receiver,
+            coinbase_reward_nanomina: genesis_block.coinbase_reward,
+            ..Default::default()
+        },
     };
+    if let Err(err) = sender
+        .send(Event {
+            event_type: EventType::CanonicalMainnetBlock,
+            payload: sonic_rs::to_string(&magic_mina).unwrap(),
+        })
+        .await
+    {
+        error!("Failed to process a double entry (magic mina) from the genesis block: {err}");
+    }
+
+    sleep(std::time::Duration::from_secs(1)).await;
+
+    for account in get_genesis_ledger().get_accounts() {
+        if let Err(_err) = sender
+            .send(Event {
+                event_type: EventType::PreExistingAccount,
+                payload: account,
+            })
+            .await
+        {
+            error!("Failed to process a pre-existing account");
+        };
+    }
 
     // 9) Give the DAG time to flush any in-flight operations
     info!("Giving some time for the DAG to flush...");
-    dag1.lock().await.wait_until_quiesced().await;
-    dag2.lock().await.wait_until_quiesced().await;
+    dag.lock().await.wait_until_quiesced().await;
 
     info!("Shutting down gracefully. Goodbye!");
 }
