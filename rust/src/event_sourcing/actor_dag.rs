@@ -136,6 +136,18 @@ impl ActorDAG {
         }
     }
 
+    pub async fn get_total_events_processed(&self) -> u64 {
+        let mut current_sum = 0_u64;
+        for node_arc in self.nodes.values() {
+            let node = { node_arc.lock().await };
+            let store_arc = node.get_state();
+            let store = { store_arc.lock().await };
+            // Add whatever is in INCR_KEY for this node (defaults to 0 if absent)
+            current_sum += store.get::<u64>(INCR_KEY).copied().unwrap_or(0_u64);
+        }
+        current_sum
+    }
+
     /// Polls each node’s INCR_KEY sum and waits until it stabilizes
     pub async fn wait_until_quiesced(&self) {
         use tokio::time::{sleep, Duration};
@@ -144,14 +156,7 @@ impl ActorDAG {
 
         loop {
             // 1) Compute the sum of increments across all nodes
-            let mut current_sum = 0u64;
-            for node_arc in self.nodes.values() {
-                let node = node_arc.lock().await;
-                let store_arc = node.get_state();
-                let store = store_arc.lock().await;
-                // Add whatever is in INCR_KEY for this node (defaults to 0 if absent)
-                current_sum += store.get::<u64>(INCR_KEY).copied().unwrap_or(0_u64);
-            }
+            let current_sum = self.get_total_events_processed().await;
 
             // 2) Check if it’s unchanged from the last loop
             if current_sum == last_sum {
