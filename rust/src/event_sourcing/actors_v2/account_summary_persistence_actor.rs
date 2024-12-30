@@ -8,6 +8,8 @@ use crate::{
     },
 };
 use log::error;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio_postgres::NoTls;
 
 /// The key under which we store our `ManagedStore<Client>` (or whichever type you use).
@@ -18,7 +20,8 @@ pub struct AccountSummaryPersistenceActor;
 impl AccountSummaryPersistenceActor {
     /// Handles an `AccountLogBalanceDelta` event by parsing the payload and upserting
     /// each account’s delta into the store.
-    async fn handle_account_delta(payload: AccountBalanceDeltaPayload, store: &mut ActorStore) {
+    async fn handle_account_delta(payload: AccountBalanceDeltaPayload, actor_store: Arc<Mutex<ActorStore>>) {
+        let mut store = { actor_store.lock().await };
         // Retrieve the store from the ActorStore
         let managed_store = store.remove::<ManagedStore>(ACCOUNT_STORE_KEY).expect("Missing ManagedStore in the ActorStore");
 
@@ -50,9 +53,8 @@ impl AccountSummaryPersistenceActor {
         });
 
         // 2) Create or init the `ManagedStore`. Suppose your `ManagedStore` has a builder or something similar:
-        let store_table_name = "account_summary_store";
 
-        let store_builder = ManagedStore::builder(client).name(store_table_name).add_numeric_column("balance");
+        let store_builder = ManagedStore::builder(client).name(ACCOUNT_STORE_KEY).add_numeric_column("balance");
         let store_obj = if preserve_data {
             store_builder
                 .preserve_data()
@@ -80,9 +82,7 @@ impl AccountSummaryPersistenceActor {
                         // parse the payload
                         let payload: AccountBalanceDeltaPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse AccountBalanceDeltaPayload");
 
-                        // Lock store => do the upserts
-                        let mut locked_store = actor_store.lock().await;
-                        AccountSummaryPersistenceActor::handle_account_delta(payload, &mut locked_store).await;
+                        AccountSummaryPersistenceActor::handle_account_delta(payload, actor_store).await;
                     }
                     None
                 })
