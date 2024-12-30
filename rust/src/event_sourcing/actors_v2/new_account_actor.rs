@@ -82,7 +82,9 @@ impl NewAccountActor {
                     // (But you might want to store the *minimum* discovered height, or the *maximum*, or something else.)
                     let pairs = &[("height", &(conf.height as i64) as &(dyn tokio_postgres::types::ToSql + Sync))];
 
-                    // Upsert
+                    if let Ok(Some(_)) = managed_store.get::<i64>(&acct, "height").await {
+                        continue;
+                    }
                     let res = managed_store.upsert(acct, pairs).await;
                     if let Err(e) = res {
                         error!("Failed to upsert new account={} at height={}: {}", acct, conf.height, e);
@@ -567,5 +569,160 @@ mod new_account_actor_tests_v2 {
         let dag_locked = dag.lock().await;
         let captured = read_captured_new_accounts(&dag_locked, sink_node_id).await;
         assert!(captured.is_empty(), "No NewAccount event should be published for existing accounts");
+    }
+
+    #[tokio::test]
+    async fn test_account_appears_in_two_blocks_height_not_overwritten() {
+        //------------------------------------------------------------------
+        // 1) Build the DAG
+        //------------------------------------------------------------------
+        let mut dag = ActorDAG::new();
+
+        // Create the main actor with `preserve_data = false`
+        let actor_node = NewAccountActor::create_actor(false).await;
+        let actor_id = actor_node.id();
+        let actor_sender = dag.set_root(actor_node);
+
+        // Create the sink node to capture new accounts
+        let sink_node = create_new_account_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // Wrap in Arc<Mutex<>> and spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        //------------------------------------------------------------------
+        // 2) Send the same account in two separate blocks
+        //------------------------------------------------------------------
+        let test_account = "B62qDoubleBlock".to_string();
+
+        // Construct block #1
+        let block1 = MainnetBlockPayload {
+            height: 10,
+            state_hash: "hash_10".to_string(),
+            user_commands: vec![CommandSummary {
+                sender: test_account.clone(),
+                receiver: test_account.clone(),
+                fee_payer: test_account.clone(),
+                status: CommandStatus::Applied, // applied => valid account
+                ..Default::default()
+            }],
+            timestamp: 1660000000,
+            ..Default::default()
+        };
+
+        // Construct block #2
+        let block2 = MainnetBlockPayload {
+            height: 20,
+            state_hash: "hash_20".to_string(),
+            user_commands: vec![CommandSummary {
+                sender: test_account.clone(),
+                receiver: test_account.clone(),
+                fee_payer: test_account.clone(),
+                status: CommandStatus::Applied,
+                ..Default::default()
+            }],
+            timestamp: 1660000001,
+            ..Default::default()
+        };
+
+        // Send block #1 => store in memory
+        actor_sender
+            .send(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&block1).unwrap(),
+            })
+            .await
+            .expect("Failed to send block #1");
+
+        // Confirm block #1 => produce new-account event
+        let block1_confirm = BlockConfirmationPayload {
+            height: block1.height,
+            state_hash: block1.state_hash.clone(),
+            confirmations: 10,
+        };
+        actor_sender
+            .send(Event {
+                event_type: EventType::BlockConfirmation,
+                payload: sonic_rs::to_string(&block1_confirm).unwrap(),
+            })
+            .await
+            .expect("Failed to confirm block #1");
+
+        // Wait
+        sleep(Duration::from_millis(200)).await;
+
+        // Send block #2 => store in memory
+        actor_sender
+            .send(Event {
+                event_type: EventType::MainnetBlock,
+                payload: sonic_rs::to_string(&block2).unwrap(),
+            })
+            .await
+            .expect("Failed to send block #2");
+
+        // Confirm block #2 => produce new-account event (unless your logic prevents it)
+        let block2_confirm = BlockConfirmationPayload {
+            height: block2.height,
+            state_hash: block2.state_hash.clone(),
+            confirmations: 10,
+        };
+        actor_sender
+            .send(Event {
+                event_type: EventType::BlockConfirmation,
+                payload: sonic_rs::to_string(&block2_confirm).unwrap(),
+            })
+            .await
+            .expect("Failed to confirm block #2");
+
+        // Wait
+        sleep(Duration::from_millis(300)).await;
+
+        //------------------------------------------------------------------
+        // 3) Now let's see how many `NewAccount` events were published, and also verify that the stored row's height did NOT get overwritten.
+        //------------------------------------------------------------------
+        // (a) Check the sink => how many `NewAccount` events for B62qDoubleBlock?
+        let captured_new_accounts = {
+            let dag_locked = dag.lock().await;
+            read_captured_new_accounts(&dag_locked, &sink_node_id).await
+        };
+
+        // We decode them into NewAccountPayload to see the account and height
+        let mut new_acct_payloads = vec![];
+        for event_json in &captured_new_accounts {
+            let nap: NewAccountPayload = sonic_rs::from_str(event_json).unwrap();
+            new_acct_payloads.push(nap);
+        }
+
+        // Filter only the ones for B62qDoubleBlock
+        let relevant: Vec<_> = new_acct_payloads.iter().filter(|p| p.account == test_account).collect();
+
+        // We expect 2 events if your code doesn't skip existing accounts
+        // or 1 event if it does skip. The test can assert whichever is correct
+        // for your logic. Let's assume you produce 2 events:
+        assert_eq!(relevant.len(), 1, "Expected 1 `NewAccount` event for the same account in 2 blocks");
+
+        // Connect to DB
+        let client = connect_to_db().await;
+        // The store name is "discovered_accounts_store" by default:
+        let check_sql = "SELECT height FROM discovered_accounts_store WHERE key = $1";
+        let row_opt = client
+            .query_opt(check_sql, &[&test_account])
+            .await
+            .expect("Failed to query discovered_accounts_store");
+
+        assert!(row_opt.is_some(), "We must have a row for the account in discovered_accounts_store");
+        let row = row_opt.unwrap();
+        let final_height: i64 = row.get("height");
+
+        // Since your code (with the logic skipping an already discovered account) won't overwrite:
+        assert_eq!(final_height, 10, "Height should remain 10, not overwritten by the second block's height=20");
     }
 }
