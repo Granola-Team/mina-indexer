@@ -3,104 +3,110 @@ use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
         actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
-        events::{Event, EventType},
+        events::EventType,
+        managed_store::ManagedStore,
         payloads::{BlockConfirmationPayload, MainnetBlockPayload, NewAccountPayload},
     },
 };
 use log::error;
 use std::collections::HashMap;
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::NoTls;
 
-/// Keys in the ActorStore
-const CLIENT_KEY: &str = "new_account_client";
+/// The key we use to store the ManagedStore in the ActorStore
+const ACCOUNTS_STORE_KEY: &str = "discovered_accounts_store";
+/// The key we use to store in-memory `HashMap<Height, Vec<MainnetBlockPayload>>`
 const BLOCKS_KEY: &str = "mainnet_blocks";
 
+/// Our actor that logs new accounts once a block is confirmed at 10 confirmations.
 pub struct NewAccountActor;
 
 impl NewAccountActor {
-    /// Handle `EventType::PreExistingAccount`.
-    /// Insert the account into a `discovered_accounts` table.
+    /// Handle a `PreExistingAccount` event by upserting that account with `height=0`.
     async fn on_preexisting_account(account: String, store: &mut ActorStore) {
-        let client = store.get::<Client>(CLIENT_KEY).expect("Postgres client missing from store");
+        let managed_store = store.remove::<ManagedStore>(ACCOUNTS_STORE_KEY).expect("ManagedStore missing from store");
 
-        let insert_query = r#"
-            INSERT INTO discovered_accounts (account, height) VALUES ($1, $2)
-            ON CONFLICT DO NOTHING
-        "#;
+        // We'll store them as `key=<account>`, and set "height" = 0 if it's new.
+        // If the row already exists, we do nothing (the store logic will update only the columns we supply).
+        // We'll assume columns: key TEXT PRIMARY KEY, height BIGINT
+        let pairs = &[("height", &0_i64 as &(dyn tokio_postgres::types::ToSql + Sync))];
 
-        if let Err(e) = client.execute(insert_query, &[&account, &0_i64]).await {
-            error!("Failed to insert preexisting account {account}: {e}");
+        if let Err(e) = managed_store.upsert(&account, pairs).await {
+            error!("Failed to upsert preexisting account={}: {}", account, e);
         }
+
+        store.insert::<ManagedStore>(ACCOUNTS_STORE_KEY, managed_store);
     }
 
-    /// Handle `EventType::MainnetBlock`.
-    /// Add the block to `mainnet_blocks[block.height]`.
+    /// Handle `MainnetBlock` => store it in the in-memory `HashMap<Height, Vec<MainnetBlockPayload>>`.
     async fn on_mainnet_block(block: MainnetBlockPayload, store: &mut ActorStore) {
+        // Retrieve the blocks map
         let mut blocks_map = store
             .remove::<HashMap<Height, Vec<MainnetBlockPayload>>>(BLOCKS_KEY)
-            .expect("Mainnet blocks map missing from store");
+            .expect("Missing blocks map from store");
 
         blocks_map.entry(Height(block.height)).or_default().push(block);
 
-        store.insert::<HashMap<Height, Vec<MainnetBlockPayload>>>(BLOCKS_KEY, blocks_map);
+        // Put it back
+        store.insert(BLOCKS_KEY, blocks_map);
     }
 
-    /// Handle `EventType::BlockConfirmation`.
-    /// If `confirmations == 10`, then for each block at that height,
-    /// insert new discovered accounts if not already known, and produce a `NewAccount` event.
-    async fn on_block_confirmation(conf: BlockConfirmationPayload, store: &mut ActorStore) -> Option<Vec<Event>> {
+    /// Handle `BlockConfirmation`.
+    /// If confirmations == 10, we discover new accounts from that block (i.e. each block’s `valid_accounts()`).
+    /// We upsert them to the ManagedStore with `height = conf.height`, if they don’t already exist.
+    async fn on_block_confirmation(conf: BlockConfirmationPayload, store: &mut ActorStore) -> Option<Vec<crate::event_sourcing::events::Event>> {
         if conf.confirmations != 10 {
             return None;
         }
 
-        let client = store.remove::<Client>(CLIENT_KEY).expect("Postgres client missing from store");
+        // Grab the store
+        let managed_store = store.remove::<ManagedStore>(ACCOUNTS_STORE_KEY).expect("Missing ManagedStore in store");
 
+        // Grab the blocks map
         let mut blocks_map = store
             .remove::<HashMap<Height, Vec<MainnetBlockPayload>>>(BLOCKS_KEY)
-            .expect("Mainnet blocks map missing from store");
+            .expect("Missing blocks map in store");
 
         let mut out_events = Vec::new();
 
-        // Look up blocks at the confirmed height:
         if let Some(blocks) = blocks_map.remove(&Height(conf.height)) {
             for block in blocks {
-                // Only proceed if this block's state_hash matches the BlockConfirmation’s state_hash
+                // Must match the state_hash
                 if block.state_hash != conf.state_hash {
                     continue;
                 }
 
-                // For each discovered account in the block
+                // For each discovered account
                 for acct in block.valid_accounts().iter().filter(|a| !a.is_empty()) {
-                    // Check if it exists in discovered_accounts
-                    let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
-                    let account_exists = client.query_one(check_query, &[&acct]).await.map(|row| row.get::<_, bool>(0)).unwrap_or(false);
+                    // Upsert the account if it doesn’t exist, with `height=conf.height`
+                    // If the row already exists, we do not override it if the store logic is set up that way
+                    // (But you might want to store the *minimum* discovered height, or the *maximum*, or something else.)
+                    let pairs = &[("height", &(conf.height as i64) as &(dyn tokio_postgres::types::ToSql + Sync))];
 
-                    if !account_exists {
-                        // Insert the account into discovered_accounts
-                        let insert_query = "INSERT INTO discovered_accounts (account, height) VALUES ($1, $2)";
-                        if let Err(e) = client.execute(insert_query, &[&acct, &(conf.height as i64)]).await {
-                            error!("Failed to insert new account {acct} at height={} into database: {e}", conf.height);
-                            continue;
-                        }
-
-                        // Also produce a `NewAccount` event so that other actors can see it
-                        out_events.push(Event {
-                            event_type: EventType::NewAccount,
-                            payload: sonic_rs::to_string(&NewAccountPayload {
-                                height: block.height,
-                                state_hash: block.state_hash.clone(),
-                                timestamp: block.timestamp,
-                                account: acct.clone(),
-                            })
-                            .unwrap(),
-                        });
+                    // Upsert
+                    let res = managed_store.upsert(acct, pairs).await;
+                    if let Err(e) = res {
+                        error!("Failed to upsert new account={} at height={}: {}", acct, conf.height, e);
+                        continue;
                     }
+
+                    // We also produce a `NewAccount` event so that other actors can see it
+                    out_events.push(crate::event_sourcing::events::Event {
+                        event_type: EventType::NewAccount,
+                        payload: sonic_rs::to_string(&NewAccountPayload {
+                            height: block.height,
+                            state_hash: block.state_hash.clone(),
+                            timestamp: block.timestamp,
+                            account: acct.clone(),
+                        })
+                        .unwrap(),
+                    });
                 }
             }
         }
 
-        store.insert::<Client>(CLIENT_KEY, client);
-        store.insert::<HashMap<Height, Vec<MainnetBlockPayload>>>(BLOCKS_KEY, blocks_map);
+        // Put things back
+        store.insert(ACCOUNTS_STORE_KEY, managed_store);
+        store.insert(BLOCKS_KEY, blocks_map);
 
         if out_events.is_empty() {
             None
@@ -116,57 +122,55 @@ impl ActorFactory for NewAccountActor {
         // 1) Connect to Postgres
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
             .await
-            .expect("Unable to connect to database in NewAccountActor");
-
-        // Spawn the connection task
+            .expect("Unable to connect to DB in NewAccountActor");
         tokio::spawn(async move {
             if let Err(e) = connection.await {
-                error!("Postgres connection error: {}", e);
+                error!("Postgres connection error in NewAccountActor: {}", e);
             }
         });
 
-        // 2) Create discovered_accounts table if needed
-        let create_table_sql = r#"
-            CREATE TABLE IF NOT EXISTS discovered_accounts (
-                account TEXT PRIMARY KEY NOT NULL,
-                height BIGINT NOT NULL
-            );
-        "#;
-        if let Err(e) = client.execute(create_table_sql, &[]).await {
-            error!("Unable to create discovered_accounts table: {e}");
-        }
+        // 2) Build (or re-build) our ManagedStore for discovered accounts.
+        // Suppose we define columns: key TEXT PRIMARY KEY, height BIGINT
+        // Non-preserving => we drop the table each time, unless you want to set preserve_data().
+        let discovered_store = ManagedStore::builder(client)
+            .name(ACCOUNTS_STORE_KEY)
+            .add_numeric_column("height") // default=0
+            // .preserve_data() // or not, depending on your needs
+            .build()
+            .await
+            .expect("Failed to build {ACCOUNTS_STORE_KEY} ManagedStore");
 
-        // 3) Build store with the client + the mainnet_blocks map
+        // 3) Create an empty HashMap<Height, Vec<MainnetBlockPayload>>
+        let blocks_map: HashMap<Height, Vec<MainnetBlockPayload>> = HashMap::new();
+
+        // 4) Put them in the actor store
         let mut store = ActorStore::new();
-        store.insert(CLIENT_KEY, client);
-        store.insert(BLOCKS_KEY, HashMap::<Height, Vec<MainnetBlockPayload>>::new());
+        store.insert(ACCOUNTS_STORE_KEY, discovered_store);
+        store.insert(BLOCKS_KEY, blocks_map);
 
-        // 4) Build the node with a single event processor closure:
+        // 5) Build and return the ActorNode
         ActorNodeBuilder::new()
             .with_state(store)
-            .with_processor(|event, store, _requeue| {
+            .with_processor(|event, actor_store, _requeue| {
                 Box::pin(async move {
-                    let mut locked_store = store.lock().await;
+                    let mut locked_store = actor_store.lock().await;
 
                     match event.event_type {
                         EventType::PreExistingAccount => {
-                            let acct = event.payload; // just a string
-                            NewAccountActor::on_preexisting_account(acct, &mut locked_store).await;
+                            let account_str = event.payload; // raw String
+                            NewAccountActor::on_preexisting_account(account_str, &mut locked_store).await;
                             None
                         }
-
                         EventType::MainnetBlock => {
                             let block: MainnetBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse MainnetBlockPayload");
                             NewAccountActor::on_mainnet_block(block, &mut locked_store).await;
                             None
                         }
-
                         EventType::BlockConfirmation => {
-                            let bc: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse BlockConfirmationPayload");
-                            // If some events are produced (i.e. new accounts discovered), return them
-                            NewAccountActor::on_block_confirmation(bc, &mut locked_store).await
+                            let conf: BlockConfirmationPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse BlockConfirmationPayload");
+                            // Possibly produce `NewAccount` events
+                            NewAccountActor::on_block_confirmation(conf, &mut locked_store).await
                         }
-
                         _ => None,
                     }
                 })
@@ -177,7 +181,7 @@ impl ActorFactory for NewAccountActor {
 
 #[cfg(test)]
 mod new_account_actor_tests_v2 {
-    use super::NewAccountActor;
+    use super::{NewAccountActor, ACCOUNTS_STORE_KEY};
     use crate::{
         blockchain_tree::Height,
         constants::POSTGRES_CONNECTION_STRING,
@@ -194,7 +198,7 @@ mod new_account_actor_tests_v2 {
         sync::Mutex,
         time::{sleep, Duration},
     };
-    use tokio_postgres::{Client, NoTls};
+    use tokio_postgres::NoTls;
 
     async fn setup() {
         let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
@@ -207,9 +211,26 @@ mod new_account_actor_tests_v2 {
             }
         });
 
-        if let Err(e) = client.execute("DROP TABLE IF EXISTS discovered_accounts;", &[]).await {
+        if let Err(e) = client.execute(format!("DROP TABLE IF EXISTS {};", ACCOUNTS_STORE_KEY).as_str(), &[]).await {
             error!("Unable to drop user_commands table {:?}", e);
         }
+    }
+
+    /// Connect to Postgres with the standard `POSTGRES_CONNECTION_STRING`.
+    /// Spawns the connection handling on a background task.
+    async fn connect_to_db() -> tokio_postgres::Client {
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to PostgreSQL");
+
+        // Spawn the connection so errors are logged if they occur.
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                eprintln!("Connection error: {}", e);
+            }
+        });
+
+        client
     }
 
     // HELPER: Create a node that captures `NewAccount` events
@@ -279,7 +300,7 @@ mod new_account_actor_tests_v2 {
         // Wait a bit
         sleep(Duration::from_millis(200)).await;
 
-        // 6. Verify the discovered_accounts table directly
+        // 6. Verify the table directly
         let dag_locked = dag.lock().await;
         let node_arc = dag_locked.read_node(new_account_id).expect("Node not found");
         let node_guard = node_arc.lock().await;
@@ -287,8 +308,8 @@ mod new_account_actor_tests_v2 {
         let mut locked_store = store.lock().await;
 
         // Grab the Postgres client
-        let client = locked_store.remove::<Client>("new_account_client").expect("Missing client in store");
-        let check_query = "SELECT EXISTS (SELECT 1 FROM discovered_accounts WHERE account = $1)";
+        let client = connect_to_db().await;
+        let check_query = &format!("SELECT EXISTS (SELECT 1 FROM {} WHERE key = $1)", ACCOUNTS_STORE_KEY);
         let account_exists: bool = client.query_one(check_query, &[&account]).await.unwrap().get(0);
         assert!(account_exists, "Pre-existing account should be inserted into the DB");
 
