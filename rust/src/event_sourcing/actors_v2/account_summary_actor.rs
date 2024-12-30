@@ -1,7 +1,7 @@
 use crate::event_sourcing::{
     actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
     events::{Event, EventType},
-    payloads::{AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    payloads::{AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
 };
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -22,7 +22,13 @@ impl AccountSummaryActor {
         }
 
         // 3) Interleave LHS + RHS into a single list of entries
-        let combined_entries: Vec<AccountingEntry> = record.lhs.iter().interleave(record.rhs.iter()).cloned().collect();
+        let combined_entries: Vec<AccountingEntry> = record
+            .lhs
+            .iter()
+            .interleave(record.rhs.iter())
+            .cloned()
+            .filter(|r| r.account_type == AccountingEntryAccountType::BlockchainAddress)
+            .collect();
 
         // 4) Build a local aggregator: per-account => net balance_delta (signed).
         let mut account_deltas: HashMap<String, i64> = HashMap::new();
