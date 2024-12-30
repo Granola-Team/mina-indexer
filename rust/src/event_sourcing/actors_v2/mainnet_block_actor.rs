@@ -4,7 +4,7 @@ use crate::{
         block::BlockTrait,
         events::{Event, EventType},
         mainnet_block_models::MainnetBlock,
-        payloads::{GenesisBlockPayload, MainnetBlockPayload},
+        payloads::MainnetBlockPayload,
     },
     utility::{extract_height_and_hash, get_cleaned_pcb},
 };
@@ -21,35 +21,6 @@ impl ActorFactory for MainnetBlockParserActor {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     match event.event_type {
-                        EventType::GenesisBlock => {
-                            let block: GenesisBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse block");
-
-                            // Create block payload
-                            let block_payload = MainnetBlockPayload {
-                                height: block.height,
-                                global_slot: 1,
-                                state_hash: block.state_hash,
-                                previous_state_hash: block.previous_state_hash,
-                                last_vrf_output: block.last_vrf_output,
-                                user_command_count: 0,
-                                snark_work_count: 0,
-                                snark_work: vec![],
-                                timestamp: block.unix_timestamp,
-                                coinbase_reward_nanomina: block.coinbase_reward,
-                                coinbase_receiver: block.coinbase_receiver,
-                                global_slot_since_genesis: block.global_slot_since_genesis,
-                                user_commands: vec![],
-                                fee_transfer_via_coinbase: None,
-                                fee_transfers: vec![],
-                                internal_command_count: 0,
-                            };
-
-                            // Publish the MainnetBlock event
-                            Some(vec![Event {
-                                event_type: EventType::MainnetBlock,
-                                payload: sonic_rs::to_string(&block_payload).unwrap(),
-                            }])
-                        }
                         EventType::MainnetBlockPath => {
                             // Parse the block path and contents
                             let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
