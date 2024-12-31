@@ -43,6 +43,11 @@ impl ActorFactory for NewBlockActor {
                         } else if blockchain_tree.has_parent(&next_node) {
                             blockchain_tree.add_node(next_node).unwrap();
                         } else {
+                            warn!("Unable to add block {:?}-{:?}", next_node.height, next_node.state_hash);
+                            if let Ok((height, node)) = blockchain_tree.get_best_tip() {
+                                warn!("Best tip is currently {:?}-{:?}", height, node.state_hash);
+                            }
+
                             if let Err(err) = requeue.send(event).await {
                                 warn!("Unable to requeue event: {err}");
                             }
