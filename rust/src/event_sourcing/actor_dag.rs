@@ -1,7 +1,7 @@
 use super::events::Event;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use log::error;
+use log::{error, info};
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
@@ -166,7 +166,7 @@ impl ActorDAG {
 
             // 3) Otherwise, update `last_sum` and wait a bit before re-checking
             last_sum = current_sum;
-            sleep(Duration::from_millis(500)).await;
+            sleep(Duration::from_secs(1)).await;
         }
     }
 

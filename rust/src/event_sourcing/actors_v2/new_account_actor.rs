@@ -42,8 +42,38 @@ impl NewAccountActor {
 
         // For each discovered account
         for acct in block.valid_accounts().iter().filter(|a| !a.is_empty()) {
-            if let Ok(Some(height)) = managed_store.get::<i64>(acct, "height").await {
-                if !block.canonical && block.get_height() == height as u64 {
+            let maybe_height = managed_store.get::<i64>(acct, "height").await;
+            let maybe_state = managed_store.get::<String>(acct, "state_hash").await;
+
+            match (maybe_height, maybe_state, block.canonical) {
+                (Ok(None), Ok(None), true) => {
+                    let pairs = &[
+                        ("height", &(block.block.height as i64) as &(dyn tokio_postgres::types::ToSql + Sync)),
+                        ("state_hash", &block.block.state_hash as &(dyn tokio_postgres::types::ToSql + Sync)),
+                    ];
+                    let res = managed_store.upsert(acct, pairs).await;
+                    if let Err(e) = res {
+                        error!("Failed to upsert new account={} at height={}: {}", acct, block.block.height, e);
+                        continue;
+                    }
+
+                    // We also produce a `NewAccount` event so that other actors can see it
+                    out_events.push(Event {
+                        event_type: EventType::NewAccount,
+                        payload: sonic_rs::to_string(&NewAccountPayload {
+                            apply: true,
+                            height: block.block.height,
+                            state_hash: block.block.state_hash.clone(),
+                            timestamp: block.block.timestamp,
+                            account: acct.clone(),
+                        })
+                        .unwrap(),
+                    });
+                }
+                (Ok(Some(_)), Ok(Some(_)), true) => {
+                    debug!("Account already discovered: {acct}");
+                }
+                (Ok(Some(height)), Ok(Some(state_hash)), false) if block.get_height() == height as u64 && block.get_state_hash() == state_hash => {
                     if let Err(e) = managed_store.remove_key(acct).await {
                         error!("Unable to remove from store: {e}");
                     }
@@ -59,29 +89,8 @@ impl NewAccountActor {
                         })
                         .unwrap(),
                     });
-                } else {
-                    debug!("Account already discovered {acct}");
                 }
-            } else if block.canonical {
-                let pairs = &[("height", &(block.block.height as i64) as &(dyn tokio_postgres::types::ToSql + Sync))];
-                let res = managed_store.upsert(acct, pairs).await;
-                if let Err(e) = res {
-                    error!("Failed to upsert new account={} at height={}: {}", acct, block.block.height, e);
-                    continue;
-                }
-
-                // We also produce a `NewAccount` event so that other actors can see it
-                out_events.push(Event {
-                    event_type: EventType::NewAccount,
-                    payload: sonic_rs::to_string(&NewAccountPayload {
-                        apply: true,
-                        height: block.block.height,
-                        state_hash: block.block.state_hash.clone(),
-                        timestamp: block.block.timestamp,
-                        account: acct.clone(),
-                    })
-                    .unwrap(),
-                });
+                _ => {}
             }
         }
 
@@ -109,7 +118,10 @@ impl NewAccountActor {
         // 2) Build (or re-build) our ManagedStore for discovered accounts.
         // Suppose we define columns: key TEXT PRIMARY KEY, height BIGINT
         // Non-preserving => we drop the table each time, unless you want to set preserve_data().
-        let store_builder = ManagedStore::builder(client).name(ACCOUNTS_STORE_KEY).add_numeric_column("height"); // default=0
+        let store_builder = ManagedStore::builder(client)
+            .name(ACCOUNTS_STORE_KEY)
+            .add_text_column("state_hash")
+            .add_numeric_column("height"); // default=0
         let managed_store = if preserve_data {
             store_builder
                 .preserve_data()
@@ -575,6 +587,154 @@ mod new_account_actor_tests_v2 {
             let row = row_opt.unwrap();
             let final_height: i64 = row.get("height");
             assert_eq!(final_height, 0, "Expected the preexisting account to remain at height=0, not removed");
+        }
+    }
+
+    /// Verifies that when we have a stored account at a particular height + state_hash,
+    /// and we receive a non-canonical block with the **same** height and state_hash,
+    /// the code removes the account from the store and emits a "NewAccount" event with `apply=false`.
+    #[tokio::test]
+    async fn test_revert_account_at_same_height_and_hash() {
+        // 1) Build the DAG + root actor
+        let mut dag = ActorDAG::new();
+        let actor_node = NewAccountActor::create_actor(false).await; // `preserve_data=false`
+        let actor_id = actor_node.id();
+        let sender = dag.set_root(actor_node);
+
+        // 2) Create sink node to capture `NewAccount` events, link from our actor
+        let sink_node = create_new_account_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // 3) Wrap + spawn the DAG
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // --------------------------------------------------------------------
+        // 4) STEP A: Insert a canonical block that discovers an account at (height=42, state_hash="test_state")
+        // --------------------------------------------------------------------
+
+        // This block *will* discover "B62qRevertableAcct" => store (height=42, state_hash="test_state")
+        // with `apply=true`.
+        let discovered_account = "B62qRevertableAcct".to_string();
+
+        let canonical_block = CanonicalMainnetBlockPayload {
+            block: MainnetBlockPayload {
+                height: 42,
+                state_hash: "test_state".into(),
+                user_commands: vec![CommandSummary {
+                    sender: discovered_account.clone(),
+                    receiver: discovered_account.clone(),
+                    status: CommandStatus::Applied,
+                    ..Default::default()
+                }],
+                timestamp: 111111,
+                ..Default::default()
+            },
+            canonical: true,
+            was_canonical: false,
+        };
+
+        sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&canonical_block).unwrap(),
+            })
+            .await
+            .expect("Failed to send canonical block event #1");
+
+        // Wait for processing
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+        // Confirm the store has the account at height=42 + state_hash="test_state"
+        {
+            let client = connect_to_db().await;
+            let sql = "SELECT height, state_hash FROM discovered_accounts_store WHERE key = $1";
+            let row_opt = client.query_opt(sql, &[&discovered_account]).await.expect("Query failed");
+            assert!(row_opt.is_some(), "Account should be discovered after the canonical block");
+            let row = row_opt.unwrap();
+            let db_height: i64 = row.get("height");
+            let db_state: String = row.get("state_hash");
+            assert_eq!(db_height, 42, "Expected height=42 in the store");
+            assert_eq!(db_state, "test_state", "Expected state_hash='test_state' in the store");
+        }
+
+        // --------------------------------------------------------------------
+        // 5) STEP B: Send a non-canonical block with the SAME (height=42, state_hash="test_state"). This should hit the revert scenario => remove the account
+        //    => emit apply=false
+        // --------------------------------------------------------------------
+        let revert_block = CanonicalMainnetBlockPayload {
+            block: MainnetBlockPayload {
+                height: 42,
+                state_hash: "test_state".into(),
+                user_commands: vec![CommandSummary {
+                    sender: discovered_account.clone(),
+                    receiver: discovered_account.clone(),
+                    status: CommandStatus::Applied,
+                    ..Default::default()
+                }],
+                timestamp: 222222,
+                ..Default::default()
+            },
+            canonical: false,    // reversing
+            was_canonical: true, // it was previously canonical
+        };
+
+        sender
+            .send(Event {
+                event_type: EventType::CanonicalMainnetBlock,
+                payload: sonic_rs::to_string(&revert_block).unwrap(),
+            })
+            .await
+            .expect("Failed to send revert block event");
+
+        // Wait for processing
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+        // --------------------------------------------------------------------
+        // 6) Verify the actor emitted `NewAccount` with `apply=false`, and the store no longer has the account
+        // --------------------------------------------------------------------
+        let dag_locked = dag.lock().await;
+        let captured_events = read_captured_new_accounts(&dag_locked, &sink_node_id).await;
+
+        // We expect 2 total events for `discovered_account`:
+        //   1) the canonical block with apply=true
+        //   2) the revert block with apply=false
+        // If you want to separate them out or check only the second, do so.
+        let relevant: Vec<NewAccountPayload> = captured_events
+            .iter()
+            .filter_map(|json_str| sonic_rs::from_str::<NewAccountPayload>(json_str).ok())
+            .filter(|nap| nap.account == discovered_account)
+            .collect();
+
+        assert_eq!(
+            relevant.len(),
+            2,
+            "Expected two events for the same account: discovered (apply=true) and reverted (apply=false)."
+        );
+
+        // The second event must be `apply=false`
+        let second_event = &relevant[1];
+        assert!(!second_event.apply, "Second event must have apply=false");
+        assert_eq!(second_event.height, 42, "Still referencing the same height=42");
+        assert_eq!(second_event.state_hash, "test_state", "Still referencing the same state_hash='test_state'");
+
+        // Confirm the store no longer has the account
+        {
+            let client = connect_to_db().await;
+            let sql = "SELECT EXISTS(SELECT 1 FROM discovered_accounts_store WHERE key=$1)";
+            let row_opt = client.query_opt(sql, &[&discovered_account]).await.expect("Query failed");
+            // row_opt might be Some(row), but the boolean should be false
+            if let Some(row) = row_opt {
+                let exists: bool = row.get(0);
+                assert!(!exists, "The account should have been removed from the store after reverting");
+            }
         }
     }
 }
