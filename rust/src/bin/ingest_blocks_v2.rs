@@ -19,8 +19,13 @@ async fn main() {
         .map(PathBuf::from)
         .expect("BLOCKS_DIR environment variable must be present and valid");
 
+    let destroy_data = env::var("DESTROY_DATA")
+        .ok() // Convert Result<String, VarError> to Option<String>
+        .and_then(|val| val.parse::<bool>().ok()) // Try to parse "true"/"false" => Option<bool>
+        .unwrap_or(false);
+
     // 3) Spawn your actor DAG, which returns a Sender<Event>
-    let (dag, sender) = spawn_actor_dag().await;
+    let (dag, sender) = spawn_actor_dag(!destroy_data).await;
 
     // 4) Give the DAG a moment to start
     tokio::time::sleep(Duration::from_millis(500)).await;
