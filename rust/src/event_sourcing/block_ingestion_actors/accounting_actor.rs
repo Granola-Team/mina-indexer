@@ -781,6 +781,7 @@ mod accounting_actor_tests {
             state_hash: "3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4".to_string(),
             timestamp: 0,
             account: "B62qnewaccount1".to_string(),
+            apply: true,
         };
 
         // Create the event
@@ -836,6 +837,7 @@ mod accounting_actor_tests {
             state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
             timestamp: 0,
             account: "B62qnewaccount1".to_string(),
+            apply: true,
         };
 
         // Create the event

@@ -126,6 +126,7 @@ impl Actor for NewAccountActor {
                                                 state_hash: block.state_hash.clone(),
                                                 timestamp: block.timestamp,
                                                 account: account.clone(),
+                                                apply: true,
                                             })
                                             .unwrap(),
                                         };
