@@ -761,7 +761,6 @@ mod blockchain_tree_prune_tests {
     #[tokio::test]
     async fn test_load_and_persist_blockchain_tree() {
         use super::*; // make sure this brings in BlockchainTree, Node, etc.
-        use tokio_postgres::types::ToSql;
 
         // 1) Load or initialize an empty tree from DB (false => don't preserve data) This also returns the ManagedStore instance we'll reuse for persisting
         let (mut tree_before, managed_store) = BlockchainTree::load(false).await;
@@ -793,7 +792,7 @@ mod blockchain_tree_prune_tests {
         BlockchainTree::persist(&managed_store, &tree_before).await;
 
         // 4) Load it back into a new variable (false => we skip preserve_data, but the table + row still exist)
-        let (tree_after, _) = BlockchainTree::load(false).await;
+        let (tree_after, _) = BlockchainTree::load(true).await;
 
         // 5) Confirm the loaded version matches the in-memory version (size, best tip, or direct equality if your `BlockchainTree` is `PartialEq`)
         assert_eq!(

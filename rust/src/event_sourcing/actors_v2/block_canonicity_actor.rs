@@ -1,12 +1,11 @@
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
     event_sourcing::{
-        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        actor_dag::{ActorNode, ActorNodeBuilder, ActorStore},
         events::{Event, EventType},
         payloads::{BlockCanonicityUpdatePayload, NewBlockPayload},
     },
 };
-use async_trait::async_trait;
 use log::warn;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -71,13 +70,9 @@ impl BlockCanonicityActor {
 
         events
     }
-}
-
-#[async_trait]
-impl ActorFactory for BlockCanonicityActor {
-    async fn create_actor() -> ActorNode {
+    pub async fn create_actor(preserve_data: bool) -> ActorNode {
         let mut actor_store = ActorStore::new();
-        let (blockchain_tree, _) = BlockchainTree::load(true).await;
+        let (blockchain_tree, _) = BlockchainTree::load(preserve_data).await;
         actor_store.insert(BLOCKCHAIN_TREE_KEY, blockchain_tree);
 
         ActorNodeBuilder::new()
@@ -141,7 +136,7 @@ mod block_canonicity_actor_tests_v2 {
     use crate::{
         constants::GENESIS_STATE_HASH,
         event_sourcing::{
-            actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+            actor_dag::{ActorDAG, ActorNode, ActorNodeBuilder, ActorStore},
             events::{Event, EventType},
             payloads::{BlockCanonicityUpdatePayload, NewBlockPayload},
         },
@@ -199,7 +194,7 @@ mod block_canonicity_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create the BlockCanonicityActor node (root)
-        let canonicity_actor = BlockCanonicityActor::create_actor().await;
+        let canonicity_actor = BlockCanonicityActor::create_actor(false).await;
         let canonicity_actor_id = canonicity_actor.id();
 
         // 4. Set the root in the DAG to get a `Sender<Event>`
@@ -326,7 +321,7 @@ mod block_canonicity_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create BlockCanonicityActor, set as root
-        let canonicity_actor = BlockCanonicityActor::create_actor().await;
+        let canonicity_actor = BlockCanonicityActor::create_actor(false).await;
         let canonicity_actor_id = canonicity_actor.id();
         let canonicity_sender = dag.set_root(canonicity_actor);
 
@@ -423,7 +418,7 @@ mod block_canonicity_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create the BlockCanonicityActor node (root)
-        let canonicity_actor = BlockCanonicityActor::create_actor().await;
+        let canonicity_actor = BlockCanonicityActor::create_actor(false).await;
         let canonicity_actor_id = canonicity_actor.id();
 
         // 4. Set the root in the DAG to get a `Sender<Event>`
@@ -628,7 +623,7 @@ mod block_canonicity_actor_tests_v2 {
         let mut dag = ActorDAG::new();
 
         // 3. Create BlockCanonicityActor, set as root
-        let canonicity_actor = BlockCanonicityActor::create_actor().await;
+        let canonicity_actor = BlockCanonicityActor::create_actor(false).await;
         let canonicity_actor_id = canonicity_actor.id();
         let canonicity_sender = dag.set_root(canonicity_actor);
 

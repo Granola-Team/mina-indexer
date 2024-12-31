@@ -72,7 +72,7 @@ pub async fn spawn_actor_dag(preserve_data: bool) -> (Arc<Mutex<ActorDAG>>, toki
     dag.add_node(new_block_node);
     dag.link_parent(&block_ancestor_id, &new_block_id);
 
-    let block_canonicity_node = BlockCanonicityActor::create_actor().await;
+    let block_canonicity_node = BlockCanonicityActor::create_actor(true).await;
     let block_canonicity_id = block_canonicity_node.id();
     dag.add_node(block_canonicity_node);
     dag.link_parent(&new_block_id, &block_canonicity_id);
