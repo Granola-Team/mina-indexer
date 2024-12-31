@@ -1,12 +1,16 @@
 use env_logger::Builder;
 use log::{error, info};
-use mina_indexer::event_sourcing::{
-    actors_v2::spawn_genesis_dag,
-    events::{Event, EventType},
-    payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
-    sourcing::get_genesis_ledger,
+use mina_indexer::{
+    constants::POSTGRES_CONNECTION_STRING,
+    event_sourcing::{
+        actors_v2::spawn_genesis_dag,
+        events::{Event, EventType},
+        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
+        sourcing::get_genesis_ledger,
+    },
 };
 use tokio::time::sleep;
+use tokio_postgres::NoTls;
 
 #[tokio::main]
 async fn main() {
@@ -14,6 +18,25 @@ async fn main() {
     Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .filter_module("tokio_postgres", log::LevelFilter::Warn)
         .init();
+
+    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+        .await
+        .expect("Failed to connect to database");
+
+    // Spawn the connection handle
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            error!("Postgres connection error: {}", e);
+        }
+    });
+
+    if let Err(e) = client.execute("DROP SCHEMA public CASCADE;", &[]).await {
+        eprintln!("unable to drop public schema: {}", e);
+    }
+
+    if let Err(e) = client.execute("CREATE SCHEMA public;", &[]).await {
+        eprintln!("unable to public schema: {}", e);
+    }
 
     let (dag, sender) = spawn_genesis_dag().await;
 
