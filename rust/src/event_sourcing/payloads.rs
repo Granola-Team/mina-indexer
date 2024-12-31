@@ -16,6 +16,7 @@ pub struct UsernamePayload {
 
 #[derive(Serialize, Deserialize)]
 pub struct NewAccountPayload {
+    pub apply: bool,
     pub height: u64,
     pub state_hash: String,
     pub timestamp: u64,
