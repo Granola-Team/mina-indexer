@@ -44,92 +44,77 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     // 2. Create each actor node and capture IDs before adding them to the DAG.
     let pcb_node = PcbFilePathActor::create_actor().await;
     let pcb_id = pcb_node.id(); // Root node ID
+    let sender = dag.set_root(pcb_node);
 
     let mainnet_block_node = MainnetBlockParserActor::create_actor().await;
     let mainnet_block_id = mainnet_block_node.id();
-
-    let berkeley_block_node = BerkeleyBlockActor::create_actor().await;
-    let berkeley_block_id = berkeley_block_node.id();
-
-    let block_ancestor_node = BlockAncestorActor::create_actor().await;
-    let block_ancestor_id = block_ancestor_node.id();
-
-    let new_block_node = NewBlockActor::create_actor().await;
-    let new_block_id = new_block_node.id();
-
-    let block_canonicity_node = BlockCanonicityActor::create_actor().await;
-    let block_canonicity_id = block_canonicity_node.id();
-
-    let canonical_mainnet_block_node = CanonicalMainnetBlockActor::create_actor().await;
-    let canonical_mainnet_block_id = canonical_mainnet_block_node.id();
-
-    let canonical_berkeley_block_node = CanonicalBerkeleyBlockActor::create_actor().await;
-    let canonical_berkeley_block_id = canonical_berkeley_block_node.id();
-
-    let accounting_node = AccountingActor::create_actor().await;
-    let accounting_node_id = accounting_node.id();
-
-    let ledger_persistence_node = LedgerPersistenceActor::create_actor(true).await;
-    let ledger_persistence_node_id = ledger_persistence_node.id();
-
-    let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
-    let block_confirmations_node_id = block_confirmations_node.id();
-
-    let new_account_node = NewAccountActor::create_actor(true).await;
-    let new_account_node_id = new_account_node.id();
-
-    let account_summary_node = AccountSummaryActor::create_actor().await;
-    let account_summary_node_id = account_summary_node.id();
-
-    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(true).await;
-    let account_summary_pers_node_id = account_summary_pers_node.id();
-
-    let pcb_sender = dag.set_root(pcb_node);
-
     dag.add_node(mainnet_block_node);
     dag.link_parent(&pcb_id, &mainnet_block_id);
 
+    let berkeley_block_node = BerkeleyBlockActor::create_actor().await;
+    let berkeley_block_id = berkeley_block_node.id();
     dag.add_node(berkeley_block_node);
     dag.link_parent(&pcb_id, &berkeley_block_id);
 
+    let block_ancestor_node = BlockAncestorActor::create_actor().await;
+    let block_ancestor_id = block_ancestor_node.id();
     dag.add_node(block_ancestor_node);
     dag.link_parent(&mainnet_block_id, &block_ancestor_id);
     dag.link_parent(&berkeley_block_id, &block_ancestor_id);
 
+    let new_block_node = NewBlockActor::create_actor().await;
+    let new_block_id = new_block_node.id();
     dag.add_node(new_block_node);
     dag.link_parent(&block_ancestor_id, &new_block_id);
 
-    dag.add_node(block_canonicity_node);
-    dag.link_parent(&new_block_id, &block_canonicity_id);
-
-    dag.add_node(canonical_mainnet_block_node);
-    dag.link_parent(&block_canonicity_id, &canonical_mainnet_block_id);
-    dag.link_parent(&mainnet_block_id, &canonical_mainnet_block_id);
-
-    dag.add_node(canonical_berkeley_block_node);
-    dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
-    dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
-
-    dag.add_node(accounting_node);
-    dag.link_parent(&canonical_mainnet_block_id, &accounting_node_id);
-    dag.link_parent(&canonical_berkeley_block_id, &accounting_node_id);
-
-    dag.add_node(ledger_persistence_node);
-    dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
-
+    let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
+    let block_confirmations_node_id = block_confirmations_node.id();
     dag.add_node(block_confirmations_node);
     dag.link_parent(&new_block_id, &block_confirmations_node_id);
 
+    let new_account_node = NewAccountActor::create_actor(true).await;
+    let new_account_node_id = new_account_node.id();
     dag.add_node(new_account_node);
     dag.link_parent(&mainnet_block_id, &new_account_node_id);
     dag.link_parent(&block_confirmations_node_id, &new_account_node_id);
 
+    let block_canonicity_node = BlockCanonicityActor::create_actor().await;
+    let block_canonicity_id = block_canonicity_node.id();
+    dag.add_node(block_canonicity_node);
+    dag.link_parent(&new_block_id, &block_canonicity_id);
+
+    let canonical_mainnet_block_node = CanonicalMainnetBlockActor::create_actor().await;
+    let canonical_mainnet_block_id = canonical_mainnet_block_node.id();
+    dag.add_node(canonical_mainnet_block_node);
+    dag.link_parent(&block_canonicity_id, &canonical_mainnet_block_id);
+    dag.link_parent(&mainnet_block_id, &canonical_mainnet_block_id);
+
+    let canonical_berkeley_block_node = CanonicalBerkeleyBlockActor::create_actor().await;
+    let canonical_berkeley_block_id = canonical_berkeley_block_node.id();
+    dag.add_node(canonical_berkeley_block_node);
+    dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
+    dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
+
+    let accounting_node = AccountingActor::create_actor().await;
+    let accounting_node_id = accounting_node.id();
+    dag.add_node(accounting_node);
+    dag.link_parent(&canonical_mainnet_block_id, &accounting_node_id);
+    dag.link_parent(&canonical_berkeley_block_id, &accounting_node_id);
     // Introduce a Cycle into the graph
     dag.link_parent(&new_account_node_id, &accounting_node_id);
 
+    let ledger_persistence_node = LedgerPersistenceActor::create_actor(true).await;
+    let ledger_persistence_node_id = ledger_persistence_node.id();
+    dag.add_node(ledger_persistence_node);
+    dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
+
+    let account_summary_node = AccountSummaryActor::create_actor().await;
+    let account_summary_node_id = account_summary_node.id();
     dag.add_node(account_summary_node);
     dag.link_parent(&accounting_node_id, &account_summary_node_id);
 
+    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(true).await;
+    let account_summary_pers_node_id = account_summary_pers_node.id();
     dag.add_node(account_summary_pers_node);
     dag.link_parent(&account_summary_node_id, &account_summary_pers_node_id);
 
@@ -142,7 +127,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     });
 
     // 7. Return the root actor’s Sender<Event>.
-    (dag, pcb_sender)
+    (dag, sender)
 }
 
 pub async fn spawn_genesis_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
