@@ -120,7 +120,7 @@ impl LedgerPersistenceActor {
             }
         });
 
-        let view_def = r"#
+        let view_def = r#"
             CREATE OR REPLACE VIEW account_summary AS
             SELECT
                 address,
@@ -132,7 +132,7 @@ impl LedgerPersistenceActor {
             GROUP BY
                 address, address_type
             ORDER BY
-                latest_height DESC;#";
+                latest_height DESC;"#;
         if let Err(e) = client.execute(view_def, &[]).await {
             eprintln!("unable to create view: {}", e);
         }
