@@ -414,7 +414,7 @@ impl ActorFactory for AccountingActor {
                                 // magic mina receiver in block 1 is also no subject to account creation fee
                                 return None;
                             }
-                            let record = DoubleEntryRecordPayload {
+                            let mut record = DoubleEntryRecordPayload {
                                 height: payload.height,
                                 state_hash: payload.state_hash.to_string(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
@@ -437,6 +437,10 @@ impl ActorFactory for AccountingActor {
                                     timestamp: 0,
                                 }],
                             };
+                            if !payload.apply {
+                                record.lhs[0].entry_type = AccountingEntryType::Credit;
+                                record.rhs[0].entry_type = AccountingEntryType::Debit;
+                            }
 
                             let new_event = Event {
                                 event_type: EventType::DoubleEntryTransaction,
@@ -525,7 +529,9 @@ mod accounting_actor_tests_v2 {
             actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
             events::{Event, EventType},
             models::{CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
-            payloads::{AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, LedgerDestination, MainnetBlockPayload},
+            payloads::{
+                AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+            },
         },
     };
     use std::sync::Arc;
@@ -1768,5 +1774,183 @@ mod accounting_actor_tests_v2 {
 
         // 10) shutdown
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    }
+
+    #[tokio::test]
+    async fn test_new_account_height_less_than_2_produces_no_transaction() {
+        // 1) Build the DAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Root => create the AccountingActor
+        let actor_node = AccountingActor::create_actor().await;
+        let actor_id = actor_node.id();
+        let actor_sender = dag.set_root(actor_node);
+
+        // 3) Sink node => captures DoubleEntryTransaction
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // 4) Spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 5) Construct a NewAccountPayload with height = 1 => no fee
+        let new_acct_payload = NewAccountPayload {
+            apply: true, // doesn't matter, height < 2 overrides
+            height: 1,   // main point
+            state_hash: "hash_low_height".into(),
+            timestamp: 999999,
+            account: "B62qNewAcctLowHeight".to_string(),
+        };
+
+        // 6) Send the NewAccount event
+        actor_sender
+            .send(Event {
+                event_type: EventType::NewAccount,
+                payload: sonic_rs::to_string(&new_acct_payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send NewAccount with height < 2");
+
+        // Wait for processing
+        sleep(Duration::from_millis(200)).await;
+
+        // 7) Read from the sink => we expect NO DoubleEntryTransaction
+        let captured = read_captured_transactions(&dag, &sink_node_id).await;
+        assert!(captured.is_empty(), "No transaction events should be emitted when height < 2");
+    }
+
+    #[tokio::test]
+    async fn test_new_account_height_ge_2_apply_true_and_false() {
+        // 1) Build the DAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Root => create the AccountingActor
+        let actor_node = AccountingActor::create_actor().await;
+        let actor_id = actor_node.id();
+        let actor_sender = dag.set_root(actor_node);
+
+        // 3) Sink node => captures DoubleEntryTransaction
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // 4) Spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // --------------------------
+        // CASE A) apply=true
+        // --------------------------
+        let new_acct_payload_apply_true = NewAccountPayload {
+            apply: true,
+            height: 100,
+            state_hash: "hash_new_acct_apply_true".into(),
+            timestamp: 123_456,
+            account: "B62qNewAcctApplyTrue".to_string(),
+        };
+
+        actor_sender
+            .send(Event {
+                event_type: EventType::NewAccount,
+                payload: sonic_rs::to_string(&new_acct_payload_apply_true).unwrap(),
+            })
+            .await
+            .expect("Failed to send NewAccount apply=true");
+
+        // Wait
+        sleep(Duration::from_millis(200)).await;
+
+        // Read from sink => expect 1 DoubleEntryTransaction
+        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
+        assert_eq!(transactions.len(), 1, "Expected exactly one DoubleEntryTransaction for the first new account");
+
+        // Parse
+        let record_a: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions[0]).expect("Failed to parse DERP for apply=true");
+        assert_eq!(record_a.height, 100);
+        assert_eq!(record_a.state_hash, "hash_new_acct_apply_true");
+        assert_eq!(record_a.lhs.len(), 1, "One LHS for the creation fee");
+        assert_eq!(record_a.rhs.len(), 1, "One RHS for the creation fee");
+
+        let lhs_a = &record_a.lhs[0];
+        let rhs_a = &record_a.rhs[0];
+        assert_eq!(lhs_a.account, "B62qNewAcctApplyTrue");
+        assert_eq!(lhs_a.entry_type, crate::event_sourcing::payloads::AccountingEntryType::Debit);
+        assert_eq!(rhs_a.account, "AccountCreationFee#hash_new_acct_apply_true");
+        assert_eq!(rhs_a.entry_type, crate::event_sourcing::payloads::AccountingEntryType::Credit);
+
+        // Clear out the sink for the next scenario
+        {
+            let dag_locked = dag.lock().await;
+            let sink_state = dag_locked.read_node(sink_node_id.clone()).expect("sink node gone?").lock().await.get_state();
+            let mut store_locked = sink_state.lock().await;
+            store_locked.remove::<Vec<String>>("captured_transactions");
+        }
+
+        // --------------------------
+        // CASE B) apply=false => reversed
+        // --------------------------
+        let new_acct_payload_apply_false = NewAccountPayload {
+            apply: false,
+            height: 101, // >= 2
+            state_hash: "hash_new_acct_apply_false".into(),
+            timestamp: 321_654,
+            account: "B62qNewAcctApplyFalse".to_string(),
+        };
+
+        actor_sender
+            .send(Event {
+                event_type: EventType::NewAccount,
+                payload: sonic_rs::to_string(&new_acct_payload_apply_false).unwrap(),
+            })
+            .await
+            .expect("Failed to send NewAccount apply=false");
+
+        sleep(Duration::from_millis(200)).await;
+
+        // read from sink => expect 1 reversed DoubleEntryTransaction
+        let transactions_b = read_captured_transactions(&dag, &sink_node_id).await;
+        assert_eq!(
+            transactions_b.len(),
+            1,
+            "Expected exactly one DoubleEntryTransaction for the second new account"
+        );
+
+        let record_b: DoubleEntryRecordPayload = sonic_rs::from_str(&transactions_b[0]).expect("Failed to parse DERP for apply=false");
+        assert_eq!(record_b.height, 101);
+        assert_eq!(record_b.state_hash, "hash_new_acct_apply_false");
+        assert_eq!(record_b.lhs.len(), 1);
+        assert_eq!(record_b.rhs.len(), 1);
+
+        let lhs_b = &record_b.lhs[0];
+        let rhs_b = &record_b.rhs[0];
+        // Because apply=false => reversed: LHS => credit to the new account, RHS => debit from the "AccountCreationFee#..." virtual
+        assert_eq!(lhs_b.account, "B62qNewAcctApplyFalse");
+        assert_eq!(
+            lhs_b.entry_type,
+            crate::event_sourcing::payloads::AccountingEntryType::Credit,
+            "Should be reversed"
+        );
+        assert_eq!(rhs_b.account, "AccountCreationFee#hash_new_acct_apply_false");
+        assert_eq!(
+            rhs_b.entry_type,
+            crate::event_sourcing::payloads::AccountingEntryType::Debit,
+            "Should be reversed"
+        );
+
+        // All done!
     }
 }
