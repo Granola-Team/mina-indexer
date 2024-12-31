@@ -1,5 +1,11 @@
+use crate::{
+    constants::{POSTGRES_CONNECTION_STRING, TRANSITION_FRONTIER_DISTANCE},
+    event_sourcing::managed_store::ManagedStore,
+};
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use tokio_postgres::NoTls;
 
 #[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Height(pub u64);
@@ -21,6 +27,10 @@ pub struct BlockchainTree {
     tree: BTreeMap<Height, Vec<Node>>,
     max_ancestors_from_best_tip: usize,
 }
+
+const BLOCKCHAIN_TREE_STORE: &str = "blockchain_tree_store";
+const BLOCKCHAIN_TREE_KEY: &str = "blockchain_tree";
+const BLOCKCHAIN_TREE_COL: &str = "tree";
 
 impl BlockchainTree {
     pub fn new(max_ancestors_from_best_tip: usize) -> Self {
@@ -178,6 +188,47 @@ impl BlockchainTree {
                 }
                 _ => return Err("No common ancestor found"),
             }
+        }
+    }
+
+    pub async fn load(preserve_data: bool) -> (BlockchainTree, ManagedStore) {
+        // 1) Connect to Postgres
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect to the database for BlockchainTree");
+        // Spawn the connection task
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                error!("Postgres connection error in BlockchainTree: {}", e);
+            }
+        });
+
+        let store_builder = ManagedStore::builder(client).name(BLOCKCHAIN_TREE_STORE).add_text_column(BLOCKCHAIN_TREE_COL);
+
+        // If you want to preserve data across runs, you can do `preserve_data()`
+        let managed_store = if preserve_data {
+            store_builder
+                .preserve_data()
+                .build()
+                .await
+                .expect("Failed to build ManagedStore for NewBlockActor")
+        } else {
+            store_builder.build().await.expect("Failed to build ManagedStore for BlockchainTree")
+        };
+
+        if let Ok(Some(tree)) = managed_store.get::<String>(BLOCKCHAIN_TREE_KEY, BLOCKCHAIN_TREE_COL).await {
+            let blockchain_tree: BlockchainTree = sonic_rs::from_str(&tree).unwrap();
+            (blockchain_tree, managed_store)
+        } else {
+            (BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE), managed_store)
+        }
+    }
+
+    pub async fn persist(managed_store: &ManagedStore, blockchain_tree: &BlockchainTree) {
+        let tree = sonic_rs::to_string(&blockchain_tree).unwrap();
+        let pairs = &[(BLOCKCHAIN_TREE_COL, &tree as &(dyn tokio_postgres::types::ToSql + Sync))];
+        if let Err(e) = managed_store.upsert(BLOCKCHAIN_TREE_KEY, pairs).await {
+            error!("Unable to insert blockchain_tree {e}");
         }
     }
 }
@@ -705,5 +756,63 @@ mod blockchain_tree_prune_tests {
         let retrieved_node = tree.get_node(Height(1), Hash("block_4".to_string()));
         assert!(retrieved_node.is_some());
         assert_eq!(retrieved_node.unwrap().metadata_str, Some("Important metadata".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_load_and_persist_blockchain_tree() {
+        use super::*; // make sure this brings in BlockchainTree, Node, etc.
+        use tokio_postgres::types::ToSql;
+
+        // 1) Load or initialize an empty tree from DB (false => don't preserve data) This also returns the ManagedStore instance we'll reuse for persisting
+        let (mut tree_before, managed_store) = BlockchainTree::load(false).await;
+
+        // If the DB was empty, `tree_before` is a fresh tree. If not, it includes prior data.
+        // We'll illustrate overwriting it with a new "small" chain for the test.
+
+        // 2) Build a sample chain in memory
+        let node1 = Node {
+            height: Height(5),
+            state_hash: Hash("hash_5".to_string()),
+            previous_state_hash: Hash("hash_4".to_string()),
+            last_vrf_output: "vrf_5".to_string(),
+            metadata_str: Some("Node5 metadata".to_string()),
+        };
+        let node2 = Node {
+            height: Height(6),
+            state_hash: Hash("hash_6".to_string()),
+            previous_state_hash: Hash("hash_5".to_string()),
+            last_vrf_output: "vrf_6".to_string(),
+            metadata_str: None,
+        };
+
+        // Start fresh
+        let _ = tree_before.set_root(node1.clone());
+        let _ = tree_before.add_node(node2.clone());
+
+        // 3) Persist that updated tree to PostgreSQL
+        BlockchainTree::persist(&managed_store, &tree_before).await;
+
+        // 4) Load it back into a new variable (false => we skip preserve_data, but the table + row still exist)
+        let (tree_after, _) = BlockchainTree::load(false).await;
+
+        // 5) Confirm the loaded version matches the in-memory version (size, best tip, or direct equality if your `BlockchainTree` is `PartialEq`)
+        assert_eq!(
+            tree_before.tree.len(),
+            tree_after.tree.len(),
+            "Expected the same number of heights in the reloaded tree"
+        );
+
+        // Optional: Compare best tips or do a direct eq check
+        let before_best_tip = tree_before.get_best_tip().expect("Should have best tip");
+        let after_best_tip = tree_after.get_best_tip().expect("Reloaded tree should have best tip");
+
+        assert_eq!(before_best_tip, after_best_tip, "Best tips must match after reload");
+
+        // Or if your `BlockchainTree` is fully `PartialEq`:
+        assert_eq!(
+            sonic_rs::to_string(&tree_before).unwrap(),
+            sonic_rs::to_string(&tree_after).unwrap(),
+            "Persisted & re-loaded tree should exactly match the original"
+        );
     }
 }
