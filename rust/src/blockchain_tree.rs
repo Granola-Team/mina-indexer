@@ -1,12 +1,13 @@
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Height(pub u64);
 
-#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(PartialOrd, Ord, Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub struct Hash(pub String);
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Node {
     pub height: Height,
     pub state_hash: Hash,
@@ -15,7 +16,7 @@ pub struct Node {
     pub metadata_str: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockchainTree {
     tree: BTreeMap<Height, Vec<Node>>,
     max_ancestors_from_best_tip: usize,
