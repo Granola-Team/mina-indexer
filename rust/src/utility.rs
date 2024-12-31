@@ -347,15 +347,15 @@ fn clean_memo(decoded: &str) -> String {
     decoded.trim_matches(|c: char| c == '\0' || c.is_control()).to_string()
 }
 
-pub fn decode_base58check_to_string(input: &str) -> Result<String, String> {
+pub fn decode_base58check_to_string(input: &str) -> Result<String> {
     let decoded_bytes = bs58::decode(input)
         .with_check(None) // Verifies the checksum
         .into_vec()
-        .map_err(|e| format!("Decoding error: {:?}", e))?;
+        .map_err(|e| anyhow!("Decoding error: {e}"))?;
 
     String::from_utf8(decoded_bytes)
         .map(|m| clean_memo(&m))
-        .map_err(|e| format!("Invalid UTF-8 sequence: {:?}", e))
+        .map_err(|e| anyhow!("Invalid UTF-8 sequence {e}"))
 }
 
 #[cfg(test)]

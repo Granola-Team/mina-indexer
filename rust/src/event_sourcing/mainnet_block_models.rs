@@ -3,6 +3,7 @@ use super::{
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina},
 };
 use crate::{constants::MAINNET_COINBASE_REWARD, utility::decode_base58check_to_string};
+use anyhow::Result;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use core::fmt;
 use serde::{
@@ -219,8 +220,8 @@ impl Command {
         }
     }
 
-    fn get_memo(&self) -> String {
-        decode_base58check_to_string(&self.signed_command.as_ref().unwrap().payload.common.memo.to_string()).unwrap()
+    fn get_memo(&self) -> Result<String> {
+        decode_base58check_to_string(&self.signed_command.as_ref().unwrap().payload.common.memo.to_string())
     }
 
     fn get_fee_payer(&self) -> String {
@@ -229,7 +230,7 @@ impl Command {
 
     pub fn to_command_summary(&self) -> CommandSummary {
         CommandSummary {
-            memo: self.get_memo(),
+            memo: self.get_memo().unwrap_or("Invalid memo".to_string()),
             fee_payer: self.get_fee_payer(),
             sender: self.get_sender(),
             receiver: self.get_receiver(),
