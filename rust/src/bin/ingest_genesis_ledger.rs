@@ -3,10 +3,7 @@ use log::{error, info};
 use mina_indexer::event_sourcing::{
     actors_v2::spawn_genesis_dag,
     events::{Event, EventType},
-    payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, GenesisBlockPayload,
-        LedgerDestination, MainnetBlockPayload,
-    },
+    payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, GenesisBlockPayload, LedgerDestination},
     sourcing::get_genesis_ledger,
 };
 use tokio::time::sleep;
@@ -63,34 +60,6 @@ async fn main() {
         .send(Event {
             event_type: EventType::DoubleEntryTransaction,
             payload: sonic_rs::to_string(&magic_mina).unwrap(),
-        })
-        .await
-    {
-        error!("Failed to process a double entry (magic mina) from the genesis block: {err}");
-    }
-
-    sleep(std::time::Duration::from_secs(1)).await;
-
-    let canonical_genesis_block = CanonicalMainnetBlockPayload {
-        canonical: true,
-        was_canonical: false,
-        block: MainnetBlockPayload {
-            height: genesis_block.height,
-            state_hash: genesis_block.state_hash,
-            previous_state_hash: genesis_block.previous_state_hash,
-            last_vrf_output: genesis_block.last_vrf_output,
-            timestamp: genesis_block.unix_timestamp,
-            global_slot: genesis_block.global_slot_since_genesis,
-            global_slot_since_genesis: genesis_block.global_slot_since_genesis,
-            coinbase_receiver: genesis_block.coinbase_receiver,
-            coinbase_reward_nanomina: genesis_block.coinbase_reward,
-            ..Default::default()
-        },
-    };
-    if let Err(err) = sender
-        .send(Event {
-            event_type: EventType::CanonicalMainnetBlock,
-            payload: sonic_rs::to_string(&canonical_genesis_block).unwrap(),
         })
         .await
     {
