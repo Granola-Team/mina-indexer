@@ -111,6 +111,32 @@ impl LedgerPersistenceActor {
                 .expect("Failed building ledger table in LedgerPersistenceActor")
         };
 
+        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Unable to connect to database");
+        tokio::spawn(async move {
+            if let Err(e) = connection.await {
+                error!("connection error: {}", e);
+            }
+        });
+
+        let view_def = r"#
+            CREATE OR REPLACE VIEW account_summary AS
+            SELECT
+                address,
+                address_type,
+                SUM(balance_delta) AS balance,
+                MAX(height) AS latest_height
+            FROM
+                blockchain_ledger
+            GROUP BY
+                address, address_type
+            ORDER BY
+                latest_height DESC;#";
+        if let Err(e) = client.execute(view_def, &[]).await {
+            eprintln!("unable to create view: {}", e);
+        }
+
         // 4) Put the table in the ActorStore
         let mut store = ActorStore::new();
         store.insert(LEDGER_TABLE_KEY, table);
