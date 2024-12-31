@@ -254,6 +254,12 @@ impl ManagedStore {
         Ok(rows_affected)
     }
 
+    pub async fn remove_key(&self, key: &str) -> Result<u64> {
+        let sql = format!("DELETE FROM {} WHERE key = $1", self.store_name);
+        let rows_deleted = self.client.execute(&sql, &[&key]).await?;
+        Ok(rows_deleted)
+    }
+
     pub async fn key_exists(&self, key: &str) -> Result<bool> {
         // Build a simple query: "SELECT 1 FROM table WHERE key = $1 LIMIT 1"
         let sql = format!("SELECT 1 FROM {} WHERE key = $1 LIMIT 1", self.store_name);
@@ -732,6 +738,40 @@ mod managed_store_tests {
         // 7) For completeness, check another random key => false
         let exists4 = store.key_exists("another_key").await?;
         assert!(!exists4, "Another random key should not exist");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_managed_store_remove_key() -> anyhow::Result<()> {
+        use tokio_postgres::types::ToSql;
+
+        // 1) Connect to Postgres
+        let client = connect_to_db().await;
+
+        // 2) Build a new store (non-preserving)
+        let store_name = "test_managed_store_remove_key";
+        let store = ManagedStore::builder(client).name(store_name).add_numeric_column("counter").build().await?; // Will drop/create the table
+
+        // 3) Insert (upsert) a couple of keys
+        store.upsert("key1", &[("counter", &100_i64 as &(dyn ToSql + Sync))]).await?;
+        store.upsert("key2", &[("counter", &200_i64 as &(dyn ToSql + Sync))]).await?;
+
+        // 4) Verify both exist
+        assert!(store.key_exists("key1").await?, "key1 should exist");
+        assert!(store.key_exists("key2").await?, "key2 should exist");
+
+        // 5) Remove key1
+        let deleted = store.remove_key("key1").await?;
+        assert_eq!(deleted, 1, "Should have deleted exactly one row for 'key1'");
+
+        // 6) Now key1 should be gone, key2 should remain
+        assert!(!store.key_exists("key1").await?, "key1 should no longer exist after remove_key");
+        assert!(store.key_exists("key2").await?, "key2 should still exist");
+
+        // 7) Removing a non-existent key should affect 0 rows
+        let deleted2 = store.remove_key("no_such_key").await?;
+        assert_eq!(deleted2, 0, "Removing a non-existent key returns 0 rows deleted");
 
         Ok(())
     }
