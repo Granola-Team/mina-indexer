@@ -72,6 +72,8 @@ port = ${PGPORT}
 EOF
     fi
 
+    export DB_DIR="$FLOX_ENV_PROJECT/db"
+
     if ! pg_ctl status > /dev/null; then
 
         # Clean up any stale files
@@ -81,21 +83,21 @@ EOF
         echo "Starting PostgreSQL"
         pg_ctl -D $PGDATA -o "-k $PGHOST" -l $LOG_PATH start
 
-        until pg_isready -h $PGHOST -p $PGPORT -U $PGUSER; do
+        until pg_isready --host $PGHOST --port $PGPORT --username $PGUSER; do
             echo "Waiting for PostgreSQL to start"
             sleep 1
         done
 
-        if ! psql -U $PGUSER -h $PGHOST -p $PGPORT -d postgres -lqt | cut -d \\| -f 1 | grep -qw $PGDATABASE; then
+        if ! psql --username $PGUSER --host $PGHOST --port $PGPORT -d postgres -lqt | cut -d \\| -f 1 | grep -qw $PGDATABASE; then
             echo "Creating database since it doesn't exist"
-            createdb -U $PGUSER -h $PGHOST -p $PGPORT $PGDATABASE
+            createdb --username $PGUSER --host $PGHOST --port $PGPORT $PGDATABASE
         fi
 
-        ./db/install_pg_graphql.sh
-        ./db/install_postgrest.sh
+        $DB_DIR/install_pg_graphql.sh
+        $DB_DIR/install_postgrest.sh
     fi
 
-    nohup postgrest db/postgrest.conf > db/postgrest.log 2>&1 &
+    nohup postgrest $DB_DIR/postgrest.conf > $DB_DIR/postgrest.log 2>&1 &
 """
 
 [profile]

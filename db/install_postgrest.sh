@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Create temporary directory
 readonly TMP_DIR=$(mktemp -d)
@@ -12,7 +12,7 @@ echo "Downloading PostgREST binary..."
 curl -L \
     -H "Accept: application/vnd.oci.image.content.v1+json" \
     -H "Authorization: Bearer QQ==" \
-    "https://ghcr.io/v2/homebrew/core/postgrest/blobs/sha256:68a1b201a0396ca4a9332f68f4a1a039c4239e984dbdd23558778809686237cf" \
+    "https://ghcr.io/v2/homebrew/core/postgrest/blobs/sha256:eba1e995f952f401c16c7ea727555c2cde35fb099639c3692de26fa6ca2b0ede" \
     -o postgrest.tar.gz
 
 # Create installation directory
