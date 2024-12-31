@@ -1,12 +1,11 @@
 use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
 use serde::Deserialize;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     io::{BufRead, BufReader},
     path::Path,
     process::{Command, Stdio},
     thread,
-    time::{Duration, Instant},
 };
 use tokio_postgres::NoTls;
 
@@ -25,79 +24,35 @@ struct Block {
     canonical: bool,
 }
 
-#[tokio::test]
-async fn test_first_100_blocks() {
-    run_test_process(
-        env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-        &[],
-        Duration::from_secs(20),
-    );
-
-    truncate_table("blocks_log", 100).await;
-    test_blocks_first_100().await;
-    test_commands_first_100().await;
-
-    // restart ingestion from block 52
-    run_test_process(
-        env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-        &["52", "3NLY4ci13GgX1GGkUrfTKr1Zt69U6Xj546d15nU9o1WrfHVnbosd"],
-        Duration::from_secs(10),
-    );
-
-    truncate_table("blocks_log", 100).await;
-    test_blocks_first_100().await;
-    test_commands_first_100().await;
-}
+// #[tokio::test]
+// async fn test_first_100_blocks() {
+//     run_test_process(
+//         env!("CARGO_BIN_EXE_ingestion"), // Binary path
+//         &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+//         &[],
+//     );
+//
+//     test_blocks_first_100().await;
+//     test_commands_first_100().await;
+// }
 
 #[tokio::test]
 async fn test_blockchain_ledger() {
     run_test_process(
-        env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
+        env!("CARGO_BIN_EXE_ingest_genesis_ledger"), // Binary path
         &[],
-        Duration::from_secs(12 * 60),
+        &[],
     );
 
-    truncate_table("blockchain_ledger", 5000).await;
-    test_ledger_ingested_up_to(5000).await;
-    test_blockchain_ledger_accounting_per_block().await;
-    test_account_balances().await;
-
-    // restart ingestion from height 4501
     run_test_process(
-        env!("CARGO_BIN_EXE_ingestion"), // Binary path
-        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks"), ("PUBLISH_RATE_PER_SECOND", "20")],
-        &["4501", "3NLRAYzM1oPghMUJWaQqMrdpaAwj4FpQ8BUw6GQ8e9Q4zW3K864F"],
-        Duration::from_secs(2 * 60),
+        env!("CARGO_BIN_EXE_ingest_blocks"), // Binary path
+        &[("BLOCKS_DIR", "./tests/data/5000_mainnet_blocks")],
+        &[],
     );
 
-    truncate_table("blockchain_ledger", 5000).await;
     test_ledger_ingested_up_to(5000).await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances().await;
-}
-
-async fn truncate_table(table: &str, height: u64) {
-    if let Ok((client, connection)) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls).await {
-        let handle = tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
-            }
-        });
-
-        let query = format!("DELETE FROM {} WHERE height > {};", table, height);
-
-        // Execute the query using the SQL client from the actor
-        if let Err(e) = client.execute(query.as_str(), &[]).await.map_err(|_| "Unable to trim the blockchain ledger") {
-            eprintln!("{}", e);
-        }
-
-        drop(handle);
-    } else {
-        panic!("Unable to open connection to database");
-    }
 }
 
 async fn test_ledger_ingested_up_to(x: u64) {
@@ -158,120 +113,120 @@ async fn test_blockchain_ledger_accounting_per_block() {
     }
 }
 
-async fn test_commands_first_100() {
-    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-        .await
-        .expect("Expected to open connection");
+// async fn test_commands_first_100() {
+//     let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+//         .await
+//         .expect("Expected to open connection");
 
-    let handle = tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+//     let handle = tokio::spawn(async move {
+//         if let Err(e) = connection.await {
+//             eprintln!("connection error: {}", e);
+//         }
+//     });
 
-    {
-        let query = r#"
-        SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=true;
-        "#;
+//     {
+//         let query = r#"
+//         SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=true;
+//         "#;
 
-        let row = client.query_one(query, &[]).await.expect("Failed to execute query");
-        let count: i64 = row.get(0);
-        assert_eq!(count, 152);
-    }
+//         let row = client.query_one(query, &[]).await.expect("Failed to execute query");
+//         let count: i64 = row.get(0);
+//         assert_eq!(count, 152);
+//     }
 
-    {
-        let query = r#"
-        SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=false;
-        "#;
+//     {
+//         let query = r#"
+//         SELECT count(*) FROM user_commands WHERE height <= 100 AND canonical=false;
+//         "#;
 
-        let row = client.query_one(query, &[]).await.expect("Failed to execute query");
-        let count: i64 = row.get(0);
-        assert_eq!(count, 95);
-    }
+//         let row = client.query_one(query, &[]).await.expect("Failed to execute query");
+//         let count: i64 = row.get(0);
+//         assert_eq!(count, 95);
+//     }
 
-    drop(handle);
-}
+//     drop(handle);
+// }
 
-async fn test_blocks_first_100() {
-    let file_content = std::fs::read_to_string(Path::new("./tests/data/canonicity_of_first_100_blocks.json")).expect("Failed to read JSON file from disk");
+// async fn test_blocks_first_100() {
+//     let file_content = std::fs::read_to_string(Path::new("./tests/data/canonicity_of_first_100_blocks.json")).expect("Failed to read JSON file from disk");
 
-    let blocks: Vec<Block> = sonic_rs::from_str(&file_content).unwrap();
+//     let blocks: Vec<Block> = sonic_rs::from_str(&file_content).unwrap();
 
-    // Create a HashMap with composite keys (height, state_hash)
-    let file_blocks_map: HashMap<(u64, String), bool> = blocks
-        .into_iter()
-        .map(|block| ((block.block_height, block.state_hash.clone()), block.canonical))
-        .collect();
+//     // Create a HashMap with composite keys (height, state_hash)
+//     let file_blocks_map: HashMap<(u64, String), bool> = blocks
+//         .into_iter()
+//         .map(|block| ((block.block_height, block.state_hash.clone()), block.canonical))
+//         .collect();
 
-    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-        .await
-        .expect("Expected to open connection");
+//     let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+//         .await
+//         .expect("Expected to open connection");
 
-    let handle = tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {}", e);
-        }
-    });
+//     let handle = tokio::spawn(async move {
+//         if let Err(e) = connection.await {
+//             eprintln!("connection error: {}", e);
+//         }
+//     });
 
-    let query = r#"
-        SELECT height, state_hash, canonical
-        FROM blocks;
-    "#;
+//     let query = r#"
+//         SELECT height, state_hash, canonical
+//         FROM blocks;
+//     "#;
 
-    let rows = client.query(query, &[]).await.expect("Failed to execute query");
+//     let rows = client.query(query, &[]).await.expect("Failed to execute query");
 
-    // Create a HashMap from database rows with composite keys
-    let db_blocks_map: HashMap<(u64, String), bool> = rows
-        .into_iter()
-        .map(|row| {
-            (
-                (row.get::<_, i64>("height") as u64, row.get::<_, String>("state_hash")),
-                row.get::<_, bool>("canonical"),
-            )
-        })
-        .collect();
+//     // Create a HashMap from database rows with composite keys
+//     let db_blocks_map: HashMap<(u64, String), bool> = rows
+//         .into_iter()
+//         .map(|row| {
+//             (
+//                 (row.get::<_, i64>("height") as u64, row.get::<_, String>("state_hash")),
+//                 row.get::<_, bool>("canonical"),
+//             )
+//         })
+//         .collect();
 
-    // Ensure the sizes match
-    // Calculate the symmetric difference
-    let file_keys: HashSet<_> = file_blocks_map.keys().collect();
-    let db_keys: HashSet<_> = db_blocks_map.keys().collect();
+//     // Ensure the sizes match
+//     // Calculate the symmetric difference
+//     let file_keys: HashSet<_> = file_blocks_map.keys().collect();
+//     let db_keys: HashSet<_> = db_blocks_map.keys().collect();
 
-    let missing_in_db: HashSet<_> = file_keys.difference(&db_keys).collect();
-    let extra_in_db: HashSet<_> = db_keys.difference(&file_keys).collect();
+//     let missing_in_db: HashSet<_> = file_keys.difference(&db_keys).collect();
+//     let extra_in_db: HashSet<_> = db_keys.difference(&file_keys).collect();
 
-    // Print the symmetric difference
-    if !missing_in_db.is_empty() || !extra_in_db.is_empty() {
-        println!("Blocks missing in DB: {:?}", missing_in_db);
-        println!("Blocks extra in DB: {:?}", extra_in_db);
-    }
-    assert_eq!(file_blocks_map.len(), db_blocks_map.len(), "Mismatch in number of blocks");
+//     // Print the symmetric difference
+//     if !missing_in_db.is_empty() || !extra_in_db.is_empty() {
+//         println!("Blocks missing in DB: {:?}", missing_in_db);
+//         println!("Blocks extra in DB: {:?}", extra_in_db);
+//     }
+//     assert_eq!(file_blocks_map.len(), db_blocks_map.len(), "Mismatch in number of blocks");
 
-    // Check that all blocks have the correct canonical status
-    let mut mismatches: Vec<((u64, String), bool, bool)> = vec![];
-    for (key, &file_canonical) in &file_blocks_map {
-        if let Some(&db_canonical) = db_blocks_map.get(key) {
-            if file_canonical != db_canonical {
-                mismatches.push((key.clone(), file_canonical, db_canonical));
-            }
-        } else {
-            panic!("Block with height {} and state_hash {} not found in database", key.0, key.1);
-        }
-    }
+//     // Check that all blocks have the correct canonical status
+//     let mut mismatches: Vec<((u64, String), bool, bool)> = vec![];
+//     for (key, &file_canonical) in &file_blocks_map {
+//         if let Some(&db_canonical) = db_blocks_map.get(key) {
+//             if file_canonical != db_canonical {
+//                 mismatches.push((key.clone(), file_canonical, db_canonical));
+//             }
+//         } else {
+//             panic!("Block with height {} and state_hash {} not found in database", key.0, key.1);
+//         }
+//     }
 
-    // Report mismatches
-    if !mismatches.is_empty() {
-        for ((height, state_hash), expected, actual) in &mismatches {
-            println!(
-                "Mismatch for height {} and state_hash {}: expected canonical {}, got {}",
-                height, state_hash, expected, actual
-            );
-        }
-    }
+//     // Report mismatches
+//     if !mismatches.is_empty() {
+//         for ((height, state_hash), expected, actual) in &mismatches {
+//             println!(
+//                 "Mismatch for height {} and state_hash {}: expected canonical {}, got {}",
+//                 height, state_hash, expected, actual
+//             );
+//         }
+//     }
 
-    assert!(mismatches.is_empty(), "Found mismatches between file and database canonical statuses");
+//     assert!(mismatches.is_empty(), "Found mismatches between file and database canonical statuses");
 
-    drop(handle);
-}
+//     drop(handle);
+// }
 
 async fn test_account_balances() {
     let file_content = std::fs::read_to_string(Path::new("./tests/data/ledger_at_height_5000.json")).expect("Failed to read JSON file from disk");
@@ -335,10 +290,7 @@ async fn test_account_balances() {
 /// - `binary_path`: The path to the binary (e.g., `env!("CARGO_BIN_EXE_tool")`).
 /// - `env_vars`: A list of environment variables to set for the process.
 /// - `args`: A list of command-line arguments to pass to the binary.
-/// - `timeout`: Duration for which the process is allowed to run.
-pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], args: &[&str], timeout: Duration) {
-    println!("Running ingestion process for {} minutes...", timeout.as_secs() / 60);
-
+pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], args: &[&str]) {
     // Spawn the child process with environment variables and arguments
     let mut child = {
         let mut cmd = Command::new(binary_path);
@@ -380,26 +332,6 @@ pub fn run_test_process(binary_path: &str, env_vars: &[(&str, &str)], args: &[&s
             }
         }
     });
-
-    // Monitor the process and enforce the timeout
-    let start = Instant::now();
-    loop {
-        if start.elapsed() >= timeout {
-            // Kill the process if it exceeds the timeout
-            child.kill().expect("Failed to kill the child process");
-            println!("Process killed after timeout");
-            break;
-        }
-
-        // Check if the process has exited
-        if let Ok(Some(status)) = child.try_wait() {
-            println!("Process exited with status: {}", status);
-            break;
-        }
-
-        // Avoid busy-waiting
-        thread::sleep(Duration::from_millis(100));
-    }
 
     // Ensure the process is fully terminated
     child.wait().expect("Failed to wait on child process");

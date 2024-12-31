@@ -1,7 +1,7 @@
 use super::events::Event;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use log::{error, info};
+use log::error;
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
