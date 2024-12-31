@@ -2,6 +2,7 @@ use crate::{
     constants::POSTGRES_CONNECTION_STRING,
     event_sourcing::{
         actor_dag::{ActorNode, ActorNodeBuilder, ActorStore},
+        canonical_items_manager::CanonicalItem,
         events::{Event, EventType},
         managed_store::ManagedStore,
         payloads::{CanonicalMainnetBlockPayload, NewAccountPayload},
@@ -41,8 +42,8 @@ impl NewAccountActor {
 
         // For each discovered account
         for acct in block.valid_accounts().iter().filter(|a| !a.is_empty()) {
-            if let Ok(true) = managed_store.key_exists(acct).await {
-                if !block.canonical {
+            if let Ok(Some(height)) = managed_store.get::<i64>(acct, "height").await {
+                if !block.canonical && block.get_height() == height as u64 {
                     if let Err(e) = managed_store.remove_key(acct).await {
                         error!("Unable to remove from store: {e}");
                     }
@@ -316,114 +317,6 @@ mod new_account_actor_tests_v2 {
     }
 
     #[tokio::test]
-    async fn test_existing_account_mixed_canonical_blocks() {
-        let mut dag = ActorDAG::new();
-        let actor = NewAccountActor::create_actor(false).await;
-        let actor_id = actor.id();
-        let sender = dag.set_root(actor);
-
-        let sink_node = create_new_account_sink_node();
-        let sink_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_id);
-
-        // Spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move { dag.lock().await.spawn_all().await }
-        });
-
-        // 1) Insert a "preexisting" account
-        let existing_account = "B62qExisting1".to_string();
-        sender
-            .send(Event {
-                event_type: EventType::PreExistingAccount,
-                payload: existing_account.clone(),
-            })
-            .await
-            .unwrap();
-
-        // 2) Build two blocks referencing the same account:
-        //    - BlockA => canonical = true
-        //    - BlockB => canonical = false (like a rollback scenario)
-        let block_a = CanonicalMainnetBlockPayload {
-            block: crate::event_sourcing::payloads::MainnetBlockPayload {
-                height: 11,
-                state_hash: "hash_A".into(),
-                user_commands: vec![CommandSummary {
-                    sender: existing_account.clone(),
-                    receiver: existing_account.clone(),
-                    fee_payer: existing_account.clone(),
-                    status: CommandStatus::Applied,
-                    ..Default::default()
-                }],
-                timestamp: 999111,
-                ..Default::default()
-            },
-            canonical: true,
-            was_canonical: false,
-        };
-        let block_b = CanonicalMainnetBlockPayload {
-            block: crate::event_sourcing::payloads::MainnetBlockPayload {
-                height: 12,
-                state_hash: "hash_B".into(),
-                user_commands: vec![CommandSummary {
-                    sender: existing_account.clone(),
-                    receiver: existing_account.clone(),
-                    fee_payer: existing_account.clone(),
-                    status: CommandStatus::Applied,
-                    ..Default::default()
-                }],
-                timestamp: 999222,
-                ..Default::default()
-            },
-            canonical: false,
-            was_canonical: true, // This scenario is "unapplying" an old canonical block
-        };
-
-        // 3) Send blockA => canonical => referencing existing account => no new account event
-        sender
-            .send(Event {
-                event_type: EventType::CanonicalMainnetBlock,
-                payload: sonic_rs::to_string(&block_a).unwrap(),
-            })
-            .await
-            .unwrap();
-
-        // 4) Send blockB => non-canonical => referencing same account => "remove" scenario
-        sender
-            .send(Event {
-                event_type: EventType::CanonicalMainnetBlock,
-                payload: sonic_rs::to_string(&block_b).unwrap(),
-            })
-            .await
-            .unwrap();
-
-        // Wait
-        sleep(Duration::from_millis(400)).await;
-
-        // 5) Check the sink => we expect exactly 1 event from blockB (the “apply=false” scenario), but only if the account *had not* previously been
-        //    discovered. However, we inserted it as "preexisting", so let's see if the code tries to remove it.
-        let dag_locked = dag.lock().await;
-        let captured = read_captured_new_accounts(&dag_locked, &sink_id).await;
-
-        // Because the account was preexisting, blockA (canonical) does not produce a new account
-        // blockB (non-canonical) might produce "apply=false" if it tries to remove a discovered account
-        // ... or possibly no event if your code checks for "existing" first.
-        // Adjust the assertions to match your intended logic. For example:
-        assert_eq!(
-            captured.len(),
-            1,
-            "We expect a single 'apply=false' event removing the existing account (or 0 if your logic differs)."
-        );
-        let payload_json = &captured[0];
-        let new_account_payload: NewAccountPayload = sonic_rs::from_str(payload_json).unwrap();
-        assert_eq!(new_account_payload.apply, false, "Should be a 'removal' event");
-        assert_eq!(new_account_payload.account, existing_account, "It's the same account we had");
-    }
-
-    #[tokio::test]
     async fn test_account_discovered_once_across_multiple_canonical_blocks() {
         // DAG
         let mut dag = ActorDAG::new();
@@ -597,19 +490,21 @@ mod new_account_actor_tests_v2 {
     }
 
     #[tokio::test]
-    async fn test_preexisting_account_immediately_non_canonical() {
-        // 1) Build the DAG + root actor
+    async fn test_non_canonical_block_at_same_height_for_undiscovered_account() {
+        // 1) Build the DAG, root actor, sink node, etc.
         let mut dag = ActorDAG::new();
+
+        // Create the actor with `preserve_data = false` (or `true` if you prefer).
         let actor_node = NewAccountActor::create_actor(false).await;
         let actor_id = actor_node.id();
         let sender = dag.set_root(actor_node);
 
-        // 2) Sink node
         let sink_node = create_new_account_sink_node();
         let sink_node_id = sink_node.id();
         dag.add_node(sink_node);
         dag.link_parent(&actor_id, &sink_node_id);
 
+        // Wrap + spawn the DAG
         let dag = Arc::new(Mutex::new(dag));
         tokio::spawn({
             let dag = Arc::clone(&dag);
@@ -618,73 +513,68 @@ mod new_account_actor_tests_v2 {
             }
         });
 
-        // 3) Insert a PreExistingAccount
-        let account = "B62qJustInserted".to_string();
+        // 2) Insert a preexisting account at height=0
         sender
             .send(Event {
                 event_type: EventType::PreExistingAccount,
-                payload: account.clone(),
+                payload: "B62qPhantomAccount".to_string(),
             })
             .await
-            .expect("Failed to send PreExistingAccount event");
+            .unwrap();
 
-        // Wait briefly for insertion
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        // 4) Now reference the same account in a block => canonical=false => we expect removal + apply=false
-        let block_payload = CanonicalMainnetBlockPayload {
-            block: MainnetBlockPayload {
-                height: 77,
-                state_hash: "some_non_canon_state".to_string(),
-                user_commands: vec![CommandSummary {
-                    sender: account.clone(),
-                    receiver: account.clone(),
-                    status: CommandStatus::Applied,
-                    ..Default::default()
-                }],
-                timestamp: 987654321,
+        // 3) Create a *non-canonical* block at height=50 referencing that account but the code believes it was once canonical ("was_canonical=true"), so it
+        //    tries to "revert" it. We expect no removal since we never had the account discovered at height=50 in the store.
+        let test_block = MainnetBlockPayload {
+            height: 50,
+            state_hash: "phantom_noncanon_hash".to_string(),
+            user_commands: vec![CommandSummary {
+                sender: "B62qPhantomAccount".to_string(),
+                receiver: "B62qPhantomAccount".to_string(),
+                status: CommandStatus::Applied,
                 ..Default::default()
-            },
-            canonical: false,
-            was_canonical: true, // Suppose it *was* canonical => now it’s reversing
+            }],
+            timestamp: 123456,
+            ..Default::default()
         };
 
+        let block_payload = CanonicalMainnetBlockPayload {
+            block: test_block,
+            canonical: false,
+            was_canonical: true, // simulating a "rollback" of something never truly stored
+        };
+
+        // 4) Send this non-canonical block
         sender
             .send(Event {
                 event_type: EventType::CanonicalMainnetBlock,
                 payload: sonic_rs::to_string(&block_payload).unwrap(),
             })
             .await
-            .expect("Failed to send non-canonical block referencing a preexisting account");
+            .expect("Failed to send non-canonical referencing an undiscovered account");
 
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // 5) Wait a bit for processing
+        tokio::time::sleep(Duration::from_millis(200)).await;
 
-        // 5) Check the sink => we expect exactly 1 `NewAccount` with apply=false
+        // 6) Check the sink => we expect NO `NewAccount` events at all
         let dag_locked = dag.lock().await;
-        let all_captured = read_captured_new_accounts(&dag_locked, &sink_node_id).await;
+        let captured_payloads = read_captured_new_accounts(&dag_locked, &sink_node_id).await;
+        assert!(
+            captured_payloads.is_empty(),
+            "No 'NewAccount' event should be emitted if the account wasn't discovered at that height."
+        );
 
-        // Filter for the target account
-        let mut relevant = vec![];
-        for evt_json in &all_captured {
-            let nap: NewAccountPayload = sonic_rs::from_str(evt_json).unwrap();
-            if nap.account == account {
-                relevant.push(nap);
-            }
-        }
-        assert_eq!(relevant.len(), 1, "We should see exactly one event removing the newly preexisting account");
-        let removal_payload = &relevant[0];
-        assert_eq!(removal_payload.apply, false, "Should be a removal (apply=false) event");
-
-        // 6) Optionally verify the store no longer has that account
+        // 7) Confirm the *preexisting* account remains in the DB at height=0
         {
-            // Connect to DB
             let client = connect_to_db().await;
-            let check_sql = format!("SELECT EXISTS (SELECT 1 FROM discovered_accounts_store WHERE key=$1)");
-            let row_opt = client.query_opt(&check_sql, &[&account]).await.expect("Query error");
-            if let Some(row) = row_opt {
-                let still_exists: bool = row.get(0);
-                assert!(!still_exists, "The account should have been removed from the store after non-canonical block");
-            }
+            let check_sql = "SELECT height FROM discovered_accounts_store WHERE key = $1";
+            let row_opt = client
+                .query_opt(check_sql, &[&"B62qPhantomAccount"])
+                .await
+                .expect("Query failed against discovered_accounts_store");
+            assert!(row_opt.is_some(), "Preexisting account should remain in the store after non-canonical block");
+            let row = row_opt.unwrap();
+            let final_height: i64 = row.get("height");
+            assert_eq!(final_height, 0, "Expected the preexisting account to remain at height=0, not removed");
         }
     }
 }
