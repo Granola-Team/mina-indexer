@@ -1,6 +1,5 @@
 use crate::{
     blockchain_tree::{BlockchainTree, Hash, Height, Node},
-    constants::TRANSITION_FRONTIER_DISTANCE,
     event_sourcing::{
         actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         events::{Event, EventType},
@@ -78,7 +77,8 @@ impl BlockCanonicityActor {
 impl ActorFactory for BlockCanonicityActor {
     async fn create_actor() -> ActorNode {
         let mut actor_store = ActorStore::new();
-        actor_store.insert(BLOCKCHAIN_TREE_KEY, BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE));
+        let (blockchain_tree, _) = BlockchainTree::load(true).await;
+        actor_store.insert(BLOCKCHAIN_TREE_KEY, blockchain_tree);
 
         ActorNodeBuilder::new()
             .with_state(actor_store)

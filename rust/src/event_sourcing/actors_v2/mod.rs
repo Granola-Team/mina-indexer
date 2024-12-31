@@ -16,6 +16,7 @@ use mainnet_block_actor::MainnetBlockParserActor;
 use new_account_actor::NewAccountActor;
 use new_block_actor::NewBlockActor;
 use pcb_file_path_actor::PcbFilePathActor;
+use pcb_filter_actor::PcbFilterActor;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -33,16 +34,22 @@ pub(crate) mod mainnet_block_actor;
 pub(crate) mod new_account_actor;
 pub(crate) mod new_block_actor;
 pub(crate) mod pcb_file_path_actor;
+pub(crate) mod pcb_filter_actor;
 
 /// Spawns a DAG of interlinked actors and returns the `Sender<Event>` for the root actor (`PcbFilePathActor`).
-pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
+pub async fn spawn_actor_dag(preserve_data: bool) -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
     // 1. Create a new DAG.
     let mut dag = ActorDAG::new();
 
     // 2. Create each actor node and capture IDs before adding them to the DAG.
+    let pcb_filter_node = PcbFilterActor::create_actor(preserve_data).await;
+    let pcb_filter_node_id = pcb_filter_node.id();
+    let sender = dag.set_root(pcb_filter_node);
+
     let pcb_node = PcbFilePathActor::create_actor().await;
     let pcb_id = pcb_node.id(); // Root node ID
-    let sender = dag.set_root(pcb_node);
+    dag.add_node(pcb_node);
+    dag.link_parent(&pcb_filter_node_id, &pcb_id);
 
     let mainnet_block_node = MainnetBlockParserActor::create_actor().await;
     let mainnet_block_id = mainnet_block_node.id();
@@ -60,7 +67,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.link_parent(&mainnet_block_id, &block_ancestor_id);
     dag.link_parent(&berkeley_block_id, &block_ancestor_id);
 
-    let new_block_node = NewBlockActor::create_actor().await;
+    let new_block_node = NewBlockActor::create_actor(preserve_data).await;
     let new_block_id = new_block_node.id();
     dag.add_node(new_block_node);
     dag.link_parent(&block_ancestor_id, &new_block_id);
@@ -82,7 +89,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
     dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
 
-    let new_account_node = NewAccountActor::create_actor(true).await;
+    let new_account_node = NewAccountActor::create_actor(preserve_data).await;
     let new_account_node_id = new_account_node.id();
     dag.add_node(new_account_node);
     dag.link_parent(&canonical_mainnet_block_id, &new_account_node_id);
@@ -95,7 +102,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     // Introduce a Cycle into the graph
     dag.link_parent(&new_account_node_id, &accounting_node_id);
 
-    let ledger_persistence_node = LedgerPersistenceActor::create_actor(true).await;
+    let ledger_persistence_node = LedgerPersistenceActor::create_actor(preserve_data).await;
     let ledger_persistence_node_id = ledger_persistence_node.id();
     dag.add_node(ledger_persistence_node);
     dag.link_parent(&accounting_node_id, &ledger_persistence_node_id);
@@ -105,7 +112,7 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.add_node(account_summary_node);
     dag.link_parent(&accounting_node_id, &account_summary_node_id);
 
-    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(true).await;
+    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(preserve_data).await;
     let account_summary_pers_node_id = account_summary_pers_node.id();
     dag.add_node(account_summary_pers_node);
     dag.link_parent(&account_summary_node_id, &account_summary_pers_node_id);
