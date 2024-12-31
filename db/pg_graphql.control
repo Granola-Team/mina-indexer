@@ -3,4 +3,4 @@ default_version = '1.5.9'
 module_pathname = '$libdir/pg_graphql'
 relocatable = false
 superuser = true
-schema = 'public'
+schema = 'graphql'
