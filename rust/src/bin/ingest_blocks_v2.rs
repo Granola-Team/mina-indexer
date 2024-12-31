@@ -5,7 +5,7 @@ use mina_indexer::event_sourcing::{
     events::{Event, EventType},
     sourcing::{get_block_entries, sort_entries},
 };
-use std::{env, path::PathBuf, sync::Arc, thread::sleep, time::Duration};
+use std::{env, path::PathBuf, time::Duration};
 
 #[tokio::main]
 async fn main() {
@@ -21,17 +21,6 @@ async fn main() {
 
     // 3) Spawn your actor DAG, which returns a Sender<Event>
     let (dag, sender) = spawn_actor_dag().await;
-
-    let handle = tokio::spawn({
-        let dag = Arc::clone(&dag);
-        async move {
-            loop {
-                sleep(Duration::from_secs(60));
-                let locked_dag = { dag.lock().await };
-                info!("Total events processed: {}", locked_dag.get_total_events_processed().await);
-            }
-        }
-    });
 
     // 4) Give the DAG a moment to start
     tokio::time::sleep(Duration::from_millis(500)).await;
@@ -85,8 +74,6 @@ async fn main() {
             }
         }
     }
-
-    handle.abort();
 
     // 9) Give the DAG time to flush any in-flight operations
     info!("Giving some time for the DAG to flush...");
