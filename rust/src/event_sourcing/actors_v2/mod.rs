@@ -8,7 +8,6 @@ use accounting_actor::AccountingActor;
 use berkeley_block_actor::BerkeleyBlockActor;
 use block_ancestor_actor::BlockAncestorActor;
 use block_canonicity_actor::BlockCanonicityActor;
-use block_confirmations_actor::BlockConfirmationsActor;
 use canonical_berkeley_block_actor::CanonicalBerkeleyBlockActor;
 use canonical_mainnet_block_actor::CanonicalMainnetBlockActor;
 use identity_actor::IdentityActor;
@@ -26,7 +25,6 @@ pub(crate) mod accounting_actor;
 pub(crate) mod berkeley_block_actor;
 pub(crate) mod block_ancestor_actor;
 pub(crate) mod block_canonicity_actor;
-pub(crate) mod block_confirmations_actor;
 pub(crate) mod canonical_berkeley_block_actor;
 pub(crate) mod canonical_mainnet_block_actor;
 pub(crate) mod identity_actor;
@@ -67,17 +65,6 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.add_node(new_block_node);
     dag.link_parent(&block_ancestor_id, &new_block_id);
 
-    let block_confirmations_node = BlockConfirmationsActor::create_actor().await;
-    let block_confirmations_node_id = block_confirmations_node.id();
-    dag.add_node(block_confirmations_node);
-    dag.link_parent(&new_block_id, &block_confirmations_node_id);
-
-    let new_account_node = NewAccountActor::create_actor(true).await;
-    let new_account_node_id = new_account_node.id();
-    dag.add_node(new_account_node);
-    dag.link_parent(&mainnet_block_id, &new_account_node_id);
-    dag.link_parent(&block_confirmations_node_id, &new_account_node_id);
-
     let block_canonicity_node = BlockCanonicityActor::create_actor().await;
     let block_canonicity_id = block_canonicity_node.id();
     dag.add_node(block_canonicity_node);
@@ -94,6 +81,11 @@ pub async fn spawn_actor_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Send
     dag.add_node(canonical_berkeley_block_node);
     dag.link_parent(&block_canonicity_id, &canonical_berkeley_block_id);
     dag.link_parent(&berkeley_block_id, &canonical_berkeley_block_id);
+
+    let new_account_node = NewAccountActor::create_actor(true).await;
+    let new_account_node_id = new_account_node.id();
+    dag.add_node(new_account_node);
+    dag.link_parent(&canonical_mainnet_block_id, &new_account_node_id);
 
     let accounting_node = AccountingActor::create_actor().await;
     let accounting_node_id = accounting_node.id();
