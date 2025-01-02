@@ -1,7 +1,7 @@
 {
   inputs = {
     rust-overlay.url = "github:oxalica/rust-overlay";
-    nixpkgs.url = "github:NixOS/nixpkgs?ref=931494da4b60fb26719e231d6de4b2c96167a1ce";
+    nixpkgs.url = "github:NixOS/nixpkgs?ref=b134951a4c9f3c995fd7be05f3243f8ecd65d798";
   };
 
   outputs = {
@@ -80,9 +80,10 @@
           just
           nightlyToolchain.passthru.availableComponents.rustfmt
           nix-output-monitor # Use 'nom' in place of 'nix' to use this.
+          openssh # Needed by 'git' but not declared.
           rclone
           ruby
-          rubyPackages.standard
+          # rubyPackages.standard
           rubyPackages.rspec
           rust
           shellcheck
