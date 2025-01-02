@@ -124,5 +124,25 @@ task :check do
   sh "standardrb --no-fix scripts"
 end
 
+desc "Download blocks from :start_height to :end_height into :dir"
+task :dl, [:start_height, :end_height, :dir] do |t, args|
+  # Provide some default values or parse arguments as integers
+  args.with_defaults(
+    start_height: 1,
+    end_height: 5000,
+    dir: "./downloads"
+  )
+
+  start_height = args[:start_height].to_i
+  end_height   = args[:end_height].to_i
+  dir          = args[:dir]
+
+  # Iterate over the range [start_height..end_height]
+  (start_height..end_height).each do |height|
+    sh "gsutil -m cp -n \"gs://mina_network_block_data/mainnet-#{height}-*\" #{dir}"
+  end
+end
+
+
 desc "Checks readiness of code"
 task ready: [:lint, :format, :check, :test]
