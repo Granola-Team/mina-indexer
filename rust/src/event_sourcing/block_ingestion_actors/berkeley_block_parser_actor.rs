@@ -62,6 +62,7 @@ impl Actor for BerkeleyBlockParserActor {
                 coinbase_receiver: berkeley_block.get_coinbase_receiver(),
                 coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
                 global_slot_since_genesis: berkeley_block.get_global_slot_since_genesis(),
+                ..Default::default()
             };
             self.publish(Event {
                 event_type: EventType::BerkeleyBlock,

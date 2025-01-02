@@ -73,6 +73,7 @@ impl ActorFactory for CanonicalBerkeleyBlockActor {
                                     global_slot_since_genesis: berkeley_block.global_slot_since_genesis,
                                     fee_transfer_via_coinbase: berkeley_block.fee_transfer_via_coinbase.clone(),
                                     fee_transfers: berkeley_block.fee_transfers.clone(),
+                                    tokens_used: berkeley_block.tokens_used,
                                 },
                             };
 
@@ -226,6 +227,7 @@ mod canonical_berkeley_block_actor_tests_v2 {
             global_slot_since_genesis: 10,
             fee_transfer_via_coinbase: None,
             fee_transfers: vec![],
+            ..Default::default()
         };
 
         let canonicity_update = BlockCanonicityUpdatePayload {
@@ -319,6 +321,7 @@ mod canonical_berkeley_block_actor_tests_v2 {
             global_slot_since_genesis: 10,
             fee_transfer_via_coinbase: None,
             fee_transfers: vec![],
+            ..Default::default()
         };
 
         let canonicity_update = BlockCanonicityUpdatePayload {

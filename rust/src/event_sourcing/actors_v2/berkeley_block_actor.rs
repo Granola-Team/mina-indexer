@@ -44,6 +44,7 @@ impl ActorFactory for BerkeleyBlockActor {
                             coinbase_receiver: berkeley_block.get_coinbase_receiver(),
                             coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
                             global_slot_since_genesis: berkeley_block.get_global_slot_since_genesis(),
+                            tokens_used: berkeley_block.get_tokens_used(),
                         };
 
                         // Publish the BerkeleyBlock event

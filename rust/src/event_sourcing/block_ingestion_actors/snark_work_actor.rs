@@ -207,6 +207,7 @@ mod snark_work_actor_tests {
             coinbase_receiver: block.get_coinbase_receiver(),
             coinbase_reward_nanomina: block.get_coinbase_reward_nanomina(),
             global_slot_since_genesis: block.get_global_slot_since_genesis(),
+            ..Default::default()
         };
 
         // Create shared publisher and SnarkWorkSummaryActor

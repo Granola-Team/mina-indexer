@@ -64,6 +64,7 @@ pub struct BerkeleyBlockPayload {
     pub coinbase_receiver: String,
     pub coinbase_reward_nanomina: u64,
     pub global_slot_since_genesis: u64,
+    pub tokens_used: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
