@@ -176,7 +176,7 @@ impl LedgerPersistenceActor {
 mod ledger_persistence_actor_tests_v2 {
     use super::LedgerPersistenceActor;
     use crate::{
-        constants::POSTGRES_CONNECTION_STRING,
+        constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
         event_sourcing::{
             actor_dag::ActorDAG,
             events::EventType,
@@ -289,6 +289,7 @@ mod ledger_persistence_actor_tests_v2 {
             height: 777,
             state_hash: "test_state_hash_interleave".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: lhs_entries,
             rhs: rhs_entries,
         };

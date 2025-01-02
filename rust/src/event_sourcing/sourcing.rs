@@ -4,7 +4,7 @@ use super::{
     shared_publisher::SharedPublisher,
 };
 use crate::{
-    constants::FILE_PUBLISHER_ACTOR_ID,
+    constants::{FILE_PUBLISHER_ACTOR_ID, MINA_TOKEN_ID},
     event_sourcing::{
         events::{Event, EventType},
         payloads::ActorHeightPayload,
@@ -36,6 +36,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
             height: 1,
             state_hash: payload.state_hash,
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![AccountingEntry {
                 counterparty: "MagicMinaForBlock0".to_string(),
                 transfer_type: "BlockReward".to_string(),

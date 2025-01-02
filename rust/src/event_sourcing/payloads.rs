@@ -574,6 +574,7 @@ impl CanonicalItem for BatchCanonicalUserCommandLogPayload {
 pub enum LedgerDestination {
     StakingLedger,
     BlockchainLedger,
+    TokenLedger,
 }
 
 impl fmt::Display for LedgerDestination {
@@ -581,6 +582,7 @@ impl fmt::Display for LedgerDestination {
         let display_text = match self {
             LedgerDestination::BlockchainLedger => "BlockchainLedger",
             LedgerDestination::StakingLedger => "StakingLedger",
+            LedgerDestination::TokenLedger => "TokenLedger",
         };
         write!(f, "{}", display_text)
     }
@@ -591,6 +593,7 @@ pub struct DoubleEntryRecordPayload {
     pub height: u64,
     pub state_hash: String,
     pub ledger_destination: LedgerDestination,
+    pub token_id: String,
     pub lhs: Vec<AccountingEntry>, // Multiple debit entries
     pub rhs: Vec<AccountingEntry>, // Multiple credit entries
 }

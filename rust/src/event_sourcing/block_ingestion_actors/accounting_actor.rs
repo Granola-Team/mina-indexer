@@ -3,11 +3,14 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::event_sourcing::{
-    models::{CommandStatus, CommandType},
-    payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBatchZkappCommandLogPayload, CanonicalInternalCommandLogPayload,
-        CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
+use crate::{
+    constants::MINA_TOKEN_ID,
+    event_sourcing::{
+        models::{CommandStatus, CommandType},
+        payloads::{
+            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBatchZkappCommandLogPayload, CanonicalInternalCommandLogPayload,
+            CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
+        },
     },
 };
 use async_trait::async_trait;
@@ -69,6 +72,7 @@ impl AccountingActor {
                     height: payload.height,
                     ledger_destination: LedgerDestination::BlockchainLedger,
                     state_hash: payload.state_hash.to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                     lhs: vec![source],
                     rhs: vec![recipient],
                 };
@@ -103,6 +107,7 @@ impl AccountingActor {
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
                     ledger_destination: LedgerDestination::BlockchainLedger,
+                    token_id: MINA_TOKEN_ID.to_string(),
                     lhs: vec![source],
                     rhs: vec![recipient],
                 };
@@ -145,6 +150,7 @@ impl AccountingActor {
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
                 ledger_destination: LedgerDestination::BlockchainLedger,
+                token_id: MINA_TOKEN_ID.to_string(),
                 lhs: vec![source],
                 rhs: vec![recipient],
             };
@@ -183,6 +189,7 @@ impl AccountingActor {
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
                 ledger_destination: LedgerDestination::BlockchainLedger,
+                token_id: MINA_TOKEN_ID.to_string(),
                 lhs: vec![sender_entry],   // Sender entry
                 rhs: vec![receiver_entry], // Receiver entry
             };
@@ -220,6 +227,7 @@ impl AccountingActor {
             height: payload.height,
             state_hash: payload.state_hash.to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![fee_payer_entry],
             rhs: vec![block_reward_pool_entry],
         };
@@ -259,6 +267,7 @@ impl AccountingActor {
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
                 ledger_destination: LedgerDestination::BlockchainLedger,
+                token_id: MINA_TOKEN_ID.to_string(),
                 lhs: vec![fee_payer_entry],
                 rhs: vec![block_reward_pool_entry],
             };
@@ -291,6 +300,7 @@ impl Actor for AccountingActor {
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
                     ledger_destination: LedgerDestination::BlockchainLedger,
+                    token_id: MINA_TOKEN_ID.to_string(),
                     lhs: vec![AccountingEntry {
                         counterparty: format!("AccountCreationFee#{}", payload.state_hash),
                         transfer_type: "AccountCreationFee".to_string(),

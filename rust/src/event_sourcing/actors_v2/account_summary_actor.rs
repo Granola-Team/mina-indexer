@@ -90,10 +90,15 @@ impl ActorFactory for AccountSummaryActor {
 #[cfg(test)]
 mod account_summary_actor_tests_v2 {
     use super::AccountSummaryActor;
-    use crate::event_sourcing::{
-        actor_dag::{ActorDAG, ActorFactory, ActorNode},
-        events::{Event, EventType},
-        payloads::{AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::{
+            actor_dag::{ActorDAG, ActorFactory, ActorNode},
+            events::{Event, EventType},
+            payloads::{
+                AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination,
+            },
+        },
     };
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -178,6 +183,7 @@ mod account_summary_actor_tests_v2 {
             height: 999,
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![
                 // LHS #1
                 AccountingEntry {

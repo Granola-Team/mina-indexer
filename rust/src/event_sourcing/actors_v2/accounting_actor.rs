@@ -1,10 +1,13 @@
-use crate::event_sourcing::{
-    actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
-    events::{Event, EventType},
-    models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
-    payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload,
-        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+use crate::{
+    constants::MINA_TOKEN_ID,
+    event_sourcing::{
+        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        events::{Event, EventType},
+        models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
+        payloads::{
+            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload,
+            CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+        },
     },
 };
 use async_trait::async_trait;
@@ -418,6 +421,7 @@ impl ActorFactory for AccountingActor {
                                 height: payload.height,
                                 state_hash: payload.state_hash.to_string(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
+                                token_id: MINA_TOKEN_ID.to_string(),
                                 lhs: vec![AccountingEntry {
                                     counterparty: format!("AccountCreationFee#{}", payload.state_hash),
                                     transfer_type: "AccountCreationFee".to_string(),
@@ -469,6 +473,7 @@ impl ActorFactory for AccountingActor {
                                 height: payload.block.height,
                                 state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
+                                token_id: MINA_TOKEN_ID.to_string(),
                                 lhs,
                                 rhs,
                             };
@@ -500,6 +505,7 @@ impl ActorFactory for AccountingActor {
                                 height: payload.block.height,
                                 state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
+                                token_id: MINA_TOKEN_ID.to_string(),
                                 lhs,
                                 rhs,
                             };

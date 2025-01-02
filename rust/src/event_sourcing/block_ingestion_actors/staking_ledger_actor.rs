@@ -151,7 +151,10 @@ impl Actor for StakingLedgerActor {
 #[cfg(test)]
 mod staking_ledger_actor_tests {
     use super::*;
-    use crate::event_sourcing::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination};
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    };
     use std::sync::Arc;
 
     #[tokio::test]
@@ -205,6 +208,7 @@ mod staking_ledger_actor_tests {
             height: 10,
             state_hash: "non_staking_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger, // Non-staking destination
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
                 account: "non_staking_account".to_string(),
@@ -246,6 +250,7 @@ mod staking_ledger_actor_tests {
             height: 20,
             state_hash: "staking_state_hash".to_string(),
             ledger_destination: LedgerDestination::StakingLedger, // Staking destination
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_staking_account".to_string(),

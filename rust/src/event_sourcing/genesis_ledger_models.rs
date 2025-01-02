@@ -1,4 +1,5 @@
 use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination};
+use crate::constants::MINA_TOKEN_ID;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -48,6 +49,7 @@ impl GenesisLedger {
                     height: 0,
                     state_hash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ".to_string(),
                     ledger_destination: LedgerDestination::BlockchainLedger,
+                    token_id: MINA_TOKEN_ID.to_string(),
                     lhs: vec![AccountingEntry {
                         counterparty: account.pk.to_string(),
                         transfer_type: "InitialDistribution".to_string(),

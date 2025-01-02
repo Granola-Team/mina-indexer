@@ -1,7 +1,7 @@
 use env_logger::Builder;
 use log::{error, info};
 use mina_indexer::{
-    constants::POSTGRES_CONNECTION_STRING,
+    constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
     event_sourcing::{
         actors_v2::spawn_genesis_dag,
         events::{Event, EventType},
@@ -60,6 +60,7 @@ async fn main() {
         height: 1,
         state_hash: genesis_block.state_hash.to_string(),
         ledger_destination: LedgerDestination::BlockchainLedger,
+        token_id: MINA_TOKEN_ID.to_string(),
         lhs: vec![AccountingEntry {
             counterparty: "MagicMinaForBlock0".to_string(),
             transfer_type: "BlockReward".to_string(),

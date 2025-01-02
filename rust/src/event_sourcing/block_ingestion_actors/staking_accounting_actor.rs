@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::{
-    constants::MAINNET_EPOCH_SLOT_COUNT,
+    constants::{MAINNET_EPOCH_SLOT_COUNT, MINA_TOKEN_ID},
     event_sourcing::{models::CommandType, payloads::*},
 };
 use async_trait::async_trait;
@@ -50,6 +50,7 @@ impl Actor for StakingAccountingActor {
                     height: log.height,
                     state_hash: log.state_hash,
                     ledger_destination: LedgerDestination::StakingLedger,
+                    token_id: MINA_TOKEN_ID.to_string(),
                     lhs: vec![AccountingEntry {
                         transfer_type: CommandType::StakeDelegation.to_string(),
                         account: log.sender.to_string(),

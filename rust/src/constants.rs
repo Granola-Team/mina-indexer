@@ -8,3 +8,4 @@ pub const MAINNET_EPOCH_SLOT_COUNT: u64 = 7140;
 pub const SLIDING_WINDOW_SIZE: usize = 100;
 pub const MINA_NAME_SERVICE_ADDRESS: &str = "B62qjzJvc59DdG9ahht9rwxkEz7GedKuUMsnaVTuXFUeANKqfBeWpRE";
 pub const MEMO_PREFIX: &str = "Name: ";
+pub const MINA_TOKEN_ID: &str = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf";

@@ -164,9 +164,12 @@ impl Actor for LedgerActor {
 #[cfg(test)]
 mod blockchain_ledger_actor_tests {
     use super::*;
-    use crate::event_sourcing::{
-        events::{Event, EventType},
-        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::{
+            events::{Event, EventType},
+            payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+        },
     };
     // use serial_test::serial;
     use std::sync::Arc;
@@ -308,6 +311,7 @@ mod blockchain_ledger_actor_tests {
             height: 9, // Matches modulo 3
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_account".to_string(),
@@ -373,6 +377,7 @@ mod blockchain_ledger_actor_tests {
             height: 15,
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
+            token_id: MINA_TOKEN_ID.to_string(),
             lhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_account".to_string(),
