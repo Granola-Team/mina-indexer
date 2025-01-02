@@ -420,6 +420,17 @@ impl<T> TreeNode<T> {
         }
         total
     }
+
+    pub fn all_nodes(&self) -> Vec<&Self> {
+        let mut result = Vec::new();
+        // Add the current node
+        result.push(self);
+        // Recursively add children
+        for child in &self.children {
+            result.extend(child.all_nodes());
+        }
+        result
+    }
 }
 
 #[cfg(test)]
@@ -502,5 +513,32 @@ mod tree_node_tests {
 
         assert_eq!(root.size(), 4);
         assert_eq!(root.children[0].children[0].children[0].value, "level3");
+    }
+
+    #[test]
+    fn test_tree_node_all_nodes() {
+        let mut root = TreeNode::new("root");
+        let mut child1 = TreeNode::new("child1");
+        let child2 = TreeNode::new("child2");
+        let grandchild = TreeNode::new("grandchild");
+
+        // Build this structure:
+        //   root
+        //   ├── child1
+        //   │    └── grandchild
+        //   └── child2
+        child1.add_child(grandchild);
+        root.add_child(child1);
+        root.add_child(child2);
+
+        // Call `all_nodes()`
+        let all = root.all_nodes();
+
+        // Ensure we have references to each node: root, child1, grandchild, child2
+        assert_eq!(all.len(), 4);
+        assert_eq!(all[0].value, "root");
+        assert_eq!(all[1].value, "child1");
+        assert_eq!(all[2].value, "grandchild");
+        assert_eq!(all[3].value, "child2");
     }
 }
