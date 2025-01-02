@@ -87,9 +87,11 @@ lint:
     -Dclippy::negative_feature_names \
     -Dclippy::redundant_feature_names \
     -Dclippy::wildcard_dependencies \
+    -Dclippy::unused_self \
     -Dclippy::used_underscore_binding \
     -Dclippy::zero_sized_map_values
   # Lints that demonstrably fail
+  # -Dclippy::unused_async \
   # -Dclippy::multiple_crate_versions \
   # -Dclippy::cargo_common_metadata
   # -Dclippy::pedantic
