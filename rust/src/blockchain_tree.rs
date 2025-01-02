@@ -1,7 +1,4 @@
-use crate::{
-    constants::{POSTGRES_CONNECTION_STRING, TRANSITION_FRONTIER_DISTANCE},
-    event_sourcing::managed_store::ManagedStore,
-};
+use crate::{constants::POSTGRES_CONNECTION_STRING, event_sourcing::managed_store::ManagedStore};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
