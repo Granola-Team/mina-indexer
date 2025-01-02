@@ -1,2 +1,7 @@
+# TODO: make this 24
+# Interim goal 1: 500  PLEASE stop creating 500+-line functions!
+# Interim goal 2: 100
+# Interim goal 3: 50
+# Interim goal 4: 30
+# Currently, there is a 1021-line function
 too-many-lines-threshold = 1022
-# warn-on-all-wildcard-imports = true
