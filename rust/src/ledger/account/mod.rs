@@ -320,11 +320,13 @@ impl Account {
             Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
             FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
             FeeTransferViaCoinbase(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
-            FailedTransactionNonce(diff) => self.failed_transaction_unapply(if diff.nonce.0 > 0 {
-                Some(diff.nonce - 1)
-            } else {
-                None
-            }),
+            FailedTransactionNonce(diff) => self.failed_transaction_unapply(
+                if diff.nonce.0 > 0 {
+                    Some(diff.nonce - 1)
+                } else {
+                    None
+                },
+            ),
         })
     }
 
