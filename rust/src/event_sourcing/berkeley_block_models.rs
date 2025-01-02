@@ -70,7 +70,7 @@ impl BerkeleyBlock {
     pub fn contains_user_tokens(&self) -> bool {
         let mut tokens: HashSet<String> = self.get_tokens_used().into_iter().collect();
         tokens.remove(MINA_TOKEN_ID);
-        tokens.len() > 0
+        !tokens.is_empty()
     }
 
     pub fn get_accounts_created(&self) -> Vec<(String, u64)> {
