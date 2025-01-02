@@ -220,7 +220,7 @@ impl BlockchainTree {
             let blockchain_tree: BlockchainTree = sonic_rs::from_str(&tree).unwrap();
             (blockchain_tree, managed_store)
         } else {
-            (BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE), managed_store)
+            (BlockchainTree::new(20), managed_store)
         }
     }
 
