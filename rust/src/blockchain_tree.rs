@@ -1,4 +1,7 @@
-use crate::{constants::POSTGRES_CONNECTION_STRING, event_sourcing::managed_store::ManagedStore};
+use crate::{
+    constants::{POSTGRES_CONNECTION_STRING, TRANSITION_FRONTIER_DISTANCE},
+    event_sourcing::managed_store::ManagedStore,
+};
 use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -217,7 +220,7 @@ impl BlockchainTree {
             let blockchain_tree: BlockchainTree = sonic_rs::from_str(&tree).unwrap();
             (blockchain_tree, managed_store)
         } else {
-            (BlockchainTree::new(20), managed_store)
+            (BlockchainTree::new(TRANSITION_FRONTIER_DISTANCE / 5), managed_store)
         }
     }
 
