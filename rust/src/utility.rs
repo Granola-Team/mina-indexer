@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueMutTrait, Value};
 use std::{fs::File, io::Read, path::Path};
 
@@ -397,7 +398,7 @@ mod decode_base58check_to_string_tests {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct TreeNode<T> {
     pub value: T,
     pub children: Vec<TreeNode<T>>,

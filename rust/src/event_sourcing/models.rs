@@ -1,3 +1,4 @@
+use super::berkeley_block_models::AccountUpdateTree;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -97,6 +98,7 @@ pub struct ZkAppCommandSummary {
     pub nonce: usize,
     pub fee_nanomina: u64,
     pub account_updates: usize,
+    pub account_updates_trees: Option<Vec<AccountUpdateTree>>,
 }
 
 impl ZkAppCommandSummary {

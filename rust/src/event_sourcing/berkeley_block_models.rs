@@ -11,6 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
 use std::{
     collections::{HashMap, HashSet},
+    ops::Neg,
     str::FromStr,
 };
 
@@ -326,13 +327,24 @@ pub struct FeePayerBody {
     pub nonce: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct BalanceChange {
     pub magnitude: String,
     pub sgn: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+impl BalanceChange {
+    pub fn balance_delta(&self) -> i64 {
+        let balance_delta = BigDecimal::from_str(&self.magnitude).expect("Invalid number format");
+        if self.sgn[0] == "Neg" {
+            balance_delta.to_i64().unwrap().neg()
+        } else {
+            balance_delta.to_i64().unwrap()
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct AccountUpdateBody {
     pub public_key: String,
     pub token_id: String,
@@ -470,6 +482,7 @@ impl CommandWrapper {
                     .iter()
                     .map(|update_tree| update_tree.size())
                     .sum::<usize>(),
+                account_updates_trees: self.get_account_updates(),
             },
         }
     }
@@ -783,5 +796,40 @@ mod berkeley_block_tests {
 
         // Assert that the tokens match what we initialized
         assert!(!block.contains_user_tokens());
+    }
+
+    #[test]
+    fn test_parse_account_updates() {
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
+                .expect("Failed to read test file");
+
+        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        let punk_zk_app_command = block.get_zk_app_commands().last().cloned().unwrap();
+        assert_eq!(punk_zk_app_command.account_updates, 4, "Expected 4 account updates");
+
+        let account_update_trees = punk_zk_app_command.account_updates_trees.unwrap();
+        let first_update_tree = account_update_trees.first().cloned().unwrap();
+        assert_eq!(
+            first_update_tree.value.balance_change.balance_delta(),
+            -1_000_000_000_i64,
+            "Expected deduction of 1 MINA"
+        );
+        assert_eq!(first_update_tree.value.token_id, MINA_TOKEN_ID);
+        assert_eq!(first_update_tree.size(), 1);
+
+        let last_update_tree = account_update_trees.last().cloned().unwrap();
+        assert_eq!(last_update_tree.value.balance_change.balance_delta(), 0);
+        assert_eq!(last_update_tree.value.token_id, MINA_TOKEN_ID);
+        assert_eq!(last_update_tree.size(), 3);
+
+        let child_1 = last_update_tree.children.first().cloned().unwrap();
+        assert_eq!(child_1.value.balance_change.balance_delta(), -100_000_000, "Expected deduction of 0.1 PUNK");
+        assert_eq!(child_1.value.token_id, "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg");
+
+        let child_2 = last_update_tree.children.last().cloned().unwrap();
+        assert_eq!(child_2.value.balance_change.balance_delta(), 100_000_000, "Expected addition of 0.1 PUNK");
+        assert_eq!(child_2.value.token_id, "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg");
     }
 }

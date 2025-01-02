@@ -142,6 +142,7 @@ mod canonical_zkapp_command_log_actor_tests {
                 nonce: 1,
                 fee_nanomina: 1000,
                 account_updates: 2,
+                ..Default::default()
             }],
         };
         actor
@@ -198,6 +199,7 @@ mod canonical_zkapp_command_log_actor_tests {
                 nonce: 1,
                 fee_nanomina: 1000,
                 account_updates: 2,
+                ..Default::default()
             }],
         };
         actor

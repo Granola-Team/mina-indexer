@@ -83,6 +83,7 @@ mod zkapp_command_actor_tests {
                 nonce: 1,
                 fee_nanomina: 1_000_000,
                 account_updates: 2,
+                ..Default::default()
             },
             ZkAppCommandSummary {
                 memo: "memo_2".to_string(),
@@ -92,6 +93,7 @@ mod zkapp_command_actor_tests {
                 nonce: 2,
                 fee_nanomina: 2_000_000,
                 account_updates: 3,
+                ..Default::default()
             },
         ];
 

@@ -937,6 +937,7 @@ mod accounting_actor_tests {
                     nonce: 1,
                     fee_nanomina: 10_000,
                     account_updates: 2,
+                    ..Default::default()
                 },
                 ZkAppCommandSummary {
                     memo: "memo_2".to_string(),
@@ -946,6 +947,7 @@ mod accounting_actor_tests {
                     nonce: 2,
                     fee_nanomina: 20_000,
                     account_updates: 3,
+                    ..Default::default()
                 },
             ],
         };
@@ -1009,6 +1011,7 @@ mod accounting_actor_tests {
                 nonce: 1,
                 fee_nanomina: 15_000,
                 account_updates: 2,
+                ..Default::default()
             }],
         };
 
