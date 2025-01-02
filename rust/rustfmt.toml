@@ -2,6 +2,5 @@ imports_granularity = "Crate"
 group_imports = "One"
 wrap_comments = true
 newline_style = "Unix"
-
-# Additions attempting to improve quality of code semantics:
 combine_control_expr = false
+edition = "2024"

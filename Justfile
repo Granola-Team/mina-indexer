@@ -80,13 +80,26 @@ lint:
   alejandra --check flake.nix
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
-  cd rust && time cargo clippy --all-targets --all-features -- -D warnings
+  cd rust && time cargo clippy --all-targets --all-features \
+    -- \
+    -Dwarnings \
+    -Dclippy::too_many_lines \
+    -Dclippy::negative_feature_names \
+    -Dclippy::redundant_feature_names \
+    -Dclippy::wildcard_dependencies \
+    -Dclippy::used_underscore_binding \
+    -Dclippy::zero_sized_map_values
+  # Lints that demonstrably fail
+  # -Dclippy::multiple_crate_versions \
+  # -Dclippy::cargo_common_metadata
+  # -Dclippy::pedantic
+  # -Dclippy::wildcard_imports \
   @echo "--- Linting Cargo dependencies"
   cd rust && cargo machete Cargo.toml
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all
-  standardrb --fix ops/*.rb
+  # standardrb --fix ops/*.rb
   shfmt --write ops/*.sh
   alejandra flake.nix
 
