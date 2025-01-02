@@ -3,13 +3,16 @@ use super::{
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, ZkAppCommandSummary},
 };
 use crate::{
-    constants::MAINNET_COINBASE_REWARD,
+    constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
     utility::{decode_base58check_to_string, TreeNode},
 };
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Deserializer, Serialize};
 use sonic_rs::{JsonValueTrait, Value};
-use std::{collections::HashMap, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BerkeleyBlock {
@@ -60,6 +63,16 @@ impl BlockTrait for BerkeleyBlock {
 }
 
 impl BerkeleyBlock {
+    pub fn get_tokens_used(&self) -> Vec<String> {
+        self.data.tokens_used.iter().map(|t| t.0.to_string()).collect()
+    }
+
+    pub fn contains_user_tokens(&self) -> bool {
+        let mut tokens: HashSet<String> = self.get_tokens_used().into_iter().collect();
+        tokens.remove(MINA_TOKEN_ID);
+        tokens.len() > 0
+    }
+
     pub fn get_accounts_created(&self) -> Vec<(String, u64)> {
         self.data
             .accounts_created
@@ -158,6 +171,7 @@ pub struct Data {
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: StagedLedgerDiff,
     pub accounts_created: Vec<(Vec<String>, String)>,
+    pub tokens_used: Vec<(String, Option<(String, String)>)>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -741,5 +755,33 @@ mod berkeley_block_tests {
             accounts_created[2],
             ("B62qj4JGH7KPE59RLhX4pyZdt1g6rJSuniWWrvXRRrVrkGAePuKJZnW".to_string(), 1_000_000_000)
         );
+    }
+
+    #[test]
+    fn test_get_tokens_used() {
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410773-3NLjmPVZ6HRV3CUdB3N8VbgwdNRAyjJibTCc4viKfUrrFuwTZk9s.json")
+                .expect("Failed to read test file");
+
+        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        // Call `get_tokens_used()`
+        let tokens_used = block.get_tokens_used();
+
+        // Assert that the tokens match what we initialized
+        assert_eq!(tokens_used, vec![MINA_TOKEN_ID, "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg"]);
+        // rust/src/event_sourcing/test_data/berkeley_blocks/mainnet-410543-3NLeMXBpXKCpHtY2ugK5RdyQsZp2AUBQNYaJdgJNfu4h83TNvKGj.json
+    }
+
+    #[test]
+    fn test_contains_user_tokens() {
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410543-3NLeMXBpXKCpHtY2ugK5RdyQsZp2AUBQNYaJdgJNfu4h83TNvKGj.json")
+                .expect("Failed to read test file");
+
+        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        // Assert that the tokens match what we initialized
+        assert!(!block.contains_user_tokens());
     }
 }
