@@ -2,6 +2,7 @@ use crate::{
     constants::MINA_TOKEN_ID,
     event_sourcing::{
         actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        berkeley_block_models::AccountUpdateBody,
         events::{Event, EventType},
         models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
         payloads::{
@@ -9,8 +10,10 @@ use crate::{
             CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
         },
     },
+    utility::TreeNode,
 };
 use async_trait::async_trait;
+use std::collections::HashSet;
 
 pub struct AccountingActor;
 
@@ -313,45 +316,260 @@ impl AccountingActor {
         (lhs, rhs)
     }
 
-    /// Your partial method #4
+    fn process_balanced_pairs(timestamp: u64, children: &[&TreeNode<AccountUpdateBody>], canonical: bool) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
+        // 1) Partition children based on sign of delta: negative => debit group, positive => credit group
+        let mut debit_children = vec![];
+        let mut credit_children = vec![];
+        for child in children {
+            if child.value.balance_change.balance_delta() < 0 {
+                debit_children.push(child);
+            } else {
+                credit_children.push(child)
+            }
+        }
+
+        // 2) Build LHS entries (canonical = debit)
+        let mut lhs: Vec<AccountingEntry> = debit_children
+            .iter()
+            .filter_map(|child| {
+                let delta = child.value.balance_change.balance_delta();
+                if delta == 0 {
+                    return None;
+                }
+                let abs_amount = delta.unsigned_abs();
+                let token_id = child.value.token_id.clone();
+                Some(AccountingEntry {
+                    transfer_type: "ZkAppCommand".to_string(),
+                    // You can change the counterparty as you prefer
+                    counterparty: credit_children
+                        .iter()
+                        .map(|cc| cc.value.public_key.to_string())
+                        .collect::<Vec<String>>()
+                        .as_slice()
+                        .join("#"),
+                    // Canonical => Debit
+                    // We'll flip below if not canonical
+                    entry_type: AccountingEntryType::Debit,
+                    account: child.value.public_key.clone(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: abs_amount,
+                    timestamp,
+                    token_id,
+                })
+            })
+            .collect();
+
+        // 3) Build RHS entries (canonical = credit)
+        let mut rhs: Vec<AccountingEntry> = credit_children
+            .iter()
+            .filter_map(|child| {
+                let delta = child.value.balance_change.balance_delta();
+                if delta == 0 {
+                    return None;
+                }
+                let abs_amount = delta.unsigned_abs();
+                let token_id = child.value.token_id.clone();
+                Some(AccountingEntry {
+                    transfer_type: "ZkAppCommand".to_string(),
+                    // You can change the counterparty as you prefer
+                    counterparty: debit_children
+                        .iter()
+                        .map(|cc| cc.value.public_key.to_string())
+                        .collect::<Vec<String>>()
+                        .as_slice()
+                        .join("#"),
+                    // Canonical => Credit
+                    // We'll flip below if not canonical
+                    entry_type: AccountingEntryType::Credit,
+                    account: child.value.public_key.clone(),
+                    account_type: AccountingEntryAccountType::BlockchainAddress,
+                    amount_nanomina: abs_amount,
+                    timestamp,
+                    token_id,
+                })
+            })
+            .collect();
+
+        // 4) If not canonical => flip all entry types
+        if !canonical {
+            // For LHS, all are canonical Debits => become Credits
+            for entry in &mut lhs {
+                entry.entry_type = AccountingEntryType::Credit;
+            }
+            // For RHS, all are canonical Credits => become Debits
+            for entry in &mut rhs {
+                entry.entry_type = AccountingEntryType::Debit;
+            }
+        }
+
+        (lhs, rhs)
+    }
+
+    fn process_token_minting_burning(
+        state_hash: &str,
+        timestamp: u64,
+        child: &TreeNode<AccountUpdateBody>,
+        canonical: bool,
+    ) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
+        // 1) Extract net_delta from the single `child`.
+        let net_delta = child.value.balance_change.balance_delta();
+        if net_delta == 0 {
+            // No leftover => no minted or burned
+            return (vec![], vec![]);
+        }
+
+        // 2) Identify the token ID from the child's data
+        let token_id = child.value.token_id.clone();
+
+        // 3) Decide minted vs. burned based on sign
+        let abs_amount = net_delta.unsigned_abs();
+        let is_minted = net_delta > 0;
+
+        // 4) Build canonical entries: Mint => debit "Mint#", credit "ZkApp#...#Minted" Burn => credit "Burn#", debit "ZkApp#...#Burned"
+        let (mut lhs_entry, mut rhs_entry) = if is_minted {
+            // Mint scenario (canonical)
+            let debit_mint = AccountingEntry {
+                transfer_type: "Token::Mint".to_string(),
+                counterparty: format!("TokenMint#{}", state_hash),
+                entry_type: AccountingEntryType::Debit,
+                account: child.value.public_key.to_string(),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: abs_amount,
+                timestamp,
+                token_id: token_id.clone(),
+            };
+            let credit_mint = AccountingEntry {
+                transfer_type: "Token::Mint".to_string(),
+                counterparty: debit_mint.account.clone(),
+                entry_type: AccountingEntryType::Credit,
+                account: format!("TokenMint#{}", state_hash),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: abs_amount,
+                timestamp,
+                token_id: token_id.clone(),
+            };
+            (debit_mint, credit_mint)
+        } else {
+            // Burn scenario (canonical)
+            let credit_burn = AccountingEntry {
+                transfer_type: "Token::Burn".to_string(),
+                counterparty: format!("TokenBurn#{}", state_hash),
+                entry_type: AccountingEntryType::Credit,
+                account: child.value.public_key.to_string(),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: abs_amount,
+                timestamp,
+                token_id: token_id.clone(),
+            };
+            let debit_burn = AccountingEntry {
+                transfer_type: "Token::Burn".to_string(),
+                counterparty: credit_burn.account.clone(),
+                entry_type: AccountingEntryType::Debit,
+                account: format!("TokenBurn#{}", state_hash),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: abs_amount,
+                timestamp,
+                token_id: token_id.clone(),
+            };
+            (debit_burn, credit_burn)
+        };
+
+        // 5) If not canonical, flip only the entry_type
+        if !canonical {
+            lhs_entry.entry_type = match lhs_entry.entry_type {
+                AccountingEntryType::Debit => AccountingEntryType::Credit,
+                AccountingEntryType::Credit => AccountingEntryType::Debit,
+            };
+            rhs_entry.entry_type = match rhs_entry.entry_type {
+                AccountingEntryType::Debit => AccountingEntryType::Credit,
+                AccountingEntryType::Credit => AccountingEntryType::Debit,
+            };
+        }
+
+        // 6) Return them
+        (vec![lhs_entry], vec![rhs_entry])
+    }
+
+    fn process_fee_payer_block_reward_pool(
+        state_hash: &str,
+        timestamp: u64,
+        fee_payer: &str,
+        fee_nanomina: u64,
+        canonical: bool,
+    ) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
+        // LHS & RHS containers
+        let mut lhs = vec![];
+        let mut rhs = vec![];
+
+        let mut fee_payer_entry = AccountingEntry {
+            counterparty: format!("BlockRewardPool#{}", state_hash),
+            transfer_type: "BlockRewardPool".to_string(),
+            entry_type: AccountingEntryType::Debit,
+            account: fee_payer.to_string(),
+            account_type: AccountingEntryAccountType::BlockchainAddress,
+            amount_nanomina: fee_nanomina,
+            timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
+        };
+        let mut block_reward_pool_entry = AccountingEntry {
+            counterparty: fee_payer.to_string(),
+            transfer_type: "BlockRewardPool".to_string(),
+            entry_type: AccountingEntryType::Credit,
+            account: format!("BlockRewardPool#{}", state_hash),
+            account_type: AccountingEntryAccountType::VirtualAddess,
+            amount_nanomina: fee_nanomina,
+            timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
+        };
+
+        // Swap if non-canonical
+        if !canonical {
+            fee_payer_entry.entry_type = AccountingEntryType::Credit;
+            block_reward_pool_entry.entry_type = AccountingEntryType::Debit;
+        }
+
+        lhs.push(fee_payer_entry);
+        rhs.push(block_reward_pool_entry);
+
+        (lhs, rhs)
+    }
+
     async fn process_batch_zk_app_commands(
         state_hash: &str,
         timestamp: u64,
         command: &ZkAppCommandSummary,
         canonical: bool,
     ) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
-        // (Identical to your partial refactor code)
         let mut lhs = vec![];
         let mut rhs = vec![];
 
-        // fee payer => block reward pool
-        let mut fee_payer_entry = AccountingEntry {
-            counterparty: format!("BlockRewardPool#{}", state_hash),
-            transfer_type: "BlockRewardPool".to_string(),
-            entry_type: AccountingEntryType::Debit,
-            account: command.fee_payer.to_string(),
-            account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
-            amount_nanomina: command.fee_nanomina,
-            timestamp,
-            token_id: MINA_TOKEN_ID.to_string(),
-        };
-        let mut block_reward_pool_entry = AccountingEntry {
-            counterparty: command.fee_payer.to_string(),
-            transfer_type: "BlockRewardPool".to_string(),
-            entry_type: AccountingEntryType::Credit,
-            account: format!("BlockRewardPool#{}", state_hash),
-            account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
-            amount_nanomina: command.fee_nanomina,
-            timestamp,
-            token_id: MINA_TOKEN_ID.to_string(),
-        };
+        // (1) Fee payer → block reward pool
+        let (fee_lhs, fee_rhs) = Self::process_fee_payer_block_reward_pool(state_hash, timestamp, &command.fee_payer, command.fee_nanomina, canonical);
+        lhs.extend(fee_lhs);
+        rhs.extend(fee_rhs);
 
-        if !canonical {
-            fee_payer_entry.entry_type = AccountingEntryType::Credit;
-            block_reward_pool_entry.entry_type = AccountingEntryType::Debit;
+        if let Some(account_update_trees) = command.account_updates_trees.clone() {
+            for root in account_update_trees {
+                // BFS-level iterator returning children of each BFS node in order
+                let mut iter = root.bfs_steps();
+
+                // For each BFS node’s children:
+                while let Some(node_children) = iter.next() {
+                    let token_ids: HashSet<String> = node_children.iter().map(|c| c.value.token_id.to_string()).collect();
+                    assert_eq!(token_ids.len(), 1, "Did not expect mixed tokens amongst chilren");
+
+                    let net_delta: i64 = node_children.iter().map(|c| c.value.balance_change.balance_delta()).sum::<i64>();
+                    let (children_lhs, children_rhs) = match (net_delta == 0, node_children.len()) {
+                        (true, _) => Self::process_balanced_pairs(timestamp, &node_children, canonical),
+                        (false, 1) => Self::process_token_minting_burning(state_hash, timestamp, node_children[0], canonical),
+                        (_, _) => panic!("Unexpected ZK App accounting scenario"),
+                    };
+
+                    lhs.extend(children_lhs);
+                    rhs.extend(children_rhs);
+                }
+            }
         }
-        lhs.push(fee_payer_entry);
-        rhs.push(block_reward_pool_entry);
 
         (lhs, rhs)
     }
@@ -543,15 +761,19 @@ impl ActorFactory for AccountingActor {
 mod accounting_actor_tests_v2 {
     use super::AccountingActor;
     use crate::{
-        constants::MAINNET_COINBASE_REWARD,
+        constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
         event_sourcing::{
             actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+            berkeley_block_models::BerkeleyBlock,
+            block::BlockTrait,
             events::{Event, EventType},
             models::{CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
             payloads::{
-                AccountingEntryType, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+                AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload,
+                LedgerDestination, MainnetBlockPayload, NewAccountPayload,
             },
         },
+        utility::get_cleaned_pcb,
     };
     use std::sync::Arc;
     use tokio::{
@@ -1971,5 +2193,227 @@ mod accounting_actor_tests_v2 {
         );
 
         // All done!
+    }
+
+    #[tokio::test]
+    async fn test_berkeley_block_407555_extensive_punk_accounting() {
+        use std::sync::Arc;
+        use tokio::{
+            sync::Mutex,
+            time::{sleep, Duration},
+        };
+
+        // 1) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor().await;
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 3) Create a sink node that captures DoubleEntryTransaction events
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // 4) Wrap in Arc<Mutex<>> and spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 5) Load & clean the JSON for block 407555
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
+                .expect("Failed to read or clean file");
+
+        // 6) Parse into your BerkeleyBlock struct
+        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse BerkeleyBlock JSON");
+
+        // 7) Wrap into a canonical BerkeleyBlockPayload (or similar)
+        let payload = CanonicalBerkeleyBlockPayload {
+            block: BerkeleyBlockPayload {
+                height: 407555,
+                state_hash: berkeley_block.data.protocol_state.previous_state_hash.clone(),
+                timestamp: berkeley_block.get_timestamp(),
+                coinbase_receiver: berkeley_block.get_coinbase_receiver().to_string(),
+                coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
+                user_commands: berkeley_block.get_user_commands(),
+                fee_transfers: berkeley_block.get_fee_transfers(),
+                fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
+                zk_app_commands: berkeley_block.get_zk_app_commands().to_vec(),
+                ..Default::default()
+            },
+            canonical: true,
+            was_canonical: false,
+        };
+
+        // 8) Send the event => BFS expansions => LHS/RHS entries
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalBerkeleyBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send CanonicalBerkeleyBlock event");
+
+        // Allow time for processing
+        sleep(Duration::from_millis(200)).await;
+
+        // 9) Read from the sink node => should have at least 1 DoubleEntryTransaction
+        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
+        assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 407555");
+
+        // In many cases, you'd expect exactly one DoubleEntryTransaction event. If so:
+        assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 407555");
+
+        // 10) Parse the DoubleEntryRecordPayload from the sink
+        let record_json = &transactions[0];
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 407555");
+
+        // 11) Basic checks on height, state_hash, etc.
+        assert_eq!(record.height, 407555, "Block height mismatch");
+        // Compare record.state_hash if you want:
+        // assert_eq!(record.state_hash, "3NK51MXHFabX7p...", "State hash mismatch");
+
+        // 12) BFS expansions => examine LHS + RHS
+        // For example, we expect:
+        //   - One BFS node had a delta of -1,000,000,000 (1 MINA)
+        //   - Another BFS node had -100,000,000  PUNK
+        //   - Another BFS node had +100,000,000  PUNK
+        //   etc.
+
+        // Let's find the negative-1 MINA LHS entry:
+        let negative_one_mina = record
+            .lhs
+            .iter()
+            .find(|e| e.amount_nanomina == 1_000_000_000 && e.entry_type == AccountingEntryType::Debit && e.token_id == MINA_TOKEN_ID);
+        assert!(negative_one_mina.is_some(), "Expected BFS debit of 1 MINA in LHS");
+
+        // Now let's look for the "PUNK" token (0.1 PUNK):
+        let punk_token_id = "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg";
+
+        // -0.1 PUNK => e.amount_nanomina = 100_000_000, e.entry_type=Debit
+        let negative_punk_entry = record
+            .lhs
+            .iter()
+            .find(|e| e.amount_nanomina == 100_000_000 && e.entry_type == AccountingEntryType::Debit && e.token_id == punk_token_id);
+        assert!(negative_punk_entry.is_some(), "Expected BFS debit of 0.1 PUNK in LHS");
+
+        // +0.1 PUNK => e.amount_nanomina= 100_000_000, e.entry_type=Credit
+        let positive_punk_entry = record
+            .rhs
+            .iter()
+            .find(|e| e.amount_nanomina == 100_000_000 && e.entry_type == AccountingEntryType::Credit && e.token_id == punk_token_id);
+        assert!(positive_punk_entry.is_some(), "Expected BFS credit of 0.1 PUNK in RHS");
+    }
+
+    #[tokio::test]
+    async fn test_berkeley_block_367681_punk_minting_scenario() {
+        // 1) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Create the AccountingActor (root)
+        let accounting_actor = AccountingActor::create_actor().await;
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 3) Create a sink node that captures DoubleEntryTransaction events
+        let sink_node = create_double_entry_sink_node();
+        let sink_node_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_node_id);
+
+        // 4) Wrap in Arc<Mutex<>> and spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 5) Load + clean the JSON for block 367681
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-367681-3NKficMDTHxKrj6VYUtncZCsT9TjBciWMu8upPryYZTjrw9vcTX4.json")
+                .expect("Failed to read or clean block 367681 file");
+
+        // 6) Parse into your BerkeleyBlock or similar
+        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse BerkeleyBlock JSON for block 367681");
+
+        // 7) Wrap into a canonical BerkeleyBlockPayload (or your event type)
+        let payload = CanonicalBerkeleyBlockPayload {
+            block: BerkeleyBlockPayload {
+                height: 367681,
+                state_hash: berkeley_block.data.protocol_state.previous_state_hash.clone(),
+                timestamp: berkeley_block.get_timestamp(),
+                coinbase_receiver: berkeley_block.get_coinbase_receiver().to_string(),
+                coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
+                user_commands: berkeley_block.get_user_commands(),
+                fee_transfers: berkeley_block.get_fee_transfers(),
+                fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
+                zk_app_commands: berkeley_block.get_zk_app_commands().to_vec(),
+                ..Default::default()
+            },
+            canonical: true,
+            was_canonical: false,
+        };
+
+        // 8) Send the event => BFS expansions => LHS/RHS
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalBerkeleyBlock,
+                payload: sonic_rs::to_string(&payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send CanonicalBerkeleyBlock event for block 367681");
+
+        // Allow time for processing
+        sleep(Duration::from_millis(200)).await;
+
+        // 9) Read from the sink => expect at least 1 DoubleEntryTransaction
+        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
+        assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 367681");
+
+        // Usually you'd have exactly 1 DoubleEntryTransaction per block in your design:
+        assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 367681");
+
+        // 10) Parse the DoubleEntryRecordPayload
+        let record_json = &transactions[0];
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 367681");
+
+        // Basic checks
+        assert_eq!(record.height, 367681, "Block height mismatch");
+        // If your BFS sets final state_hash in the record:
+        // assert_eq!(record.state_hash, "3NKficMDTHxKrj...", "State hash mismatch");
+
+        // 11) Check for the negative 1,000,000,000 (the 'PUNK cost') => LHS
+        let minus_one_billion = record
+            .lhs
+            .iter()
+            .find(|e| e.entry_type == AccountingEntryType::Debit && e.amount_nanomina == 1_000_000_000 && e.token_id == MINA_TOKEN_ID);
+        assert!(minus_one_billion.is_some(), "Expected BFS debit of 1,000,000,000 for PUNK token in LHS");
+
+        // 12) The BFS child is +10_000_000_000_000_000 for punk token
+        let punk_token_id = "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg";
+
+        let minted_lhs = record
+            .lhs
+            .iter()
+            .find(|e| e.transfer_type.contains("Mint") && e.amount_nanomina == 10_000_000_000_000_000 && e.token_id == punk_token_id);
+        let minted_rhs = record
+            .rhs
+            .iter()
+            .find(|e| e.transfer_type.contains("Mint") && e.amount_nanomina == 10_000_000_000_000_000 && e.token_id == punk_token_id);
+        // Because BFS might put one side on LHS, one side on RHS.
+        // We want to ensure we found something that indicates a minted scenario:
+        assert!(
+            minted_lhs.is_some() && minted_rhs.is_some(),
+            "Expected minted scenario with +10,000,000,000,000,000 for PUNK token"
+        );
     }
 }
