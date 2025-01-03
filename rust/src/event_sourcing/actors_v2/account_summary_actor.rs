@@ -6,6 +6,9 @@ use crate::event_sourcing::{
 use itertools::Itertools;
 use std::collections::HashMap;
 
+type AccountSummary = HashMap<String, i64>;
+type TokenAccountSummary = HashMap<String, AccountSummary>;
+
 /// Name your actor something like `AccountSummaryActor`.
 pub struct AccountSummaryActor;
 
@@ -31,7 +34,7 @@ impl AccountSummaryActor {
             .collect();
 
         // 4) Build a local aggregator: per-account => net balance_delta (signed).
-        let mut account_deltas: HashMap<String, i64> = HashMap::new();
+        let mut account_deltas: TokenAccountSummary = HashMap::new();
 
         for entry in combined_entries {
             let delta = match entry.entry_type {
@@ -39,17 +42,21 @@ impl AccountSummaryActor {
                 AccountingEntryType::Debit => -(entry.amount_nanomina as i64),
             };
 
-            // Accumulate in the map
-            *account_deltas.entry(entry.account.clone()).or_insert(0) += delta;
+            let token_id = entry.token_id;
+            *account_deltas.entry(token_id).or_default().entry(entry.account.to_string()).or_insert(0) += delta;
         }
 
-        let out_events = vec![Event {
-            event_type: EventType::AccountLogBalanceDelta,
-            payload: sonic_rs::to_string(&AccountBalanceDeltaPayload {
-                balance_deltas: account_deltas,
+        let mut out_events = vec![];
+        for (token_id, acct_deltas) in account_deltas.iter() {
+            out_events.push(Event {
+                event_type: EventType::AccountLogBalanceDelta,
+                payload: sonic_rs::to_string(&AccountBalanceDeltaPayload {
+                    token_id: token_id.to_string(),
+                    balance_deltas: acct_deltas.to_owned(),
+                })
+                .unwrap(),
             })
-            .unwrap(),
-        }];
+        }
 
         // If no deltas, return None => no events
         if out_events.is_empty() {

@@ -30,8 +30,13 @@ impl AccountSummaryPersistenceActor {
             if delta == 0 {
                 continue; // No change
             }
+            let key = format!("{}#{}", payload.token_id, account);
 
-            if let Err(e) = managed_store.incr(&account, "balance", delta).await {
+            if let Err(e) = managed_store.upsert(&key, &[]).await {
+                error!("Unable to insert blockchain_tree {e}");
+            }
+
+            if let Err(e) = managed_store.incr(&key, "balance", delta).await {
                 error!("Failed to upsert balance for account={}: {}", account, e);
             }
         }
@@ -90,26 +95,32 @@ impl AccountSummaryPersistenceActor {
             .build()
     }
 }
+
 #[cfg(test)]
 mod account_summary_persistence_actor_tests {
     use super::AccountSummaryPersistenceActor;
     use crate::{
-        constants::POSTGRES_CONNECTION_STRING,
+        constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
         event_sourcing::{
             actor_dag::ActorDAG,
             events::{Event, EventType},
             payloads::AccountBalanceDeltaPayload,
         },
     };
-    use std::sync::Arc;
+    use std::{collections::HashMap, sync::Arc};
     use tokio::sync::Mutex;
     use tokio_postgres::NoTls;
 
     /// Utility to fetch the numeric `balance` from `account_summary_store`
-    /// for a given `account`.
-    async fn fetch_account_balance(client: &tokio_postgres::Client, account: &str) -> i64 {
+    /// for a given `(token_id, account)`.
+    async fn fetch_balance_for_token(client: &tokio_postgres::Client, token_id: &str, account: &str) -> i64 {
+        let compound_key = format!("{}#{}", token_id, account);
         let sql = "SELECT balance FROM account_summary_store WHERE key = $1";
-        let row_opt = client.query_opt(sql, &[&account]).await.expect("Failed to query balance");
+        let row_opt = client
+            .query_opt(sql, &[&compound_key])
+            .await
+            .expect("Failed to query balance for token_id#account");
+
         row_opt.map(|row| row.get::<_, i64>("balance")).unwrap_or(0)
     }
 
@@ -133,13 +144,15 @@ mod account_summary_persistence_actor_tests {
             }
         });
 
-        // 5) First event: increment acct1 => +100, acct2 => -50
-        use std::collections::HashMap;
+        // 5) First event: increment acct1 => +100, acct2 => -50 on the SAME token (MINA_TOKEN_ID)
         let mut deltas_1 = HashMap::new();
         deltas_1.insert("acct1".to_string(), 100i64);
         deltas_1.insert("acct2".to_string(), -50i64);
 
-        let payload_1 = AccountBalanceDeltaPayload { balance_deltas: deltas_1 };
+        let payload_1 = AccountBalanceDeltaPayload {
+            token_id: MINA_TOKEN_ID.to_string(),
+            balance_deltas: deltas_1,
+        };
 
         actor_sender
             .send(Event {
@@ -147,14 +160,17 @@ mod account_summary_persistence_actor_tests {
                 payload: sonic_rs::to_string(&payload_1).unwrap(),
             })
             .await
-            .expect("Failed to send first AccountLogBalanceDelta event");
+            .expect("Failed to send first event");
 
-        // 6) Second event: increment acct1 => +25, acct2 => +75
+        // 6) Second event: increment acct1 => +25, acct2 => +75 on the SAME token (MINA_TOKEN_ID)
         let mut deltas_2 = HashMap::new();
         deltas_2.insert("acct1".to_string(), 25i64);
         deltas_2.insert("acct2".to_string(), 75i64);
 
-        let payload_2 = AccountBalanceDeltaPayload { balance_deltas: deltas_2 };
+        let payload_2 = AccountBalanceDeltaPayload {
+            token_id: MINA_TOKEN_ID.to_string(),
+            balance_deltas: deltas_2,
+        };
 
         actor_sender
             .send(Event {
@@ -162,9 +178,88 @@ mod account_summary_persistence_actor_tests {
                 payload: sonic_rs::to_string(&payload_2).unwrap(),
             })
             .await
-            .expect("Failed to send second AccountLogBalanceDelta event");
+            .expect("Failed to send second event");
 
         // Give it some processing time
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+        // 7) Connect for verification
+        let (client, conn) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+            .await
+            .expect("Failed to connect for verification");
+        tokio::spawn(async move {
+            if let Err(e) = conn.await {
+                eprintln!("Verification connection error: {}", e);
+            }
+        });
+
+        // 8) Confirm final balances for each (token_id, account).
+        // For 'acct1' => we should see 100 + 25 => 125 total
+        // For 'acct2' => we should see -50 + 75 => 25 total
+        let acct1_balance = fetch_balance_for_token(&client, MINA_TOKEN_ID, "acct1").await;
+        let acct2_balance = fetch_balance_for_token(&client, MINA_TOKEN_ID, "acct2").await;
+
+        assert_eq!(acct1_balance, 125, "acct1 should have +125 total for token=MINA");
+        assert_eq!(acct2_balance, 25, "acct2 should have +25 total for token=MINA");
+    }
+
+    #[tokio::test]
+    async fn test_account_summary_persistence_actor_multiple_token_ids() {
+        // 1) Build the ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Create the actor node (no preserve_data for a fresh start)
+        let actor_node = AccountSummaryPersistenceActor::create_actor(false).await;
+
+        // 3) Add as root => get the sender
+        let actor_sender = dag.set_root(actor_node);
+
+        // 4) Wrap in Arc<Mutex<>> and spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 5) First event: token "token_a" => { acct1 => +10, acct2 => +20 }
+        let mut deltas_a = HashMap::new();
+        deltas_a.insert("acct1".to_string(), 10i64);
+        deltas_a.insert("acct2".to_string(), 20i64);
+
+        let payload_a = AccountBalanceDeltaPayload {
+            token_id: "token_a".to_string(),
+            balance_deltas: deltas_a,
+        };
+
+        actor_sender
+            .send(Event {
+                event_type: EventType::AccountLogBalanceDelta,
+                payload: sonic_rs::to_string(&payload_a).unwrap(),
+            })
+            .await
+            .expect("Failed to send first event for token_a");
+
+        // 6) Second event: token "token_b" => { acct1 => +100, acct2 => +200 }
+        let mut deltas_b = HashMap::new();
+        deltas_b.insert("acct1".to_string(), 100i64);
+        deltas_b.insert("acct2".to_string(), 200i64);
+
+        let payload_b = AccountBalanceDeltaPayload {
+            token_id: "token_b".to_string(),
+            balance_deltas: deltas_b,
+        };
+
+        actor_sender
+            .send(Event {
+                event_type: EventType::AccountLogBalanceDelta,
+                payload: sonic_rs::to_string(&payload_b).unwrap(),
+            })
+            .await
+            .expect("Failed to send second event for token_b");
+
+        // Wait a bit
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // 7) Connect to DB for verification
@@ -177,13 +272,21 @@ mod account_summary_persistence_actor_tests {
             }
         });
 
-        let acct1_balance = fetch_account_balance(&client, "acct1").await;
-        let acct2_balance = fetch_account_balance(&client, "acct2").await;
+        // 8) Now check each (token_id, account) individually
+        // "token_a#acct1" => +10
+        // "token_a#acct2" => +20
+        // "token_b#acct1" => +100
+        // "token_b#acct2" => +200
 
-        // 8) Confirm final balances
-        // For acct1: first event +100, second event +25 => total +125
-        // For acct2: first event -50, second event +75 => total +25
-        assert_eq!(acct1_balance, 125, "acct1 should have +125 total");
-        assert_eq!(acct2_balance, 25, "acct2 should have +25 total");
+        let acct1_token_a = fetch_balance_for_token(&client, "token_a", "acct1").await;
+        let acct2_token_a = fetch_balance_for_token(&client, "token_a", "acct2").await;
+        let acct1_token_b = fetch_balance_for_token(&client, "token_b", "acct1").await;
+        let acct2_token_b = fetch_balance_for_token(&client, "token_b", "acct2").await;
+
+        // Confirm each
+        assert_eq!(acct1_token_a, 10, "acct1 for token_a should be +10");
+        assert_eq!(acct2_token_a, 20, "acct2 for token_a should be +20");
+        assert_eq!(acct1_token_b, 100, "acct1 for token_b should be +100");
+        assert_eq!(acct2_token_b, 200, "acct2 for token_b should be +200");
     }
 }

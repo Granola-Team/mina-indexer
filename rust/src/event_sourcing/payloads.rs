@@ -665,5 +665,6 @@ impl AccountingEntry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountBalanceDeltaPayload {
+    pub token_id: String,
     pub balance_deltas: HashMap<String, i64>,
 }
