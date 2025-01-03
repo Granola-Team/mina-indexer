@@ -1,7 +1,7 @@
 pub mod command;
 pub mod completed_work;
 
-use super::protocol_state::SupplyAdjustment;
+use super::{protocol_state::SupplyAdjustment, Permissions, Timing, VerificationKey};
 use crate::{
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
@@ -254,13 +254,12 @@ pub struct ZkappEvents(pub Vec<String>);
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Update {
     pub app_state: [UpdateKind; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
-
     pub delegate: UpdateKind,
-    pub verification_key: UpdateKind,
-    pub permissions: UpdateKind,
+    pub verification_key: UpdateVerificationKey,
+    pub permissions: UpdatePermissions,
     pub zkapp_uri: UpdateKind,
     pub token_symbol: UpdateKind,
-    pub timing: UpdateKind,
+    pub timing: UpdateTiming,
     pub voting_for: UpdateKind,
 }
 
@@ -269,6 +268,27 @@ pub struct Update {
 pub enum UpdateKind {
     Keep((String,)),
     Set((String, String)),
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateVerificationKey {
+    Keep((String,)),
+    Set((String, VerificationKey)),
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdatePermissions {
+    Keep((String,)),
+    Set((String, Permissions)),
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateTiming {
+    Keep((String,)),
+    Set((String, Timing)),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -401,6 +421,47 @@ fn convert_object(key: &str, value: &mut serde_json::Value) {
             .iter_mut()
             .for_each(|(k, value)| convert_object(k, value)),
         _ => (),
+    }
+}
+
+// conversions
+
+impl<T> From<UpdateKind> for Option<T>
+where
+    T: From<String>,
+{
+    fn from(value: UpdateKind) -> Self {
+        match value {
+            UpdateKind::Keep(_) => None,
+            UpdateKind::Set((_, data)) => Some(data.into()),
+        }
+    }
+}
+
+impl From<UpdateVerificationKey> for Option<VerificationKey> {
+    fn from(value: UpdateVerificationKey) -> Self {
+        match value {
+            UpdateVerificationKey::Keep(_) => None,
+            UpdateVerificationKey::Set((_, vk)) => Some(vk),
+        }
+    }
+}
+
+impl From<UpdatePermissions> for Option<Permissions> {
+    fn from(value: UpdatePermissions) -> Self {
+        match value {
+            UpdatePermissions::Keep(_) => None,
+            UpdatePermissions::Set((_, perm)) => Some(perm),
+        }
+    }
+}
+
+impl From<UpdateTiming> for Option<Timing> {
+    fn from(value: UpdateTiming) -> Self {
+        match value {
+            UpdateTiming::Keep(_) => None,
+            UpdateTiming::Set((_, timing)) => Some(timing),
+        }
     }
 }
 

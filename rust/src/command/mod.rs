@@ -352,7 +352,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         vec![new_delegate.to_owned()]
                     }
                 },
-                UserCommandData::ZkappCommandData(_zkapp) => todo!("zkapp receiver"),
+                UserCommandData::ZkappCommandData(zkapp) => zkapp
+                    .account_updates
+                    .iter()
+                    .map(|update| update.elt.account_update.body.public_key.to_owned())
+                    .collect(),
             },
         }
     }
