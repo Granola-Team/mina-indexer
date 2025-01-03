@@ -20,6 +20,7 @@ async fn hardfork() -> anyhow::Result<()> {
     // final pre-harfork v1 block
     let (root_block, root_block_bytes) = block_parser.next_block().await?.unwrap();
     let root_block: PrecomputedBlock = root_block.into();
+
     assert_eq!(
         root_block.state_hash().0,
         "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15"
@@ -31,32 +32,44 @@ async fn hardfork() -> anyhow::Result<()> {
 
     // ingest the remaining blocks
     while let Some((block, _)) = block_parser.next_block().await? {
-        state.add_block_to_witness_tree(&block.into(), true, false)?;
+        let block: PrecomputedBlock = block.into();
+        println!("{}", block.summary());
+
+        state.add_block_to_witness_tree(&block, true, false)?;
     }
 
     // root branch
     println!("=== Root Branch ===");
     println!("{}", state.root_branch);
 
-    assert_eq!(state.root_branch.len(), 7);
-    assert_eq!(state.root_branch.height(), 4);
-    assert_eq!(state.root_branch.leaves().len(), 3);
+    assert_eq!(state.root_branch.len(), 18);
+    assert_eq!(state.root_branch.height(), 14);
+    assert_eq!(state.root_branch.leaves().len(), 4);
 
     // dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
 
+    // best chain
     let best_chain = state
         .best_chain()
         .into_iter()
         .map(|b| b.state_hash.0)
         .collect::<Vec<_>>();
+
     assert_eq!(
         best_chain,
         vec![
-            "3NKXo8ugDzgiJBc3zZTejrdJSoNXRCxM9kAEXzzxeCGzJRMX3NkP",
-            "3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot",
-            "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP",
-            "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15"
+            "3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW",
+            "3NLjpotw6aZ2r7Twccgr7cceXiPkdH5LqdugWCpq9tL1ZZLeDsJV",
+            "3NKP2tSFCcQ5G1wDZUaFcU5KpYPmorvnHndSQ3CbBgirZ7HTK7Nm",
+            "3NK3EzoJEv4udD8DpTks8osNZwGuB9GEnDWC5kf4Wd2kXrapjaKR",
+            "3NLcQZw2tNfFV6hRxEPcJhpTcwnhsDsLzU1B33cyRH1WkBFWGmvb",
+            "3NLcUk9u8FgvCip634qaDQFBm26ja8C3pSk2L1SQd9nSE2CEcqpQ",
+            "3NKybkb8C3R5PjwkxNUVCL6tb5qVf5i4jPWkDCcyJbka9Qgvr8CG",
+            "3NLe669kJ89t48btn8NX6jMy7vnWNjP9caBdGgsCw2VSMjzP1anW",
+            "3NL8ym45gfcDR18fyn7WMJVwgweb4C4HYWUnwNEQuyb5TsF8Hemn",
+            "3NLdgCbegvkfGm29x9NryzESJCoCC7DknrcB2TAmzyvcZjtsvJ76",
+            "3NKg81uwJ61tNNbM1SkS6862AHwfRhwNQEKZemJS9UwBAzaNK8ch"
         ]
     );
 
