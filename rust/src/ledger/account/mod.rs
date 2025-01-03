@@ -40,7 +40,7 @@ pub struct Account {
     pub username: Option<Username>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Permissions {
     pub edit_state: Permission,
     pub access: Permission,
@@ -57,7 +57,9 @@ pub struct Permissions {
     pub set_timing: Permission,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
+#[derive(
+    Default, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, AutoFrom,
+)]
 #[auto_from(v2::PermissionKind)]
 pub enum Permission {
     #[default]
@@ -68,7 +70,9 @@ pub enum Permission {
     Impossible,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
+#[derive(
+    Default, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, AutoFrom,
+)]
 #[auto_from(v2::Timing)]
 pub struct Timing {
     pub initial_minimum_balance: u64,

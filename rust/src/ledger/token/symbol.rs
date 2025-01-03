@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct TokenSymbol(pub String);
 
 impl TokenSymbol {
@@ -24,6 +24,12 @@ impl std::str::FromStr for TokenSymbol {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self::new(s))
+    }
+}
+
+impl From<String> for TokenSymbol {
+    fn from(value: String) -> Self {
+        Self(value)
     }
 }
 

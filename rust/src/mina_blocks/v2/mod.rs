@@ -84,7 +84,7 @@ pub enum AccountAccessedTiming {
     Timed((TimingKind, Timing)),
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Timing {
     #[serde(deserialize_with = "from_str")]
     pub initial_minimum_balance: u64,
@@ -108,7 +108,7 @@ pub enum TimingKind {
     Untimed,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Permissions {
     pub edit_state: Permission,
     pub access: Permission,
@@ -129,7 +129,7 @@ pub type Permission = (PermissionKind,);
 
 /// See https://github.com/MinaProtocol/mina/blob/berkeley/src/lib/mina_base/permissions.mli
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub enum PermissionKind {
     None,
     Either,
@@ -140,11 +140,14 @@ pub enum PermissionKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappAccount {
-    pub app_state: [String; ZKAPP_STATE_FIELD_ELEMENTS_NUM], // 32 bytes each
-    pub action_state: [String; 5],                           // 32 bytes each
+    pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM], // 32 bytes each
+    pub action_state: [ActionState; 5],                        // 32 bytes each
     pub verification_key: VerificationKey,
     pub proved_state: bool,
-    pub zkapp_uri: String,
+    pub zkapp_uri: ZkappUri,
+
+    #[serde(skip)]
+    pub token_symbol: Option<TokenSymbol>,
 
     #[serde(deserialize_with = "from_str")]
     pub zkapp_version: u32,
@@ -153,13 +156,25 @@ pub struct ZkappAccount {
     pub last_action_slot: u32,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct AppState(pub String);
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ActionState(pub String);
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ZkappUri(pub String);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationKey {
-    pub data: String,
+    pub data: VerificationKeyData,
     pub hash: VerificationKeyHash,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct VerificationKeyData(pub String);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationKeyHash(pub String);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -167,4 +182,26 @@ pub struct ProtocolVersion {
     pub transaction: u32,
     pub network: u32,
     pub patch: u32,
+}
+
+// conversions
+
+impl From<String> for ZkappUri {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+
+// defaults
+
+impl std::default::Default for AppState {
+    fn default() -> Self {
+        Self("0x0000000000000000000000000000000000000000000000000000000000000000".to_string())
+    }
+}
+
+impl std::default::Default for ActionState {
+    fn default() -> Self {
+        Self("0x0000000000000000000000000000000000000000000000000000000000000000".to_string())
+    }
 }
