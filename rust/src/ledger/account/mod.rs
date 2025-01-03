@@ -1,18 +1,18 @@
 use super::{
     amount::Amount,
     diff::{
-        account::{AccountDiff, UpdateType},
+        account::{AccountDiff, StateDiffs, UpdateType, ZkappDiff},
         LedgerDiff,
     },
     nonce::Nonce,
-    token::TokenAddress,
+    token::{symbol::TokenSymbol, TokenAddress},
     username::Username,
 };
 use crate::{
     block::genesis::GenesisBlock,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, ZKAPP_STATE_FIELD_ELEMENTS_NUM},
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
-    mina_blocks::v2::{self, ZkappAccount},
+    mina_blocks::v2::{self, VerificationKey, ZkappAccount, ZkappUri},
 };
 use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
@@ -268,6 +268,14 @@ impl Account {
         }
     }
 
+    pub fn delegation_unapply(self, nonce: Option<Nonce>) -> Self {
+        Account {
+            delegate: self.public_key.clone(),
+            nonce,
+            ..self
+        }
+    }
+
     /// Updates the account's nonce based on a failed transaction.
     /// This function takes the current account state (`pre`) and an updated
     /// nonce (`updated_nonce`), and returns a new account state with the
@@ -291,26 +299,139 @@ impl Account {
         Account { nonce, ..self }
     }
 
-    pub fn delegation_unapply(self, nonce: Option<Nonce>) -> Self {
-        Account {
-            delegate: self.public_key.clone(),
-            nonce,
+    pub fn zkapp(self, zkapp_diff: &ZkappDiff) -> Self {
+        let mut account = self;
+
+        // payments
+        for payment in zkapp_diff.payment_diffs.iter() {
+            account = account.payment(payment);
+        }
+
+        // app state
+        account = account.zkapp_state(&zkapp_diff.app_state_diffs);
+
+        // delegate
+        if let Some(delegate) = zkapp_diff.delegate.to_owned() {
+            account = account.zkapp_delegate(delegate);
+        }
+
+        // verification key
+        if let Some(vk) = zkapp_diff.verification_key.to_owned() {
+            account = account.zkapp_verification_key(vk);
+        }
+
+        // permissions
+        if let Some(permissions) = zkapp_diff.permissions.to_owned() {
+            account = account.zkapp_permissions(permissions);
+        }
+
+        // zkapp uri
+        if let Some(uri) = zkapp_diff.zkapp_uri.to_owned() {
+            account = account.zkapp_uri(uri);
+        }
+
+        // token symbol
+        if let Some(symbol) = zkapp_diff.token_symbol.to_owned() {
+            account = account.zkapp_token_symbol(symbol);
+        }
+
+        // timing
+        if let Some(timing) = zkapp_diff.timing.to_owned() {
+            account.timing = Some(timing);
+        }
+
+        // voting for
+        if let Some(voting_for) = zkapp_diff.voting_for.to_owned() {
+            account.voting_for = Some(voting_for);
+        }
+
+        account
+    }
+
+    /// apply zkapp state diff
+    fn zkapp_state(self, app_state_diffs: &StateDiffs) -> Self {
+        if let Some(mut zkapp) = self.zkapp {
+            for idx in 0..ZKAPP_STATE_FIELD_ELEMENTS_NUM {
+                if let Some(app_state) = app_state_diffs.diffs[idx].to_owned() {
+                    zkapp.app_state[idx] = app_state;
+                }
+            }
+
+            return Self {
+                zkapp: Some(zkapp),
+                ..self
+            };
+        }
+
+        panic!("Should not apply app state diff to non-zkapp account")
+    }
+
+    /// zkapp delegate diff
+    fn zkapp_delegate(self, delegate: PublicKey) -> Self {
+        Self { delegate, ..self }
+    }
+
+    /// zkapp verification key diff
+    fn zkapp_verification_key(self, vk: VerificationKey) -> Self {
+        if let Some(mut zkapp) = self.zkapp {
+            zkapp.verification_key = vk;
+
+            return Self {
+                zkapp: Some(zkapp),
+                ..self
+            };
+        }
+
+        panic!("Should not change verification key on non-zkapp account")
+    }
+
+    /// zkapp permissions diff
+    fn zkapp_permissions(self, permissions: Permissions) -> Self {
+        Self {
+            permissions: Some(permissions),
             ..self
         }
+    }
+
+    /// zkapp uri change
+    fn zkapp_uri(self, uri: ZkappUri) -> Self {
+        if let Some(mut zkapp) = self.zkapp {
+            zkapp.zkapp_uri = uri;
+
+            return Self {
+                zkapp: Some(zkapp),
+                ..self
+            };
+        }
+
+        panic!("Should not change verification key on non-zkapp account")
+    }
+
+    /// token symbol change
+    fn zkapp_token_symbol(self, symbol: TokenSymbol) -> Self {
+        if let Some(mut zkapp) = self.zkapp {
+            zkapp.token_symbol = Some(symbol);
+
+            return Self {
+                zkapp: Some(zkapp),
+                ..self
+            };
+        }
+
+        panic!("Should not change verification key on non-zkapp account")
     }
 
     /// Apply an account diff to an account
     pub fn apply_account_diff(self, diff: &AccountDiff) -> Self {
         use AccountDiff::*;
+
         match diff {
             Payment(payment_diff) => self.payment(payment_diff),
             Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
             }
-            Zkapp(zkapp_diff) => {
-                todo!("apply zkapp account diff {zkapp_diff:?}")
-            }
+            Zkapp(zkapp_diff) => self.zkapp(zkapp_diff.as_ref()),
             Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
             FeeTransfer(fee_transfer_diff) => self.payment(fee_transfer_diff),
             FeeTransferViaCoinbase(fee_transfer_diff) => self.payment(fee_transfer_diff),
