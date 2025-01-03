@@ -288,9 +288,12 @@ async fn test_account_balances(use_view: bool) {
         "#
     } else {
         r#"
-            SELECT key as address, CAST(balance AS BIGINT) AS balance
-            FROM account_summary_store
-            ORDER BY balance ASC;
+        SELECT
+          split_part(key, '#', 1) AS token_id,
+          split_part(key, '#', 2) AS address,
+          CAST(balance AS BIGINT) AS balance
+        FROM account_summary_store
+        ORDER BY balance ASC;
         "#
     };
 
