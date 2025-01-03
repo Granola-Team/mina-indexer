@@ -1,4 +1,4 @@
-use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
+use mina_indexer::constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING};
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -50,9 +50,39 @@ async fn test_blockchain_ledger() {
         &[],
     );
 
+    create_view_for_accounting().await;
     test_ledger_ingested_up_to(5000).await;
     test_blockchain_ledger_accounting_per_block().await;
-    test_account_balances().await;
+    test_account_balances(true).await;
+    // test_account_balances(false).await;
+}
+
+async fn create_view_for_accounting() {
+    let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
+        .await
+        .expect("Unable to connect to database");
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    let view_def = r#"
+        CREATE OR REPLACE VIEW account_summary AS
+        SELECT
+            address,
+            address_type,
+            SUM(balance_delta) AS balance,
+            MAX(height) AS latest_height
+        FROM
+            blockchain_ledger
+        GROUP BY
+            address, address_type
+        ORDER BY
+            latest_height DESC;"#;
+    if let Err(e) = client.execute(view_def, &[]).await {
+        eprintln!("unable to create view: {}", e);
+    }
 }
 
 async fn test_ledger_ingested_up_to(x: u64) {
@@ -228,7 +258,7 @@ async fn test_blockchain_ledger_accounting_per_block() {
 //     drop(handle);
 // }
 
-async fn test_account_balances() {
+async fn test_account_balances(use_view: bool) {
     let file_content = std::fs::read_to_string(Path::new("./tests/data/ledger_at_height_5000.json")).expect("Failed to read JSON file from disk");
 
     // Parse the JSON into a vector of Account structs
@@ -245,12 +275,21 @@ async fn test_account_balances() {
         }
     });
 
-    let query = r#"
-        SELECT address, CAST(balance AS BIGINT) AS balance
-        FROM account_summary
-        WHERE address_type = 'BlockchainAddress'
-        ORDER BY balance ASC;
-    "#;
+    let query = if use_view {
+        r#"
+            SELECT address, CAST(balance AS BIGINT) AS balance
+            FROM account_summary
+            WHERE address_type = 'BlockchainAddress'
+            ORDER BY balance ASC;
+        "#
+    } else {
+        r#"
+            SELECT key as address, CAST(balance AS BIGINT) AS balance
+            FROM account_summary_store
+            ORDER BY balance ASC;
+        "#
+    };
+    println!("Use view? {use_view}");
 
     // Execute the query using the SQL client from the actor
     let rows = client
@@ -266,7 +305,8 @@ async fn test_account_balances() {
 
     let mut incorrect_accounts: Vec<(String, i64, i64)> = vec![];
     for account in accounts {
-        assert!(rows_map.contains_key(&account.public_key));
+        let pk = &account.public_key;
+        assert!(rows_map.contains_key(pk), "Expected to find account {pk} in ledger");
         let ledger_account_balance = rows_map.get(&account.public_key).expect("Unable to get address from hash map");
         if &(account.balance as i64) != ledger_account_balance {
             incorrect_accounts.push((account.public_key.to_string(), account.balance as i64, ledger_account_balance.to_owned()));
