@@ -33,7 +33,7 @@ end
 desc "Integration Tests"
 task :it do
   chdir "rust"
-  sh "cargo test --test regression_tests -- --test-threads=1"
+  sh "cargo test --test regression_tests -- --test-threads=1 --nocapture"
   chdir root_dir
 end
 

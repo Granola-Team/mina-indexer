@@ -54,7 +54,7 @@ async fn test_blockchain_ledger() {
     test_ledger_ingested_up_to(5000).await;
     test_blockchain_ledger_accounting_per_block().await;
     test_account_balances(true).await;
-    // test_account_balances(false).await;
+    test_account_balances(false).await;
 }
 
 async fn create_view_for_accounting() {
@@ -260,10 +260,14 @@ async fn test_blockchain_ledger_accounting_per_block() {
 // }
 
 async fn test_account_balances(use_view: bool) {
+    println!("asdfasdf");
     let file_content = std::fs::read_to_string(Path::new("./tests/data/ledger_at_height_5000.json")).expect("Failed to read JSON file from disk");
 
     // Parse the JSON into a vector of Account structs
-    let accounts: Vec<Account> = sonic_rs::from_str(&file_content).unwrap();
+    let mut accounts: Vec<Account> = sonic_rs::from_str(&file_content).unwrap();
+    // remove accounts with zero balance as they won't make it to ledger
+    accounts.retain(|acct| acct.balance != 0);
+
     // let account_map: HashMap<String, Account> = accounts.into_iter().map(|account| (account.public_key.clone(), account)).collect();
 
     let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
@@ -306,9 +310,7 @@ async fn test_account_balances(use_view: bool) {
     for account in accounts {
         let pk = &account.public_key;
         let balance = account.balance;
-        if balance > 0 {
-            assert!(rows_map.contains_key(pk), "Expected to find account {pk} in ledger with balance {balance}");
-        }
+        assert!(rows_map.contains_key(pk), "Expected to find account {pk} in ledger with balance {balance}");
         let ledger_account_balance = rows_map.get(&account.public_key).expect("Unable to get address from hash map");
         if &(account.balance as i64) != ledger_account_balance {
             incorrect_accounts.push((account.public_key.to_string(), account.balance as i64, ledger_account_balance.to_owned()));
