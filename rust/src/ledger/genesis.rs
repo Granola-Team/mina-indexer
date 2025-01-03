@@ -179,7 +179,7 @@ impl GenesisLedger {
                     delegate: account.delegate.map_or(public_key, PublicKey),
                     token: account.token.map(TokenAddress::from),
                     receipt_chain_hash: account.receipt_chain_hash,
-                    voting_for: account.voting_for.map(|v| v.into()),
+                    voting_for: account.voting_for,
                     permissions: account.permissions,
                     timing: account.timing.map(|t| t.into()),
                     zkapp: account.zkapp,

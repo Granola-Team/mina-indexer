@@ -9,7 +9,7 @@ use super::{
     username::Username,
 };
 use crate::{
-    block::{genesis::GenesisBlock, BlockHash},
+    block::genesis::GenesisBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
     mina_blocks::v2::{self, ZkappAccount},
@@ -29,7 +29,7 @@ pub struct Account {
     // optional
     pub token: Option<TokenAddress>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<BlockHash>,
+    pub voting_for: Option<String>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
 

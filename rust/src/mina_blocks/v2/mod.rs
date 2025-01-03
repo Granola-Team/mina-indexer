@@ -3,7 +3,6 @@ pub mod protocol_state;
 pub mod staged_ledger_diff;
 
 use crate::{
-    block::BlockHash,
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
@@ -67,14 +66,12 @@ pub struct AccountAccessed {
     pub delegate: Option<PublicKey>,
 
     #[serde(deserialize_with = "from_str")]
-    pub voting_for: BlockHash,
-
-    #[serde(deserialize_with = "from_str")]
     pub token_id: TokenAddress,
 
     #[serde(deserialize_with = "from_str")]
     pub token_symbol: TokenSymbol,
 
+    pub voting_for: String,
     pub permissions: Permissions,
     pub timing: AccountAccessedTiming,
     pub zkapp: Option<ZkappAccount>,
