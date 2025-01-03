@@ -1,7 +1,20 @@
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
-    ledger::{coinbase::Coinbase, nonce::Nonce, token::TokenAddress, Amount, PublicKey},
+    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
+    ledger::{
+        account::{Permissions, Timing},
+        coinbase::Coinbase,
+        nonce::Nonce,
+        token::{symbol::TokenSymbol, TokenAddress},
+        Amount, PublicKey,
+    },
+    mina_blocks::v2::{
+        self,
+        protocol_state::SupplyAdjustmentSign,
+        staged_ledger_diff::{Elt, UpdateKind},
+        ActionState, AppState, VerificationKey, ZkappUri,
+    },
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
@@ -29,14 +42,43 @@ pub struct DelegationDiff {
     pub delegate: PublicKey,
 }
 
-/// TODO zkapp diff
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+/// Zkapps can:
+/// - make token payments
+/// - change app state elements
+/// - change app delegate
+/// - change app verification key
+/// - change app permissions
+/// - change `zkapp_uri`
+/// - change `token_symbol`
+/// - change `timing`
+/// - change `voting_for`
+/// - change actions
+/// - change events
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappDiff {
-    pub update_type: UpdateType,
     pub public_key: PublicKey,
-    pub amount: Amount,
-    pub diffs: Vec<PaymentDiff>,
+    pub payment_diffs: Vec<PaymentDiff>,
+    pub app_state_diffs: StateDiffs,
+    pub delegate: Option<PublicKey>,
+    pub verification_key: Option<VerificationKey>,
+    pub permissions: Option<Permissions>,
+    pub zkapp_uri: Option<ZkappUri>,
+    pub token_symbol: Option<TokenSymbol>,
+    pub timing: Option<Timing>,
+    pub voting_for: Option<String>,
+    pub actions: Vec<ActionState>,
+    pub events: Vec<EventState>,
 }
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct StateDiffs {
+    pub token: TokenAddress,
+    pub public_key: PublicKey,
+    pub diffs: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct EventState(pub String);
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct CoinbaseDiff {
@@ -54,7 +96,7 @@ pub struct FailedTransactionNonceDiff {
 pub enum AccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
-    Zkapp(ZkappDiff),
+    Zkapp(Box<ZkappDiff>),
     Coinbase(CoinbaseDiff),
     FeeTransfer(PaymentDiff),
     /// Overrides the fee transfer for SNARK work
@@ -67,7 +109,7 @@ pub enum AccountDiff {
 pub enum UnapplyAccountDiff {
     Payment(PaymentDiff),
     Delegation(DelegationDiff),
-    Zkapp(ZkappDiff),
+    Zkapp(Box<ZkappDiff>),
     Coinbase(CoinbaseDiff),
     FeeTransfer(PaymentDiff),
     /// Overrides the fee transfer for SNARK work
@@ -120,7 +162,23 @@ impl AccountDiff {
                     nonce: delegation.nonce + 1,
                 })]]
             }
-            Command::Zkapp(zkapp) => todo!("account diff {zkapp:?}"),
+            Command::Zkapp(zkapp) => zkapp
+                .account_updates
+                .iter()
+                .map(|update| {
+                    let fee_payer = zkapp.fee_payer.body.public_key.to_owned();
+                    let nonce = zkapp.fee_payer.body.nonce.into();
+
+                    let mut diffs = vec![];
+                    diffs.push((fee_payer.to_owned(), nonce, &update.elt).into());
+
+                    for call in update.elt.calls.iter() {
+                        diffs.push((fee_payer.to_owned(), nonce, call.elt.as_ref()).into());
+                    }
+
+                    diffs
+                })
+                .collect(),
         }
     }
 
@@ -270,7 +328,7 @@ impl AccountDiff {
                     UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
                 }
             }
-            Self::Zkapp(diff) => diff.amount.0 as i64,
+            Self::Zkapp(_) => unreachable!("zkapp commands do not have an amount"),
         }
     }
 
@@ -332,36 +390,62 @@ impl AccountDiff {
                     token: TokenAddress::default(),
                 }),
             ]],
-            // TODO
-            AccountDiffType::Zkapp { token, nonce } => vec![vec![Self::Zkapp(ZkappDiff {
-                public_key: sender.into(),
-                amount: amount.into(),
-                update_type: UpdateType::Debit(Some(nonce)),
-                diffs: vec![PaymentDiff {
-                    update_type: UpdateType::Credit,
-                    public_key: receiver.into(),
-                    amount: amount.into(),
-                    token,
-                }],
-            })]],
+            AccountDiffType::Zkapp { token, nonce } => {
+                vec![vec![Self::Zkapp(Box::new(ZkappDiff {
+                    public_key: sender.into(),
+                    payment_diffs: vec![
+                        PaymentDiff {
+                            update_type: UpdateType::Credit,
+                            public_key: receiver.into(),
+                            amount: amount.into(),
+                            token: token.to_owned(),
+                        },
+                        PaymentDiff {
+                            update_type: UpdateType::Debit(Some(nonce)),
+                            public_key: sender.into(),
+                            amount: amount.into(),
+                            token,
+                        },
+                    ],
+                    app_state_diffs: StateDiffs::default(),
+                    delegate: None,
+                    verification_key: None,
+                    permissions: None,
+                    zkapp_uri: None,
+                    token_symbol: None,
+                    timing: None,
+                    voting_for: None,
+                    actions: vec![],
+                    events: vec![],
+                }))]]
+            }
+        }
+    }
+}
+
+impl StateDiffs {
+    pub fn from_account(public_key: &str) -> Self {
+        Self {
+            public_key: public_key.into(),
+            ..Default::default()
         }
     }
 }
 
 impl PaymentDiff {
-    pub fn from_account_diff(diff: AccountDiff) -> Option<Self> {
+    pub fn from_account_diff(diff: AccountDiff) -> Vec<Self> {
         use AccountDiff::*;
 
         match diff {
-            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => Some(diff),
-            Coinbase(cb_diff) => Some(Self {
+            Zkapp(diff) => diff.payment_diffs,
+            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => vec![diff],
+            Coinbase(cb_diff) => vec![Self {
                 update_type: UpdateType::Credit,
                 public_key: cb_diff.public_key,
                 amount: cb_diff.amount,
                 token: TokenAddress::default(), // always MINA
-            }),
-            Delegation(_) | FailedTransactionNonce(_) => None,
-            Zkapp(diff) => todo!("from_account_diff zkapp {diff:?}"),
+            }],
+            Delegation(_) | FailedTransactionNonce(_) => vec![],
         }
     }
 
@@ -379,6 +463,207 @@ impl PaymentDiff {
         }
     }
 }
+
+// conversions
+
+impl
+    From<(
+        TokenAddress,
+        PublicKey,
+        [UpdateKind; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    )> for StateDiffs
+{
+    fn from(
+        value: (
+            TokenAddress,
+            PublicKey,
+            [UpdateKind; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+        ),
+    ) -> Self {
+        Self {
+            token: value.0,
+            public_key: value.1,
+            diffs: value.2.map(|update_kind| match update_kind {
+                UpdateKind::Keep(_) => None,
+                UpdateKind::Set((_, state)) => Some(AppState(state)),
+            }),
+        }
+    }
+}
+
+impl From<SupplyAdjustmentSign> for UpdateType {
+    fn from(value: SupplyAdjustmentSign) -> Self {
+        match value {
+            SupplyAdjustmentSign::Neg => Self::Debit(None),
+            SupplyAdjustmentSign::Pos => Self::Credit,
+        }
+    }
+}
+
+impl From<(PublicKey, Nonce, &Elt)> for AccountDiff {
+    fn from(value: (PublicKey, Nonce, &Elt)) -> Self {
+        // receiver
+        let public_key = value.2.account_update.body.public_key.to_owned();
+
+        let mut payment_diffs = vec![];
+        let token = value.2.account_update.body.token_id.to_owned();
+
+        // update zkapp state
+        let app_state_diffs: StateDiffs = (
+            token.to_owned(),
+            value.0.to_owned(),
+            value.2.account_update.body.update.app_state.to_owned(),
+        )
+            .into();
+
+        // token payments
+        let amount = value.2.account_update.body.balance_change.magnitude.into();
+        let mut update_type: UpdateType = value
+            .2
+            .account_update
+            .body
+            .balance_change
+            .sgn
+            .0
+            .to_owned()
+            .into();
+
+        if matches!(update_type, UpdateType::Debit(_)) {
+            update_type = UpdateType::Debit(Some(value.1 + 1))
+        }
+
+        // pay creation fee of receiver zkapp
+        if value.2.account_update.body.implicit_account_creation_fee {
+            payment_diffs.push(PaymentDiff {
+                public_key: value.0,
+                update_type: UpdateType::Debit(Some(value.1 + 1)),
+                token: token.to_owned(),
+                amount,
+            })
+        }
+
+        // increment nonce of receiver
+        if value.2.account_update.body.increment_nonce {
+            payment_diffs.push(PaymentDiff {
+                public_key: public_key.to_owned(),
+                update_type: UpdateType::Debit(Some(value.1 + 1)),
+                token: token.to_owned(),
+                amount: 0.into(),
+            });
+        };
+
+        // only push non-zero payments
+        if amount.0 != 0 {
+            payment_diffs.push(PaymentDiff {
+                public_key: public_key.to_owned(),
+                update_type,
+                token,
+                amount,
+            });
+        }
+
+        // delegation change
+        let delegate = value
+            .2
+            .account_update
+            .body
+            .update
+            .delegate
+            .to_owned()
+            .into();
+
+        // verification key change
+        let verification_key = value
+            .2
+            .account_update
+            .body
+            .update
+            .verification_key
+            .to_owned()
+            .into();
+
+        // permissions change
+        let permissions = {
+            let permissions: Option<v2::Permissions> = value
+                .2
+                .account_update
+                .body
+                .update
+                .permissions
+                .to_owned()
+                .into();
+            permissions.map(Into::into)
+        };
+
+        // zkapp uri change
+        let zkapp_uri = value
+            .2
+            .account_update
+            .body
+            .update
+            .zkapp_uri
+            .to_owned()
+            .into();
+
+        // token symbol change
+        let token_symbol = value
+            .2
+            .account_update
+            .body
+            .update
+            .token_symbol
+            .to_owned()
+            .into();
+
+        // account timing change
+        let timing = {
+            let timing: Option<v2::Timing> =
+                value.2.account_update.body.update.timing.to_owned().into();
+            timing.map(Into::into)
+        };
+
+        // account `voting_for` change
+        let voting_for = value
+            .2
+            .account_update
+            .body
+            .update
+            .voting_for
+            .to_owned()
+            .into();
+
+        // update actions
+        let actions = if let Some(actions) = value.2.account_update.body.actions.first() {
+            actions.0.iter().cloned().map(ActionState).collect()
+        } else {
+            vec![]
+        };
+
+        // update events
+        let events = if let Some(events) = value.2.account_update.body.events.first() {
+            events.0.iter().cloned().map(EventState).collect()
+        } else {
+            vec![]
+        };
+
+        Self::Zkapp(Box::new(ZkappDiff {
+            public_key,
+            payment_diffs,
+            app_state_diffs,
+            delegate,
+            verification_key,
+            permissions,
+            zkapp_uri,
+            token_symbol,
+            timing,
+            voting_for,
+            actions,
+            events,
+        }))
+    }
+}
+
+// debug/display
 
 impl std::fmt::Debug for PaymentDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
