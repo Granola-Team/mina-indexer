@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sonic_rs::{JsonValueMutTrait, Value};
-use std::{fs::File, io::Read, path::Path};
+use std::{collections::VecDeque, fs::File, io::Read, path::Path};
 
 pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
     let filename = path.file_stem().and_then(|x| x.to_str()).expect("Failed to extract filename from path");
@@ -398,6 +398,70 @@ mod decode_base58check_to_string_tests {
     }
 }
 
+pub struct NodeBfsSteps<'a, T> {
+    // We store the root separately so we can yield it once.
+    root: Option<&'a TreeNode<T>>,
+    // After yielding the root, we use a BFS queue of nodes
+    // (NOT their children, but the nodes themselves).
+    queue: VecDeque<&'a TreeNode<T>>,
+    // We track whether we've already returned the root.
+    first_call: bool,
+}
+
+impl<'a, T> NodeBfsSteps<'a, T> {
+    pub fn new(root: &'a TreeNode<T>) -> Self {
+        // We'll store the root in `root: Option<&'a TreeNode<T>>`,
+        // plus an empty queue initially.
+        Self {
+            root: Some(root),
+            queue: VecDeque::new(),
+            first_call: true,
+        }
+    }
+}
+
+impl<'a, T> Iterator for NodeBfsSteps<'a, T> {
+    /// Each `.next()` yields a `Vec<&'a TreeNode<T>>`.
+    ///  - First call => `[root]`
+    ///  - Second call => children of `root`
+    ///  - Third call => children of BFS node #2
+    ///  - etc.
+    type Item = Vec<&'a TreeNode<T>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // 1) If this is the *very first* call, return `[root]`.
+        if self.first_call {
+            self.first_call = false;
+            // If there's no root, we have nothing
+            let root_node = self.root.take()?;
+            // Put the root in the queue so we can proceed with BFS
+            self.queue.push_back(root_node);
+            // Return a single-element vector containing the root
+            return Some(vec![root_node]);
+        }
+
+        // 2) Otherwise, pop the *next BFS node*, return its children
+        let node = self.queue.pop_front()?;
+        if node.children.is_empty() {
+            return self.next();
+        }
+        let kids: Vec<&'a TreeNode<T>> = node.children.iter().collect();
+
+        // Then enqueue these children themselves for BFS
+        for child in &node.children {
+            self.queue.push_back(child);
+        }
+
+        Some(kids)
+    }
+}
+
+impl<T> TreeNode<T> {
+    pub fn bfs_steps(&self) -> NodeBfsSteps<'_, T> {
+        NodeBfsSteps::new(self)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Default, Hash)]
 pub struct TreeNode<T> {
     pub value: T,
@@ -540,5 +604,50 @@ mod tree_node_tests {
         assert_eq!(all[1].value, "child1");
         assert_eq!(all[2].value, "grandchild");
         assert_eq!(all[3].value, "child2");
+    }
+
+    #[test]
+    fn test_tree_node_bfs_steps() {
+        // Build the tree
+        let mut root = TreeNode::new("root");
+
+        let mut child1 = TreeNode::new("child1");
+        child1.add_child(TreeNode::new("grandchild"));
+
+        let mut child2 = TreeNode::new("child2");
+        child2.add_child(TreeNode::new("leaf2a"));
+        child2.add_child(TreeNode::new("leaf2b"));
+
+        root.add_child(child1);
+        root.add_child(child2);
+
+        // Initialize the BFS Steps iterator
+        let mut iter = root.bfs_steps();
+
+        // (1) First .next() => [root]
+        let first = iter.next().expect("Should have first iteration");
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].value, "root");
+
+        // (2) Second .next() => children of root => [child1, child2]
+        let second = iter.next().expect("Should have second iteration");
+        assert_eq!(second.len(), 2);
+        // BFS typically enqueues child1 first, child2 second
+        assert_eq!(second[0].value, "child1");
+        assert_eq!(second[1].value, "child2");
+
+        // (3) Third .next() => children of 'child1' => [grandchild]
+        let third = iter.next().expect("Should have third iteration");
+        assert_eq!(third.len(), 1);
+        assert_eq!(third[0].value, "grandchild");
+
+        // (4) Fourth .next() => children of 'child2' => [leaf2a, leaf2b]
+        let fourth = iter.next().expect("Should have fourth iteration");
+        assert_eq!(fourth.len(), 2);
+        assert_eq!(fourth[0].value, "leaf2a");
+        assert_eq!(fourth[1].value, "leaf2b");
+
+        // (8) Finally, no more => None
+        assert!(iter.next().is_none(), "No more BFS steps remain");
     }
 }
