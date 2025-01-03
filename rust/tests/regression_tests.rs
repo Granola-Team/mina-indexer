@@ -1,4 +1,4 @@
-use mina_indexer::constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING};
+use mina_indexer::constants::POSTGRES_CONNECTION_STRING;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -76,6 +76,7 @@ async fn create_view_for_accounting() {
             MAX(height) AS latest_height
         FROM
             blockchain_ledger
+        WHERE address_type = 'BlockchainAddress'
         GROUP BY
             address, address_type
         ORDER BY
@@ -279,7 +280,6 @@ async fn test_account_balances(use_view: bool) {
         r#"
             SELECT address, CAST(balance AS BIGINT) AS balance
             FROM account_summary
-            WHERE address_type = 'BlockchainAddress'
             ORDER BY balance ASC;
         "#
     } else {
@@ -289,7 +289,6 @@ async fn test_account_balances(use_view: bool) {
             ORDER BY balance ASC;
         "#
     };
-    println!("Use view? {use_view}");
 
     // Execute the query using the SQL client from the actor
     let rows = client
@@ -306,7 +305,10 @@ async fn test_account_balances(use_view: bool) {
     let mut incorrect_accounts: Vec<(String, i64, i64)> = vec![];
     for account in accounts {
         let pk = &account.public_key;
-        assert!(rows_map.contains_key(pk), "Expected to find account {pk} in ledger");
+        let balance = account.balance;
+        if balance > 0 {
+            assert!(rows_map.contains_key(pk), "Expected to find account {pk} in ledger with balance {balance}");
+        }
         let ledger_account_balance = rows_map.get(&account.public_key).expect("Unable to get address from hash map");
         if &(account.balance as i64) != ledger_account_balance {
             incorrect_accounts.push((account.public_key.to_string(), account.balance as i64, ledger_account_balance.to_owned()));
@@ -321,6 +323,8 @@ async fn test_account_balances(use_view: bool) {
     }
 
     assert_eq!(incorrect_accounts.len(), 0, "Expected ledger to match");
+
+    println!("Successfully tested the {}", if use_view { "view" } else { "table" });
 
     drop(handle);
 }
