@@ -151,7 +151,10 @@ impl Actor for StakingLedgerActor {
 #[cfg(test)]
 mod staking_ledger_actor_tests {
     use super::*;
-    use crate::event_sourcing::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination};
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    };
     use std::sync::Arc;
 
     #[tokio::test]
@@ -167,6 +170,7 @@ mod staking_ledger_actor_tests {
             timestamp: 123456789,
             counterparty: "counterparty_1".to_string(),
             transfer_type: "StakeDelegation".to_string(),
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         let height: i64 = 10;
@@ -213,6 +217,7 @@ mod staking_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "counterparty_1".to_string(),
                 transfer_type: "Payment".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
             rhs: vec![],
         };
@@ -254,6 +259,7 @@ mod staking_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "rhs_staking_account".to_string(),
                 transfer_type: "StakeDelegation".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
             rhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
@@ -263,6 +269,7 @@ mod staking_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "lhs_staking_account".to_string(),
                 transfer_type: "StakeDelegation".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
         };
 
@@ -316,6 +323,7 @@ mod staking_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: counterparty.to_string(),
                 transfer_type: "StakeDelegation".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             };
 
             actor

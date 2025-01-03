@@ -654,6 +654,7 @@ pub struct AccountingEntry {
     pub account_type: AccountingEntryAccountType,
     pub amount_nanomina: u64,
     pub timestamp: u64,
+    pub token_id: String,
 }
 
 impl AccountingEntry {

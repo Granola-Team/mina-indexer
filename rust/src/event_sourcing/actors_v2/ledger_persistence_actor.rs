@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 use tokio_postgres::{types::ToSql, NoTls};
 
 pub struct LedgerPersistenceActor;
-type LedgerRow = (String, String, i64, String, String, i64, String, i64);
+type LedgerRow = (String, String, String, i64, String, String, i64, String, i64);
 
 const LEDGER_TABLE_KEY: &str = "ledger_table";
 
@@ -41,12 +41,13 @@ impl LedgerPersistenceActor {
                 (
                     entry.account.clone(),          // address
                     entry.account_type.to_string(), // address_type
-                    balance_delta,                  // balance_delta
-                    entry.counterparty.clone(),     // counterparty
-                    entry.transfer_type.clone(),    // transfer_type
-                    record_height,                  // height
-                    record_state_hash.to_string(),  // state_hash
-                    entry.timestamp as i64,         // timestamp
+                    entry.token_id.to_string(),
+                    balance_delta,                 // balance_delta
+                    entry.counterparty.clone(),    // counterparty
+                    entry.transfer_type.clone(),   // transfer_type
+                    record_height,                 // height
+                    record_state_hash.to_string(), // state_hash
+                    entry.timestamp as i64,        // timestamp
                 )
             })
             .collect();
@@ -55,10 +56,11 @@ impl LedgerPersistenceActor {
         let rows: Vec<Vec<&(dyn ToSql + Sync)>> = values
             .iter()
             .map(
-                |(address, address_type, balance_delta, counterparty, transfer_type, height, state_hash, timestamp)| {
+                |(address, address_type, token_id, balance_delta, counterparty, transfer_type, height, state_hash, timestamp)| {
                     vec![
                         address as &(dyn ToSql + Sync),
                         address_type as &(dyn ToSql + Sync),
+                        token_id as &(dyn ToSql + Sync),
                         balance_delta as &(dyn ToSql + Sync),
                         counterparty as &(dyn ToSql + Sync),
                         transfer_type as &(dyn ToSql + Sync),
@@ -91,6 +93,7 @@ impl LedgerPersistenceActor {
             .name("blockchain_ledger")
             .add_column("address TEXT NOT NULL")
             .add_column("address_type TEXT NOT NULL")
+            .add_column("token_id TEXT NOT NULL")
             .add_column("balance_delta BIGINT NOT NULL")
             .add_column("counterparty TEXT NOT NULL")
             .add_column("transfer_type TEXT NOT NULL")
@@ -110,32 +113,6 @@ impl LedgerPersistenceActor {
                 .await
                 .expect("Failed building ledger table in LedgerPersistenceActor")
         };
-
-        let (client, connection) = tokio_postgres::connect(POSTGRES_CONNECTION_STRING, NoTls)
-            .await
-            .expect("Unable to connect to database");
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                error!("connection error: {}", e);
-            }
-        });
-
-        let view_def = r#"
-            CREATE OR REPLACE VIEW account_summary AS
-            SELECT
-                address,
-                address_type,
-                SUM(balance_delta) AS balance,
-                MAX(height) AS latest_height
-            FROM
-                blockchain_ledger
-            GROUP BY
-                address, address_type
-            ORDER BY
-                latest_height DESC;"#;
-        if let Err(e) = client.execute(view_def, &[]).await {
-            eprintln!("unable to create view: {}", e);
-        }
 
         // 4) Put the table in the ActorStore
         let mut store = ActorStore::new();
@@ -176,11 +153,11 @@ impl LedgerPersistenceActor {
 mod ledger_persistence_actor_tests_v2 {
     use super::LedgerPersistenceActor;
     use crate::{
-        constants::POSTGRES_CONNECTION_STRING,
+        constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
         event_sourcing::{
             actor_dag::ActorDAG,
             events::EventType,
-            payloads::{AccountingEntry, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+            payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
         },
     };
     use log::info;
@@ -239,49 +216,54 @@ mod ledger_persistence_actor_tests_v2 {
             AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "lhs_debit_1".to_string(),
-                account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 10000,
                 timestamp: 111_222_333,
                 counterparty: "CP_lhs1".to_string(),
                 transfer_type: "Transfer_lhs1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             },
             AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
                 account: "lhs_credit_1".to_string(),
-                account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
+                account_type: AccountingEntryAccountType::VirtualAddess,
                 amount_nanomina: 2000,
                 timestamp: 111_222_334,
                 counterparty: "CP_lhs2".to_string(),
                 transfer_type: "Transfer_lhs2".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             },
         ];
         let rhs_entries = vec![
             AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
                 account: "rhs_credit_1".to_string(),
-                account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 3000,
                 timestamp: 111_222_335,
                 counterparty: "CP_rhs1".to_string(),
                 transfer_type: "Transfer_rhs1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             },
             AccountingEntry {
                 entry_type: AccountingEntryType::Debit,
                 account: "rhs_debit_1".to_string(),
-                account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 4000,
                 timestamp: 111_222_336,
                 counterparty: "CP_rhs2".to_string(),
                 transfer_type: "Transfer_rhs2".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             },
             AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
                 account: "rhs_credit_2".to_string(),
-                account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
+                account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 5000,
                 timestamp: 111_222_337,
                 counterparty: "CP_rhs3".to_string(),
                 transfer_type: "Transfer_rhs3".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             },
         ];
 

@@ -164,9 +164,12 @@ impl Actor for LedgerActor {
 #[cfg(test)]
 mod blockchain_ledger_actor_tests {
     use super::*;
-    use crate::event_sourcing::{
-        events::{Event, EventType},
-        payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::{
+            events::{Event, EventType},
+            payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+        },
     };
     // use serial_test::serial;
     use std::sync::Arc;
@@ -186,6 +189,7 @@ mod blockchain_ledger_actor_tests {
             timestamp: 123456789,
             counterparty: "counterparty_1".to_string(),
             transfer_type: "transfer_type_1".to_string(),
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         let height: i64 = 10;
@@ -234,6 +238,7 @@ mod blockchain_ledger_actor_tests {
             timestamp: 123456789,
             counterparty: "counterparty_1".to_string(),
             transfer_type: "transfer_type_1".to_string(),
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         let height: i64 = 10;
@@ -255,6 +260,7 @@ mod blockchain_ledger_actor_tests {
             timestamp: 123456790,
             counterparty: "counterparty_1".to_string(),
             transfer_type: "transfer_type_1".to_string(),
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         let updated_height: i64 = 11; // Use a new height for the append-only log
@@ -316,6 +322,7 @@ mod blockchain_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "counterparty_1".to_string(),
                 transfer_type: "transfer_type_1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
             rhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
@@ -325,6 +332,7 @@ mod blockchain_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "counterparty_1".to_string(),
                 transfer_type: "transfer_type_1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
         };
 
@@ -381,6 +389,7 @@ mod blockchain_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "counterparty_1".to_string(),
                 transfer_type: "transfer_type_1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
             rhs: vec![AccountingEntry {
                 entry_type: AccountingEntryType::Credit,
@@ -390,6 +399,7 @@ mod blockchain_ledger_actor_tests {
                 timestamp: 123456789,
                 counterparty: "counterparty_1".to_string(),
                 transfer_type: "transfer_type_1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
         };
 
@@ -441,6 +451,7 @@ mod blockchain_ledger_actor_tests {
                 timestamp: 123456789 + height,
                 counterparty: "counterparty".to_string(),
                 transfer_type: "transfer_type".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
             };
 
             actor_without_root

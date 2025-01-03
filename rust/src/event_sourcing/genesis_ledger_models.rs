@@ -1,4 +1,5 @@
 use super::payloads::{AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination};
+use crate::constants::MINA_TOKEN_ID;
 use bigdecimal::{BigDecimal, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -56,6 +57,7 @@ impl GenesisLedger {
                         account_type: AccountingEntryAccountType::VirtualAddess,
                         amount_nanomina: balance.to_u64().expect("Number too large for u64"),
                         timestamp: 1615939200,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                     rhs: vec![AccountingEntry {
                         counterparty: format!("MinaGenesisLedger#{}", account.pk),
@@ -65,6 +67,7 @@ impl GenesisLedger {
                         account_type: AccountingEntryAccountType::BlockchainAddress,
                         amount_nanomina: balance.to_u64().expect("Number too large for u64"),
                         timestamp: 1615939200,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                 }
             })

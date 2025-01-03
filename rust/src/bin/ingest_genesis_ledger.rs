@@ -1,7 +1,7 @@
 use env_logger::Builder;
 use log::{error, info};
 use mina_indexer::{
-    constants::POSTGRES_CONNECTION_STRING,
+    constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
     event_sourcing::{
         actors_v2::spawn_genesis_dag,
         events::{Event, EventType},
@@ -68,6 +68,7 @@ async fn main() {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: 1000,
             timestamp: genesis_block.unix_timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         }],
         rhs: vec![AccountingEntry {
             counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
@@ -77,6 +78,7 @@ async fn main() {
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: 1000,
             timestamp: genesis_block.unix_timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         }],
     };
     if let Err(err) = sender

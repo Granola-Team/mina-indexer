@@ -3,11 +3,14 @@ use super::super::{
     shared_publisher::SharedPublisher,
     Actor,
 };
-use crate::event_sourcing::{
-    models::{CommandStatus, CommandType},
-    payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBatchZkappCommandLogPayload, CanonicalInternalCommandLogPayload,
-        CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
+use crate::{
+    constants::MINA_TOKEN_ID,
+    event_sourcing::{
+        models::{CommandStatus, CommandType},
+        payloads::{
+            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, CanonicalBatchZkappCommandLogPayload, CanonicalInternalCommandLogPayload,
+            CanonicalUserCommandLogPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, NewAccountPayload,
+        },
     },
 };
 use async_trait::async_trait;
@@ -50,6 +53,7 @@ impl AccountingActor {
                     account_type: AccountingEntryAccountType::BlockchainAddress,
                     amount_nanomina: payload.amount_nanomina,
                     timestamp: payload.timestamp,
+                    token_id: MINA_TOKEN_ID.to_string(),
                 };
                 let mut recipient = AccountingEntry {
                     transfer_type: "BlockRewardPool".to_string(),
@@ -59,6 +63,7 @@ impl AccountingActor {
                     account_type: AccountingEntryAccountType::VirtualAddess,
                     amount_nanomina: payload.amount_nanomina,
                     timestamp: payload.timestamp,
+                    token_id: MINA_TOKEN_ID.to_string(),
                 };
                 // Swap debits and credits for non-canonical entries
                 if !payload.canonical {
@@ -84,6 +89,7 @@ impl AccountingActor {
                     account_type: AccountingEntryAccountType::VirtualAddess,
                     amount_nanomina: payload.amount_nanomina,
                     timestamp: payload.timestamp,
+                    token_id: MINA_TOKEN_ID.to_string(),
                 };
                 let mut recipient = AccountingEntry {
                     transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
@@ -93,6 +99,7 @@ impl AccountingActor {
                     account_type: AccountingEntryAccountType::BlockchainAddress,
                     amount_nanomina: payload.amount_nanomina,
                     timestamp: payload.timestamp,
+                    token_id: MINA_TOKEN_ID.to_string(),
                 };
                 // Swap debits and credits for non-canonical entries
                 if !payload.canonical {
@@ -121,6 +128,7 @@ impl AccountingActor {
                 account_type: AccountingEntryAccountType::VirtualAddess,
                 amount_nanomina: payload.amount_nanomina,
                 timestamp: payload.timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             };
             let mut recipient = AccountingEntry {
                 transfer_type: payload.internal_command_type.to_string(),
@@ -133,6 +141,7 @@ impl AccountingActor {
                 account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: payload.amount_nanomina,
                 timestamp: payload.timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             };
 
             if !payload.canonical {
@@ -162,6 +171,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: payload.amount_nanomina,
             timestamp: payload.timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut receiver_entry = AccountingEntry {
             transfer_type: payload.txn_type.to_string(),
@@ -171,6 +181,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: payload.amount_nanomina,
             timestamp: payload.timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         if !payload.canonical {
             // Swap debits and credits
@@ -198,6 +209,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: payload.fee_nanomina,
             timestamp: payload.timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         let mut block_reward_pool_entry = AccountingEntry {
@@ -208,6 +220,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: payload.fee_nanomina,
             timestamp: payload.timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         if !payload.canonical {
@@ -237,6 +250,7 @@ impl AccountingActor {
                 account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: command.fee_nanomina,
                 timestamp: payload.timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             };
 
             let mut block_reward_pool_entry = AccountingEntry {
@@ -247,6 +261,7 @@ impl AccountingActor {
                 account_type: AccountingEntryAccountType::VirtualAddess,
                 amount_nanomina: command.fee_nanomina,
                 timestamp: payload.timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             };
 
             if !payload.canonical {
@@ -299,6 +314,7 @@ impl Actor for AccountingActor {
                         account_type: AccountingEntryAccountType::BlockchainAddress,
                         amount_nanomina: 1_000_000_000,
                         timestamp: 0,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                     rhs: vec![AccountingEntry {
                         counterparty: payload.account,
@@ -308,6 +324,7 @@ impl Actor for AccountingActor {
                         account_type: AccountingEntryAccountType::VirtualAddess,
                         amount_nanomina: 1_000_000_000,
                         timestamp: 0,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                 };
 

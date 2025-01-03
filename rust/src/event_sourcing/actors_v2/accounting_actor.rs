@@ -1,10 +1,13 @@
-use crate::event_sourcing::{
-    actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
-    events::{Event, EventType},
-    models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
-    payloads::{
-        AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload,
-        DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+use crate::{
+    constants::MINA_TOKEN_ID,
+    event_sourcing::{
+        actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+        events::{Event, EventType},
+        models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
+        payloads::{
+            AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload,
+            CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
+        },
     },
 };
 use async_trait::async_trait;
@@ -110,6 +113,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: fee_transfer.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut recipient = AccountingEntry {
             transfer_type: InternalCommandType::FeeTransfer.to_string(),
@@ -119,6 +123,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: fee_transfer.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         // If canonical == false => swap
@@ -145,6 +150,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: coinbase_reward,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut recipient = AccountingEntry {
             transfer_type: InternalCommandType::Coinbase.to_string(),
@@ -154,6 +160,7 @@ impl AccountingActor {
             account_type: AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: coinbase_reward,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         // If canonical == false => swap
@@ -186,6 +193,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut recipient = AccountingEntry {
             transfer_type: "BlockRewardPool".to_string(),
@@ -195,6 +203,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         if !canonical {
@@ -213,6 +222,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut recipient = AccountingEntry {
             transfer_type: InternalCommandType::FeeTransferViaCoinbase.to_string(),
@@ -222,6 +232,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: fee_transfer_via_coinbase.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         if !canonical {
             source.entry_type = AccountingEntryType::Credit;
@@ -248,6 +259,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: command.amount_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut receiver_entry = AccountingEntry {
             transfer_type: command.txn_type.to_string(),
@@ -257,6 +269,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: command.amount_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         if !canonical {
             sender_entry.entry_type = AccountingEntryType::Credit;
@@ -277,6 +290,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: command.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut block_reward_pool_entry = AccountingEntry {
             counterparty: command.fee_payer.to_string(),
@@ -286,6 +300,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: command.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         if !canonical {
@@ -318,6 +333,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::BlockchainAddress,
             amount_nanomina: command.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
         let mut block_reward_pool_entry = AccountingEntry {
             counterparty: command.fee_payer.to_string(),
@@ -327,6 +343,7 @@ impl AccountingActor {
             account_type: crate::event_sourcing::payloads::AccountingEntryAccountType::VirtualAddess,
             amount_nanomina: command.fee_nanomina,
             timestamp,
+            token_id: MINA_TOKEN_ID.to_string(),
         };
 
         if !canonical {
@@ -426,6 +443,7 @@ impl ActorFactory for AccountingActor {
                                     account_type: AccountingEntryAccountType::BlockchainAddress,
                                     amount_nanomina: 1_000_000_000,
                                     timestamp: 0,
+                                    token_id: MINA_TOKEN_ID.to_string(),
                                 }],
                                 rhs: vec![AccountingEntry {
                                     counterparty: payload.account,
@@ -435,6 +453,7 @@ impl ActorFactory for AccountingActor {
                                     account_type: AccountingEntryAccountType::VirtualAddess,
                                     amount_nanomina: 1_000_000_000,
                                     timestamp: 0,
+                                    token_id: MINA_TOKEN_ID.to_string(),
                                 }],
                             };
                             if !payload.apply {

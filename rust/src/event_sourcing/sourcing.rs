@@ -4,7 +4,7 @@ use super::{
     shared_publisher::SharedPublisher,
 };
 use crate::{
-    constants::FILE_PUBLISHER_ACTOR_ID,
+    constants::{FILE_PUBLISHER_ACTOR_ID, MINA_TOKEN_ID},
     event_sourcing::{
         events::{Event, EventType},
         payloads::ActorHeightPayload,
@@ -44,6 +44,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
                 account_type: AccountingEntryAccountType::BlockchainAddress,
                 amount_nanomina: 1000,
                 timestamp: payload.unix_timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
             rhs: vec![AccountingEntry {
                 counterparty: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".to_string(),
@@ -53,6 +54,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
                 account_type: AccountingEntryAccountType::VirtualAddess,
                 amount_nanomina: 1000,
                 timestamp: payload.unix_timestamp,
+                token_id: MINA_TOKEN_ID.to_string(),
             }],
         })
         .unwrap(),

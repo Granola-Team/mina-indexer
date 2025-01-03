@@ -90,10 +90,15 @@ impl ActorFactory for AccountSummaryActor {
 #[cfg(test)]
 mod account_summary_actor_tests_v2 {
     use super::AccountSummaryActor;
-    use crate::event_sourcing::{
-        actor_dag::{ActorDAG, ActorFactory, ActorNode},
-        events::{Event, EventType},
-        payloads::{AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
+    use crate::{
+        constants::MINA_TOKEN_ID,
+        event_sourcing::{
+            actor_dag::{ActorDAG, ActorFactory, ActorNode},
+            events::{Event, EventType},
+            payloads::{
+                AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination,
+            },
+        },
     };
     use std::sync::Arc;
     use tokio::sync::Mutex;
@@ -188,6 +193,7 @@ mod account_summary_actor_tests_v2 {
                     timestamp: 123456789,
                     counterparty: "cp1".to_string(),
                     transfer_type: "t1".to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                 },
                 // LHS #2
                 AccountingEntry {
@@ -198,6 +204,7 @@ mod account_summary_actor_tests_v2 {
                     timestamp: 123456790,
                     counterparty: "cp2".to_string(),
                     transfer_type: "t2".to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                 },
                 // LHS #3: repeated acct1
                 AccountingEntry {
@@ -208,6 +215,7 @@ mod account_summary_actor_tests_v2 {
                     timestamp: 123456791,
                     counterparty: "cp3".to_string(),
                     transfer_type: "t3".to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                 },
             ],
             rhs: vec![
@@ -220,6 +228,7 @@ mod account_summary_actor_tests_v2 {
                     timestamp: 123456792,
                     counterparty: "cp4".to_string(),
                     transfer_type: "t4".to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                 },
                 // RHS #2
                 AccountingEntry {
@@ -230,6 +239,7 @@ mod account_summary_actor_tests_v2 {
                     timestamp: 123456793,
                     counterparty: "cp5".to_string(),
                     transfer_type: "t5".to_string(),
+                    token_id: MINA_TOKEN_ID.to_string(),
                 },
             ],
         };

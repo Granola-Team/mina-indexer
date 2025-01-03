@@ -4,7 +4,7 @@ use super::super::{
     Actor,
 };
 use crate::{
-    constants::MAINNET_EPOCH_SLOT_COUNT,
+    constants::{MAINNET_EPOCH_SLOT_COUNT, MINA_TOKEN_ID},
     event_sourcing::{models::CommandType, payloads::*},
 };
 use async_trait::async_trait;
@@ -58,6 +58,7 @@ impl Actor for StakingAccountingActor {
                         account_type: AccountingEntryAccountType::BlockchainAddress,
                         amount_nanomina: log.amount_nanomina,
                         timestamp: epoch,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                     rhs: vec![AccountingEntry {
                         transfer_type: CommandType::StakeDelegation.to_string(),
@@ -67,6 +68,7 @@ impl Actor for StakingAccountingActor {
                         account_type: AccountingEntryAccountType::BlockchainAddress,
                         amount_nanomina: log.amount_nanomina,
                         timestamp: epoch,
+                        token_id: MINA_TOKEN_ID.to_string(),
                     }],
                 };
                 if !log.canonical {
