@@ -75,7 +75,7 @@ impl LedgerDiff {
         account_diffs.append(&mut account_diff_fees);
 
         let accounts_created = precomputed_block.accounts_created();
-        LedgerDiff {
+        Self {
             account_diffs,
             new_pk_balances: accounts_created.0,
             new_coinbase_receiver: accounts_created.1,
