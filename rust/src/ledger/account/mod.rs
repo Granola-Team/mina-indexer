@@ -532,6 +532,19 @@ impl std::fmt::Debug for Account {
 #[cfg(test)]
 mod test {
     use super::{Account, Amount};
+    use crate::{
+        constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
+        ledger::{
+            account::{Permission, Permissions, Timing},
+            diff::account::{AccountDiff, PaymentDiff, StateDiffs, UpdateType, ZkappDiff},
+            public_key::PublicKey,
+            token::{symbol::TokenSymbol, TokenAddress},
+        },
+        mina_blocks::v2::{
+            AppState, VerificationKey, VerificationKeyData, VerificationKeyHash, ZkappAccount,
+            ZkappUri,
+        },
+    };
 
     #[test]
     fn test_account_display() -> anyhow::Result<()> {
@@ -554,5 +567,324 @@ mod test {
         // same account display & debug
         assert_eq!(format!("{ledger_account}"), format!("{ledger_account:?}"));
         Ok(())
+    }
+
+    #[test]
+    fn zkapp_account_diff_payment() {
+        let amount = Amount(2000000000);
+        let pk = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            balance: amount,
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            public_key: pk.clone(),
+            payment_diffs: vec![PaymentDiff {
+                public_key: pk.clone(),
+                update_type: UpdateType::Debit(Some(185.into())),
+                amount: 2000000000.into(),
+                token: TokenAddress::default(),
+            }],
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the balance & nonce change
+        assert_eq!(
+            after,
+            Account {
+                balance: 0.into(),
+                nonce: Some(185.into()),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_app_state() {
+        let pk = PublicKey::default();
+        let app_state_elem = AppState(
+            "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4".to_string(),
+        );
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let mut app_state_diffs: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM] =
+            [const { None }; ZKAPP_STATE_FIELD_ELEMENTS_NUM];
+        app_state_diffs[0] = Some(app_state_elem.clone());
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            public_key: pk.clone(),
+            payment_diffs: vec![],
+            app_state_diffs: StateDiffs {
+                public_key: pk,
+                diffs: app_state_diffs,
+                ..Default::default()
+            },
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        let expect = {
+            // only the first elem is modified
+            let mut app_state = before.zkapp.clone().unwrap().app_state;
+            app_state[0] = app_state_elem;
+
+            Account {
+                zkapp: Some(ZkappAccount {
+                    app_state,
+                    ..before.zkapp.unwrap()
+                }),
+                ..before
+            }
+        };
+        assert_eq!(after, expect);
+    }
+
+    #[test]
+    fn zkapp_account_diff_delegate() {
+        let pk = PublicKey::default();
+        let delegate = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            delegate: Some(delegate.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the account delegate changes
+        assert_eq!(after, Account { delegate, ..before });
+    }
+
+    #[test]
+    fn zkapp_account_diff_verification_key() {
+        let pk = PublicKey::default();
+        let verification_key = VerificationKey {
+            data: VerificationKeyData("VERIFICATION_KEY_DATA".to_string()),
+            hash: VerificationKeyHash("VERIFICATION_KEY_HASH".to_string()),
+        };
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            verification_key: Some(verification_key.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the zkapp verification key changes
+        assert_eq!(
+            after,
+            Account {
+                zkapp: Some(ZkappAccount {
+                    verification_key,
+                    ..before.zkapp.unwrap()
+                }),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_permissions() {
+        let pk = PublicKey::default();
+        let permissions = Permissions {
+            edit_state: Permission::Proof,
+            ..Default::default()
+        };
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            permissions: Some(permissions.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the account permissions changes
+        assert_eq!(
+            after,
+            Account {
+                permissions: Some(permissions),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_zkapp_uri() {
+        let pk = PublicKey::default();
+        let zkapp_uri = ZkappUri("ZKAPP_URI".to_string());
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            zkapp_uri: Some(zkapp_uri.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the zkapp uri changes
+        assert_eq!(
+            after,
+            Account {
+                zkapp: Some(ZkappAccount {
+                    zkapp_uri,
+                    ..before.zkapp.unwrap()
+                }),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_token_symbol() {
+        let pk = PublicKey::default();
+        let token_symbol = TokenSymbol("TOKEN_SYMBOL".to_string());
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            token_symbol: Some(token_symbol.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the zkapp token symbol changes
+        assert_eq!(
+            after,
+            Account {
+                zkapp: Some(ZkappAccount {
+                    token_symbol: Some(token_symbol),
+                    ..before.zkapp.unwrap()
+                }),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_timing() {
+        let pk = PublicKey::default();
+        let timing = Timing::default();
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            timing: Some(timing.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the account timing changes
+        assert_eq!(
+            after,
+            Account {
+                timing: Some(timing),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_voting_for() {
+        let pk = PublicKey::default();
+        let voting_for = String::new();
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let diff = AccountDiff::Zkapp(Box::new(ZkappDiff {
+            voting_for: Some(voting_for.clone()),
+            public_key: pk.clone(),
+            app_state_diffs: StateDiffs::from_account(pk),
+            ..Default::default()
+        }));
+
+        // account after applying diff
+        let after = before.clone().apply_account_diff(&diff);
+
+        // only the account voting_for changes
+        assert_eq!(
+            after,
+            Account {
+                voting_for: Some(voting_for),
+                ..before
+            }
+        );
     }
 }
