@@ -180,7 +180,7 @@ impl SignedCommand {
                 match data {
                     UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
                         Payment(PaymentPayload { receiver_pk, .. }) => receiver_pk.to_owned(),
-                        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
+                        StakeDelegation((_, StakeDelegationPayload { new_delegate })) => {
                             new_delegate.to_owned()
                         }
                     },
@@ -506,9 +506,10 @@ impl From<SignedCommandWithCreationData> for Command {
                             receiver: signed.receiver_pk(),
                             is_new_receiver_account: value.is_new_receiver_account,
                         }),
-                        SignedCommandPayloadBody::StakeDelegation(StakeDelegationPayload {
-                            new_delegate,
-                        }) => Command::Delegation(Delegation {
+                        SignedCommandPayloadBody::StakeDelegation((
+                            _,
+                            StakeDelegationPayload { new_delegate },
+                        )) => Command::Delegation(Delegation {
                             nonce: signed.nonce(),
                             delegator: signed.source_pk(),
                             delegate: new_delegate.to_owned(),
@@ -818,7 +819,7 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
 
             Value::Object(body_obj)
         }
-        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
+        StakeDelegation((_, StakeDelegationPayload { new_delegate })) => {
             let mut body_obj = Map::new();
 
             body_obj.insert(

@@ -286,9 +286,10 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         receiver: receiver_pk.to_owned(),
                         is_new_receiver_account: self.receiver_account_creation_fee_paid(),
                     }),
-                    SignedCommandPayloadBody::StakeDelegation(
+                    SignedCommandPayloadBody::StakeDelegation((
+                        _,
                         v2::staged_ledger_diff::StakeDelegationPayload { new_delegate },
-                    ) => Command::Delegation(Delegation {
+                    )) => Command::Delegation(Delegation {
                         nonce: self.nonce(),
                         delegator: self.sender(),
                         delegate: new_delegate.to_owned(),
@@ -346,9 +347,10 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     SignedCommandPayloadBody::Payment(payload) => {
                         vec![payload.receiver_pk.to_owned()]
                     }
-                    SignedCommandPayloadBody::StakeDelegation(StakeDelegationPayload {
-                        new_delegate,
-                    }) => {
+                    SignedCommandPayloadBody::StakeDelegation((
+                        _,
+                        StakeDelegationPayload { new_delegate },
+                    )) => {
                         vec![new_delegate.to_owned()]
                     }
                 },
@@ -565,7 +567,7 @@ impl Command {
                             SignedCommandPayloadBody::StakeDelegation(payload) => {
                                 let delegator: PublicKey = command.sender();
                                 let nonce = command.nonce();
-                                let delegate = payload.new_delegate.to_owned();
+                                let delegate = payload.1.new_delegate.to_owned();
 
                                 trace!("Delegation {{ delegator: {delegator}, new_delegate: {delegate}, nonce: {nonce} }}");
                                 Self::Delegation(Delegation {
