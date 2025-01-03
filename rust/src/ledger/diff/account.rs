@@ -424,7 +424,10 @@ impl AccountDiff {
 }
 
 impl StateDiffs {
-    pub fn from_account(public_key: &str) -> Self {
+    pub fn from_account<T>(public_key: T) -> Self
+    where
+        T: Into<PublicKey>,
+    {
         Self {
             public_key: public_key.into(),
             ..Default::default()

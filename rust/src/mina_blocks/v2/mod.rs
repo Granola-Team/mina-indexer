@@ -138,7 +138,7 @@ pub enum PermissionKind {
     Impossible,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappAccount {
     pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM], // 32 bytes each
     pub action_state: [ActionState; 5],                        // 32 bytes each
@@ -165,16 +165,16 @@ pub struct ActionState(pub String);
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappUri(pub String);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationKey {
     pub data: VerificationKeyData,
     pub hash: VerificationKeyHash,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationKeyData(pub String);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct VerificationKeyHash(pub String);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

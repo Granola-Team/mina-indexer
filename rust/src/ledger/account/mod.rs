@@ -40,7 +40,7 @@ pub struct Account {
     pub username: Option<Username>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Permissions {
     pub edit_state: Permission,
     pub access: Permission,
