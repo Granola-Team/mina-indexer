@@ -27,7 +27,7 @@ def process_directory(directory)
         remove_proofs(json_data)
 
         # Overwrite the original file with compact JSON (single line)
-        File.write(path, JSON.generate(json_data))
+        File.write(path, JSON.pretty_generate(json_data))
 
         puts "Successfully removed 'proofs' from #{path}"
       rescue Errno::ENOENT
