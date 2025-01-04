@@ -68,6 +68,10 @@ impl BerkeleyBlock {
         self.data.tokens_used.iter().map(|t| t.0.to_string()).collect()
     }
 
+    pub fn get_accessed_accounts(&self) -> Vec<AccessedAccount> {
+        self.data.accounts_accessed.clone()
+    }
+
     pub fn contains_user_tokens(&self) -> bool {
         let mut tokens: HashSet<String> = self.get_tokens_used().into_iter().collect();
         tokens.remove(MINA_TOKEN_ID);
@@ -166,33 +170,63 @@ impl BerkeleyBlock {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AccessedAccount {
+    public_key: String,
+    token_id: String,
+    token_symbol: String,
+    balance: String,
+}
+
+impl AccessedAccount {
+    pub fn balance(&self) -> u64 {
+        let balance = BigDecimal::from_str(&self.balance).expect("Invalid number format");
+        balance.to_u64().expect("Expected balance in AccessedAccount to be u64")
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Data {
     pub scheduled_time: String,
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: StagedLedgerDiff,
     pub accounts_created: Vec<(Vec<String>, String)>,
+    #[serde(deserialize_with = "deserialize_accessed")]
+    accounts_accessed: Vec<AccessedAccount>,
     pub tokens_used: Vec<(String, Option<(String, String)>)>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+fn deserialize_accessed<'de, D>(deserializer: D) -> Result<Vec<AccessedAccount>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // First, we parse it as Vec of 2-element arrays: (i64, MyAccountAccess).
+    // We don't care about the i64 later, so we just store it in a tuple temporarily.
+    let raw: Vec<(i64, AccessedAccount)> = Vec::deserialize(deserializer)?;
+
+    // Then we only keep the second element from each tuple.
+    let result = raw.into_iter().map(|(_num, obj)| obj).collect();
+    Ok(result)
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProtocolState {
     pub previous_state_hash: String,
     pub body: ProtocolStateBody,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlockchainState {
     pub timestamp: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProtocolStateBody {
     pub consensus_state: ConsensusState,
     pub blockchain_state: BlockchainState,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsensusState {
     pub last_vrf_output: String,
     pub coinbase_receiver: String,
@@ -200,7 +234,7 @@ pub struct ConsensusState {
     pub global_slot_since_genesis: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StagedLedgerDiff {
     pub diff: Vec<Option<Diff>>,
 }
@@ -831,5 +865,24 @@ mod berkeley_block_tests {
         let child_2 = last_update_tree.children.last().cloned().unwrap();
         assert_eq!(child_2.value.balance_change.balance_delta(), 100_000_000, "Expected addition of 0.1 PUNK");
         assert_eq!(child_2.value.token_id, "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg");
+    }
+
+    #[test]
+    fn test_accessed_accounts() {
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
+                .expect("Failed to read test file");
+
+        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        assert_eq!(block.get_accessed_accounts().len(), 26, "Expected 26 accessed accounts");
+        let first_accessed_account = block
+            .get_accessed_accounts()
+            .first()
+            .cloned()
+            .expect("Expected to get the first accessed account");
+        assert_eq!(first_accessed_account.balance(), 517_981_500_000);
+        assert_eq!(first_accessed_account.token_id, MINA_TOKEN_ID);
+        assert_eq!(first_accessed_account.public_key, "B62qpEFovh6b6gJxxvpwSDxbztVMyuTLR3uBfeLkZtRbWTzbBKfitYo");
     }
 }
