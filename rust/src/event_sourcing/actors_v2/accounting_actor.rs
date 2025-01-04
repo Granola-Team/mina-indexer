@@ -551,10 +551,10 @@ impl AccountingActor {
         if let Some(account_update_trees) = command.account_updates_trees.clone() {
             for root in account_update_trees {
                 // BFS-level iterator returning children of each BFS node in order
-                let mut iter = root.bfs_steps();
+                let iter = root.bfs_steps();
 
                 // For each BFS node’s children:
-                while let Some(node_children) = iter.next() {
+                for node_children in iter {
                     let token_ids: HashSet<String> = node_children.iter().map(|c| c.value.token_id.to_string()).collect();
                     assert_eq!(token_ids.len(), 1, "Did not expect mixed tokens amongst chilren");
 
