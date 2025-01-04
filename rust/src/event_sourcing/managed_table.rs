@@ -27,6 +27,7 @@ impl ManagedTable {
             name: String::new(),
             columns: Vec::new(),
             preserve_table_data: false,
+            unlogged: false,
         }
     }
 
@@ -89,6 +90,7 @@ pub struct ManagedTableBuilder {
     name: String,
     columns: Vec<String>,
     preserve_table_data: bool,
+    unlogged: bool,
 }
 
 impl ManagedTableBuilder {
@@ -107,6 +109,11 @@ impl ManagedTableBuilder {
     /// Add a column to the table
     pub fn add_column(mut self, column_definition: &str) -> Self {
         self.columns.push(column_definition.to_string());
+        self
+    }
+
+    pub fn unlogged(mut self) -> Self {
+        self.unlogged = true;
         self
     }
 
@@ -157,12 +164,13 @@ impl ManagedTableBuilder {
     // Create the table
     async fn create_table(&self, table_name: &str) -> Result<()> {
         let table_query = format!(
-            "CREATE TABLE IF NOT EXISTS {} (
+            "CREATE {} TABLE IF NOT EXISTS {} (
                 entry_id BIGSERIAL,
                 height BIGINT,
                 {},
                 PRIMARY KEY (entry_id)
             );",
+            if self.unlogged { "UNLOGGED" } else { "" },
             table_name,
             self.columns
                 .iter()

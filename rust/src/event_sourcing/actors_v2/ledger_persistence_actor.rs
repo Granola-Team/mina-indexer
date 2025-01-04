@@ -91,6 +91,7 @@ impl LedgerPersistenceActor {
         // 3) Build the ManagedTable (blocking)
         let table_builder = ManagedTable::builder(client)
             .name("blockchain_ledger")
+            .unlogged()
             .add_column("address TEXT NOT NULL")
             .add_column("address_type TEXT NOT NULL")
             .add_column("token_id TEXT NOT NULL")
