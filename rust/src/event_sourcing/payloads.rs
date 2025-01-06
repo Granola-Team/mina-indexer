@@ -594,6 +594,7 @@ pub struct DoubleEntryRecordPayload {
     pub ledger_destination: LedgerDestination,
     pub lhs: Vec<AccountingEntry>, // Multiple debit entries
     pub rhs: Vec<AccountingEntry>, // Multiple credit entries
+    pub expected_balances: Option<HashMap<String, (String, u64)>>,
 }
 
 impl DoubleEntryRecordPayload {

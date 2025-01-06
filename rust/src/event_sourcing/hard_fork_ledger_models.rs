@@ -47,6 +47,7 @@ impl HardForkLedger {
                         timestamp: 0,
                         token_id: MINA_TOKEN_ID.to_string(),
                     }],
+                    expected_balances: None,
                 }
             })
             .collect::<Vec<DoubleEntryRecordPayload>>()

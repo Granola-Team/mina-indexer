@@ -187,6 +187,7 @@ mod account_summary_actor_tests_v2 {
         // 4) Build a DoubleEntryRecordPayload that has multiple repeated accounts
         // in both LHS and RHS to confirm net summation.
         let payload = DoubleEntryRecordPayload {
+            expected_balances: None,
             height: 999,
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,

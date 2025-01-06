@@ -650,6 +650,7 @@ impl ActorFactory for AccountingActor {
                                 return None;
                             }
                             let mut record = DoubleEntryRecordPayload {
+                                expected_balances: None,
                                 height: payload.height,
                                 state_hash: payload.state_hash.to_string(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
@@ -703,6 +704,7 @@ impl ActorFactory for AccountingActor {
                             }
 
                             let record = DoubleEntryRecordPayload {
+                                expected_balances: None,
                                 height: payload.block.height,
                                 state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,
@@ -734,6 +736,7 @@ impl ActorFactory for AccountingActor {
                             }
 
                             let record = DoubleEntryRecordPayload {
+                                expected_balances: None,
                                 height: payload.block.height,
                                 state_hash: payload.block.state_hash.clone(),
                                 ledger_destination: LedgerDestination::BlockchainLedger,

@@ -57,6 +57,7 @@ async fn main() {
     // Publish magic mina from genesis block
     let genesis_block = GenesisBlockPayload::new();
     let magic_mina = DoubleEntryRecordPayload {
+        expected_balances: None,
         height: 1,
         state_hash: genesis_block.state_hash.to_string(),
         ledger_destination: LedgerDestination::BlockchainLedger,

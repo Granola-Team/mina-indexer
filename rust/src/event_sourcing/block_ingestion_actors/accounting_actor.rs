@@ -71,6 +71,7 @@ impl AccountingActor {
                     recipient.entry_type = AccountingEntryType::Debit;
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
+                    expected_balances: None,
                     height: payload.height,
                     ledger_destination: LedgerDestination::BlockchainLedger,
                     state_hash: payload.state_hash.to_string(),
@@ -107,6 +108,7 @@ impl AccountingActor {
                     recipient.entry_type = AccountingEntryType::Debit;
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
+                    expected_balances: None,
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
                     ledger_destination: LedgerDestination::BlockchainLedger,
@@ -156,6 +158,7 @@ impl AccountingActor {
                 ledger_destination: LedgerDestination::BlockchainLedger,
                 lhs: vec![source],
                 rhs: vec![recipient],
+                expected_balances: None,
             };
 
             self.publish_transaction(&double_entry_record).await;
@@ -191,6 +194,7 @@ impl AccountingActor {
         if payload.status == CommandStatus::Applied && payload.txn_type != CommandType::StakeDelegation {
             // Split into two separate transactions for publishing
             let txn_1 = DoubleEntryRecordPayload {
+                expected_balances: None,
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
                 ledger_destination: LedgerDestination::BlockchainLedger,
@@ -230,6 +234,7 @@ impl AccountingActor {
         }
 
         let txn_2 = DoubleEntryRecordPayload {
+            expected_balances: None,
             height: payload.height,
             state_hash: payload.state_hash.to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
@@ -271,6 +276,7 @@ impl AccountingActor {
             }
 
             let txn = DoubleEntryRecordPayload {
+                expected_balances: None,
                 height: payload.height,
                 state_hash: payload.state_hash.to_string(),
                 ledger_destination: LedgerDestination::BlockchainLedger,
@@ -303,6 +309,7 @@ impl Actor for AccountingActor {
                     return;
                 }
                 let double_entry_record = DoubleEntryRecordPayload {
+                    expected_balances: None,
                     height: payload.height,
                     state_hash: payload.state_hash.to_string(),
                     ledger_destination: LedgerDestination::BlockchainLedger,

@@ -47,6 +47,7 @@ impl Actor for StakingAccountingActor {
                 }
                 let epoch = log.global_slot / MAINNET_EPOCH_SLOT_COUNT;
                 let mut payload = DoubleEntryRecordPayload {
+                    expected_balances: None,
                     height: log.height,
                     state_hash: log.state_hash,
                     ledger_destination: LedgerDestination::StakingLedger,

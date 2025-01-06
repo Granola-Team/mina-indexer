@@ -311,6 +311,7 @@ mod blockchain_ledger_actor_tests {
 
         // Event payload
         let double_entry_payload = DoubleEntryRecordPayload {
+            expected_balances: None,
             height: 9, // Matches modulo 3
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
@@ -378,6 +379,7 @@ mod blockchain_ledger_actor_tests {
 
         // Define a double-entry transaction payload
         let double_entry_payload = DoubleEntryRecordPayload {
+            expected_balances: None,
             height: 15,
             state_hash: "test_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
