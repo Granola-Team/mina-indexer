@@ -58,6 +58,13 @@ task ingest_genesis_ledger: [:build] do
   chdir root_dir
 end
 
+desc "Ingest Ledger At Hard-Fork"
+task ingest_ledger_at_fork: [:build] do
+  chdir "rust"
+  sh "cargo run --bin ingest_ledger_at_fork"
+  chdir root_dir
+end
+
 desc "Ingest staking ledgers"
 task staking: [:build] do
   chdir "rust"

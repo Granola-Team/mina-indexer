@@ -37,5 +37,9 @@ name = "ingest_genesis_ledger"
 path = "src/bin/ingest_genesis_ledger.rs"
 
 [[bin]]
+name = "ingest_ledger_at_fork"
+path = "src/bin/ingest_ledger_at_359604.rs"
+
+[[bin]]
 name = "ingestion"
 path = "src/bin/ingest_blocks.rs"
