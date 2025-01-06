@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::debug;
 use tokio_postgres::Client;
 
 pub struct ManagedTable {
@@ -179,6 +180,7 @@ impl ManagedTableBuilder {
                 .collect::<Vec<String>>()
                 .join(",\n")
         );
+        debug!("{table_query}");
         self.client.execute(&table_query, &[]).await?;
         Ok(())
     }
