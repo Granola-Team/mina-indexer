@@ -116,6 +116,7 @@ pub struct ActorDAG {
     parent_edges: ParentEdges,
     child_edges: ChildEdges,
     nodes: HashMap<ActorID, Arc<Mutex<ActorNode>>>,
+    senders: Vec<Sender<Event>>,
 }
 
 const INCR_KEY: &str = "incr_key";
@@ -132,6 +133,15 @@ impl ActorDAG {
             parent_edges: HashMap::new(),
             child_edges: HashMap::new(),
             nodes: HashMap::new(),
+            senders: vec![],
+        }
+    }
+
+    pub async fn send(&self, event: Event) {
+        for sender in self.senders.iter() {
+            if let Err(err) = sender.send(event.clone()).await {
+                error!("Failed to send event to child: {}. Error: {err}", event.event_type);
+            }
         }
     }
 
@@ -207,6 +217,7 @@ impl ActorDAG {
         let senders: Option<Vec<Sender<Event>>> = self.child_edges.remove(&node_id);
 
         for (requeue, mut receiver) in receivers {
+            self.senders.push(requeue.clone());
             tokio::spawn({
                 let senders = senders.clone();
                 let node = node.clone();
@@ -599,6 +610,71 @@ mod actor_dag_tests_v2 {
         assert!(
             all_parent_payloads.contains(&"From Parent2".to_string()),
             "Should contain the payload from Parent2"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dag_send_method() {
+        use crate::event_sourcing::events::{Event, EventType};
+        use std::time::Duration;
+        use tokio::time::sleep;
+
+        // 1) Build a new ActorDAG
+        let mut dag = ActorDAG::new();
+
+        // 2) Create a root node that, whenever it receives an event, stores the event’s payload in the actor store.
+        let root_node = ActorNodeBuilder::new()
+            .with_state(ActorStore::new())
+            .with_processor(|event, state, _requeue| {
+                Box::pin(async move {
+                    let mut locked = state.lock().await;
+                    locked.insert("last_event_payload", event.payload.clone());
+                    None
+                })
+            })
+            .build();
+
+        // 3) Mark this node as the DAG’s root. (The `set_root` returns the typical `Sender<Event>` but we won't use it here, since we’re testing the new
+        //    `dag.send(...)` method.)
+        let root_node_id = root_node.id();
+        dag.set_root(root_node);
+
+        // 4) Wrap the ActorDAG in Arc<Mutex<...>> so we can spawn it
+        let dag_arc = Arc::new(Mutex::new(dag));
+
+        // 5) Spawn the DAG in the background
+        tokio::spawn({
+            let dag_arc = Arc::clone(&dag_arc);
+            async move {
+                dag_arc.lock().await.spawn_all().await;
+            }
+        });
+
+        // 6) Create an Event we want to send via `dag.send(...)`
+        let test_event = Event {
+            event_type: EventType::NewBlock,
+            payload: "Payload via dag.send".to_string(),
+        };
+
+        // 7) Actually send it using your new DAG-wide .send() method
+        dag_arc.lock().await.send(test_event).await;
+
+        // 8) Give it some processing time
+        sleep(Duration::from_millis(100)).await;
+
+        // 9) Read from the node’s state to verify it processed the event
+        let dag_locked = dag_arc.lock().await;
+        dag_locked.wait_until_quiesced().await; // optional: ensures no more events are in flight
+        let node_arc = dag_locked.read_node(root_node_id).expect("Root node not found?");
+        let state_locked = node_arc.lock().await.get_state();
+        let store = state_locked.lock().await;
+
+        // 10) Confirm the store has "last_event_payload" set to "Payload via dag.send"
+        let recorded = store.get::<String>("last_event_payload").cloned().unwrap_or_default();
+
+        assert_eq!(
+            recorded, "Payload via dag.send",
+            "Node did not process the event from `dag.send(...)` as expected"
         );
     }
 }
