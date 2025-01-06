@@ -32,7 +32,4 @@ database/
 files-to-fetch.list
 
 # mina_txn_hasher wrapper
-/ops/bin
-
-# Local binary overrides
-/bin
+.local
