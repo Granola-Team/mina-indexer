@@ -92,7 +92,7 @@ mod snark_work_actor_tests {
         },
         utility::get_cleaned_pcb,
     };
-    use std::{fs, path::PathBuf, sync::Arc};
+    use std::sync::Arc;
 
     #[tokio::test]
     async fn test_snark_work_summary_actor_with_multiple_snarks() -> anyhow::Result<()> {
@@ -115,12 +115,11 @@ mod snark_work_actor_tests {
                 }
             }
         }
-        // Path to the sample file with 64 snark works
-        let path = PathBuf::from("./src/event_sourcing/test_data/misc_blocks/mainnet-185-3NKQ3K2SNp58PEAb8UjpBe5uo3KQKxphURuE9Eq2J8JYBVCD7PSu.json");
 
-        // Load and parse the JSON file to simulate the event payload
-        let file_content = fs::read_to_string(&path).expect("Could not read test data file");
-        let block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Invalid JSON format in test data");
+        // Load and parse the sample JSON file (with 64 snark works) to simulate the event payload
+        let block: MainnetBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/misc_blocks/mainnet-185-3NKQ3K2SNp58PEAb8UjpBe5uo3KQKxphURuE9Eq2J8JYBVCD7PSu.json")
+                .expect("Invalid JSON format in test data");
         let block_payload = MainnetBlockPayload {
             height: 185,
             global_slot: 300,
@@ -187,9 +186,9 @@ mod snark_work_actor_tests {
             }
         }
         // Load and parse the JSON file to simulate the event payload
-        let file_content =
-            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-409021-3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk.json").unwrap();
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Invalid JSON format in test data");
+        let block: BerkeleyBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-409021-3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk.json")
+                .expect("Invalid JSON format in test data");
         let block_payload = BerkeleyBlockPayload {
             height: 185,
             state_hash: "3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk".to_string(),

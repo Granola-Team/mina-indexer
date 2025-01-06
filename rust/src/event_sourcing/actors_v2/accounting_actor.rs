@@ -2229,15 +2229,12 @@ mod accounting_actor_tests_v2 {
             }
         });
 
-        // 5) Load & clean the JSON for block 407555
-        let file_content =
+        // 5) Load, clean, and parse the JSON for block 407555
+        let berkeley_block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
-                .expect("Failed to read or clean file");
+                .expect("Failed to parse BerkeleyBlock JSON");
 
-        // 6) Parse into your BerkeleyBlock struct
-        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse BerkeleyBlock JSON");
-
-        // 7) Wrap into a canonical BerkeleyBlockPayload (or similar)
+        // 6) Wrap into a canonical BerkeleyBlockPayload (or similar)
         let payload = CanonicalBerkeleyBlockPayload {
             block: BerkeleyBlockPayload {
                 height: 407555,
@@ -2255,7 +2252,7 @@ mod accounting_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // 8) Send the event => BFS expansions => LHS/RHS entries
+        // 7) Send the event => BFS expansions => LHS/RHS entries
         actor_sender
             .send(Event {
                 event_type: EventType::CanonicalBerkeleyBlock,
@@ -2267,23 +2264,23 @@ mod accounting_actor_tests_v2 {
         // Allow time for processing
         sleep(Duration::from_millis(200)).await;
 
-        // 9) Read from the sink node => should have at least 1 DoubleEntryTransaction
+        // 8) Read from the sink node => should have at least 1 DoubleEntryTransaction
         let transactions = read_captured_transactions(&dag, &sink_node_id).await;
         assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 407555");
 
         // In many cases, you'd expect exactly one DoubleEntryTransaction event. If so:
         assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 407555");
 
-        // 10) Parse the DoubleEntryRecordPayload from the sink
+        // 9) Parse the DoubleEntryRecordPayload from the sink
         let record_json = &transactions[0];
         let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 407555");
 
-        // 11) Basic checks on height, state_hash, etc.
+        // 10) Basic checks on height, state_hash, etc.
         assert_eq!(record.height, 407555, "Block height mismatch");
         // Compare record.state_hash if you want:
         // assert_eq!(record.state_hash, "3NK51MXHFabX7p...", "State hash mismatch");
 
-        // 12) BFS expansions => examine LHS + RHS
+        // 11) BFS expansions => examine LHS + RHS
         // For example, we expect:
         //   - One BFS node had a delta of -1,000,000,000 (1 MINA)
         //   - Another BFS node had -100,000,000  PUNK
@@ -2340,15 +2337,12 @@ mod accounting_actor_tests_v2 {
             }
         });
 
-        // 5) Load + clean the JSON for block 367681
-        let file_content =
+        // 5) Load, clean, and parse the Berkeley JSON for block 367681
+        let berkeley_block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-367681-3NKficMDTHxKrj6VYUtncZCsT9TjBciWMu8upPryYZTjrw9vcTX4.json")
-                .expect("Failed to read or clean block 367681 file");
+                .expect("Failed to parse BerkeleyBlock JSON for block 367681");
 
-        // 6) Parse into your BerkeleyBlock or similar
-        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse BerkeleyBlock JSON for block 367681");
-
-        // 7) Wrap into a canonical BerkeleyBlockPayload (or your event type)
+        // 6) Wrap into a canonical BerkeleyBlockPayload (or your event type)
         let payload = CanonicalBerkeleyBlockPayload {
             block: BerkeleyBlockPayload {
                 height: 367681,
@@ -2366,7 +2360,7 @@ mod accounting_actor_tests_v2 {
             was_canonical: false,
         };
 
-        // 8) Send the event => BFS expansions => LHS/RHS
+        // 7) Send the event => BFS expansions => LHS/RHS
         actor_sender
             .send(Event {
                 event_type: EventType::CanonicalBerkeleyBlock,
@@ -2378,14 +2372,14 @@ mod accounting_actor_tests_v2 {
         // Allow time for processing
         sleep(Duration::from_millis(200)).await;
 
-        // 9) Read from the sink => expect at least 1 DoubleEntryTransaction
+        // 8) Read from the sink => expect at least 1 DoubleEntryTransaction
         let transactions = read_captured_transactions(&dag, &sink_node_id).await;
         assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 367681");
 
         // Usually you'd have exactly 1 DoubleEntryTransaction per block in your design:
         assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 367681");
 
-        // 10) Parse the DoubleEntryRecordPayload
+        // 9) Parse the DoubleEntryRecordPayload
         let record_json = &transactions[0];
         let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 367681");
 
@@ -2394,14 +2388,14 @@ mod accounting_actor_tests_v2 {
         // If your BFS sets final state_hash in the record:
         // assert_eq!(record.state_hash, "3NKficMDTHxKrj...", "State hash mismatch");
 
-        // 11) Check for the negative 1,000,000,000 (the 'PUNK cost') => LHS
+        // 10) Check for the negative 1,000,000,000 (the 'PUNK cost') => LHS
         let minus_one_billion = record
             .lhs
             .iter()
             .find(|e| e.entry_type == AccountingEntryType::Debit && e.amount_nanomina == 1_000_000_000 && e.token_id == MINA_TOKEN_ID);
         assert!(minus_one_billion.is_some(), "Expected BFS debit of 1,000,000,000 for PUNK token in LHS");
 
-        // 12) The BFS child is +10_000_000_000_000_000 for punk token
+        // 11) The BFS child is +10_000_000_000_000_000 for punk token
         let punk_token_id = "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg";
 
         let minted_lhs = record

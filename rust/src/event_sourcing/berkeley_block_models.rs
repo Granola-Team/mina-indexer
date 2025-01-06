@@ -648,16 +648,13 @@ fn parse_body(body: &Value) -> Result<Body, sonic_rs::Error> {
 mod berkeley_block_tests {
     use super::*;
     use crate::utility::get_cleaned_pcb;
-    use std::path::Path;
 
     #[test]
     fn test_berkeley_block_summary_info() {
-        // Path to your test JSON file
-        let path = Path::new("./src/event_sourcing/test_data/berkeley_blocks/berkeley-4969-3NL8QoLQMtsBH8vUnccQw3vt8PgYuZRMApq1yZT1jwhZjbBLMRJU.json");
-        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
-
         // Deserialize JSON into BerkeleyBlock struct
-        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        let berkeley_block: BerkeleyBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/berkeley-4969-3NL8QoLQMtsBH8vUnccQw3vt8PgYuZRMApq1yZT1jwhZjbBLMRJU.json")
+                .expect("Failed to parse JSON");
 
         // Test user commands count
         assert_eq!(berkeley_block.get_user_commands_count(), 12, "User commands count should match");
@@ -682,12 +679,10 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_berkeley_block_409021() {
-        // Path to your test JSON file
-        let file_content =
-            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-409021-3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk.json").unwrap();
-
         // Deserialize JSON into BerkeleyBlock struct
-        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        let berkeley_block: BerkeleyBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-409021-3NLWau54pjGtX98RyvEffWyK5NQbqkYfzuzMv1Y2TTUbbKqP7MDk.json")
+                .expect("Failed to parse block JSON");
 
         assert_eq!(berkeley_block.get_snark_work_count(), 37, "snark work count should match");
 
@@ -706,19 +701,10 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_berkeley_block_410543() {
-        // Path to the test JSON file
-        let file_content =
+        // Deserialize JSON into BerkeleyBlock struct
+        let berkeley_block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410543-3NLeMXBpXKCpHtY2ugK5RdyQsZp2AUBQNYaJdgJNfu4h83TNvKGj.json")
                 .expect("Failed to read test file");
-
-        // Deserialize JSON into BerkeleyBlock struct
-        let berkeley_block_res: Result<BerkeleyBlock, sonic_rs::Error> = sonic_rs::from_str(&file_content);
-
-        if let Err(e) = &berkeley_block_res {
-            println!("{e} => {}", &file_content[37000..39000]);
-        }
-
-        let berkeley_block = berkeley_block_res.unwrap();
 
         // Test the total number of user commands
         assert_eq!(berkeley_block.get_user_commands_count(), 62, "User commands count should be 62");
@@ -755,13 +741,10 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_berkeley_block_410773() {
-        // Path to the test JSON file
-        let file_content =
+        // Deserialize JSON into BerkeleyBlock struct
+        let berkeley_block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410773-3NLjmPVZ6HRV3CUdB3N8VbgwdNRAyjJibTCc4viKfUrrFuwTZk9s.json")
                 .expect("Failed to read test file");
-
-        // Deserialize JSON into BerkeleyBlock struct
-        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         let zk_app_commands = berkeley_block.get_zk_app_commands();
         assert_eq!(zk_app_commands.len(), 5);
@@ -806,11 +789,9 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_get_tokens_used() {
-        let file_content =
+        let block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410773-3NLjmPVZ6HRV3CUdB3N8VbgwdNRAyjJibTCc4viKfUrrFuwTZk9s.json")
                 .expect("Failed to read test file");
-
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         // Call `get_tokens_used()`
         let tokens_used = block.get_tokens_used();
@@ -822,11 +803,9 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_contains_user_tokens() {
-        let file_content =
+        let block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410543-3NLeMXBpXKCpHtY2ugK5RdyQsZp2AUBQNYaJdgJNfu4h83TNvKGj.json")
                 .expect("Failed to read test file");
-
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         // Assert that the tokens match what we initialized
         assert!(!block.contains_user_tokens());
@@ -834,11 +813,9 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_parse_account_updates() {
-        let file_content =
+        let block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
                 .expect("Failed to read test file");
-
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         let punk_zk_app_command = block.get_zk_app_commands().last().cloned().unwrap();
         assert_eq!(punk_zk_app_command.account_updates, 4, "Expected 4 account updates");
@@ -869,11 +846,9 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_accessed_accounts() {
-        let file_content =
+        let block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
                 .expect("Failed to read test file");
-
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         assert_eq!(block.get_accessed_accounts().len(), 26, "Expected 26 accessed accounts");
         let first_accessed_account = block

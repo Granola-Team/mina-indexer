@@ -5,11 +5,10 @@ use super::super::{
 };
 use crate::{
     event_sourcing::{berkeley_block_models::BerkeleyBlock, block::BlockTrait, payloads::BerkeleyBlockPayload},
-    utility::extract_height_and_hash,
+    utility::{extract_height_and_hash, get_cleaned_pcb},
 };
 use async_trait::async_trait;
 use std::{
-    fs,
     path::Path,
     sync::{atomic::AtomicUsize, Arc},
 };
@@ -43,8 +42,7 @@ impl Actor for BerkeleyBlockParserActor {
     async fn handle_event(&self, event: Event) {
         if let EventType::BerkeleyBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
-            let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
-            let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+            let berkeley_block: BerkeleyBlock = get_cleaned_pcb(&event.payload).expect("Failed to read JSON file from disk");
             let berkeley_block_payload = BerkeleyBlockPayload {
                 height: height as u64,
                 state_hash: state_hash.to_string(),

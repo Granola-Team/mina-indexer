@@ -24,8 +24,7 @@ impl ActorFactory for MainnetBlockParserActor {
                         EventType::MainnetBlockPath => {
                             // Parse the block path and contents
                             let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
-                            let file_content = get_cleaned_pcb(&event.payload).expect("File should exist and be readable");
-                            let block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse block");
+                            let block: MainnetBlock = get_cleaned_pcb(&event.payload).expect("Failed to parse block");
 
                             // Create block payload
                             let block_payload = MainnetBlockPayload {

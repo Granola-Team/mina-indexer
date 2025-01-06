@@ -6,10 +6,10 @@ use crate::{
         events::{Event, EventType},
         payloads::BerkeleyBlockPayload,
     },
-    utility::extract_height_and_hash,
+    utility::{extract_height_and_hash, get_cleaned_pcb},
 };
 use async_trait::async_trait;
-use std::{fs, path::Path};
+use std::path::Path;
 
 pub struct BerkeleyBlockActor;
 
@@ -23,8 +23,7 @@ impl ActorFactory for BerkeleyBlockActor {
                     if event.event_type == EventType::BerkeleyBlockPath {
                         // Parse the block path and contents
                         let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
-                        let file_content = fs::read_to_string(Path::new(&event.payload)).expect("Failed to read JSON file from disk");
-                        let berkeley_block: BerkeleyBlock = sonic_rs::from_str(&file_content).expect("Failed to parse Berkeley block");
+                        let berkeley_block: BerkeleyBlock = get_cleaned_pcb(&event.payload).expect("Failed to parse Berkeley block");
 
                         // Create the Berkeley block payload
                         let berkeley_block_payload = BerkeleyBlockPayload {

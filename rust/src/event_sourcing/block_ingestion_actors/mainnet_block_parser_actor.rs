@@ -40,8 +40,7 @@ impl Actor for MainnetBlockParserActor {
     async fn handle_event(&self, event: Event) {
         if let EventType::MainnetBlockPath = event.event_type {
             let (height, state_hash) = extract_height_and_hash(Path::new(&event.payload));
-            let file_content = get_cleaned_pcb(&event.payload).unwrap();
-            let block: MainnetBlock = sonic_rs::from_str(&file_content).unwrap();
+            let block: MainnetBlock = get_cleaned_pcb(&event.payload).unwrap();
             let block_payload = MainnetBlockPayload {
                 height: height as u64,
                 global_slot: block.get_global_slot_since_genesis(),

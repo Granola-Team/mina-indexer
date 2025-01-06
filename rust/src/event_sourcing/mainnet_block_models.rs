@@ -373,6 +373,7 @@ pub struct Common {
 #[cfg(test)]
 mod mainnet_block_parsing_tests {
     use super::*;
+    use crate::utility::get_cleaned_pcb;
     use std::path::Path;
 
     #[test]
@@ -543,12 +544,10 @@ mod mainnet_block_parsing_tests {
 
     #[test]
     fn test_mainnet_block_4556() {
-        // Path to your test JSON file
-        let path = Path::new("./src/event_sourcing/test_data/misc_blocks/mainnet-4556-3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json");
-        let file_content = std::fs::read_to_string(path).expect("Failed to read test file");
-
         // Deserialize JSON into MainnetBlock struct
-        let mainnet_block: MainnetBlock = sonic_rs::from_str(&file_content).expect("Failed to parse JSON");
+        let mainnet_block: MainnetBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/misc_blocks/mainnet-4556-3NKSoUrfAP9zqe6HP3EGWSrzhnpixbez7Hk7EerXjYpCybwKbdme.json")
+                .expect("Failed to parse JSON");
 
         // 6 internal commands
         // 1. coinbase receiver
