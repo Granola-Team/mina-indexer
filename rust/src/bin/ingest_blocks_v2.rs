@@ -24,8 +24,13 @@ async fn main() {
         .and_then(|val| val.parse::<bool>().ok()) // Try to parse "true"/"false" => Option<bool>
         .unwrap_or(false);
 
+    let runtime_ledger_check = env::var("RUNTIME_LEDGER_CHECK")
+        .ok()
+        .and_then(|val| val.parse::<bool>().ok()) // Try to parse "true"/"false" => Option<bool>
+        .expect("RUNTIME_LEDGER_CHECK environment variable must be present and valid");
+
     // 3) Spawn your actor DAG, which returns a Sender<Event>
-    let (dag, sender) = spawn_actor_dag(!destroy_data).await;
+    let (dag, sender) = spawn_actor_dag(!destroy_data, runtime_ledger_check).await;
 
     // 4) Give the DAG a moment to start
     tokio::time::sleep(Duration::from_millis(500)).await;

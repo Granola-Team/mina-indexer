@@ -172,10 +172,10 @@ impl BerkeleyBlock {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AccessedAccount {
-    public_key: String,
-    token_id: String,
-    token_symbol: String,
-    balance: String,
+    pub public_key: String,
+    pub token_id: String,
+    pub token_symbol: String,
+    pub balance: String,
 }
 
 impl AccessedAccount {

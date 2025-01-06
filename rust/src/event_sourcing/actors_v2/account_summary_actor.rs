@@ -1,5 +1,6 @@
 use crate::event_sourcing::{
     actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
+    berkeley_block_models::AccessedAccount,
     events::{Event, EventType},
     payloads::{AccountBalanceDeltaPayload, AccountingEntry, AccountingEntryAccountType, AccountingEntryType, DoubleEntryRecordPayload, LedgerDestination},
 };
@@ -53,6 +54,10 @@ impl AccountSummaryActor {
                 payload: sonic_rs::to_string(&AccountBalanceDeltaPayload {
                     token_id: token_id.to_string(),
                     balance_deltas: acct_deltas.to_owned(),
+                    accessed_accounts: record
+                        .accessed_accounts
+                        .clone()
+                        .map(|aav| aav.into_iter().filter(|aa| &aa.token_id == token_id).collect::<Vec<AccessedAccount>>()),
                 })
                 .unwrap(),
             })

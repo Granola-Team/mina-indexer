@@ -666,8 +666,9 @@ impl AccountingEntry {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AccountBalanceDeltaPayload {
     pub token_id: String,
     pub balance_deltas: HashMap<String, i64>,
+    pub accessed_accounts: Option<Vec<AccessedAccount>>,
 }

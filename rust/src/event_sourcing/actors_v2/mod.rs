@@ -37,7 +37,7 @@ pub(crate) mod pcb_file_path_actor;
 pub(crate) mod pcb_filter_actor;
 
 /// Spawns a DAG of interlinked actors and returns the `Sender<Event>` for the root actor (`PcbFilePathActor`).
-pub async fn spawn_actor_dag(preserve_data: bool) -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
+pub async fn spawn_actor_dag(preserve_data: bool, runtime_ledger_check: bool) -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Sender<Event>) {
     // 1. Create a new DAG.
     let mut dag = ActorDAG::new();
 
@@ -112,7 +112,7 @@ pub async fn spawn_actor_dag(preserve_data: bool) -> (Arc<Mutex<ActorDAG>>, toki
     dag.add_node(account_summary_node);
     dag.link_parent(&accounting_node_id, &account_summary_node_id);
 
-    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(preserve_data).await;
+    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(preserve_data, runtime_ledger_check).await;
     let account_summary_pers_node_id = account_summary_pers_node.id();
     dag.add_node(account_summary_pers_node);
     dag.link_parent(&account_summary_node_id, &account_summary_pers_node_id);
@@ -146,7 +146,7 @@ pub async fn spawn_genesis_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Se
     dag.link_parent(&identity_node_id, &account_summary_node_id);
 
     // Leaf
-    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(false).await;
+    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(false, false).await;
     let account_summary_pers_node_id = account_summary_pers_node.id();
     dag.add_node(account_summary_pers_node);
     dag.link_parent(&account_summary_node_id, &account_summary_pers_node_id);
@@ -183,7 +183,7 @@ pub async fn spawn_genesis_dag() -> (Arc<Mutex<ActorDAG>>, tokio::sync::mpsc::Se
     dag.link_parent(&accounting_node_id, &account_summary_node_id);
 
     // Leaf
-    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(true).await;
+    let account_summary_pers_node = AccountSummaryPersistenceActor::create_actor(true, false).await;
     let account_summary_pers_node_id = account_summary_pers_node.id();
     dag.add_node(account_summary_pers_node);
     dag.link_parent(&account_summary_node_id, &account_summary_pers_node_id);
