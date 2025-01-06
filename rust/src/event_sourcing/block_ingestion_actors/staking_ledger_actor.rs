@@ -206,7 +206,7 @@ mod staking_ledger_actor_tests {
 
         // Create a non-staking ledger event payload
         let non_staking_payload = DoubleEntryRecordPayload {
-            expected_balances: None,
+            accessed_accounts: None,
             height: 10,
             state_hash: "non_staking_state_hash".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger, // Non-staking destination
@@ -249,7 +249,7 @@ mod staking_ledger_actor_tests {
 
         // Create a staking ledger event payload
         let staking_payload = DoubleEntryRecordPayload {
-            expected_balances: None,
+            accessed_accounts: None,
             height: 20,
             state_hash: "staking_state_hash".to_string(),
             ledger_destination: LedgerDestination::StakingLedger, // Staking destination

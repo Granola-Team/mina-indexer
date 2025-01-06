@@ -69,7 +69,7 @@ impl GenesisLedger {
                         timestamp: 1615939200,
                         token_id: MINA_TOKEN_ID.to_string(),
                     }],
-                    expected_balances: None,
+                    accessed_accounts: None,
                 }
             })
             .collect::<Vec<DoubleEntryRecordPayload>>()

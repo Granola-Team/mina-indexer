@@ -57,7 +57,7 @@ pub fn publish_genesis_block(shared_publisher: &Arc<SharedPublisher>) -> Result<
                 timestamp: payload.unix_timestamp,
                 token_id: MINA_TOKEN_ID.to_string(),
             }],
-            expected_balances: None,
+            accessed_accounts: None,
         })
         .unwrap(),
     });

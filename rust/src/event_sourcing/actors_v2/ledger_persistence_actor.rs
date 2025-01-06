@@ -269,7 +269,7 @@ mod ledger_persistence_actor_tests_v2 {
         ];
 
         let record = DoubleEntryRecordPayload {
-            expected_balances: None,
+            accessed_accounts: None,
             height: 777,
             state_hash: "test_state_hash_interleave".to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,

@@ -1,4 +1,5 @@
 use super::{
+    berkeley_block_models::AccessedAccount,
     canonical_items_manager::CanonicalItem,
     models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
 };
@@ -65,6 +66,7 @@ pub struct BerkeleyBlockPayload {
     pub coinbase_reward_nanomina: u64,
     pub global_slot_since_genesis: u64,
     pub tokens_used: Vec<String>,
+    pub accessed_accounts: Vec<AccessedAccount>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -594,7 +596,7 @@ pub struct DoubleEntryRecordPayload {
     pub ledger_destination: LedgerDestination,
     pub lhs: Vec<AccountingEntry>, // Multiple debit entries
     pub rhs: Vec<AccountingEntry>, // Multiple credit entries
-    pub expected_balances: Option<HashMap<String, (String, u64)>>,
+    pub accessed_accounts: Option<Vec<AccessedAccount>>,
 }
 
 impl DoubleEntryRecordPayload {
