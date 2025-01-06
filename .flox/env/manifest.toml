@@ -27,7 +27,6 @@ ruby.pkg-path = "ruby"
 standard.pkg-path = "rubyPackages.standard"
 
 # Database
-duckdb.pkg-path = "duckdb"
 postgresql_16.pkg-path = "postgresql_16"
 sqlfluff.pkg-path = "sqlfluff"
 
