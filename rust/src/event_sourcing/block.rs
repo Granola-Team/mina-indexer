@@ -76,7 +76,7 @@ pub trait BlockTrait {
             .get_coinbases()
             .iter()
             .filter_map(|coinbase| {
-                if coinbase.first().map_or(false, |v| v == "One" || v == "Two") {
+                if coinbase.first().is_some_and(|v| v == "One" || v == "Two") {
                     let v2 = coinbase.last().unwrap();
                     if !v2.is_object() || v2.is_null() {
                         return None;
