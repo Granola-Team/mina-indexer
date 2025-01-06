@@ -1,13 +1,12 @@
 use super::events::Event;
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use log::error;
+use log::{debug, error};
 use std::{any::Any, collections::HashMap, future::Future, sync::Arc};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     Mutex,
 };
-use tracing::debug;
 use uuid::Uuid;
 
 pub struct ActorStore {
