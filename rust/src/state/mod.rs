@@ -922,11 +922,49 @@ impl IndexerState {
             .unwrap()
         {
             best_chain.push(b.data().clone());
-            if b.data() == self.canonical_root_block() {
+
+            if b.parent().is_none() {
                 break;
             }
         }
+
         best_chain
+    }
+
+    /// Returns the best ledger
+    pub fn best_ledger(&self) -> Ledger {
+        let mut best_ledger = self.ledger.to_owned();
+
+        let mut best_chain = self.best_chain();
+        best_chain.reverse();
+
+        // traverse best chain applying each block's ledger diff
+        // skip canonical blocks since they've already modified the ledger
+        for block in best_chain
+            .iter()
+            .skip_while(|b| *b != self.canonical_root_block())
+            .skip(1)
+        {
+            if let Some(ledger_diff) =
+                self.diffs_map.get(&block.state_hash).cloned().or_else(|| {
+                    if let Some(store) = self.indexer_store.as_ref() {
+                        if let Ok(diff) = store.get_block_ledger_diff(&block.state_hash) {
+                            return diff;
+                        }
+                    }
+
+                    None
+                })
+            {
+                if let Err(err) = best_ledger._apply_diff(&ledger_diff) {
+                    panic!("Error applying ledger diff: {err}");
+                }
+            } else {
+                panic!("Missing block from diffs map {}", block.summary());
+            }
+        }
+
+        best_ledger
     }
 
     /// Get the canonical block at the given height
