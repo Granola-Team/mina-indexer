@@ -27,7 +27,7 @@ async fn main() {
     let runtime_ledger_check = env::var("RUNTIME_LEDGER_CHECK")
         .ok()
         .and_then(|val| val.parse::<bool>().ok()) // Try to parse "true"/"false" => Option<bool>
-        .expect("RUNTIME_LEDGER_CHECK environment variable must be present and valid");
+        .unwrap_or_default();
 
     // 3) Spawn your actor DAG, which returns a Sender<Event>
     let (dag, sender) = spawn_actor_dag(!destroy_data, runtime_ledger_check).await;
