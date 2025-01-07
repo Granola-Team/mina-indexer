@@ -88,21 +88,15 @@ pub fn publish_exempt_accounts(shared_publisher: &Arc<SharedPublisher>) -> Resul
 }
 
 pub fn get_genesis_ledger() -> GenesisLedger {
-    let file_path = PathBuf::from("./src/data/genesis_ledger.json");
+    let file_content = include_str!("../../src/data/genesis_ledger.json");
 
-    // Ensure the file exists before testing
-    let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
-
-    sonic_rs::from_str(&file_content).expect("Failed to parse genesis_ledger.json")
+    sonic_rs::from_str(file_content).expect("Failed to parse genesis_ledger.json")
 }
 
 pub fn get_ledger_at_fork() -> HardForkLedger {
-    let file_path = PathBuf::from("./src/data/ledger_359604.json");
+    let file_content = include_str!("../../src/data/ledger_359604.json");
 
-    // Ensure the file exists before testing
-    let file_content = std::fs::read_to_string(file_path).expect("Failed to read ledger_359604.json file");
-
-    sonic_rs::from_str(&file_content).expect("Failed to parse ledger_359604.json")
+    sonic_rs::from_str(file_content).expect("Failed to parse ledger_359604.json")
 }
 
 pub async fn publish_block_dir_paths(

@@ -82,19 +82,11 @@ impl GenesisLedger {
 
 #[cfg(test)]
 mod gensis_ledger_tests {
-    use super::*;
-    use std::path::PathBuf;
+    use crate::event_sourcing::sourcing::get_genesis_ledger;
 
     #[tokio::test]
     async fn test_load_json_from_file() {
-        // Provide the path to the JSON file
-        let file_path = PathBuf::from("./src/data/genesis_ledger.json");
-
-        // Ensure the file exists before testing
-        let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
-
-        // Test the load_json_from_file function
-        let parsed_data: GenesisLedger = sonic_rs::from_str(&file_content).unwrap();
+        let parsed_data = get_genesis_ledger();
 
         // Assertions
         assert_eq!(parsed_data.genesis.genesis_state_timestamp, "2021-03-17T00:00:00Z");

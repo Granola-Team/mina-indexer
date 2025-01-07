@@ -56,18 +56,11 @@ impl HardForkLedger {
 
 #[cfg(test)]
 mod hard_fork_ledger_tests {
-    use super::*;
-    use std::path::PathBuf;
+    use crate::event_sourcing::sourcing::get_ledger_at_fork;
 
     #[test]
     fn test_parse_hard_fork_ledger() {
-        // Provide the path to the JSON file
-        let file_path = PathBuf::from("./src/data/ledger_359604.json");
-
-        // Ensure the file exists before testing
-        let file_content = std::fs::read_to_string(file_path).expect("Failed to read genesis_ledger.json file");
-
-        let ledger: HardForkLedger = sonic_rs::from_str(&file_content).expect("Failed to parse");
+        let ledger = get_ledger_at_fork();
         assert_eq!(ledger.accounts.len(), 228174);
 
         let acct = ledger.accounts.get("B62qiTKyEZ4Lts4DesZZwKYkZKPGD3FBPkMEpfGWC8KuhenMNyts1nd").unwrap();
