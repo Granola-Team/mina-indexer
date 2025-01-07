@@ -90,19 +90,15 @@ task :ingest_from_root, [:height, :state_hash] => [:build] do |t, args|
   chdir root_dir
 end
 
-
 desc "Clean database"
 task :clean_db do
-  chdir "rust"
-  sh "rm mina.db"
-  chdir root_dir
+  sh "rm -rf postgres*"
 end
 
 desc "Clean up build artifacts"
-task :clean do
+task :clean => [:clean_db] do
   chdir "rust"
   sh "cargo clean"
-  sh "rm mina.db"
   chdir root_dir
 end
 
