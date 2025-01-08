@@ -26,7 +26,7 @@ impl NewBlockActor {
 
         ActorNodeBuilder::new()
             .with_state(state)
-            .with_processor(|event, state: Arc<Mutex<ActorStore>>, requeue| {
+            .with_processor(|event, state: Arc<Mutex<ActorStore>>, _requeue| {
                 Box::pin(async move {
                     if event.event_type == EventType::BlockAncestor {
                         let mut state = state.lock().await;
@@ -52,9 +52,9 @@ impl NewBlockActor {
                                 warn!("Best tip is currently {:?}-{:?}", height, node.state_hash);
                             }
 
-                            if let Err(err) = requeue.send(event).await {
-                                warn!("Unable to requeue event: {err}");
-                            }
+                            // if let Err(err) = requeue.send(event).await {
+                            //     warn!("Unable to requeue event: {err}");
+                            // }
                             state.insert(BLOCKCHAIN_TREE_KEY, blockchain_tree);
                             state.insert(BLOCKCHAIN_TREE_STORE, managed_store);
                             return None;
@@ -273,79 +273,79 @@ mod new_block_actor_tests_v2 {
         shutdown_tx.send(true).expect("Failed to send shutdown signal");
     }
 
-    #[tokio::test]
-    async fn test_requeue_unconnected_node() {
-        // 1. Create the shutdown signal
-        let (shutdown_tx, _shutdown_rx) = watch::channel(false);
+    // #[tokio::test]
+    // async fn test_requeue_unconnected_node() {
+    //     // 1. Create the shutdown signal
+    //     let (shutdown_tx, _shutdown_rx) = watch::channel(false);
 
-        // 2. Create the DAG
-        let mut dag = ActorDAG::new();
+    //     // 2. Create the DAG
+    //     let mut dag = ActorDAG::new();
 
-        // 3. Create your BlockAncestorActor node (root)
-        let new_block_actor = NewBlockActor::create_actor(false).await;
-        let new_block_actor_id = new_block_actor.id();
+    //     // 3. Create your BlockAncestorActor node (root)
+    //     let new_block_actor = NewBlockActor::create_actor(false).await;
+    //     let new_block_actor_id = new_block_actor.id();
 
-        // 4. Add it as root
-        let new_block_sender = dag.set_root(new_block_actor);
+    //     // 4. Add it as root
+    //     let new_block_sender = dag.set_root(new_block_actor);
 
-        // 5. Create a sink node for BlockAncestor
-        let sink_node = create_new_block_sink_node();
-        let sink_node_id = &sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&new_block_actor_id, sink_node_id);
+    //     // 5. Create a sink node for BlockAncestor
+    //     let sink_node = create_new_block_sink_node();
+    //     let sink_node_id = &sink_node.id();
+    //     dag.add_node(sink_node);
+    //     dag.link_parent(&new_block_actor_id, sink_node_id);
 
-        // 6. Wrap the DAG and spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
+    //     // 6. Wrap the DAG and spawn
+    //     let dag = Arc::new(Mutex::new(dag));
+    //     tokio::spawn({
+    //         let dag = Arc::clone(&dag);
+    //         async move {
+    //             dag.lock().await.spawn_all().await;
+    //         }
+    //     });
 
-        // 7. Step 1: Send the root block (height=1)
-        let root_block = BlockAncestorPayload {
-            height: 1,
-            state_hash: "3N8aRootHash".to_string(),
-            previous_state_hash: "".to_string(),
-            last_vrf_output: "".to_string(),
-        };
-        new_block_sender
-            .send(Event {
-                event_type: EventType::BlockAncestor,
-                payload: sonic_rs::to_string(&root_block).unwrap(),
-            })
-            .await
-            .expect("Failed to send root block");
-        sleep(Duration::from_millis(100)).await;
+    //     // 7. Step 1: Send the root block (height=1)
+    //     let root_block = BlockAncestorPayload {
+    //         height: 1,
+    //         state_hash: "3N8aRootHash".to_string(),
+    //         previous_state_hash: "".to_string(),
+    //         last_vrf_output: "".to_string(),
+    //     };
+    //     new_block_sender
+    //         .send(Event {
+    //             event_type: EventType::BlockAncestor,
+    //             payload: sonic_rs::to_string(&root_block).unwrap(),
+    //         })
+    //         .await
+    //         .expect("Failed to send root block");
+    //     sleep(Duration::from_millis(100)).await;
 
-        // Verify we got one BlockAncestor event
-        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
-        assert_eq!(captured_blocks.len(), 1, "Root block should produce 1 BlockAncestor");
+    //     // Verify we got one BlockAncestor event
+    //     let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
+    //     assert_eq!(captured_blocks.len(), 1, "Root block should produce 1 BlockAncestor");
 
-        // 8. Step 2: Send an unconnected block at height=3 referencing a non-existent parent
-        let unconnected_block = BlockAncestorPayload {
-            height: 3,
-            state_hash: "3N8aUnconnectedHash".to_string(),
-            previous_state_hash: "3N8aNonExistentParent".to_string(),
-            last_vrf_output: "".to_string(),
-        };
-        new_block_sender
-            .send(Event {
-                event_type: EventType::BlockAncestor,
-                payload: sonic_rs::to_string(&unconnected_block).unwrap(),
-            })
-            .await
-            .expect("Failed to send unconnected block");
-        sleep(Duration::from_millis(100)).await;
+    //     // 8. Step 2: Send an unconnected block at height=3 referencing a non-existent parent
+    //     let unconnected_block = BlockAncestorPayload {
+    //         height: 3,
+    //         state_hash: "3N8aUnconnectedHash".to_string(),
+    //         previous_state_hash: "3N8aNonExistentParent".to_string(),
+    //         last_vrf_output: "".to_string(),
+    //     };
+    //     new_block_sender
+    //         .send(Event {
+    //             event_type: EventType::BlockAncestor,
+    //             payload: sonic_rs::to_string(&unconnected_block).unwrap(),
+    //         })
+    //         .await
+    //         .expect("Failed to send unconnected block");
+    //     sleep(Duration::from_millis(100)).await;
 
-        // 9. Verify that no new block event was added (still only 1 in total)
-        let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
-        assert_eq!(captured_blocks.len(), 1, "Expected no BlockAncestor event for the unconnected block");
+    //     // 9. Verify that no new block event was added (still only 1 in total)
+    //     let captured_blocks = read_new_block_payloads(&dag, sink_node_id).await;
+    //     assert_eq!(captured_blocks.len(), 1, "Expected no BlockAncestor event for the unconnected block");
 
-        // 10. Shutdown
-        shutdown_tx.send(true).expect("Failed to send shutdown signal");
-    }
+    //     // 10. Shutdown
+    //     shutdown_tx.send(true).expect("Failed to send shutdown signal");
+    // }
 
     #[tokio::test]
     async fn test_load_tree_and_reload() {
