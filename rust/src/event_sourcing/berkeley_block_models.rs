@@ -1,6 +1,6 @@
 use super::{
     block::BlockTrait,
-    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, ZkAppCommandSummary},
+    models::{AccountCreated, CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, ZkAppCommandSummary},
 };
 use crate::{
     constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
@@ -97,14 +97,19 @@ impl BerkeleyBlock {
         !tokens.is_empty()
     }
 
-    pub fn get_accounts_created(&self) -> Vec<(String, u64)> {
+    pub fn get_accounts_created(&self) -> Vec<AccountCreated> {
         self.data
             .accounts_created
             .iter()
             .map(|account_created| {
-                let new_account = account_created.0[0].to_string();
+                let public_key = account_created.0[0].to_string();
+                let token_id = account_created.0[1].to_string();
                 let fee_nanomina = BigDecimal::from_str(&account_created.1).expect("Invalid number format") * BigDecimal::from(1_000_000_000);
-                (new_account, fee_nanomina.to_u64().expect("Cannot convert to u64"))
+                AccountCreated {
+                    public_key,
+                    token_id,
+                    fee_nanomina: fee_nanomina.to_u64().expect("Expected to be able to convert account creation fee to u64"),
+                }
             })
             .collect::<Vec<_>>()
     }
@@ -773,15 +778,27 @@ mod berkeley_block_tests {
 
         assert_eq!(
             accounts_created[0],
-            ("B62qos6TJeFTeTgzxZ86F2R4YQELqwNf7q7JPUXYNPj4PB1Dfa3THKD".to_string(), 1_000_000_000)
+            AccountCreated {
+                public_key: "B62qos6TJeFTeTgzxZ86F2R4YQELqwNf7q7JPUXYNPj4PB1Dfa3THKD".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
+                fee_nanomina: 1_000_000_000,
+            }
         );
         assert_eq!(
             accounts_created[1],
-            ("B62qrKCzoAhAS7vxdTwfE5btgbnFiR9QrBgESA6SSUiwJ7L17oxAdoa".to_string(), 1_000_000_000)
+            AccountCreated {
+                public_key: "B62qrKCzoAhAS7vxdTwfE5btgbnFiR9QrBgESA6SSUiwJ7L17oxAdoa".to_string(),
+                token_id: "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg".to_string(),
+                fee_nanomina: 1_000_000_000,
+            }
         );
         assert_eq!(
             accounts_created[2],
-            ("B62qj4JGH7KPE59RLhX4pyZdt1g6rJSuniWWrvXRRrVrkGAePuKJZnW".to_string(), 1_000_000_000)
+            AccountCreated {
+                public_key: "B62qj4JGH7KPE59RLhX4pyZdt1g6rJSuniWWrvXRRrVrkGAePuKJZnW".to_string(),
+                token_id: "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg".to_string(),
+                fee_nanomina: 1_000_000_000,
+            }
         );
     }
 

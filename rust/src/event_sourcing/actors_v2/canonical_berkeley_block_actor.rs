@@ -75,6 +75,7 @@ impl ActorFactory for CanonicalBerkeleyBlockActor {
                                     fee_transfers: berkeley_block.fee_transfers.clone(),
                                     tokens_used: berkeley_block.tokens_used,
                                     accessed_accounts: berkeley_block.accessed_accounts,
+                                    accounts_created: berkeley_block.accounts_created,
                                 },
                             };
 

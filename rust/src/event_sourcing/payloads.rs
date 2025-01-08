@@ -1,7 +1,7 @@
 use super::{
     berkeley_block_models::AccessedAccount,
     canonical_items_manager::CanonicalItem,
-    models::{CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
+    models::{AccountCreated, CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
 };
 use crate::constants::MAINNET_COINBASE_REWARD;
 use sonic_rs::{Deserialize, Serialize};
@@ -67,6 +67,7 @@ pub struct BerkeleyBlockPayload {
     pub global_slot_since_genesis: u64,
     pub tokens_used: Vec<String>,
     pub accessed_accounts: Vec<AccessedAccount>,
+    pub accounts_created: Vec<AccountCreated>,
 }
 
 #[derive(Serialize, Deserialize)]

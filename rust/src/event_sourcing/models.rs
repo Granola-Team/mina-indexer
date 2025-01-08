@@ -125,3 +125,10 @@ pub struct FeeTransferViaCoinbase {
     pub receiver: String,
     pub fee_nanomina: u64,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AccountCreated {
+    pub public_key: String,
+    pub token_id: String,
+    pub fee_nanomina: u64,
+}
