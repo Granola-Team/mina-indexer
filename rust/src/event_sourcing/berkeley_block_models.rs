@@ -862,11 +862,9 @@ mod berkeley_block_tests {
 
     #[test]
     fn test_excess_block_fees() {
-        let file_content =
+        let block: BerkeleyBlock =
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-359609-3NL8ym45gfcDR18fyn7WMJVwgweb4C4HYWUnwNEQuyb5TsF8Hemn.json")
                 .expect("Failed to read test file");
-
-        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
 
         assert_eq!(
             block.get_excess_block_fees(),
