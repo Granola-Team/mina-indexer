@@ -542,6 +542,41 @@ impl AccountingActor {
         (lhs, rhs)
     }
 
+    fn process_new_account(height: u64, state_hash: &str, account: &str, apply: bool) -> DoubleEntryRecordPayload {
+        let mut record = DoubleEntryRecordPayload {
+            accessed_accounts: None,
+            height,
+            state_hash: state_hash.to_string(),
+            ledger_destination: LedgerDestination::BlockchainLedger,
+            lhs: vec![AccountingEntry {
+                counterparty: format!("AccountCreationFee#{}", state_hash.to_string()),
+                transfer_type: "AccountCreationFee".to_string(),
+                entry_type: AccountingEntryType::Debit,
+                account: account.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: 1_000_000_000,
+                timestamp: 0,
+                token_id: MINA_TOKEN_ID.to_string(),
+            }],
+            rhs: vec![AccountingEntry {
+                counterparty: account.to_string(),
+                transfer_type: "AccountCreationFee".to_string(),
+                entry_type: AccountingEntryType::Credit,
+                account: format!("AccountCreationFee#{}", state_hash),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: 1_000_000_000,
+                timestamp: 0,
+                token_id: MINA_TOKEN_ID.to_string(),
+            }],
+        };
+        if !apply {
+            record.lhs[0].entry_type = AccountingEntryType::Credit;
+            record.rhs[0].entry_type = AccountingEntryType::Debit;
+        }
+
+        record
+    }
+
     async fn process_batch_zk_app_commands(
         height: u64,
         state_hash: &str,
@@ -661,40 +696,12 @@ impl ActorFactory for AccountingActor {
                                 // magic mina receiver in block 1 is also no subject to account creation fee
                                 return None;
                             }
-                            let mut record = DoubleEntryRecordPayload {
-                                accessed_accounts: None,
-                                height: payload.height,
-                                state_hash: payload.state_hash.to_string(),
-                                ledger_destination: LedgerDestination::BlockchainLedger,
-                                lhs: vec![AccountingEntry {
-                                    counterparty: format!("AccountCreationFee#{}", payload.state_hash),
-                                    transfer_type: "AccountCreationFee".to_string(),
-                                    entry_type: AccountingEntryType::Debit,
-                                    account: payload.account.to_string(),
-                                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                                    amount_nanomina: 1_000_000_000,
-                                    timestamp: 0,
-                                    token_id: MINA_TOKEN_ID.to_string(),
-                                }],
-                                rhs: vec![AccountingEntry {
-                                    counterparty: payload.account,
-                                    transfer_type: "AccountCreationFee".to_string(),
-                                    entry_type: AccountingEntryType::Credit,
-                                    account: format!("AccountCreationFee#{}", payload.state_hash),
-                                    account_type: AccountingEntryAccountType::VirtualAddess,
-                                    amount_nanomina: 1_000_000_000,
-                                    timestamp: 0,
-                                    token_id: MINA_TOKEN_ID.to_string(),
-                                }],
-                            };
-                            if !payload.apply {
-                                record.lhs[0].entry_type = AccountingEntryType::Credit;
-                                record.rhs[0].entry_type = AccountingEntryType::Debit;
-                            }
+
+                            let double_entry = Self::process_new_account(payload.height, &payload.state_hash, &payload.account, payload.apply);
 
                             let new_event = Event {
                                 event_type: EventType::DoubleEntryTransaction,
-                                payload: sonic_rs::to_string(&record).unwrap(),
+                                payload: sonic_rs::to_string(&double_entry).unwrap(),
                             };
 
                             Some(vec![new_event])
@@ -741,7 +748,14 @@ impl ActorFactory for AccountingActor {
                             }
 
                             // also calls the same function
-                            let (lhs, rhs) = Self::process_generic_block(&payload.block, payload.canonical).await;
+                            let (mut lhs, mut rhs) = Self::process_generic_block(&payload.block, payload.canonical).await;
+
+                            for created_account in payload.block.accounts_created {
+                                let double_entry =
+                                    Self::process_new_account(payload.block.height, &payload.block.state_hash, &created_account.public_key, payload.canonical);
+                                lhs.extend(double_entry.lhs);
+                                rhs.extend(double_entry.rhs);
+                            }
 
                             if lhs.is_empty() && rhs.is_empty() {
                                 return None;
@@ -782,7 +796,7 @@ mod accounting_actor_tests_v2 {
             berkeley_block_models::BerkeleyBlock,
             block::BlockTrait,
             events::{Event, EventType},
-            models::{CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
+            models::{AccountCreated, CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
             payloads::{
                 AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload, DoubleEntryRecordPayload,
                 LedgerDestination, MainnetBlockPayload, NewAccountPayload,
@@ -2424,5 +2438,216 @@ mod accounting_actor_tests_v2 {
             minted_lhs.is_some() && minted_rhs.is_some(),
             "Expected minted scenario with +10,000,000,000,000,000 for PUNK token"
         );
+    }
+
+    #[tokio::test]
+    async fn test_canonical_berkeley_block_accounts_created() {
+        // 1) Build an ActorDAG + root => AccountingActor
+        let mut dag = ActorDAG::new();
+        let accounting_actor = AccountingActor::create_actor().await;
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 2) Add a sink node to capture `DoubleEntryTransaction` events
+        let sink_node = create_double_entry_sink_node();
+        let sink_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_id);
+
+        // 3) Spawn the DAG in the background
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 4) Construct a CanonicalBerkeleyBlockPayload with some “created accounts”
+        let accounts_created = vec![
+            AccountCreated {
+                public_key: "B62qNewlyCreated1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
+                fee_nanomina: 1,
+            },
+            AccountCreated {
+                public_key: "B62qNewlyCreated2".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
+                fee_nanomina: 1,
+            },
+        ];
+
+        // Suppose everything else is minimal or default
+        let test_block = BerkeleyBlockPayload {
+            height: 1234,
+            state_hash: "berkeley_state_hash".into(),
+            timestamp: 111_222_333,
+            coinbase_receiver: "B62qCoinbaseReceiver".into(),
+            coinbase_reward_nanomina: 0,
+            user_commands: vec![],
+            fee_transfers: vec![],
+            fee_transfer_via_coinbase: None,
+            zk_app_commands: vec![], // no zk app commands
+            // The critical piece:
+            accounts_created,
+            // If you have any “accessed_accounts,” supply them here if you wish
+            ..Default::default()
+        };
+
+        let canonical_payload = CanonicalBerkeleyBlockPayload {
+            block: test_block,
+            canonical: true, // canonical => “apply=true”
+            was_canonical: false,
+        };
+
+        // 5) Send this block event
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalBerkeleyBlock,
+                payload: sonic_rs::to_string(&canonical_payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send canonical Berkeley block with created accounts");
+
+        // Wait for processing
+        sleep(Duration::from_millis(200)).await;
+
+        // 6) Read from the sink => expect exactly 1 DoubleEntryTransaction
+        let sink_events = read_captured_transactions(&dag, &sink_id).await;
+        assert_eq!(sink_events.len(), 1, "Should have exactly one DoubleEntryTransaction event");
+
+        // 7) Parse the single DoubleEntryRecordPayload
+        let record_json = &sink_events[0];
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload");
+
+        // Confirm block info
+        assert_eq!(record.height, 1234);
+        assert_eq!(record.state_hash, "berkeley_state_hash");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // 8) Because we had 2 newly created accounts, we expect 2 “account creation” pairs appended to LHS/RHS
+        // Each new account insertion is 1 pair => LHS: Debit of 1_000_000_000, RHS: Credit. So with 2 accounts, that’s 2 pairs => 2 LHS, 2 RHS — plus any
+        // other entries from coinbase / fee transfers (if any).
+        //
+        // In this test, we had no coinbase or fees => total 2 LHS, 2 RHS for the new accounts:
+        assert_eq!(record.lhs.len(), 3, "2 new accounts => 2 LHS entries + coinbase");
+        assert_eq!(record.rhs.len(), 3, "2 new accounts => 2 RHS entries + coinbase");
+
+        // 9) Basic check of the first new account
+        let lhs_first = &record.lhs[1];
+        let rhs_first = &record.rhs[1];
+
+        assert_eq!(lhs_first.account, "B62qNewlyCreated1");
+        assert_eq!(lhs_first.amount_nanomina, 1_000_000_000);
+        assert_eq!(lhs_first.entry_type, crate::event_sourcing::payloads::AccountingEntryType::Debit);
+        assert_eq!(lhs_first.transfer_type, "AccountCreationFee");
+
+        assert_eq!(rhs_first.account, "AccountCreationFee#berkeley_state_hash");
+        assert_eq!(rhs_first.entry_type, crate::event_sourcing::payloads::AccountingEntryType::Credit);
+
+        // 10) And so on for the second account, etc.
+        // If your code appends them in a different order, you can search by .account instead.
+    }
+
+    #[tokio::test]
+    async fn test_non_canonical_berkeley_block_accounts_created() {
+        // 1) Build the DAG + root => AccountingActor
+        let mut dag = ActorDAG::new();
+        let accounting_actor = AccountingActor::create_actor().await;
+        let actor_id = accounting_actor.id();
+        let actor_sender = dag.set_root(accounting_actor);
+
+        // 2) Sink node => track DoubleEntryTransaction
+        let sink_node = create_double_entry_sink_node();
+        let sink_id = sink_node.id();
+        dag.add_node(sink_node);
+        dag.link_parent(&actor_id, &sink_id);
+
+        // 3) Spawn
+        let dag = Arc::new(Mutex::new(dag));
+        tokio::spawn({
+            let dag = Arc::clone(&dag);
+            async move {
+                dag.lock().await.spawn_all().await;
+            }
+        });
+
+        // 4) Construct a NON-canonical Berkeley block => block.accounts_created is nonempty => expect reversed new accounts
+        let accounts_created = vec![
+            AccountCreated {
+                public_key: "B62qNonCanonCreated1".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
+                fee_nanomina: 1,
+            },
+            AccountCreated {
+                public_key: "B62qNonCanonCreated2".to_string(),
+                token_id: MINA_TOKEN_ID.to_string(),
+                fee_nanomina: 1,
+            },
+        ];
+
+        let test_block = BerkeleyBlockPayload {
+            height: 888,
+            state_hash: "berkeley_noncanon_state".into(),
+            timestamp: 999999,
+            coinbase_receiver: "B62qSomeCoinbaseReceiver".into(),
+            coinbase_reward_nanomina: 0,
+            user_commands: vec![],
+            fee_transfers: vec![],
+            fee_transfer_via_coinbase: None,
+            zk_app_commands: vec![],
+            accounts_created,
+            ..Default::default()
+        };
+
+        let noncanonical_payload = CanonicalBerkeleyBlockPayload {
+            block: test_block,
+            canonical: false,    // reversed
+            was_canonical: true, // it was previously canonical
+        };
+
+        actor_sender
+            .send(Event {
+                event_type: EventType::CanonicalBerkeleyBlock,
+                payload: sonic_rs::to_string(&noncanonical_payload).unwrap(),
+            })
+            .await
+            .expect("Failed to send non-canonical BerkeleyBlock with created accounts");
+
+        // Wait
+        sleep(Duration::from_millis(200)).await;
+
+        // 5) Check sink => 1 DoubleEntryTransaction
+        let events = read_captured_transactions(&dag, &sink_id).await;
+        assert_eq!(events.len(), 1, "Expected exactly one DoubleEntryTransaction event for the non-canonical block");
+
+        // 6) Parse DoubleEntryRecordPayload
+        let record: DoubleEntryRecordPayload = sonic_rs::from_str(&events[0]).expect("Failed to parse DoubleEntryRecordPayload");
+        assert_eq!(record.height, 888);
+        assert_eq!(record.state_hash, "berkeley_noncanon_state");
+        assert_eq!(record.ledger_destination, LedgerDestination::BlockchainLedger);
+
+        // Because 2 accounts got created in a non-canonical block => each creation is reversed => we get 2 pairs => 2 LHS, 2 RHS
+        // If you had no coinbase or fees => total 2 LHS, 2 RHS:
+        assert_eq!(record.lhs.len(), 3, "2 reversed creation fee debits => 2 LHS + coinbase");
+        assert_eq!(record.rhs.len(), 3, "2 reversed creation fee credits => 2 RHS + coinbase");
+
+        // 7) Verify each LHS entry is a “Credit” for the new account
+        for lhs_entry in &record.lhs {
+            if lhs_entry.transfer_type.contains("MinaCoinbase") {
+                continue;
+            }
+            assert_eq!(lhs_entry.transfer_type, "AccountCreationFee");
+            assert_eq!(
+                lhs_entry.entry_type,
+                crate::event_sourcing::payloads::AccountingEntryType::Credit,
+                "Non-canonical => reversed => credit on LHS"
+            );
+            assert!(
+                lhs_entry.account == "B62qNonCanonCreated1" || lhs_entry.account == "B62qNonCanonCreated2",
+                "Should be one of the newly created accounts"
+            );
+        }
+        // Meanwhile the corresponding RHS entry is a Debit from “AccountCreationFee#berkeley_noncanon_state”.
     }
 }

@@ -5,7 +5,7 @@ use crate::{
         canonical_items_manager::CanonicalItem,
         events::{Event, EventType},
         managed_store::ManagedStore,
-        payloads::{CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload, NewAccountPayload},
+        payloads::{CanonicalMainnetBlockPayload, NewAccountPayload},
     },
 };
 use log::{debug, error};
@@ -32,31 +32,6 @@ impl NewAccountActor {
         }
 
         store.insert::<ManagedStore>(ACCOUNTS_STORE_KEY, managed_store);
-    }
-
-    async fn on_berkeley_block(block: CanonicalBerkeleyBlockPayload) -> Option<Vec<crate::event_sourcing::events::Event>> {
-        if block.block.accounts_created.is_empty() {
-            None
-        } else {
-            Some(
-                block
-                    .block
-                    .accounts_created
-                    .iter()
-                    .map(|ac| Event {
-                        event_type: EventType::NewAccount,
-                        payload: sonic_rs::to_string(&NewAccountPayload {
-                            apply: block.canonical,
-                            height: block.block.height,
-                            state_hash: block.block.state_hash.clone(),
-                            timestamp: block.block.timestamp,
-                            account: ac.public_key.to_string(),
-                        })
-                        .unwrap(),
-                    })
-                    .collect(),
-            )
-        }
     }
 
     async fn on_mainnet_block(block: CanonicalMainnetBlockPayload, store: &mut ActorStore) -> Option<Vec<crate::event_sourcing::events::Event>> {
@@ -178,10 +153,6 @@ impl NewAccountActor {
                             let block: CanonicalMainnetBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse MainnetBlockPayload");
                             NewAccountActor::on_mainnet_block(block, &mut locked_store).await
                         }
-                        EventType::CanonicalBerkeleyBlock => {
-                            let block: CanonicalBerkeleyBlockPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse BerkeleyBlockPayload");
-                            NewAccountActor::on_berkeley_block(block).await
-                        }
                         _ => None,
                     }
                 })
@@ -194,12 +165,12 @@ impl NewAccountActor {
 mod new_account_actor_tests_v2 {
     use super::{NewAccountActor, ACCOUNTS_STORE_KEY};
     use crate::{
-        constants::{MINA_TOKEN_ID, POSTGRES_CONNECTION_STRING},
+        constants::POSTGRES_CONNECTION_STRING,
         event_sourcing::{
             actor_dag::*,
             events::{Event, EventType},
-            models::{AccountCreated, CommandStatus, CommandSummary},
-            payloads::{BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload, CanonicalMainnetBlockPayload, MainnetBlockPayload, NewAccountPayload},
+            models::{CommandStatus, CommandSummary},
+            payloads::{CanonicalMainnetBlockPayload, MainnetBlockPayload, NewAccountPayload},
         },
     };
     use std::sync::Arc;
@@ -764,167 +735,6 @@ mod new_account_actor_tests_v2 {
                 let exists: bool = row.get(0);
                 assert!(!exists, "The account should have been removed from the store after reverting");
             }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_canonical_berkeley_block_accounts_created() {
-        // 1) Build an ActorDAG + root => NewAccountActor
-        let mut dag = ActorDAG::new();
-        let actor_node = NewAccountActor::create_actor(false).await;
-        let actor_id = actor_node.id();
-        let actor_sender = dag.set_root(actor_node);
-
-        // 2) Add a sink node to capture `NewAccount` events
-        let sink_node = create_new_account_sink_node();
-        let sink_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_id);
-
-        // 3) Spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
-
-        // 4) Construct a CanonicalBerkeleyBlockPayload whose `block.accounts_created` is nonempty Suppose your `CreatedAccount` has a `.public_key` field
-        let accounts_created = vec![
-            AccountCreated {
-                public_key: "B62qCanonAcct1".to_string(),
-                token_id: MINA_TOKEN_ID.to_string(),
-                fee_nanomina: 1,
-            },
-            AccountCreated {
-                public_key: "B62qCanonAcct2".to_string(),
-                token_id: MINA_TOKEN_ID.to_string(),
-                fee_nanomina: 1,
-            },
-        ];
-
-        let block_payload = CanonicalBerkeleyBlockPayload {
-            block: BerkeleyBlockPayload {
-                height: 777,
-                state_hash: "berk_state_hash".to_string(),
-                timestamp: 123456789,
-                // plus any other fields you need
-                accounts_created,
-                ..Default::default()
-            },
-            canonical: true, // canonical => we expect `apply = true`
-            was_canonical: false,
-        };
-
-        // 5) Send the `CanonicalBerkeleyBlock` event
-        actor_sender
-            .send(Event {
-                event_type: EventType::CanonicalBerkeleyBlock,
-                payload: sonic_rs::to_string(&block_payload).unwrap(),
-            })
-            .await
-            .expect("Failed to send CanonicalBerkeleyBlock event");
-
-        // 6) Wait for processing
-        sleep(Duration::from_millis(200)).await;
-
-        // 7) Confirm the sink node captured the correct `NewAccount` events
-        let dag_locked = dag.lock().await;
-        dag_locked.wait_until_quiesced().await;
-        let all_captured = read_captured_new_accounts(&dag_locked, &sink_id).await;
-
-        // We expect 2 new accounts => 2 events
-        assert_eq!(all_captured.len(), 2, "Should emit 2 NewAccount events");
-
-        for payload_json in &all_captured {
-            let parsed: NewAccountPayload = sonic_rs::from_str(payload_json).expect("Failed to parse NewAccountPayload");
-            assert!(parsed.apply, "Because block was canonical, 'apply' should be true");
-            assert_eq!(parsed.height, 777);
-            assert_eq!(parsed.state_hash, "berk_state_hash");
-            // The `account` field should match one of the 2 we gave
-            assert!(
-                parsed.account == "B62qCanonAcct1" || parsed.account == "B62qCanonAcct2",
-                "Unknown account discovered"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_non_canonical_berkeley_block_accounts_created() {
-        // 1) Build DAG + root actor
-        let mut dag = ActorDAG::new();
-        let actor_node = NewAccountActor::create_actor(false).await;
-        let actor_id = actor_node.id();
-        let actor_sender = dag.set_root(actor_node);
-
-        // 2) Sink node
-        let sink_node = create_new_account_sink_node();
-        let sink_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_id);
-
-        // 3) Spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
-
-        // 4) Construct a NON‐canonical Berkeley block => accounts_created not empty => we expect "apply = false"
-        let accounts_created = vec![
-            AccountCreated {
-                public_key: "B62qNonCanonAcct1".into(),
-                token_id: MINA_TOKEN_ID.to_string(),
-                fee_nanomina: 1,
-            },
-            AccountCreated {
-                public_key: "B62qNonCanonAcct2".into(),
-                token_id: MINA_TOKEN_ID.to_string(),
-                fee_nanomina: 1,
-            },
-        ];
-
-        let block_payload = CanonicalBerkeleyBlockPayload {
-            block: BerkeleyBlockPayload {
-                height: 999,
-                state_hash: "berk_noncanon_hash".to_string(),
-                timestamp: 987654321,
-                accounts_created,
-                ..Default::default()
-            },
-            canonical: false,    // non-canonical => apply=false
-            was_canonical: true, // we’re simulating a rollback
-        };
-
-        actor_sender
-            .send(Event {
-                event_type: EventType::CanonicalBerkeleyBlock,
-                payload: sonic_rs::to_string(&block_payload).unwrap(),
-            })
-            .await
-            .expect("Failed to send non-canonical Berkeley block event");
-
-        // Wait
-        sleep(Duration::from_millis(200)).await;
-
-        // 5) Confirm we got 2 NewAccount events, each with apply=false
-        let dag_locked = dag.lock().await;
-        dag_locked.wait_until_quiesced().await;
-        let captured = read_captured_new_accounts(&dag_locked, &sink_id).await;
-        assert_eq!(
-            captured.len(),
-            2,
-            "Should emit a NewAccount event for each newly created account, even if non-canonical"
-        );
-
-        for payload_json in &captured {
-            let parsed: NewAccountPayload = sonic_rs::from_str(payload_json).unwrap();
-            assert!(!parsed.apply, "Non-canonical => apply=false");
-            assert_eq!(parsed.height, 999);
-            assert_eq!(parsed.state_hash, "berk_noncanon_hash");
         }
     }
 }
