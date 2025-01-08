@@ -549,7 +549,7 @@ impl AccountingActor {
             state_hash: state_hash.to_string(),
             ledger_destination: LedgerDestination::BlockchainLedger,
             lhs: vec![AccountingEntry {
-                counterparty: format!("AccountCreationFee#{}", state_hash.to_string()),
+                counterparty: format!("AccountCreationFee#{}", state_hash),
                 transfer_type: "AccountCreationFee".to_string(),
                 entry_type: AccountingEntryType::Debit,
                 account: account.to_string(),
@@ -2634,7 +2634,7 @@ mod accounting_actor_tests_v2 {
 
         // 7) Verify each LHS entry is a “Credit” for the new account
         for lhs_entry in &record.lhs {
-            if lhs_entry.transfer_type.contains("MinaCoinbase") {
+            if lhs_entry.transfer_type.contains("Coinbase") {
                 continue;
             }
             assert_eq!(lhs_entry.transfer_type, "AccountCreationFee");
