@@ -133,13 +133,7 @@ impl BerkeleyBlock {
             .filter_map(|opt_diff| {
                 opt_diff.as_ref().and_then(|diff| match diff.coinbase.first() {
                     Some(v) if v == "Zero" => None,
-                    _ => {
-                        let multiplier = match self.data.protocol_state.body.consensus_state.supercharge_coinbase {
-                            true => 2,
-                            false => 1,
-                        };
-                        Some(multiplier * MAINNET_COINBASE_REWARD)
-                    }
+                    _ => Some(MAINNET_COINBASE_REWARD), // no such thing as supercharged blocks apparently
                 })
             })
             .sum()
