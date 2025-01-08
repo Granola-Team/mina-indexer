@@ -42,7 +42,7 @@ end
 def parse_filename(file_path)
   # Expects something like: mainnet-<height>-<hash>.json
   basename = File.basename(file_path)
-  if m = basename.match(/-(\d+)-([a-zA-Z0-9]+)\.json$/)
+  if (m = basename.match(/-(\d+)-([a-zA-Z0-9]+)\.json$/))
     height = m[1].to_i
     block_hash = m[2]
     return [height, block_hash]
@@ -78,8 +78,6 @@ def find_children(source_dir, parent_height, parent_hash, is_fork)
   # For each candidate, parse JSON, compare previous_state_hash
   Dir.glob(pattern).each_with_object([]) do |child_path, arr|
     if parse_filename(child_path)
-      # parse_filename => [child_height, child_hash]
-      child_height, child_hash = parse_filename(child_path)
       # read previous_state_hash
       prev = get_previous_state_hash(child_path, is_fork)
       # if prev == parent_hash => it's a child
