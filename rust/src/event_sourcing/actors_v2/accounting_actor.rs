@@ -753,7 +753,7 @@ impl ActorFactory for AccountingActor {
                                 ledger_destination: LedgerDestination::BlockchainLedger,
                                 lhs,
                                 rhs,
-                                accessed_accounts: Some(payload.block.accessed_accounts),
+                                accessed_accounts: if payload.canonical { Some(payload.block.accessed_accounts) } else { None },
                             };
                             record.verify();
 
