@@ -1,4 +1,4 @@
-use super::models::{CommandSummary, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase};
+use super::models::{CommandSummary, CompletedWorksNanomina, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary};
 use bigdecimal::{BigDecimal, ToPrimitive};
 use sonic_rs::{JsonValueTrait, Value};
 use std::{collections::HashMap, str::FromStr};
@@ -17,10 +17,15 @@ pub trait BlockTrait {
         self.get_user_commands().len()
     }
 
+    fn get_zk_app_commands(&self) -> Option<Vec<ZkAppCommandSummary>>;
+
     fn get_excess_block_fees(&self) -> u64 {
         let total_snark_fees = self.get_snark_work().iter().map(|ft| ft.fee_nanomina).sum::<u64>();
 
         let mut total_fees_paid_into_block_pool = self.get_user_commands().iter().map(|uc| uc.fee_nanomina).sum::<u64>();
+        if let Some(zk_app_commands) = self.get_zk_app_commands() {
+            total_fees_paid_into_block_pool += zk_app_commands.iter().map(|zkac| zkac.fee_nanomina).sum::<u64>();
+        }
         for ftvc in self.get_fee_transfers_via_coinbase().unwrap_or_default().iter() {
             total_fees_paid_into_block_pool += ftvc.fee_nanomina;
         }

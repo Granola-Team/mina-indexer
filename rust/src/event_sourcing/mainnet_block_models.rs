@@ -56,6 +56,10 @@ impl BlockTrait for MainnetBlock {
             .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.coinbase.clone()))
             .collect()
     }
+
+    fn get_zk_app_commands(&self) -> Option<Vec<super::models::ZkAppCommandSummary>> {
+        None
+    }
 }
 
 impl MainnetBlock {

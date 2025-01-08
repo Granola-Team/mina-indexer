@@ -61,6 +61,25 @@ impl BlockTrait for BerkeleyBlock {
             .filter_map(|opt_diff| opt_diff.as_ref().map(|diff| diff.coinbase.clone()))
             .collect()
     }
+
+    fn get_zk_app_commands(&self) -> Option<Vec<ZkAppCommandSummary>> {
+        Some(
+            [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
+                .iter()
+                .filter_map(|opt_diff| {
+                    opt_diff.as_ref().map(|diff| {
+                        diff.commands
+                            .iter()
+                            .filter(|wrapper| matches!(wrapper.command, Command::ZkappCommand(_)))
+                            .cloned()
+                            .collect::<Vec<CommandWrapper>>()
+                    })
+                })
+                .flatten()
+                .map(|w| w.to_zk_app_summary())
+                .collect(),
+        )
+    }
 }
 
 impl BerkeleyBlock {
@@ -107,24 +126,7 @@ impl BerkeleyBlock {
     }
 
     pub fn get_zk_app_commands_count(&self) -> usize {
-        self.get_zk_app_commands().len()
-    }
-
-    pub fn get_zk_app_commands(&self) -> Vec<ZkAppCommandSummary> {
-        [self.get_staged_ledger_pre_diff(), self.get_staged_ledger_post_diff()]
-            .iter()
-            .filter_map(|opt_diff| {
-                opt_diff.as_ref().map(|diff| {
-                    diff.commands
-                        .iter()
-                        .filter(|wrapper| matches!(wrapper.command, Command::ZkappCommand(_)))
-                        .cloned()
-                        .collect::<Vec<CommandWrapper>>()
-                })
-            })
-            .flatten()
-            .map(|w| w.to_zk_app_summary())
-            .collect()
+        self.get_zk_app_commands().expect("Expected a vec of zk app commands").len()
     }
 
     pub fn get_coinbase_reward_nanomina(&self) -> u64 {
@@ -741,7 +743,8 @@ mod berkeley_block_tests {
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-410773-3NLjmPVZ6HRV3CUdB3N8VbgwdNRAyjJibTCc4viKfUrrFuwTZk9s.json")
                 .expect("Failed to read test file");
 
-        let zk_app_commands = berkeley_block.get_zk_app_commands();
+        let zk_app_commands = berkeley_block.get_zk_app_commands().expect("Expected to have a vec of zk app commands");
+
         assert_eq!(zk_app_commands.len(), 5);
 
         let first_zkapp_command = zk_app_commands.first().unwrap();
@@ -812,7 +815,8 @@ mod berkeley_block_tests {
             get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
                 .expect("Failed to read test file");
 
-        let punk_zk_app_command = block.get_zk_app_commands().last().cloned().unwrap();
+        let opt_zk_app_commands = block.get_zk_app_commands().expect("Expected to have a vec of zk app commands");
+        let punk_zk_app_command = opt_zk_app_commands.last().cloned().unwrap();
         assert_eq!(punk_zk_app_command.account_updates, 4, "Expected 4 account updates");
 
         let account_update_trees = punk_zk_app_command.account_updates_trees.unwrap();
@@ -854,5 +858,20 @@ mod berkeley_block_tests {
         assert_eq!(first_accessed_account.balance(), 517_981_500_000);
         assert_eq!(first_accessed_account.token_id, MINA_TOKEN_ID);
         assert_eq!(first_accessed_account.public_key, "B62qpEFovh6b6gJxxvpwSDxbztVMyuTLR3uBfeLkZtRbWTzbBKfitYo");
+    }
+
+    #[test]
+    fn test_excess_block_fees() {
+        let file_content =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-359609-3NL8ym45gfcDR18fyn7WMJVwgweb4C4HYWUnwNEQuyb5TsF8Hemn.json")
+                .expect("Failed to read test file");
+
+        let block: BerkeleyBlock = sonic_rs::from_str(&file_content).unwrap();
+
+        assert_eq!(
+            block.get_excess_block_fees(),
+            401_100_000,
+            "Expected all fees from zk apps and user commands to be excees block fees"
+        );
     }
 }

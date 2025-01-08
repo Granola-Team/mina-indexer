@@ -2257,7 +2257,7 @@ mod accounting_actor_tests_v2 {
                 user_commands: berkeley_block.get_user_commands(),
                 fee_transfers: berkeley_block.get_fee_transfers(),
                 fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
-                zk_app_commands: berkeley_block.get_zk_app_commands().to_vec(),
+                zk_app_commands: berkeley_block.get_zk_app_commands().expect("Expected a vec of zk app commands").to_vec(),
                 ..Default::default()
             },
             canonical: true,
@@ -2365,7 +2365,7 @@ mod accounting_actor_tests_v2 {
                 user_commands: berkeley_block.get_user_commands(),
                 fee_transfers: berkeley_block.get_fee_transfers(),
                 fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
-                zk_app_commands: berkeley_block.get_zk_app_commands().to_vec(),
+                zk_app_commands: berkeley_block.get_zk_app_commands().expect("Expected a vec of zk app commands").to_vec(),
                 ..Default::default()
             },
             canonical: true,
