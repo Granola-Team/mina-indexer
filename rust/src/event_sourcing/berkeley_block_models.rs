@@ -664,7 +664,8 @@ mod berkeley_block_tests {
             "Coinbase receiver should match"
         );
 
-        assert_eq!(berkeley_block.get_coinbase_reward_nanomina(), 1_440_000_000_000, "Coinbase reward should match");
+        // supercharged blocks are always 720 MINA
+        assert_eq!(berkeley_block.get_coinbase_reward_nanomina(), 720_000_000_000, "Coinbase reward should match");
 
         assert_eq!(berkeley_block.get_global_slot_since_genesis(), 8612, "Global slot since genesis should match");
 
