@@ -17,7 +17,7 @@ impl ActorFactory for PcbFilePathActor {
             .with_processor(|event, _state, _requeue| {
                 Box::pin(async move {
                     let keys = get_top_level_keys_from_json_file(&event.payload).expect("file to exist");
-                    if keys == vec!["data".to_string(), "version".to_string()] {
+                    if keys.len() == 2 {
                         Some(vec![Event {
                             event_type: EventType::BerkeleyBlockPath,
                             payload: event.payload,
