@@ -53,6 +53,8 @@ impl AccountSummaryActor {
                 event_type: EventType::AccountLogBalanceDelta,
                 payload: sonic_rs::to_string(&AccountBalanceDeltaPayload {
                     token_id: token_id.to_string(),
+                    height: record.height,
+                    state_hash: record.state_hash.to_string(),
                     balance_deltas: acct_deltas.to_owned(),
                     accessed_accounts: record
                         .accessed_accounts

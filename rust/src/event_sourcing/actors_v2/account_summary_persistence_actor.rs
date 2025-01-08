@@ -118,6 +118,8 @@ impl AccountSummaryPersistenceActor {
                     if event.event_type == EventType::AccountLogBalanceDelta {
                         // parse the payload
                         let payload: AccountBalanceDeltaPayload = sonic_rs::from_str(&event.payload).expect("Failed to parse AccountBalanceDeltaPayload");
+                        let height = payload.height;
+                        let state_hash = payload.state_hash.to_string();
 
                         AccountSummaryPersistenceActor::handle_account_delta(&payload, &actor_store).await;
 
@@ -132,7 +134,7 @@ impl AccountSummaryPersistenceActor {
                             if let Err(incorrect_accounts) =
                                 AccountSummaryPersistenceActor::handle_runtime_ledger_check(payload.accessed_accounts.unwrap(), actor_store).await
                             {
-                                error!("Incorrect balance: {:#?}", incorrect_accounts);
+                                error!("Incorrect balance at {height} and {state_hash}: {:#?}", incorrect_accounts);
                             }
                         }
                     }
@@ -374,6 +376,8 @@ mod account_summary_persistence_actor_tests {
         deltas.insert("acct2".to_string(), 25i64);
 
         let payload = AccountBalanceDeltaPayload {
+            height: 50,
+            state_hash: "state_hash_1".to_string(),
             token_id: "test_token".to_string(),
             balance_deltas: deltas,
             accessed_accounts: None, // no checks yet
@@ -414,6 +418,8 @@ mod account_summary_persistence_actor_tests {
 
         // Now we send an event that triggers runtime ledger check:
         let payload_ok = AccountBalanceDeltaPayload {
+            height: 50,
+            state_hash: "state_hash_1".to_string(),
             token_id: "test_token".to_string(),
             balance_deltas: HashMap::new(), // no deltas needed
             accessed_accounts: Some(accounts_ok),
@@ -453,6 +459,8 @@ mod account_summary_persistence_actor_tests {
         ];
 
         let payload_bad = AccountBalanceDeltaPayload {
+            height: 50,
+            state_hash: "state_hash_1".to_string(),
             token_id: "test_token".to_string(),
             balance_deltas: HashMap::new(),
             accessed_accounts: Some(accounts_bad),

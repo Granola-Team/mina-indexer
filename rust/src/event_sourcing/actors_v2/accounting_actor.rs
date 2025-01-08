@@ -13,6 +13,7 @@ use crate::{
     utility::TreeNode,
 };
 use async_trait::async_trait;
+use log::warn;
 use std::collections::HashSet;
 
 pub struct AccountingActor;
@@ -26,6 +27,7 @@ pub struct AccountingActor;
 ///   - fee_transfer_via_coinbase
 ///   - plus (for Berkeley) optional zk_app_commands
 pub trait AccountingBlock {
+    fn get_height(&self) -> u64;
     fn get_state_hash(&self) -> &str;
     fn get_timestamp(&self) -> u64;
     fn get_coinbase_receiver(&self) -> &str;
@@ -45,6 +47,9 @@ pub trait AccountingBlock {
 // --------------------------------------
 
 impl AccountingBlock for MainnetBlockPayload {
+    fn get_height(&self) -> u64 {
+        self.height
+    }
     fn get_state_hash(&self) -> &str {
         &self.state_hash
     }
@@ -73,6 +78,9 @@ impl AccountingBlock for MainnetBlockPayload {
 // --------------------------------------
 
 impl AccountingBlock for BerkeleyBlockPayload {
+    fn get_height(&self) -> u64 {
+        self.height
+    }
     fn get_state_hash(&self) -> &str {
         &self.state_hash
     }
@@ -535,6 +543,7 @@ impl AccountingActor {
     }
 
     async fn process_batch_zk_app_commands(
+        height: u64,
         state_hash: &str,
         timestamp: u64,
         command: &ZkAppCommandSummary,
@@ -562,7 +571,10 @@ impl AccountingActor {
                     let (children_lhs, children_rhs) = match (net_delta == 0, node_children.len()) {
                         (true, _) => Self::process_balanced_pairs(timestamp, &node_children, canonical),
                         (false, 1) => Self::process_token_minting_burning(state_hash, timestamp, node_children[0], canonical),
-                        (_, _) => panic!("Unexpected ZK App accounting scenario"),
+                        (_, _) => {
+                            warn!("Unexpected zk app accounting scenario for {height} {state_hash}");
+                            Self::process_token_minting_burning(state_hash, timestamp, node_children[0], canonical)
+                        }
                     };
 
                     lhs.extend(children_lhs);
@@ -588,7 +600,7 @@ impl AccountingActor {
         // 4b) possible zk_app_commands (only meaningful for Berkeley)
         if let Some(zk_cmds) = block.get_zk_app_commands() {
             for cmd in zk_cmds {
-                let (lhs, rhs) = Self::process_batch_zk_app_commands(block.get_state_hash(), block.get_timestamp(), cmd, canonical).await;
+                let (lhs, rhs) = Self::process_batch_zk_app_commands(block.get_height(), block.get_state_hash(), block.get_timestamp(), cmd, canonical).await;
                 total_lhs.extend(lhs);
                 total_rhs.extend(rhs);
             }
