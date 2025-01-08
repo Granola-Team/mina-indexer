@@ -6,7 +6,8 @@ require "optparse"
 # Define default options
 options = {
   source_dir: "/path/to/source",
-  tip_file: "mainnet-25-<tip_hash>.json"
+  tip_file: "mainnet-25-<tip_hash>.json",
+  fork: false  # default to false unless --fork is given
 }
 
 # Parse command-line options
@@ -20,25 +21,40 @@ OptionParser.new do |opts|
   opts.on("-t", "--tip FILE", "Tip file (starting file in the chain)") do |t|
     options[:tip_file] = t
   end
+
+  opts.on("-f", "--fork", "Parse blocks post-fork") do
+    options[:fork] = true
+  end
 end.parse!
 
 # Helper function to get the previous state hash from file contents
-def get_previous_state_hash(file_path)
+def get_previous_state_hash(file_path, is_fork)
   file_content = JSON.parse(File.read(file_path))
-  file_content.dig("protocol_state", "previous_state_hash")
+
+  if is_fork
+    file_content.dig("data", "protocol_state", "previous_state_hash")
+  else
+    file_content.dig("protocol_state", "previous_state_hash")
+  end
 end
 
 # Traverse the blockchain from the tip to the root
-def traverse_chain(source_dir, tip_file)
+def traverse_chain(source_dir, tip_file, is_fork)
   current_file = File.join(source_dir, tip_file)
   chain = []
 
-  puts "current file: #{current_file}"
+  puts "Starting traversal from #{current_file}"
 
   while File.exist?(current_file)
     # Extract height and current hash from filename
-    height, current_hash = current_file.match(/-(\d+)-([a-zA-Z0-9]+)\.json$/).captures
-    height = height.to_i
+    if (m = current_file.match(/-(\d+)-([a-zA-Z0-9]+)\.json$/))
+      height_str, current_hash = m.captures
+      height = height_str.to_i
+    else
+      # Could not match the filename format => break or raise error
+      puts "Filename format unexpected: #{current_file}"
+      break
+    end
 
     # Append the current file to the chain
     chain << current_file
@@ -48,11 +64,15 @@ def traverse_chain(source_dir, tip_file)
     break if height == 0
 
     # Get the previous state hash to find the next file in the chain
-    prev_state_hash = get_previous_state_hash(current_file)
+    prev_state_hash = get_previous_state_hash(current_file, is_fork)
+    unless prev_state_hash
+      puts "No previous_state_hash found in JSON file, stopping."
+      break
+    end
 
     # Decrement the height and find the next file
     next_file = "#{source_dir}/mainnet-#{height - 1}-#{prev_state_hash}.json"
-    puts "next file: #{next_file}"
+    puts "Next file: #{next_file}"
     current_file = next_file
   end
 
@@ -61,4 +81,4 @@ def traverse_chain(source_dir, tip_file)
 end
 
 # Start the traversal from the tip file
-traverse_chain(options[:source_dir], options[:tip_file])
+traverse_chain(options[:source_dir], options[:tip_file], options[:fork])
