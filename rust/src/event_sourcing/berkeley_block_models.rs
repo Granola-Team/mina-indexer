@@ -196,6 +196,24 @@ impl BerkeleyBlock {
     pub fn get_global_slot_since_genesis(&self) -> u64 {
         self.data.protocol_state.body.consensus_state.global_slot_since_genesis.parse::<u64>().unwrap()
     }
+
+    pub fn get_zk_app_accounts(&self) -> Option<Vec<String>> {
+        if let Some(zk_app_commands) = self.get_zk_app_commands() {
+            let zk_app_update_trees = zk_app_commands
+                .iter()
+                .flat_map(|zkapp| zkapp.account_updates_trees.clone().into_iter().flat_map(|tree| tree))
+                .collect::<Vec<TreeNode<AccountUpdateBody>>>();
+            let zk_app_all_updates = zk_app_update_trees.iter().flat_map(|t| t.all_nodes()).collect::<Vec<_>>();
+            let all_accounts_within_zk_apps: HashSet<String> = zk_app_all_updates.iter().map(|n| n.value.public_key.to_string()).collect();
+            if all_accounts_within_zk_apps.is_empty() {
+                None
+            } else {
+                Some(all_accounts_within_zk_apps.into_iter().collect())
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -915,5 +933,44 @@ mod berkeley_block_tests {
             401_100_000,
             "Expected all fees from zk apps and user commands to be excees block fees"
         );
+    }
+
+    #[test]
+    fn test_mainnet_359606_no_zk_app_accounts() {
+        let block: BerkeleyBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json")
+                .expect("Failed to parse block JSON");
+
+        // Assert no ZK app accounts
+        let zk_app_accounts = block.get_zk_app_accounts();
+        assert!(zk_app_accounts.is_none(), "Expected no ZK app accounts in this block");
+
+        // Validate other accounts
+        let accessed_accounts = block.get_accessed_accounts();
+        let accessed_public_keys: Vec<String> = accessed_accounts.iter().map(|acc| acc.public_key.clone()).collect();
+
+        assert!(accessed_public_keys.contains(&"B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32".to_string()));
+        assert!(accessed_public_keys.contains(&"B62qqKUehFVKEvANaKUCrCUJXMxe4tSXMdJLg1upY5ikJmkcXHHRjfx".to_string()));
+    }
+
+    #[test]
+    fn test_mainnet_359610_zk_app_and_other_accounts() {
+        let block: BerkeleyBlock =
+            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-359610-3NLe669kJ89t48btn8NX6jMy7vnWNjP9caBdGgsCw2VSMjzP1anW.json")
+                .expect("Failed to parse block JSON");
+
+        // Validate ZK app accounts
+        let zk_app_accounts = block.get_zk_app_accounts().expect("Expected ZK app accounts in this block");
+
+        assert_eq!(zk_app_accounts.len(), 1, "Expected exactly 1 ZK app account");
+        assert!(zk_app_accounts.contains(&"B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".to_string()));
+
+        // Validate other accounts
+        let accessed_accounts = block.get_accessed_accounts();
+        let accessed_public_keys: Vec<String> = accessed_accounts.iter().map(|acc| acc.public_key.clone()).collect();
+
+        assert!(accessed_public_keys.contains(&"B62qjtTtTW7LRdQHNwg2be24qoWvnGiJqxKM9xQAszXsJQ8LQQK55N5".to_string()));
+        assert!(accessed_public_keys.contains(&"B62qj287L1bwP9XguURbxW5cneTRD8Kde4vx3fbeZCNxNxyMzXdsYLP".to_string()));
+        assert!(accessed_public_keys.contains(&"B62qpf8NdK4A2oRCjQxEcvzeP2K3gbtAHEJXpic3F34e3R2s77k1czt".to_string()));
     }
 }
