@@ -57,20 +57,22 @@ async fn account_diffs() {
 
     println!("=== Account diffs ===");
     for diff in diff.account_diffs.iter().flatten() {
+        use AccountDiff::*;
+
         match diff {
-            AccountDiff::Payment(PaymentDiff {
+            Payment(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
                 token: _,
             })
-            | AccountDiff::FeeTransfer(PaymentDiff {
+            | FeeTransfer(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
                 token: _,
             })
-            | AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
+            | FeeTransferViaCoinbase(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
@@ -104,7 +106,7 @@ async fn account_diffs() {
                     }
                 }
             }
-            AccountDiff::Delegation(DelegationDiff {
+            Delegation(DelegationDiff {
                 delegate,
                 delegator,
                 nonce,
@@ -114,7 +116,7 @@ async fn account_diffs() {
                 println!("delegator: {delegator}");
                 println!("nonce:     {nonce}");
             }
-            AccountDiff::Coinbase(CoinbaseDiff { public_key, amount }) => {
+            Coinbase(CoinbaseDiff { public_key, amount }) => {
                 println!("\n* Coinbase");
                 println!("public_key: {public_key}");
                 println!("amount:     {}", amount.0);
@@ -124,7 +126,7 @@ async fn account_diffs() {
                     ledger.insert(public_key.clone(), (amount.0 as i64, 0));
                 }
             }
-            AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
+            FailedTransactionNonce(FailedTransactionNonceDiff {
                 public_key,
                 nonce: new_nonce,
             }) => {
@@ -135,7 +137,16 @@ async fn account_diffs() {
                     *nonce += new_nonce.0;
                 }
             }
-            AccountDiff::Zkapp(_zkapp) => todo!(),
+            Zkapp(_)
+            | ZkappStateDiff(_)
+            | ZkappPermissionsDiff(_)
+            | ZkappVerificationKeyDiff(_)
+            | ZkappUriDiff(_)
+            | ZkappTokenSymbolDiff(_)
+            | ZkappTimingDiff(_)
+            | ZkappVotingForDiff(_)
+            | ZkappActionsDiff(_)
+            | ZkappEventsDiff(_) => unimplemented!(),
         }
     }
 

@@ -229,7 +229,24 @@ impl BestLedgerStore for IndexerStore {
                         },
                         ..acct
                     }),
-                    Zkapp(_diff) => todo!("zkapp diff unapply update_best_accounts"),
+
+                    // TODO zkapp unapply
+                    Zkapp(diff) => todo!("zkapp diff unapply {:?}", diff),
+                    ZkappStateDiff(diff) => todo!("zkapp state diff unapply {:?}", diff),
+                    ZkappPermissionsDiff(diff) => {
+                        todo!("zkapp permissions diff unapply {:?}", diff)
+                    }
+                    ZkappVerificationKeyDiff(diff) => {
+                        todo!("zkapp verification key diff unapply {:?}", diff)
+                    }
+                    ZkappUriDiff(diff) => todo!("zkapp uri diff unapply {:?}", diff),
+                    ZkappTokenSymbolDiff(diff) => {
+                        todo!("zkapp token symbol diff unapply {:?}", diff)
+                    }
+                    ZkappTimingDiff(diff) => todo!("zkapp timing diff unapply {:?}", diff),
+                    ZkappVotingForDiff(diff) => todo!("zkapp voting for diff unapply {:?}", diff),
+                    ZkappActionsDiff(diff) => todo!("zkapp actions diff unapply {:?}", diff),
+                    ZkappEventsDiff(diff) => todo!("zkapp events diff unapply {:?}", diff),
                 };
 
                 self.update_best_account(&pk, &token, account)?;
@@ -292,7 +309,18 @@ impl BestLedgerStore for IndexerStore {
                         nonce: Some(diff.nonce),
                         ..acct
                     }),
-                    Zkapp(_diff) => todo!("zkapp diff apply update_best_accounts"),
+
+                    // TODO zkapp apply
+                    Zkapp(_)
+                    | ZkappStateDiff(_)
+                    | ZkappPermissionsDiff(_)
+                    | ZkappVerificationKeyDiff(_)
+                    | ZkappUriDiff(_)
+                    | ZkappTokenSymbolDiff(_)
+                    | ZkappTimingDiff(_)
+                    | ZkappVotingForDiff(_)
+                    | ZkappActionsDiff(_)
+                    | ZkappEventsDiff(_) => None,
                 };
 
                 self.update_best_account(&pk, &token, account)?;
