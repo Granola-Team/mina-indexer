@@ -56,27 +56,7 @@ impl ActorFactory for CanonicalBerkeleyBlockActor {
                             let canonical_block = CanonicalBerkeleyBlockPayload {
                                 canonical: false, // Default placeholder, updated later
                                 was_canonical: false,
-                                block: BerkeleyBlockPayload {
-                                    height: berkeley_block.height,
-                                    state_hash: berkeley_block.state_hash.clone(),
-                                    previous_state_hash: berkeley_block.previous_state_hash.clone(),
-                                    last_vrf_output: berkeley_block.last_vrf_output.clone(),
-                                    user_command_count: berkeley_block.user_commands.len(),
-                                    zk_app_command_count: berkeley_block.zk_app_command_count,
-                                    user_commands: berkeley_block.user_commands.clone(),
-                                    zk_app_commands: berkeley_block.zk_app_commands.clone(),
-                                    snark_work_count: berkeley_block.snark_work_count,
-                                    snark_work: berkeley_block.snark_work.clone(),
-                                    timestamp: berkeley_block.timestamp,
-                                    coinbase_receiver: berkeley_block.coinbase_receiver.clone(),
-                                    coinbase_reward_nanomina: berkeley_block.coinbase_reward_nanomina,
-                                    global_slot_since_genesis: berkeley_block.global_slot_since_genesis,
-                                    fee_transfer_via_coinbase: berkeley_block.fee_transfer_via_coinbase.clone(),
-                                    fee_transfers: berkeley_block.fee_transfers.clone(),
-                                    tokens_used: berkeley_block.tokens_used,
-                                    accessed_accounts: berkeley_block.accessed_accounts,
-                                    accounts_created: berkeley_block.accounts_created,
-                                },
+                                block: berkeley_block.clone(),
                             };
 
                             manager.add_item(canonical_block).await;

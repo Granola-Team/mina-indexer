@@ -44,6 +44,7 @@ impl BerkeleyBlock {
             tokens_used: self.get_tokens_used(),
             accessed_accounts: self.get_accessed_accounts(),
             accounts_created: self.get_accounts_created(),
+            zk_app_accounts: self.get_zk_app_accounts(),
         }
     }
 }
@@ -201,7 +202,7 @@ impl BerkeleyBlock {
         if let Some(zk_app_commands) = self.get_zk_app_commands() {
             let zk_app_update_trees = zk_app_commands
                 .iter()
-                .flat_map(|zkapp| zkapp.account_updates_trees.clone().into_iter().flat_map(|tree| tree))
+                .flat_map(|zkapp| zkapp.account_updates_trees.clone().into_iter().flatten())
                 .collect::<Vec<TreeNode<AccountUpdateBody>>>();
             let zk_app_all_updates = zk_app_update_trees.iter().flat_map(|t| t.all_nodes()).collect::<Vec<_>>();
             let all_accounts_within_zk_apps: HashSet<String> = zk_app_all_updates.iter().map(|n| n.value.public_key.to_string()).collect();

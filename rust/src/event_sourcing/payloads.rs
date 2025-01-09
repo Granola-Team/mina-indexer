@@ -68,6 +68,7 @@ pub struct BerkeleyBlockPayload {
     pub tokens_used: Vec<String>,
     pub accessed_accounts: Vec<AccessedAccount>,
     pub accounts_created: Vec<AccountCreated>,
+    pub zk_app_accounts: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize)]

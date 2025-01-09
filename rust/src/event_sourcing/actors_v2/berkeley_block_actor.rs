@@ -2,9 +2,7 @@ use crate::{
     event_sourcing::{
         actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         berkeley_block_models::BerkeleyBlock,
-        block::BlockTrait,
         events::{Event, EventType},
-        payloads::BerkeleyBlockPayload,
     },
     utility::{extract_height_and_hash, get_cleaned_pcb},
 };
@@ -26,27 +24,7 @@ impl ActorFactory for BerkeleyBlockActor {
                         let berkeley_block: BerkeleyBlock = get_cleaned_pcb(&event.payload).expect("Failed to parse Berkeley block");
 
                         // Create the Berkeley block payload
-                        let berkeley_block_payload = BerkeleyBlockPayload {
-                            height: height as u64,
-                            state_hash: state_hash.to_string(),
-                            previous_state_hash: berkeley_block.get_previous_state_hash(),
-                            last_vrf_output: berkeley_block.get_last_vrf_output(),
-                            user_command_count: berkeley_block.get_user_commands_count(),
-                            user_commands: berkeley_block.get_user_commands(),
-                            zk_app_command_count: berkeley_block.get_zk_app_commands_count(),
-                            zk_app_commands: berkeley_block.get_zk_app_commands().expect("Expected a vec of zk app commands"),
-                            snark_work_count: berkeley_block.get_aggregated_snark_work().len(),
-                            snark_work: berkeley_block.get_aggregated_snark_work(),
-                            fee_transfers: berkeley_block.get_fee_transfers(),
-                            fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase(),
-                            timestamp: berkeley_block.get_timestamp(),
-                            coinbase_receiver: berkeley_block.get_coinbase_receiver(),
-                            coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
-                            global_slot_since_genesis: berkeley_block.get_global_slot_since_genesis(),
-                            tokens_used: berkeley_block.get_tokens_used(),
-                            accessed_accounts: berkeley_block.get_accessed_accounts(),
-                            accounts_created: berkeley_block.get_accounts_created(),
-                        };
+                        let berkeley_block_payload = berkeley_block.to_payload(height as u64, state_hash);
 
                         // Publish the BerkeleyBlock event
                         Some(vec![Event {

@@ -4,7 +4,7 @@ use crate::{
         actor_dag::{ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
         berkeley_block_models::AccountUpdateBody,
         events::{Event, EventType},
-        models::{AccountCreated, CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
+        models::{CommandSummary, CommandType, FeeTransfer, FeeTransferViaCoinbase, ZkAppCommandSummary},
         payloads::{
             AccountingEntry, AccountingEntryAccountType, AccountingEntryType, BerkeleyBlockPayload, CanonicalBerkeleyBlockPayload,
             CanonicalMainnetBlockPayload, DoubleEntryRecordPayload, InternalCommandType, LedgerDestination, MainnetBlockPayload, NewAccountPayload,
@@ -13,6 +13,7 @@ use crate::{
     utility::TreeNode,
 };
 use async_trait::async_trait;
+use std::collections::HashSet;
 
 pub struct AccountingActor;
 
@@ -37,10 +38,6 @@ pub trait AccountingBlock {
     // For Berkeley blocks, if you have zk_app_commands:
     fn get_zk_app_commands(&self) -> Option<&[ZkAppCommandSummary]> {
         None // default
-    }
-
-    fn get_accounts_created(&self) -> Vec<AccountCreated> {
-        vec![]
     }
 }
 
@@ -106,10 +103,6 @@ impl AccountingBlock for BerkeleyBlockPayload {
     }
     fn get_zk_app_commands(&self) -> Option<&[ZkAppCommandSummary]> {
         Some(&self.zk_app_commands)
-    }
-
-    fn get_accounts_created(&self) -> Vec<AccountCreated> {
-        self.accounts_created.clone()
     }
 }
 
@@ -446,73 +439,7 @@ impl AccountingActor {
         (lhs, rhs)
     }
 
-    // A helper function to check if a child has the 1,000,000,000 creation fee.
-    fn is_creation_fee_child(child: &TreeNode<AccountUpdateBody>) -> bool {
-        child.value.token_id == MINA_TOKEN_ID && child.value.balance_change.balance_delta().unsigned_abs() == 1_000_000_000
-    }
-
-    fn is_a_new_account(child: &TreeNode<AccountUpdateBody>, created_accounts: &Vec<AccountCreated>) -> bool {
-        created_accounts.iter().find(|ca| ca.public_key == child.value.public_key).is_some()
-    }
-
-    fn is_subsidized_account_creation_fee(
-        child_a: &TreeNode<AccountUpdateBody>,
-        child_b: &TreeNode<AccountUpdateBody>,
-        created_accounts: &Vec<AccountCreated>,
-        canonical: bool,
-    ) -> Option<(AccountingEntry, AccountingEntry)> {
-        // 1. Determine which child is the creation-fee payer, and which is new
-        let is_fee_a = Self::is_creation_fee_child(&child_a);
-        let is_new_a = Self::is_a_new_account(&child_a, created_accounts);
-
-        let is_fee_b = Self::is_creation_fee_child(&child_b);
-        let is_new_b = Self::is_a_new_account(&child_b, &created_accounts);
-
-        // 2. Match the booleans to decide which is which
-        if let Some((account_creation_fee_payer, new_account)) = match (is_fee_a, is_new_a, is_fee_b, is_new_b) {
-            // Case: child_a is fee payer, child_b is new
-            (true, false, false, true) => Some((child_a, child_b)),
-
-            // Case: child_b is fee payer, child_a is new
-            (false, true, true, false) => Some((child_b, child_a)),
-
-            // Otherwise, handle or ignore. For example:
-            _ => None,
-        } {
-            let (mut lhs, mut rhs) = (
-                AccountingEntry {
-                    counterparty: new_account.value.public_key.to_string(),
-                    transfer_type: "ZKAppSubsidizedAccountCreationFee".to_string(),
-                    entry_type: AccountingEntryType::Debit,
-                    account: account_creation_fee_payer.value.public_key.to_string(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: account_creation_fee_payer.value.balance_change.balance_delta().unsigned_abs(),
-                    timestamp: 0,
-                    token_id: account_creation_fee_payer.value.token_id.to_string(),
-                },
-                AccountingEntry {
-                    counterparty: account_creation_fee_payer.value.public_key.to_string(),
-                    transfer_type: "ZKAppSubsidizedAccountCreationFee".to_string(),
-                    entry_type: AccountingEntryType::Credit,
-                    account: new_account.value.public_key.to_string(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: account_creation_fee_payer.value.balance_change.balance_delta().unsigned_abs(),
-                    timestamp: 0,
-                    token_id: account_creation_fee_payer.value.token_id.to_string(),
-                },
-            );
-            if !canonical {
-                lhs.entry_type = lhs.entry_type.opposite();
-                rhs.entry_type = rhs.entry_type.opposite();
-            }
-            Some((lhs, rhs))
-        } else {
-            None
-        }
-    }
-
     async fn process_batch_zk_app_commands(
-        accounts_created: &Vec<AccountCreated>,
         _height: u64,
         state_hash: &str,
         timestamp: u64,
@@ -528,29 +455,20 @@ impl AccountingActor {
         rhs.extend(fee_rhs);
 
         if let Some(account_update_trees) = command.account_updates_trees.clone() {
-            if let [child_a, child_b] = &account_update_trees.clone()[..] {
-                if child_a.size() == 1 && child_b.size() == 1 {
-                    if let Some((child_lhs, child_rhs)) = Self::is_subsidized_account_creation_fee(&child_a, &child_b, accounts_created, canonical) {
+            for root in account_update_trees {
+                // BFS-level iterator returning children of each BFS node in order
+                let iter = root.bfs_steps();
+
+                for node_children in iter {
+                    // Sanity check: all children must have the same token_id
+                    let token_ids: std::collections::HashSet<_> = node_children.iter().map(|c| &c.value.token_id).collect();
+                    assert_eq!(token_ids.len(), 1, "Did not expect mixed tokens amongst children");
+
+                    // Process each child node for ledger entries
+                    for child in node_children {
+                        let (child_lhs, child_rhs) = Self::process_zk_app_child(timestamp, child, canonical);
                         lhs.push(child_lhs);
                         rhs.push(child_rhs);
-                    }
-                }
-            } else {
-                for root in account_update_trees {
-                    // BFS-level iterator returning children of each BFS node in order
-                    let iter = root.bfs_steps();
-
-                    for node_children in iter {
-                        // Sanity check: all children must have the same token_id
-                        let token_ids: std::collections::HashSet<_> = node_children.iter().map(|c| &c.value.token_id).collect();
-                        assert_eq!(token_ids.len(), 1, "Did not expect mixed tokens amongst children");
-
-                        // Process each child node for ledger entries
-                        for child in node_children {
-                            let (child_lhs, child_rhs) = Self::process_zk_app_child(timestamp, child, canonical);
-                            lhs.push(child_lhs);
-                            rhs.push(child_rhs);
-                        }
                     }
                 }
             }
@@ -573,15 +491,7 @@ impl AccountingActor {
         // 4b) possible zk_app_commands (only meaningful for Berkeley)
         if let Some(zk_cmds) = block.get_zk_app_commands() {
             for cmd in zk_cmds {
-                let (lhs, rhs) = Self::process_batch_zk_app_commands(
-                    &block.get_accounts_created(),
-                    block.get_height(),
-                    block.get_state_hash(),
-                    block.get_timestamp(),
-                    cmd,
-                    canonical,
-                )
-                .await;
+                let (lhs, rhs) = Self::process_batch_zk_app_commands(block.get_height(), block.get_state_hash(), block.get_timestamp(), cmd, canonical).await;
                 total_lhs.extend(lhs);
                 total_rhs.extend(rhs);
             }
@@ -696,7 +606,13 @@ impl ActorFactory for AccountingActor {
                             // also calls the same function
                             let (mut lhs, mut rhs) = Self::process_generic_block(&payload.block, payload.canonical).await;
 
-                            for created_account in payload.block.accounts_created {
+                            let zk_app_accounts: HashSet<String> = HashSet::from_iter(payload.block.zk_app_accounts.unwrap_or_default().into_iter());
+                            for created_account in payload
+                                .block
+                                .accounts_created
+                                .into_iter()
+                                .filter(|ac| !zk_app_accounts.contains(&ac.public_key))
+                            {
                                 let double_entry =
                                     Self::process_new_account(payload.block.height, &payload.block.state_hash, &created_account.public_key, payload.canonical);
                                 lhs.extend(double_entry.lhs);
@@ -2378,99 +2294,6 @@ mod accounting_actor_tests_v2 {
             );
         }
         // Meanwhile the corresponding RHS entry is a Debit from “AccountCreationFee#berkeley_noncanon_state”.
-    }
-
-    #[tokio::test]
-    async fn test_canonical_berkeley_block_subsidized_account_creation_fee_359611() {
-        // 1) Build a new ActorDAG + root => AccountingActor
-        let mut dag = ActorDAG::new();
-        let accounting_actor = AccountingActor::create_actor().await;
-        let actor_id = accounting_actor.id();
-        let actor_sender = dag.set_root(accounting_actor);
-
-        // 2) Create a sink node to capture DoubleEntryTransaction events
-        let sink_node = create_double_entry_sink_node();
-        let sink_node_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_node_id);
-
-        // 3) Spawn the DAG in background
-        let dag = std::sync::Arc::new(tokio::sync::Mutex::new(dag));
-        tokio::spawn({
-            let dag = std::sync::Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
-
-        // 4) Load the JSON file that includes the block with a subsidized account creation fee
-        let path = "./tests/data/test_berkeley_blocks/mainnet-359611-3NKybkb8C3R5PjwkxNUVCL6tb5qVf5i4jPWkDCcyJbka9Qgvr8CG.json";
-        let block: BerkeleyBlock = get_cleaned_pcb(path).expect("Failed to read test block JSON file");
-        let (height, state_hash) = extract_height_and_hash(Path::new(path));
-
-        // 5) Parse into your CanonicalBerkeleyBlockPayload (or whichever struct holds the block data)
-        let payload: CanonicalBerkeleyBlockPayload = CanonicalBerkeleyBlockPayload {
-            block: block.to_payload(height as u64, state_hash),
-            canonical: true,
-            was_canonical: false,
-        };
-
-        // 6) Send the event to the root actor
-        actor_sender
-            .send(Event {
-                event_type: EventType::CanonicalBerkeleyBlock,
-                payload: sonic_rs::to_string(&payload).unwrap(),
-            })
-            .await
-            .expect("Failed to send CanonicalBerkeleyBlock event");
-
-        // 7) Allow some time for asynchronous processing
-        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-
-        // 8) Fetch the recorded DoubleEntryTransaction events from the sink node
-        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
-        assert!(
-            !transactions.is_empty(),
-            "Expected at least one DoubleEntryTransaction event for subsidized account creation fee."
-        );
-
-        // 9) Examine each DoubleEntryTransaction. We look for the “ZKAppSubsidizedAccountCreationFee” among the LHS/RHS entries. We also expect a particular
-        //    payer & new account.
-
-        let mut found_subsidized_fee = false;
-        let mut found_expected_payer = false;
-        let mut found_expected_new_acct = false;
-
-        for tx_json in &transactions {
-            let record: DoubleEntryRecordPayload = sonic_rs::from_str(tx_json).expect("Failed to parse DoubleEntryRecordPayload");
-
-            // Check each entry in LHS + RHS
-            for entry in record.lhs.iter().chain(record.rhs.iter()) {
-                if entry.transfer_type == "ZKAppSubsidizedAccountCreationFee" {
-                    found_subsidized_fee = true;
-
-                    if entry.account == "B62qnYLvgjkDpAYc9eaPvDbMmJWKJg8pB5C1Gmte6eJZP2miPs7uiiY" {
-                        found_expected_payer = true;
-                    }
-                    if entry.account == "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P" {
-                        found_expected_new_acct = true;
-                    }
-                }
-            }
-        }
-
-        assert!(
-            found_subsidized_fee,
-            "Did not find any 'ZKAppSubsidizedAccountCreationFee' transfer in DoubleEntryTransaction records."
-        );
-        assert!(
-            found_expected_payer,
-            "Did not find the expected fee payer: B62qnYLvgjkDpAYc9eaPvDbMmJWKJg8pB5C1Gmte6eJZP2miPs7uiiY"
-        );
-        assert!(
-            found_expected_new_acct,
-            "Did not find the expected new account: B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P"
-        );
     }
 }
 
