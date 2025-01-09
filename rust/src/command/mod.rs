@@ -475,7 +475,7 @@ pub const MEMO_LEN: usize = 32;
 /// bytes 2 to 33 - are data, 0-right-padded if length is less than 32
 
 pub fn decode_memo(encoded: &[u8]) -> String {
-    let value = &encoded[2..encoded[1] as usize + 2];
+    let value = &encoded[2..(encoded[1] as usize + 2).min(encoded.len())];
     String::from_utf8(value.to_vec()).unwrap_or_default()
 }
 
