@@ -1006,11 +1006,24 @@ pub fn to_mina_format(json: Value) -> Value {
                 // payment/delegation
                 if let Value::Object(mut body) = obj["body"].clone() {
                     let kind = obj["body"]["kind"].clone();
-                    if kind == Value::String("Payment".into())
-                        || kind == Value::String("Stake_delegation".into())
-                    {
+
+                    if kind == Value::String("Payment".into()) {
                         body.remove("kind");
-                        obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                        obj["body"] =
+                            Value::Array(vec![kind.to_owned(), Value::Object(body.to_owned())]);
+                    }
+
+                    if kind == Value::String("Stake_delegation".into()) {
+                        body.remove("kind");
+
+                        if let Some(set_delegate) = body.remove("Set_delegate") {
+                            obj["body"] = Value::Array(vec![
+                                kind,
+                                Value::Array(vec!["Set_delegate".into(), set_delegate]),
+                            ]);
+                        } else {
+                            obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                        }
                     }
                 }
 

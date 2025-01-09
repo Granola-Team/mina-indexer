@@ -839,15 +839,14 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
         StakeDelegation((_, StakeDelegationPayload { new_delegate })) => {
             let mut body_obj = Map::new();
 
-            body_obj.insert(
-                "delegator".into(),
-                Value::String(fee_payer_pk.to_owned().to_address()),
-            );
-            body_obj.insert(
+            let mut set_delegate = Map::new();
+            set_delegate.insert(
                 "new_delegate".into(),
                 Value::String(new_delegate.to_owned().to_address()),
             );
+
             body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));
+            body_obj.insert("Set_delegate".into(), Value::Object(set_delegate));
 
             Value::Object(body_obj)
         }
