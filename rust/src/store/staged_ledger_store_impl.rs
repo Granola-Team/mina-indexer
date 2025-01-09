@@ -115,6 +115,7 @@ impl StagedLedgerStore for IndexerStore {
         pk: &PublicKey,
         token: &TokenAddress,
         state_hash: &BlockHash,
+        block_height: u32,
         account: &Account,
     ) -> anyhow::Result<()> {
         let account_serde_bytes = serde_json::to_vec(account)?;
@@ -123,6 +124,7 @@ impl StagedLedgerStore for IndexerStore {
             token,
             state_hash,
             account.balance.0,
+            block_height,
             &account_serde_bytes,
         )
     }
@@ -133,14 +135,10 @@ impl StagedLedgerStore for IndexerStore {
         token: &TokenAddress,
         state_hash: &BlockHash,
         balance: u64,
+        block_height: u32,
         account_serde_bytes: &[u8],
     ) -> anyhow::Result<()> {
         trace!("Setting staged account raw bytes pk {pk}");
-
-        let block_height = match self.get_block_height(state_hash)? {
-            None => bail!("Block missing from store {state_hash}"),
-            Some(block_height) => block_height,
-        };
 
         // update pk min block height
         let pk_min_block_height = self.get_pk_min_staged_ledger_block(pk)?.unwrap_or(u32::MAX);
@@ -210,36 +208,48 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         ledger: Ledger,
+        block_height: u32,
     ) -> anyhow::Result<()> {
         trace!("Adding staged ledger at state hash {state_hash}");
 
         // add staged accounts
         for (token, token_ledger) in ledger.tokens.iter() {
             for (pk, account) in token_ledger.accounts.iter() {
-                self.set_staged_account(pk, token, state_hash, account)?;
+                self.set_staged_account(pk, token, state_hash, block_height, account)?;
             }
         }
 
         // index on state hash & add new ledger event
-        if self
-            .get_known_genesis_prev_state_hashes()?
-            .contains(state_hash)
-        {
-            if self
+        if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH
+            && self
                 .add_staged_ledger_hashes(
                     &LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
                     state_hash,
                 )
                 .unwrap_or(false)
-            {
-                self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
-                    DbLedgerEvent::NewLedger {
-                        blockchain_length: 0,
-                        state_hash: state_hash.clone(),
-                        ledger_hash: LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
-                    },
-                )))?;
-            }
+        {
+            self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                DbLedgerEvent::NewLedger {
+                    blockchain_length: 0,
+                    state_hash: state_hash.clone(),
+                    ledger_hash: LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
+                },
+            )))?;
+        } else if state_hash.0 == HARDFORK_GENESIS_PREV_STATE_HASH
+            && self
+                .add_staged_ledger_hashes(
+                    &LedgerHash::new_or_panic(HARDFORK_GENESIS_LEDGER_HASH.into()),
+                    state_hash,
+                )
+                .unwrap_or(false)
+        {
+            self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
+                DbLedgerEvent::NewLedger {
+                    blockchain_length: HARDFORK_GENESIS_BLOCKCHAIN_LENGTH - 1,
+                    state_hash: state_hash.clone(),
+                    ledger_hash: LedgerHash::new_or_panic(HARDFORK_GENESIS_LEDGER_HASH.into()),
+                },
+            )))?;
         } else {
             match self.get_block_staged_ledger_hash(state_hash)? {
                 Some(ledger_hash) => {
@@ -259,7 +269,9 @@ impl StagedLedgerStore for IndexerStore {
                     }
                 }
                 None => {
-                    if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
+                    if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH
+                        || state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
+                    {
                         bail!("Block missing from store: {state_hash}")
                     }
                 }
@@ -279,9 +291,11 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         state_hash: &BlockHash,
         genesis_ledger: TokenLedger,
+        height: u32,
     ) -> anyhow::Result<()> {
         // add prev genesis state hash
         let mut known_prev = self.get_known_genesis_prev_state_hashes()?;
+
         if !known_prev.contains(state_hash) {
             known_prev.push(state_hash.clone());
             self.database.put(
@@ -296,7 +310,11 @@ impl StagedLedgerStore for IndexerStore {
             self.update_best_account(pk, &token, Some(acct.clone()))?;
         }
 
-        self.add_staged_ledger_at_state_hash(state_hash, Ledger::from_mina_ledger(genesis_ledger))?;
+        self.add_staged_ledger_at_state_hash(
+            state_hash,
+            Ledger::from_mina_ledger(genesis_ledger),
+            height,
+        )?;
         Ok(())
     }
 
@@ -329,7 +347,9 @@ impl StagedLedgerStore for IndexerStore {
                     curr_state_hash = parent_hash;
                 }
             } else {
-                if curr_state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH {
+                if curr_state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH
+                    || curr_state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
+                {
                     error!("Block missing from store: {curr_state_hash}");
                 }
 
@@ -347,7 +367,15 @@ impl StagedLedgerStore for IndexerStore {
 
             if memoize {
                 trace!("Memoizing ledger for block {state_hash}");
-                self.add_staged_ledger_at_state_hash(state_hash, ledger.clone())?;
+
+                match self.get_block_height(state_hash)? {
+                    Some(block_height) => self.add_staged_ledger_at_state_hash(
+                        state_hash,
+                        ledger.clone(),
+                        block_height,
+                    )?,
+                    None => bail!("Block missing from store {state_hash}"),
+                }
             }
 
             return Ok(Some(ledger));
