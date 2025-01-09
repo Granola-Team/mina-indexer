@@ -655,7 +655,6 @@ mod accounting_actor_tests_v2 {
         constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
         event_sourcing::{
             actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
-            berkeley_block_models::BerkeleyBlock,
             events::{Event, EventType},
             models::{AccountCreated, CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
             payloads::{
@@ -663,9 +662,8 @@ mod accounting_actor_tests_v2 {
                 LedgerDestination, MainnetBlockPayload, NewAccountPayload,
             },
         },
-        utility::{extract_height_and_hash, get_cleaned_pcb},
     };
-    use std::{path::Path, sync::Arc};
+    use std::sync::Arc;
     use tokio::{
         sync::{watch, Mutex},
         time::{sleep, Duration},
