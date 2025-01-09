@@ -13,7 +13,6 @@ use crate::{
     utility::TreeNode,
 };
 use async_trait::async_trait;
-use log::warn;
 use std::collections::HashSet;
 
 pub struct AccountingActor;
@@ -324,180 +323,6 @@ impl AccountingActor {
         (lhs, rhs)
     }
 
-    fn process_balanced_pairs(timestamp: u64, children: &[&TreeNode<AccountUpdateBody>], canonical: bool) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
-        // 1) Partition children based on sign of delta: negative => debit group, positive => credit group
-        let mut debit_children = vec![];
-        let mut credit_children = vec![];
-        for child in children {
-            if child.value.balance_change.balance_delta() < 0 {
-                debit_children.push(child);
-            } else {
-                credit_children.push(child)
-            }
-        }
-
-        // 2) Build LHS entries (canonical = debit)
-        let mut lhs: Vec<AccountingEntry> = debit_children
-            .iter()
-            .filter_map(|child| {
-                let delta = child.value.balance_change.balance_delta();
-                if delta == 0 {
-                    return None;
-                }
-                let abs_amount = delta.unsigned_abs();
-                let token_id = child.value.token_id.clone();
-                Some(AccountingEntry {
-                    transfer_type: "ZkAppCommand".to_string(),
-                    // You can change the counterparty as you prefer
-                    counterparty: credit_children
-                        .iter()
-                        .map(|cc| cc.value.public_key.to_string())
-                        .collect::<Vec<String>>()
-                        .as_slice()
-                        .join("#"),
-                    // Canonical => Debit
-                    // We'll flip below if not canonical
-                    entry_type: AccountingEntryType::Debit,
-                    account: child.value.public_key.clone(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: abs_amount,
-                    timestamp,
-                    token_id,
-                })
-            })
-            .collect();
-
-        // 3) Build RHS entries (canonical = credit)
-        let mut rhs: Vec<AccountingEntry> = credit_children
-            .iter()
-            .filter_map(|child| {
-                let delta = child.value.balance_change.balance_delta();
-                if delta == 0 {
-                    return None;
-                }
-                let abs_amount = delta.unsigned_abs();
-                let token_id = child.value.token_id.clone();
-                Some(AccountingEntry {
-                    transfer_type: "ZkAppCommand".to_string(),
-                    // You can change the counterparty as you prefer
-                    counterparty: debit_children
-                        .iter()
-                        .map(|cc| cc.value.public_key.to_string())
-                        .collect::<Vec<String>>()
-                        .as_slice()
-                        .join("#"),
-                    // Canonical => Credit
-                    // We'll flip below if not canonical
-                    entry_type: AccountingEntryType::Credit,
-                    account: child.value.public_key.clone(),
-                    account_type: AccountingEntryAccountType::BlockchainAddress,
-                    amount_nanomina: abs_amount,
-                    timestamp,
-                    token_id,
-                })
-            })
-            .collect();
-
-        // 4) If not canonical => flip all entry types
-        if !canonical {
-            // For LHS, all are canonical Debits => become Credits
-            for entry in &mut lhs {
-                entry.entry_type = AccountingEntryType::Credit;
-            }
-            // For RHS, all are canonical Credits => become Debits
-            for entry in &mut rhs {
-                entry.entry_type = AccountingEntryType::Debit;
-            }
-        }
-
-        (lhs, rhs)
-    }
-
-    fn process_token_minting_burning(
-        state_hash: &str,
-        timestamp: u64,
-        child: &TreeNode<AccountUpdateBody>,
-        canonical: bool,
-    ) -> (Vec<AccountingEntry>, Vec<AccountingEntry>) {
-        // 1) Extract net_delta from the single `child`.
-        let net_delta = child.value.balance_change.balance_delta();
-        if net_delta == 0 {
-            // No leftover => no minted or burned
-            return (vec![], vec![]);
-        }
-
-        // 2) Identify the token ID from the child's data
-        let token_id = child.value.token_id.clone();
-
-        // 3) Decide minted vs. burned based on sign
-        let abs_amount = net_delta.unsigned_abs();
-        let is_minted = net_delta > 0;
-
-        // 4) Build canonical entries: Mint => debit "Mint#", credit "ZkApp#...#Minted" Burn => credit "Burn#", debit "ZkApp#...#Burned"
-        let (mut lhs_entry, mut rhs_entry) = if is_minted {
-            // Mint scenario (canonical)
-            let debit_mint = AccountingEntry {
-                transfer_type: "Token::Mint".to_string(),
-                counterparty: format!("TokenMint#{}", state_hash),
-                entry_type: AccountingEntryType::Debit,
-                account: child.value.public_key.to_string(),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: abs_amount,
-                timestamp,
-                token_id: token_id.clone(),
-            };
-            let credit_mint = AccountingEntry {
-                transfer_type: "Token::Mint".to_string(),
-                counterparty: debit_mint.account.clone(),
-                entry_type: AccountingEntryType::Credit,
-                account: format!("TokenMint#{}", state_hash),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: abs_amount,
-                timestamp,
-                token_id: token_id.clone(),
-            };
-            (debit_mint, credit_mint)
-        } else {
-            // Burn scenario (canonical)
-            let credit_burn = AccountingEntry {
-                transfer_type: "Token::Burn".to_string(),
-                counterparty: format!("TokenBurn#{}", state_hash),
-                entry_type: AccountingEntryType::Credit,
-                account: child.value.public_key.to_string(),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: abs_amount,
-                timestamp,
-                token_id: token_id.clone(),
-            };
-            let debit_burn = AccountingEntry {
-                transfer_type: "Token::Burn".to_string(),
-                counterparty: credit_burn.account.clone(),
-                entry_type: AccountingEntryType::Debit,
-                account: format!("TokenBurn#{}", state_hash),
-                account_type: AccountingEntryAccountType::VirtualAddess,
-                amount_nanomina: abs_amount,
-                timestamp,
-                token_id: token_id.clone(),
-            };
-            (debit_burn, credit_burn)
-        };
-
-        // 5) If not canonical, flip only the entry_type
-        if !canonical {
-            lhs_entry.entry_type = match lhs_entry.entry_type {
-                AccountingEntryType::Debit => AccountingEntryType::Credit,
-                AccountingEntryType::Credit => AccountingEntryType::Debit,
-            };
-            rhs_entry.entry_type = match rhs_entry.entry_type {
-                AccountingEntryType::Debit => AccountingEntryType::Credit,
-                AccountingEntryType::Credit => AccountingEntryType::Debit,
-            };
-        }
-
-        // 6) Return them
-        (vec![lhs_entry], vec![rhs_entry])
-    }
-
     fn process_fee_payer_block_reward_pool(
         state_hash: &str,
         timestamp: u64,
@@ -577,8 +402,45 @@ impl AccountingActor {
         record
     }
 
+    fn process_zk_app_child(timestamp: u64, node: &TreeNode<AccountUpdateBody>, canonical: bool) -> (AccountingEntry, AccountingEntry) {
+        let entry_type = if node.value.balance_change.balance_delta() > 0 {
+            AccountingEntryType::Credit
+        } else {
+            AccountingEntryType::Debit
+        };
+        let (mut lhs, mut rhs) = (
+            AccountingEntry {
+                counterparty: format!("ZkAppTxn#{}", node.value.public_key),
+                transfer_type: "ZkAppTxn".to_string(),
+                entry_type: entry_type.clone(),
+                account: node.value.public_key.to_string(),
+                account_type: AccountingEntryAccountType::BlockchainAddress,
+                amount_nanomina: node.value.balance_change.balance_delta().unsigned_abs(),
+                timestamp,
+                token_id: node.value.token_id.to_string(),
+            },
+            AccountingEntry {
+                counterparty: node.value.public_key.to_string(),
+                transfer_type: "ZkAppTxn".to_string(),
+                entry_type: entry_type.opposite(),
+                account: format!("ZkAppTxn#{}", node.value.public_key),
+                account_type: AccountingEntryAccountType::VirtualAddess,
+                amount_nanomina: node.value.balance_change.balance_delta().unsigned_abs(),
+                timestamp,
+                token_id: node.value.token_id.to_string(),
+            },
+        );
+
+        if !canonical {
+            lhs.entry_type = lhs.entry_type.opposite();
+            rhs.entry_type = rhs.entry_type.opposite();
+        }
+
+        (lhs, rhs)
+    }
+
     async fn process_batch_zk_app_commands(
-        height: u64,
+        _height: u64,
         state_hash: &str,
         timestamp: u64,
         command: &ZkAppCommandSummary,
@@ -602,18 +464,12 @@ impl AccountingActor {
                     let token_ids: HashSet<String> = node_children.iter().map(|c| c.value.token_id.to_string()).collect();
                     assert_eq!(token_ids.len(), 1, "Did not expect mixed tokens amongst chilren");
 
-                    let net_delta: i64 = node_children.iter().map(|c| c.value.balance_change.balance_delta()).sum::<i64>();
-                    let (children_lhs, children_rhs) = match (net_delta == 0, node_children.len()) {
-                        (true, _) => Self::process_balanced_pairs(timestamp, &node_children, canonical),
-                        (false, 1) => Self::process_token_minting_burning(state_hash, timestamp, node_children[0], canonical),
-                        (_, _) => {
-                            warn!("Unexpected zk app accounting scenario for {height} {state_hash}");
-                            Self::process_token_minting_burning(state_hash, timestamp, node_children[0], canonical)
-                        }
-                    };
+                    for child in node_children {
+                        let (child_lhs, child_rhs) = Self::process_zk_app_child(timestamp, child, canonical);
 
-                    lhs.extend(children_lhs);
-                    rhs.extend(children_rhs);
+                        lhs.push(child_lhs);
+                        rhs.push(child_rhs);
+                    }
                 }
             }
         }
@@ -793,8 +649,6 @@ mod accounting_actor_tests_v2 {
         constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
         event_sourcing::{
             actor_dag::{ActorDAG, ActorFactory, ActorNode, ActorNodeBuilder, ActorStore},
-            berkeley_block_models::BerkeleyBlock,
-            block::BlockTrait,
             events::{Event, EventType},
             models::{AccountCreated, CommandSummary, FeeTransfer, FeeTransferViaCoinbase},
             payloads::{
@@ -802,7 +656,6 @@ mod accounting_actor_tests_v2 {
                 LedgerDestination, MainnetBlockPayload, NewAccountPayload,
             },
         },
-        utility::get_cleaned_pcb,
     };
     use std::sync::Arc;
     use tokio::{
@@ -2225,222 +2078,6 @@ mod accounting_actor_tests_v2 {
     }
 
     #[tokio::test]
-    async fn test_berkeley_block_407555_extensive_punk_accounting() {
-        use std::sync::Arc;
-        use tokio::{
-            sync::Mutex,
-            time::{sleep, Duration},
-        };
-
-        // 1) Build the ActorDAG
-        let mut dag = ActorDAG::new();
-
-        // 2) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor().await;
-        let actor_id = accounting_actor.id();
-        let actor_sender = dag.set_root(accounting_actor);
-
-        // 3) Create a sink node that captures DoubleEntryTransaction events
-        let sink_node = create_double_entry_sink_node();
-        let sink_node_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_node_id);
-
-        // 4) Wrap in Arc<Mutex<>> and spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
-
-        // 5) Load, clean, and parse the JSON for block 407555
-        let berkeley_block: BerkeleyBlock =
-            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-407555-3NK51MXHFabX7pEfHDHDAuQSKYbXnn1A3vCFXzRPZwp9z4DGwU2r.json")
-                .expect("Failed to parse BerkeleyBlock JSON");
-
-        // 6) Wrap into a canonical BerkeleyBlockPayload (or similar)
-        let payload = CanonicalBerkeleyBlockPayload {
-            block: BerkeleyBlockPayload {
-                height: 407555,
-                state_hash: berkeley_block.data.protocol_state.previous_state_hash.clone(),
-                timestamp: berkeley_block.get_timestamp(),
-                coinbase_receiver: berkeley_block.get_coinbase_receiver().to_string(),
-                coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
-                user_commands: berkeley_block.get_user_commands(),
-                fee_transfers: berkeley_block.get_fee_transfers(),
-                fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
-                zk_app_commands: berkeley_block.get_zk_app_commands().expect("Expected a vec of zk app commands").to_vec(),
-                ..Default::default()
-            },
-            canonical: true,
-            was_canonical: false,
-        };
-
-        // 7) Send the event => BFS expansions => LHS/RHS entries
-        actor_sender
-            .send(Event {
-                event_type: EventType::CanonicalBerkeleyBlock,
-                payload: sonic_rs::to_string(&payload).unwrap(),
-            })
-            .await
-            .expect("Failed to send CanonicalBerkeleyBlock event");
-
-        // Allow time for processing
-        sleep(Duration::from_millis(200)).await;
-
-        // 8) Read from the sink node => should have at least 1 DoubleEntryTransaction
-        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
-        assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 407555");
-
-        // In many cases, you'd expect exactly one DoubleEntryTransaction event. If so:
-        assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 407555");
-
-        // 9) Parse the DoubleEntryRecordPayload from the sink
-        let record_json = &transactions[0];
-        let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 407555");
-
-        // 10) Basic checks on height, state_hash, etc.
-        assert_eq!(record.height, 407555, "Block height mismatch");
-        // Compare record.state_hash if you want:
-        // assert_eq!(record.state_hash, "3NK51MXHFabX7p...", "State hash mismatch");
-
-        // 11) BFS expansions => examine LHS + RHS
-        // For example, we expect:
-        //   - One BFS node had a delta of -1,000,000,000 (1 MINA)
-        //   - Another BFS node had -100,000,000  PUNK
-        //   - Another BFS node had +100,000,000  PUNK
-        //   etc.
-
-        // Let's find the negative-1 MINA LHS entry:
-        let negative_one_mina = record
-            .lhs
-            .iter()
-            .find(|e| e.amount_nanomina == 1_000_000_000 && e.entry_type == AccountingEntryType::Debit && e.token_id == MINA_TOKEN_ID);
-        assert!(negative_one_mina.is_some(), "Expected BFS debit of 1 MINA in LHS");
-
-        // Now let's look for the "PUNK" token (0.1 PUNK):
-        let punk_token_id = "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg";
-
-        // -0.1 PUNK => e.amount_nanomina = 100_000_000, e.entry_type=Debit
-        let negative_punk_entry = record
-            .lhs
-            .iter()
-            .find(|e| e.amount_nanomina == 100_000_000 && e.entry_type == AccountingEntryType::Debit && e.token_id == punk_token_id);
-        assert!(negative_punk_entry.is_some(), "Expected BFS debit of 0.1 PUNK in LHS");
-
-        // +0.1 PUNK => e.amount_nanomina= 100_000_000, e.entry_type=Credit
-        let positive_punk_entry = record
-            .rhs
-            .iter()
-            .find(|e| e.amount_nanomina == 100_000_000 && e.entry_type == AccountingEntryType::Credit && e.token_id == punk_token_id);
-        assert!(positive_punk_entry.is_some(), "Expected BFS credit of 0.1 PUNK in RHS");
-    }
-
-    #[tokio::test]
-    async fn test_berkeley_block_367681_punk_minting_scenario() {
-        // 1) Build the ActorDAG
-        let mut dag = ActorDAG::new();
-
-        // 2) Create the AccountingActor (root)
-        let accounting_actor = AccountingActor::create_actor().await;
-        let actor_id = accounting_actor.id();
-        let actor_sender = dag.set_root(accounting_actor);
-
-        // 3) Create a sink node that captures DoubleEntryTransaction events
-        let sink_node = create_double_entry_sink_node();
-        let sink_node_id = sink_node.id();
-        dag.add_node(sink_node);
-        dag.link_parent(&actor_id, &sink_node_id);
-
-        // 4) Wrap in Arc<Mutex<>> and spawn
-        let dag = Arc::new(Mutex::new(dag));
-        tokio::spawn({
-            let dag = Arc::clone(&dag);
-            async move {
-                dag.lock().await.spawn_all().await;
-            }
-        });
-
-        // 5) Load, clean, and parse the Berkeley JSON for block 367681
-        let berkeley_block: BerkeleyBlock =
-            get_cleaned_pcb("./src/event_sourcing/test_data/berkeley_blocks/mainnet-367681-3NKficMDTHxKrj6VYUtncZCsT9TjBciWMu8upPryYZTjrw9vcTX4.json")
-                .expect("Failed to parse BerkeleyBlock JSON for block 367681");
-
-        // 6) Wrap into a canonical BerkeleyBlockPayload (or your event type)
-        let payload = CanonicalBerkeleyBlockPayload {
-            block: BerkeleyBlockPayload {
-                height: 367681,
-                state_hash: berkeley_block.data.protocol_state.previous_state_hash.clone(),
-                timestamp: berkeley_block.get_timestamp(),
-                coinbase_receiver: berkeley_block.get_coinbase_receiver().to_string(),
-                coinbase_reward_nanomina: berkeley_block.get_coinbase_reward_nanomina(),
-                user_commands: berkeley_block.get_user_commands(),
-                fee_transfers: berkeley_block.get_fee_transfers(),
-                fee_transfer_via_coinbase: berkeley_block.get_fee_transfers_via_coinbase().map(|x| x.to_vec()),
-                zk_app_commands: berkeley_block.get_zk_app_commands().expect("Expected a vec of zk app commands").to_vec(),
-                ..Default::default()
-            },
-            canonical: true,
-            was_canonical: false,
-        };
-
-        // 7) Send the event => BFS expansions => LHS/RHS
-        actor_sender
-            .send(Event {
-                event_type: EventType::CanonicalBerkeleyBlock,
-                payload: sonic_rs::to_string(&payload).unwrap(),
-            })
-            .await
-            .expect("Failed to send CanonicalBerkeleyBlock event for block 367681");
-
-        // Allow time for processing
-        sleep(Duration::from_millis(200)).await;
-
-        // 8) Read from the sink => expect at least 1 DoubleEntryTransaction
-        let transactions = read_captured_transactions(&dag, &sink_node_id).await;
-        assert!(!transactions.is_empty(), "Expected at least one DoubleEntryTransaction for block 367681");
-
-        // Usually you'd have exactly 1 DoubleEntryTransaction per block in your design:
-        assert_eq!(transactions.len(), 1, "Expected exactly 1 DoubleEntryTransaction for block 367681");
-
-        // 9) Parse the DoubleEntryRecordPayload
-        let record_json = &transactions[0];
-        let record: DoubleEntryRecordPayload = sonic_rs::from_str(record_json).expect("Failed to parse DoubleEntryRecordPayload for block 367681");
-
-        // Basic checks
-        assert_eq!(record.height, 367681, "Block height mismatch");
-        // If your BFS sets final state_hash in the record:
-        // assert_eq!(record.state_hash, "3NKficMDTHxKrj...", "State hash mismatch");
-
-        // 10) Check for the negative 1,000,000,000 (the 'PUNK cost') => LHS
-        let minus_one_billion = record
-            .lhs
-            .iter()
-            .find(|e| e.entry_type == AccountingEntryType::Debit && e.amount_nanomina == 1_000_000_000 && e.token_id == MINA_TOKEN_ID);
-        assert!(minus_one_billion.is_some(), "Expected BFS debit of 1,000,000,000 for PUNK token in LHS");
-
-        // 11) The BFS child is +10_000_000_000_000_000 for punk token
-        let punk_token_id = "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg";
-
-        let minted_lhs = record
-            .lhs
-            .iter()
-            .find(|e| e.transfer_type.contains("Mint") && e.amount_nanomina == 10_000_000_000_000_000 && e.token_id == punk_token_id);
-        let minted_rhs = record
-            .rhs
-            .iter()
-            .find(|e| e.transfer_type.contains("Mint") && e.amount_nanomina == 10_000_000_000_000_000 && e.token_id == punk_token_id);
-        // Because BFS might put one side on LHS, one side on RHS.
-        // We want to ensure we found something that indicates a minted scenario:
-        assert!(
-            minted_lhs.is_some() && minted_rhs.is_some(),
-            "Expected minted scenario with +10,000,000,000,000,000 for PUNK token"
-        );
-    }
-
-    #[tokio::test]
     async fn test_canonical_berkeley_block_accounts_created() {
         // 1) Build an ActorDAG + root => AccountingActor
         let mut dag = ActorDAG::new();
@@ -2649,5 +2286,102 @@ mod accounting_actor_tests_v2 {
             );
         }
         // Meanwhile the corresponding RHS entry is a Debit from “AccountCreationFee#berkeley_noncanon_state”.
+    }
+}
+
+#[cfg(test)]
+mod process_zk_app_child_tests {
+    use super::*; // Pulls in `process_zk_app_child`, `AccountingEntryType`, etc.
+    use crate::{
+        event_sourcing::berkeley_block_models::{AccountUpdateBody, BalanceChange},
+        utility::TreeNode,
+    };
+
+    /// Helper to build a TreeNode<AccountUpdateBody> with the specified delta, public key, and token.
+    fn make_node(balance_delta: i64, pubkey: &str, token: &str) -> TreeNode<AccountUpdateBody> {
+        TreeNode::new(AccountUpdateBody {
+            public_key: pubkey.to_string(),
+            token_id: token.to_string(),
+            balance_change: BalanceChange {
+                magnitude: balance_delta.unsigned_abs().to_string(),
+                sgn: vec![if balance_delta.is_negative() { "Neg".to_string() } else { "Pos".to_string() }],
+            },
+        })
+    }
+
+    #[test]
+    fn test_process_zk_app_child_canonical_positive_delta() {
+        // 1) Construct a node with +500000000 delta
+        let node = make_node(500_000_000, "B62qPositive", "MINA_TOKEN");
+        // 2) Call the function in canonical mode (true)
+        let (lhs, rhs) = super::AccountingActor::process_zk_app_child(123456789, &node, true);
+
+        // 3) Because the delta is positive => LHS => Credit, RHS => Debit
+        assert_eq!(
+            lhs.entry_type,
+            AccountingEntryType::Credit,
+            "Positive delta => LHS should be Credit in canonical mode"
+        );
+        assert_eq!(
+            rhs.entry_type,
+            AccountingEntryType::Debit,
+            "Positive delta => RHS should be Debit in canonical mode"
+        );
+
+        // Basic checks
+        assert_eq!(lhs.account, "B62qPositive");
+        assert_eq!(lhs.amount_nanomina, 500_000_000);
+        assert_eq!(rhs.account, "ZkAppTxn#B62qPositive");
+        assert_eq!(rhs.amount_nanomina, 500_000_000);
+    }
+
+    #[test]
+    fn test_process_zk_app_child_canonical_negative_delta() {
+        // 1) Construct a node with -250000000 delta
+        let node = make_node(-250_000_000, "B62qNegative", "MINA_TOKEN");
+        // 2) Call the function in canonical mode (true)
+        let (lhs, rhs) = super::AccountingActor::process_zk_app_child(111222333, &node, true);
+
+        // 3) Because the delta is negative => LHS => Debit, RHS => Credit
+        assert_eq!(
+            lhs.entry_type,
+            AccountingEntryType::Debit,
+            "Negative delta => LHS should be Debit in canonical mode"
+        );
+        assert_eq!(
+            rhs.entry_type,
+            AccountingEntryType::Credit,
+            "Negative delta => RHS should be Credit in canonical mode"
+        );
+
+        // Basic checks
+        assert_eq!(lhs.account, "B62qNegative");
+        assert_eq!(lhs.amount_nanomina, 250_000_000);
+        assert_eq!(rhs.account, "ZkAppTxn#B62qNegative");
+        assert_eq!(rhs.amount_nanomina, 250_000_000);
+    }
+
+    #[test]
+    fn test_process_zk_app_child_non_canonical_positive_delta() {
+        // Node with +100000000
+        let node = make_node(100_000_000, "B62qFlipPositive", "MINA_TOKEN");
+        // Non-canonical => false
+        let (lhs, rhs) = super::AccountingActor::process_zk_app_child(999999999, &node, false);
+
+        // Normally, positive => (Credit, Debit). Because it's non-canonical, we flip => LHS => Debit, RHS => Credit
+        assert_eq!(lhs.entry_type, AccountingEntryType::Debit, "Should be flipped to Debit in non-canonical mode");
+        assert_eq!(rhs.entry_type, AccountingEntryType::Credit, "Should be flipped to Credit in non-canonical mode");
+    }
+
+    #[test]
+    fn test_process_zk_app_child_non_canonical_negative_delta() {
+        // Node with -900000000
+        let node = make_node(-900_000_000, "B62qFlipNegative", "MINA_TOKEN");
+        // Non-canonical => false
+        let (lhs, rhs) = super::AccountingActor::process_zk_app_child(555000, &node, false);
+
+        // Normally, negative => (Debit, Credit). Because it's non-canonical, we flip => LHS => Credit, RHS => Debit
+        assert_eq!(lhs.entry_type, AccountingEntryType::Credit, "Should be flipped to Credit in non-canonical mode");
+        assert_eq!(rhs.entry_type, AccountingEntryType::Debit, "Should be flipped to Debit in non-canonical mode");
     }
 }

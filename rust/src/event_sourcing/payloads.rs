@@ -623,6 +623,16 @@ pub enum AccountingEntryType {
     Credit,
 }
 
+impl AccountingEntryType {
+    /// Returns the opposite of the current `AccountingEntryType`.
+    pub fn opposite(&self) -> Self {
+        match self {
+            AccountingEntryType::Debit => AccountingEntryType::Credit,
+            AccountingEntryType::Credit => AccountingEntryType::Debit,
+        }
+    }
+}
+
 impl fmt::Display for AccountingEntryType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_text = match self {
@@ -674,4 +684,22 @@ pub struct AccountBalanceDeltaPayload {
     pub state_hash: String,
     pub balance_deltas: HashMap<String, i64>,
     pub accessed_accounts: Option<Vec<AccessedAccount>>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AccountingEntryType;
+
+    #[test]
+    fn test_opposite_accounting_entry_type() {
+        // Test Debit -> Credit
+        let debit = AccountingEntryType::Debit;
+        let opposite_of_debit = debit.opposite();
+        assert_eq!(opposite_of_debit, AccountingEntryType::Credit, "Debit should have opposite Credit");
+
+        // Test Credit -> Debit
+        let credit = AccountingEntryType::Credit;
+        let opposite_of_credit = credit.opposite();
+        assert_eq!(opposite_of_credit, AccountingEntryType::Debit, "Credit should have opposite Debit");
+    }
 }
