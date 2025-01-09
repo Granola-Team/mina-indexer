@@ -23,6 +23,7 @@ use crate::{
         token::TokenAddress,
     },
 };
+use diff::account::ZkappDiff;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
@@ -71,10 +72,19 @@ impl Ledger {
         self.len() == 0
     }
 
+    /// Get a token ledger from the corresponding ledger
+    pub fn get_token_ledger(&self, token: &TokenAddress) -> Option<&TokenLedger> {
+        self.tokens.get(token)
+    }
+
+    /// Get a mutable token ledger from the corresponding ledger
+    pub fn get_mut_token_ledger(&mut self, token: &TokenAddress) -> Option<&mut TokenLedger> {
+        self.tokens.get_mut(token)
+    }
+
     /// Get a token account from the corresponding token ledger
     pub fn get_account(&self, pk: &PublicKey, token: &TokenAddress) -> Option<&Account> {
-        self.tokens
-            .get(token)
+        self.get_token_ledger(token)
             .and_then(|token_ledger| token_ledger.accounts.get(pk))
     }
 
@@ -84,8 +94,7 @@ impl Ledger {
         pk: &PublicKey,
         token: &TokenAddress,
     ) -> Option<&mut Account> {
-        self.tokens
-            .get_mut(token)
+        self.get_mut_token_ledger(token)
             .and_then(|token_ledger| token_ledger.accounts.get_mut(pk))
     }
 
@@ -117,6 +126,7 @@ impl Ledger {
     pub fn apply_diff(self, diff: &LedgerDiff) -> anyhow::Result<Self> {
         let mut ledger = self;
         ledger._apply_diff(diff)?;
+
         Ok(ledger)
     }
 
@@ -130,6 +140,12 @@ impl Ledger {
 
     /// Apply an account diff to a mutable ledger
     pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
+        // zkapp account diff
+        if let AccountDiff::Zkapp(zkapp) = acct_diff {
+            return self.apply_zkapp_diff(zkapp.as_ref());
+        }
+
+        // non-zkapp account diff
         let pk = acct_diff.public_key();
         let token = acct_diff.token_address();
 
@@ -137,12 +153,16 @@ impl Ledger {
             .tokens
             .get_mut(&token)
             .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
-            .or(Some(Account::empty(pk.clone(), token.clone())))
+            .or(Some(Account::empty(pk, token.to_owned())))
         {
             self.insert_account(account.apply_account_diff(acct_diff), &token);
         }
 
         Ok(())
+    }
+
+    fn apply_zkapp_diff(&mut self, zkapp: &ZkappDiff) -> anyhow::Result<()> {
+        todo!("apply zkapp {:?}", zkapp)
     }
 
     /// Unapply a ledger diff to a mutable ledger
