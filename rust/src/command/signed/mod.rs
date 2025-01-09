@@ -2,7 +2,10 @@ mod txn_hash;
 
 use crate::{
     command::*,
-    mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
+    mina_blocks::v2::{
+        self,
+        staged_ledger_diff::{Authorization, ProofOrSignature, UserCommandData},
+    },
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
@@ -319,6 +322,20 @@ impl SignedCommand {
                 ))
             }
             Self::V2(data) => {
+                // TODO mina daemon has a JSON parsing bug
+                // https://github.com/Granola-Team/mina-indexer/issues/1699
+                if let UserCommandData::ZkappCommandData(zkapp) = data {
+                    if zkapp.account_updates.iter().any(|update| {
+                        matches!(
+                            update.elt.account_update.authorization,
+                            Authorization::Proof_((ProofOrSignature::Proof, _))
+                        )
+                    }) {
+                        return Ok(TxnHash::V2("5J".repeat(26)));
+                    }
+                }
+
+                // no bugs
                 let json: serde_json::Value = data.to_owned().to_mina_json();
 
                 match serde_json::to_string(&json) {
