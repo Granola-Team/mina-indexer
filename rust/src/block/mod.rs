@@ -208,15 +208,12 @@ impl std::str::FromStr for BlockHash {
     }
 }
 
-impl From<String> for BlockHash {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-impl From<&str> for BlockHash {
-    fn from(value: &str) -> Self {
-        Self(value.to_string())
+impl<T> From<T> for BlockHash
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }
 
