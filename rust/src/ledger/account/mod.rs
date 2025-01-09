@@ -28,17 +28,21 @@ pub type Timing = timing::Timing;
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nonce: Option<Nonce>,
     pub delegate: PublicKey,
     pub genesis_account: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<Nonce>,
 
     // optional
     pub token: Option<TokenAddress>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<String>,
+    pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
+
+    #[serde(skip_deserializing)]
+    pub token_symbol: Option<TokenSymbol>,
 
     // for zkapp accounts
     pub zkapp: Option<ZkappAccount>,

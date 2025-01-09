@@ -12,7 +12,12 @@ impl LedgerHash {
     pub const PREFIX: &'static [&'static str] = &["jx", "jw", "jy", "jz"];
     pub const LEN: usize = 51;
 
-    pub fn new(hash: String) -> anyhow::Result<Self> {
+    pub fn new<T>(hash: T) -> anyhow::Result<Self>
+    where
+        T: Into<String>,
+    {
+        let hash: String = hash.into();
+
         if is_valid_ledger_hash(&hash) {
             return Ok(Self(hash));
         }
