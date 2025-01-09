@@ -65,6 +65,7 @@ pub trait StagedLedgerStore {
         pk: &PublicKey,
         token: &TokenAddress,
         state_hash: &BlockHash,
+        block_height: u32,
         account: &Account,
     ) -> anyhow::Result<()>;
 
@@ -75,6 +76,7 @@ pub trait StagedLedgerStore {
         token: &TokenAddress,
         state_hash: &BlockHash,
         balance: u64,
+        block_height: u32,
         account_serde_bytes: &[u8],
     ) -> anyhow::Result<()>;
 
@@ -101,6 +103,7 @@ pub trait StagedLedgerStore {
         &self,
         state_hash: &BlockHash,
         ledger: Ledger,
+        block_height: u32,
     ) -> anyhow::Result<()>;
 
     /// Add a new genesis ledger
@@ -108,6 +111,7 @@ pub trait StagedLedgerStore {
         &self,
         state_hash: &BlockHash,
         genesis_ledger: TokenLedger,
+        block_height: u32,
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff

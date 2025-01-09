@@ -286,9 +286,10 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         receiver: receiver_pk.to_owned(),
                         is_new_receiver_account: self.receiver_account_creation_fee_paid(),
                     }),
-                    SignedCommandPayloadBody::StakeDelegation(
+                    SignedCommandPayloadBody::StakeDelegation((
+                        _,
                         v2::staged_ledger_diff::StakeDelegationPayload { new_delegate },
-                    ) => Command::Delegation(Delegation {
+                    )) => Command::Delegation(Delegation {
                         nonce: self.nonce(),
                         delegator: self.sender(),
                         delegate: new_delegate.to_owned(),
@@ -346,9 +347,10 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     SignedCommandPayloadBody::Payment(payload) => {
                         vec![payload.receiver_pk.to_owned()]
                     }
-                    SignedCommandPayloadBody::StakeDelegation(StakeDelegationPayload {
-                        new_delegate,
-                    }) => {
+                    SignedCommandPayloadBody::StakeDelegation((
+                        _,
+                        StakeDelegationPayload { new_delegate },
+                    )) => {
                         vec![new_delegate.to_owned()]
                     }
                 },
@@ -426,7 +428,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     Payment(PaymentPayload { amount, .. }) => amount,
                     StakeDelegation(_) => 0,
                 },
-                UserCommandData::ZkappCommandData(_data) => todo!("zkapp amount"),
+                UserCommandData::ZkappCommandData(_data) => 0,
             },
         }
     }
@@ -473,7 +475,7 @@ pub const MEMO_LEN: usize = 32;
 /// bytes 2 to 33 - are data, 0-right-padded if length is less than 32
 
 pub fn decode_memo(encoded: &[u8]) -> String {
-    let value = &encoded[2..encoded[1] as usize + 2];
+    let value = &encoded[2..(encoded[1] as usize + 2).min(encoded.len())];
     String::from_utf8(value.to_vec()).unwrap_or_default()
 }
 
@@ -565,7 +567,7 @@ impl Command {
                             SignedCommandPayloadBody::StakeDelegation(payload) => {
                                 let delegator: PublicKey = command.sender();
                                 let nonce = command.nonce();
-                                let delegate = payload.new_delegate.to_owned();
+                                let delegate = payload.1.new_delegate.to_owned();
 
                                 trace!("Delegation {{ delegator: {delegator}, new_delegate: {delegate}, nonce: {nonce} }}");
                                 Self::Delegation(Delegation {
@@ -1004,11 +1006,24 @@ pub fn to_mina_format(json: Value) -> Value {
                 // payment/delegation
                 if let Value::Object(mut body) = obj["body"].clone() {
                     let kind = obj["body"]["kind"].clone();
-                    if kind == Value::String("Payment".into())
-                        || kind == Value::String("Stake_delegation".into())
-                    {
+
+                    if kind == Value::String("Payment".into()) {
                         body.remove("kind");
-                        obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                        obj["body"] =
+                            Value::Array(vec![kind.to_owned(), Value::Object(body.to_owned())]);
+                    }
+
+                    if kind == Value::String("Stake_delegation".into()) {
+                        body.remove("kind");
+
+                        if let Some(set_delegate) = body.remove("Set_delegate") {
+                            obj["body"] = Value::Array(vec![
+                                kind,
+                                Value::Array(vec!["Set_delegate".into(), set_delegate]),
+                            ]);
+                        } else {
+                            obj["body"] = Value::Array(vec![kind, Value::Object(body)]);
+                        }
                     }
                 }
 

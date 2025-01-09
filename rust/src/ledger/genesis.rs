@@ -178,8 +178,9 @@ impl GenesisLedger {
                     // If delegate is None, delegate to yourself
                     delegate: account.delegate.map_or(public_key, PublicKey),
                     token: account.token.map(TokenAddress::from),
+                    token_symbol: None,
                     receipt_chain_hash: account.receipt_chain_hash,
-                    voting_for: account.voting_for,
+                    voting_for: account.voting_for.map(Into::into),
                     permissions: account.permissions,
                     timing: account.timing.map(|t| t.into()),
                     zkapp: account.zkapp,

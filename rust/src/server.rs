@@ -34,13 +34,22 @@ pub struct IndexerVersion {
     pub network: Network,
     pub version: PcbVersion,
     pub chain_id: ChainId,
-    pub genesis_state_hash: BlockHash,
+    pub genesis: GenesisVersion,
+}
+
+#[derive(Clone, Debug)]
+pub struct GenesisVersion {
+    pub state_hash: BlockHash,
+    pub prev_hash: BlockHash,
+    pub blockchain_lenth: u32,
+    pub global_slot: u32,
+    pub last_vrf_output: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct IndexerConfiguration {
     pub genesis_ledger: GenesisLedger,
-    pub genesis_hash: BlockHash,
+    pub genesis_version: GenesisVersion,
     pub genesis_constants: GenesisConstants,
     pub constraint_system_digests: Vec<String>,
     pub protocol_txn_version_digest: Option<String>,
@@ -161,7 +170,7 @@ async fn initialize(
     let db_path = store.db_path.clone();
     let IndexerConfiguration {
         genesis_ledger,
-        genesis_hash,
+        genesis_version,
         blocks_dir,
         staking_ledgers_dir,
         prune_interval,
@@ -193,7 +202,7 @@ async fn initialize(
     }
 
     let chain_id = chain_id(
-        &genesis_hash.0,
+        &genesis_version.state_hash.0,
         &[
             genesis_constants.k.unwrap(),
             genesis_constants.slots_per_epoch.unwrap(),
@@ -210,9 +219,13 @@ async fn initialize(
         protocol_txn_version_digest.as_ref().map(|d| d as &str),
         protocol_network_version_digest.as_ref().map(|d| d as &str),
     );
-    let indexer_version = IndexerVersion::new(&Network::Mainnet, &chain_id, &genesis_hash);
+    let indexer_version = IndexerVersion {
+        network: Network::Mainnet,
+        version: version.clone(),
+        chain_id,
+        genesis: genesis_version,
+    };
     let state_config = IndexerStateConfig {
-        genesis_hash: genesis_hash.clone(),
         indexer_store: store.clone(),
         version: indexer_version.clone(),
         genesis_ledger: genesis_ledger.clone(),
@@ -271,10 +284,9 @@ async fn initialize(
         InitializationMode::Replay => {
             if let Ok(ref replay_state) =
                 IndexerState::new_without_genesis_events(IndexerStateConfig {
-                    genesis_hash: genesis_hash.clone(),
                     indexer_store: store.clone(),
-                    version: indexer_version.clone(),
-                    genesis_ledger: genesis_ledger.clone(),
+                    version: indexer_version,
+                    genesis_ledger,
                     transition_frontier_length: MAINNET_TRANSITION_FRONTIER_K,
                     prune_interval,
                     canonical_threshold,
@@ -319,8 +331,10 @@ async fn initialize(
     // flush/compress database
     let store = state.indexer_store.as_ref().unwrap();
     let temp_checkpoint_dir = store.db_path.join("tmp-checkpoint");
+
     Checkpoint::new(&store.database)?.create_checkpoint(&temp_checkpoint_dir)?;
     fs::remove_dir_all(&temp_checkpoint_dir)?;
+
     Ok(state)
 }
 
@@ -524,7 +538,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 let version = state.read().await.version.clone();
                 let state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match retry_parse_staking_ledger(&path, version.genesis_state_hash.clone())
+                    match retry_parse_staking_ledger(&path, version.genesis.state_hash.clone())
                         .await
                     {
                         Ok(staking_ledger) => {
@@ -536,7 +550,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                             store
                                 .add_staking_ledger(
                                     staking_ledger,
-                                    &state.version.genesis_state_hash,
+                                    &state.version.genesis.state_hash,
                                 )
                                 .unwrap_or_else(|e| {
                                     error!("Error adding staking ledger {ledger_summary} {e}")
@@ -648,24 +662,51 @@ async fn recover_missing_blocks(
     }
 }
 
-impl IndexerVersion {
-    pub fn new(network: &Network, chain_id: &ChainId, genesis_state_hash: &BlockHash) -> Self {
+impl GenesisVersion {
+    pub fn v1() -> Self {
         Self {
-            version: PcbVersion::default(),
-            network: network.clone(),
-            chain_id: chain_id.clone(),
-            genesis_state_hash: genesis_state_hash.clone(),
+            state_hash: MAINNET_GENESIS_HASH.into(),
+            prev_hash: MAINNET_GENESIS_PREV_STATE_HASH.into(),
+            last_vrf_output: MAINNET_GENESIS_LAST_VRF_OUTPUT.into(),
+            blockchain_lenth: 1,
+            global_slot: 0,
+        }
+    }
+
+    pub fn v2() -> Self {
+        Self {
+            state_hash: HARDFORK_GENSIS_HASH.into(),
+            prev_hash: HARDFORK_GENESIS_PREV_STATE_HASH.into(),
+            last_vrf_output: HARDFORK_GENESIS_LAST_VRF_OUTPUT.into(),
+            blockchain_lenth: HARDFORK_GENESIS_BLOCKCHAIN_LENGTH,
+            global_slot: HARDFORK_GENESIS_GLOBAL_SLOT,
+        }
+    }
+}
+
+impl IndexerVersion {
+    pub fn v1() -> Self {
+        Self {
+            network: Network::Mainnet,
+            version: PcbVersion::V1,
+            chain_id: ChainId::v1(),
+            genesis: GenesisVersion::v1(),
+        }
+    }
+
+    pub fn v2() -> Self {
+        Self {
+            network: Network::Mainnet,
+            version: PcbVersion::V2,
+            chain_id: ChainId::v2(),
+            genesis: GenesisVersion::v2(),
         }
     }
 }
 
 impl Default for IndexerVersion {
     fn default() -> Self {
-        Self::new(
-            &Network::Mainnet,
-            &ChainId(MAINNET_CHAIN_ID.to_string()),
-            &MAINNET_GENESIS_HASH.into(),
-        )
+        Self::v1()
     }
 }
 

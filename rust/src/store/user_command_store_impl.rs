@@ -827,7 +827,13 @@ impl<'a> TxnCsvRecord<'a> {
             block_height: cmd.blockchain_length,
             block_state_hash: &cmd.state_hash.0,
             from: cmd.command.source_pk().0,
-            to: cmd.command.receiver_pk().0,
+            to: cmd
+                .command
+                .receiver_pk()
+                .first()
+                .expect("receiver")
+                .0
+                .to_owned(),
             nonce: cmd.nonce.0,
             hash: cmd.tx_hash.ref_inner(),
             fee: cmd.command.fee(),

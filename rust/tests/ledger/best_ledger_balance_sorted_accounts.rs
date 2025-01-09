@@ -45,7 +45,8 @@ async fn check_best_accounts() -> anyhow::Result<()> {
 
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
-    let best_ledger = indexer_store.build_best_ledger()?.unwrap();
+    let store_best_ledger = indexer_store.build_best_ledger()?.unwrap();
+
     for (n, (key, value)) in indexer_store
         .best_ledger_account_balance_iterator(speedb::IteratorMode::End)
         .flatten()
@@ -55,7 +56,7 @@ async fn check_best_accounts() -> anyhow::Result<()> {
 
         let pk_value_account = serde_json::from_slice::<Account>(&value)?;
         let pk_store_account = indexer_store.get_best_account(&pk, &token)?.unwrap();
-        let pk_best_account = best_ledger
+        let pk_best_account = store_best_ledger
             .get_account(&pk, &token)
             .with_context(|| format!("pk: {pk}"))
             .unwrap()
@@ -82,8 +83,18 @@ async fn check_best_accounts() -> anyhow::Result<()> {
         curr_ledger_balance = Some(pk_best_account.balance.0);
     }
 
-    // check best ledger balances equal sorted store balances
-    for (token, token_ledger) in best_ledger.tokens.iter() {
+    // check store best ledger accounts equal sorted store best accounts
+    for (token, token_ledger) in store_best_ledger.tokens.iter() {
+        for (pk, best_acct) in token_ledger.accounts.iter() {
+            assert_eq!(
+                *best_acct,
+                indexer_store.get_best_account(pk, token)?.unwrap()
+            );
+        }
+    }
+
+    // check best ledger accounts equal sorted store best accounts
+    for (token, token_ledger) in state.best_ledger().tokens.iter() {
         for (pk, best_acct) in token_ledger.accounts.iter() {
             assert_eq!(
                 *best_acct,

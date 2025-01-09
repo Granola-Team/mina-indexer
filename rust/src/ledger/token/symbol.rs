@@ -27,9 +27,12 @@ impl std::str::FromStr for TokenSymbol {
     }
 }
 
-impl From<String> for TokenSymbol {
-    fn from(value: String) -> Self {
-        Self(value)
+impl<T> From<T> for TokenSymbol
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }
 

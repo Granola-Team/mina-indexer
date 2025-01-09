@@ -704,9 +704,9 @@ impl TransactionWithoutBlock {
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,
             receiver: PK {
-                public_key: receiver.0.to_owned(),
+                public_key: receiver.first().expect("receiver").0.to_owned(),
             },
-            to: receiver.0,
+            to: receiver.first().expect("receiver").0.to_owned(),
             token: cmd.command.fee_token(),
             epoch_num_user_commands,
             total_num_user_commands,

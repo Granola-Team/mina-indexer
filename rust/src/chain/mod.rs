@@ -8,10 +8,7 @@ use bincode::{Decode, Encode};
 use clap::builder::OsStr;
 use hex::ToHex;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashMap,
-    fmt::{Debug, Display, Formatter, Result},
-};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ChainId(pub String);
@@ -22,8 +19,24 @@ pub struct ChainData(pub HashMap<BlockHash, (PcbVersion, ChainId)>);
 impl ChainId {
     pub const LEN: u32 = 64;
 
-    pub fn new(chain_id: &str) -> Self {
-        Self(chain_id.to_string())
+    pub fn new<T>(chain_id: T) -> Self
+    where
+        T: Into<String>,
+    {
+        let chain_id: String = chain_id.into();
+        assert_eq!(chain_id.len() as u32, Self::LEN);
+
+        Self(chain_id)
+    }
+
+    /// Pre-hardfork chain id
+    pub fn v1() -> Self {
+        Self::new(MAINNET_CHAIN_ID)
+    }
+
+    /// Post-hardfork chain id
+    pub fn v2() -> Self {
+        Self::new(HARDFORK_CHAIN_ID)
     }
 }
 
@@ -33,7 +46,7 @@ impl std::fmt::Display for ChainId {
     }
 }
 
-impl Default for ChainData {
+impl std::default::Default for ChainData {
     fn default() -> Self {
         let v1_genesis_state_hash: BlockHash = MAINNET_GENESIS_HASH.into();
         let v1_chain_id = chain_id(
@@ -121,7 +134,7 @@ impl Network {
     const TESTWORLD: &'static str = "testworld";
     const BERKELEY: &'static str = "berkeley";
 
-    fn format(&self, f: &mut Formatter<'_>) -> Result {
+    fn format(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
@@ -135,14 +148,14 @@ impl Network {
     }
 }
 
-impl Display for Network {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl std::fmt::Display for Network {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.format(f)
     }
 }
 
-impl Debug for Network {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+impl std::fmt::Debug for Network {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.format(f)
     }
 }

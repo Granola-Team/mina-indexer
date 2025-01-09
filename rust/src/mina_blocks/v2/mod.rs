@@ -140,14 +140,11 @@ pub enum PermissionKind {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappAccount {
-    pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM], // 32 bytes each
-    pub action_state: [ActionState; 5],                        // 32 bytes each
+    pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    pub action_state: [ActionState; 5],
     pub verification_key: VerificationKey,
     pub proved_state: bool,
     pub zkapp_uri: ZkappUri,
-
-    #[serde(skip)]
-    pub token_symbol: Option<TokenSymbol>,
 
     #[serde(deserialize_with = "from_str")]
     pub zkapp_version: u32,
@@ -156,9 +153,11 @@ pub struct ZkappAccount {
     pub last_action_slot: u32,
 }
 
+/// 32 bytes
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct AppState(pub String);
 
+/// 32 bytes
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ActionState(pub String);
 
@@ -202,6 +201,6 @@ impl std::default::Default for AppState {
 
 impl std::default::Default for ActionState {
     fn default() -> Self {
-        Self("0x0000000000000000000000000000000000000000000000000000000000000000".to_string())
+        Self("0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9".to_string())
     }
 }

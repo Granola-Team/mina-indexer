@@ -1,7 +1,7 @@
 pub mod command;
 pub mod completed_work;
 
-use super::{protocol_state::SupplyAdjustment, Permissions, Timing, VerificationKey};
+use super::{protocol_state::SupplyAdjustment, AppState, Permissions, Timing, VerificationKey};
 use crate::{
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
@@ -125,7 +125,13 @@ pub enum SignedCommandPayloadKind {
 #[serde(untagged)]
 pub enum SignedCommandPayloadBody {
     Payment(PaymentPayload),
-    StakeDelegation(StakeDelegationPayload),
+    StakeDelegation((SetDelegate, StakeDelegationPayload)),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SetDelegate {
+    #[serde(rename = "Set_delegate")]
+    SetDelegate,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -295,16 +301,16 @@ pub enum UpdateTiming {
 pub struct Preconditions {
     pub network: NetworkPreconditions,
     pub account: AccountPreconditions,
-    pub valid_while: Precondition,
+    pub valid_while: Precondition<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NetworkPreconditions {
-    pub snarked_ledger_hash: Precondition,
-    pub blockchain_length: Precondition,
-    pub min_window_density: Precondition,
-    pub total_currency: Precondition,
-    pub global_slot_since_genesis: Precondition,
+    pub snarked_ledger_hash: Precondition<String>,
+    pub blockchain_length: Precondition<String>,
+    pub min_window_density: Precondition<String>,
+    pub total_currency: Precondition<String>,
+    pub global_slot_since_genesis: Precondition<String>,
     pub staking_epoch_data: StakingEpochDataPreconditions,
     pub next_epoch_data: StakingEpochDataPreconditions,
 }
@@ -312,46 +318,46 @@ pub struct NetworkPreconditions {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct StakingEpochDataPreconditions {
     pub ledger: LedgerPreconditions,
-    pub seed: Precondition,
-    pub start_checkpoint: Precondition,
-    pub lock_checkpoint: Precondition,
-    pub epoch_length: Precondition,
+    pub seed: Precondition<String>,
+    pub start_checkpoint: Precondition<String>,
+    pub lock_checkpoint: Precondition<String>,
+    pub epoch_length: Precondition<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct LedgerPreconditions {
-    pub hash: Precondition,
-    pub total_currency: Precondition,
+    pub hash: Precondition<String>,
+    pub total_currency: Precondition<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountPreconditions {
-    pub balance: Precondition,
-    pub nonce: Precondition,
-    pub receipt_chain_hash: Precondition,
-    pub delegate: Precondition,
-    pub state: [Precondition; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
-    pub action_state: Precondition,
-    pub proved_state: Precondition,
-    pub is_new: Precondition,
+    pub balance: Precondition<NumericBounds>,
+    pub nonce: Precondition<NumericBounds>,
+    pub receipt_chain_hash: Precondition<String>,
+    pub delegate: Precondition<PublicKey>,
+    pub state: [Precondition<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    pub action_state: Precondition<String>,
+    pub proved_state: Precondition<bool>,
+    pub is_new: Precondition<bool>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum Precondition {
+pub enum Precondition<T> {
     Ignore((String,)),
-    Check((String, CheckPreconditionBounds)),
+    Check((String, T)),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct CheckPreconditionBounds {
+pub struct NumericBounds {
     #[serde(deserialize_with = "from_str")]
     lower: u32,
     #[serde(deserialize_with = "from_str")]
     upper: u32,
 }
 
-impl std::str::FromStr for CheckPreconditionBounds {
+impl std::str::FromStr for NumericBounds {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

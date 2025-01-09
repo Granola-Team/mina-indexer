@@ -2,7 +2,10 @@ mod txn_hash;
 
 use crate::{
     command::*,
-    mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
+    mina_blocks::v2::{
+        self,
+        staged_ledger_diff::{Authorization, ProofOrSignature, UserCommandData},
+    },
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
@@ -154,24 +157,22 @@ impl SignedCommand {
                         Payment(PaymentPayload { amount, .. }) => *amount,
                         StakeDelegation(_) => 0,
                     },
-                    UserCommandData::ZkappCommandData(_data) => {
-                        todo!("zkapp amount")
-                    }
+                    UserCommandData::ZkappCommandData(_data) => 0,
                 }
             }
         }
     }
 
-    pub fn receiver_pk(&self) -> PublicKey {
+    pub fn receiver_pk(&self) -> Vec<PublicKey> {
         match self {
             Self::V1(v1) => {
                 use mina_rs::SignedCommandPayloadBody1::*;
                 match &v1.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(v1) => v1.t.t.receiver_pk.to_owned().into(),
+                    PaymentPayload(v1) => vec![v1.t.t.receiver_pk.to_owned().into()],
                     StakeDelegation(v1) => match v1.t {
                         mina_rs::StakeDelegation1::SetDelegate {
                             ref new_delegate, ..
-                        } => new_delegate.to_owned().into(),
+                        } => vec![new_delegate.to_owned().into()],
                     },
                 }
             }
@@ -179,14 +180,16 @@ impl SignedCommand {
                 use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
                 match data {
                     UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
-                        Payment(PaymentPayload { receiver_pk, .. }) => receiver_pk.to_owned(),
-                        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
-                            new_delegate.to_owned()
+                        Payment(PaymentPayload { receiver_pk, .. }) => vec![receiver_pk.to_owned()],
+                        StakeDelegation((_, StakeDelegationPayload { new_delegate })) => {
+                            vec![new_delegate.to_owned()]
                         }
                     },
-                    UserCommandData::ZkappCommandData(_data) => {
-                        todo!("zkapp receiver_pk")
-                    }
+                    UserCommandData::ZkappCommandData(data) => data
+                        .account_updates
+                        .iter()
+                        .map(|update| update.elt.account_update.body.public_key.to_owned())
+                        .collect(),
                 }
             }
         }
@@ -243,12 +246,13 @@ impl SignedCommand {
     }
 
     pub fn all_command_public_keys(&self) -> Vec<PublicKey> {
-        vec![
-            self.receiver_pk(),
-            self.source_pk(),
-            self.fee_payer_pk(),
-            self.signer(),
-        ]
+        let mut pks = self.receiver_pk();
+
+        pks.push(self.source_pk());
+        pks.push(self.fee_payer_pk());
+        pks.push(self.signer());
+
+        pks
     }
 
     pub fn contains_public_key(&self, pk: &PublicKey) -> bool {
@@ -319,6 +323,20 @@ impl SignedCommand {
                 ))
             }
             Self::V2(data) => {
+                // TODO mina daemon has a JSON parsing bug
+                // https://github.com/Granola-Team/mina-indexer/issues/1699
+                if let UserCommandData::ZkappCommandData(zkapp) = data {
+                    if zkapp.account_updates.iter().any(|update| {
+                        matches!(
+                            update.elt.account_update.authorization,
+                            Authorization::Proof_((ProofOrSignature::Proof, _))
+                        )
+                    }) {
+                        return Ok(TxnHash::V2("5J".repeat(26)));
+                    }
+                }
+
+                // no bugs
                 let json: serde_json::Value = data.to_owned().to_mina_json();
 
                 match serde_json::to_string(&json) {
@@ -503,12 +521,13 @@ impl From<SignedCommandWithCreationData> for Command {
                             nonce: signed.nonce(),
                             source: signed.fee_payer_pk(),
                             amount: signed.amount().into(),
-                            receiver: signed.receiver_pk(),
+                            receiver: signed.receiver_pk().first().expect("receiver").to_owned(),
                             is_new_receiver_account: value.is_new_receiver_account,
                         }),
-                        SignedCommandPayloadBody::StakeDelegation(StakeDelegationPayload {
-                            new_delegate,
-                        }) => Command::Delegation(Delegation {
+                        SignedCommandPayloadBody::StakeDelegation((
+                            _,
+                            StakeDelegationPayload { new_delegate },
+                        )) => Command::Delegation(Delegation {
                             nonce: signed.nonce(),
                             delegator: signed.source_pk(),
                             delegate: new_delegate.to_owned(),
@@ -818,18 +837,17 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
 
             Value::Object(body_obj)
         }
-        StakeDelegation(StakeDelegationPayload { new_delegate }) => {
+        StakeDelegation((_, StakeDelegationPayload { new_delegate })) => {
             let mut body_obj = Map::new();
 
-            body_obj.insert(
-                "delegator".into(),
-                Value::String(fee_payer_pk.to_owned().to_address()),
-            );
-            body_obj.insert(
+            let mut set_delegate = Map::new();
+            set_delegate.insert(
                 "new_delegate".into(),
                 Value::String(new_delegate.to_owned().to_address()),
             );
+
             body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));
+            body_obj.insert("Set_delegate".into(), Value::Object(set_delegate));
 
             Value::Object(body_obj)
         }
