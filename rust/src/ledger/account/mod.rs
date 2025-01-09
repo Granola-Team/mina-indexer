@@ -1,3 +1,6 @@
+mod receipt_chain_hash;
+mod timing;
+
 use super::{
     amount::Amount,
     diff::{
@@ -16,6 +19,10 @@ use crate::{
 };
 use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
+
+// re-export types
+pub type ReceiptChainHash = receipt_chain_hash::ReceiptChainHash;
+pub type Timing = timing::Timing;
 
 #[derive(Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Account {
@@ -69,21 +76,6 @@ pub enum Permission {
     Signature,
     Impossible,
 }
-
-#[derive(
-    Default, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, AutoFrom,
-)]
-#[auto_from(v2::Timing)]
-pub struct Timing {
-    pub initial_minimum_balance: u64,
-    pub cliff_time: u32,
-    pub cliff_amount: u64,
-    pub vesting_period: u32,
-    pub vesting_increment: u64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReceiptChainHash(pub String);
 
 impl Account {
     /// Display view of account
