@@ -6,7 +6,7 @@ use crate::{
         genesis::GenesisBlock,
         genesis_state_hash::GenesisStateHash,
         parser::{BlockParser, ParsedBlock},
-        precomputed::PrecomputedBlock,
+        precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
         Block, BlockHash, BlockWithoutHeight,
     },
@@ -155,7 +155,6 @@ pub enum ExtensionDirection {
 }
 
 pub struct IndexerStateConfig {
-    pub genesis_hash: BlockHash,
     pub genesis_ledger: GenesisLedger,
     pub version: IndexerVersion,
     pub indexer_store: Arc<IndexerStore>,
@@ -184,7 +183,6 @@ impl IndexerStateConfig {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
-            genesis_hash: MAINNET_GENESIS_HASH.into(),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             ledger_cadence: LEDGER_CADENCE,
@@ -232,7 +230,7 @@ impl IndexerState {
         if curr_pcb_version != new_pcb_version {
             debug!("Changing indexer version: {curr_pcb_version} -> {new_pcb_version}");
             state.write().await.version.version = new_pcb_version.clone();
-            state.write().await.version.genesis_state_hash = genesis_state_hash;
+            state.write().await.version.genesis.state_hash = genesis_state_hash;
 
             if let Some(store) = state.write().await.indexer_store.as_ref() {
                 store
@@ -250,17 +248,14 @@ impl IndexerState {
             .indexer_store
             .set_chain_id_for_network(&config.version.chain_id, &config.version.network)?;
 
-        let genesis_block = GenesisBlock::new_v1()?;
+        let genesis_block = match config.version.version {
+            PcbVersion::V1 => GenesisBlock::new_v1()?,
+            PcbVersion::V2 => GenesisBlock::new_v2()?,
+        };
         let genesis_bytes = genesis_block.1;
         let genesis_block = genesis_block.0;
 
         // add genesis block and ledger to indexer store
-        config.indexer_store.add_genesis_ledger(
-            &genesis_block.previous_state_hash(),
-            config.genesis_ledger.clone().into(),
-        )?;
-        info!("Genesis ledger added to indexer store");
-
         config
             .indexer_store
             .add_block(&genesis_block, genesis_bytes)?;
@@ -268,12 +263,19 @@ impl IndexerState {
 
         // update genesis canonicity
         config.indexer_store.add_canonical_block(
-            1,
-            0,
+            genesis_block.blockchain_length(),
+            genesis_block.global_slot_since_genesis(),
             &genesis_block.state_hash(),
             &genesis_block.state_hash(),
             Some(&genesis_block.previous_state_hash()),
         )?;
+
+        config.indexer_store.add_genesis_ledger(
+            &genesis_block.previous_state_hash(),
+            config.genesis_ledger.clone().into(),
+            config.version.genesis.blockchain_lenth,
+        )?;
+        info!("Genesis ledger added to indexer store");
 
         // update genesis best block
         config
@@ -281,14 +283,12 @@ impl IndexerState {
             .set_best_block(&genesis_block.state_hash())?;
 
         // apply genesis block to genesis ledger and keep its ledger diff
-        let root_branch = Branch::new_genesis(
-            genesis_block.state_hash(),
-            genesis_block.previous_state_hash(),
-        )?;
+        let root_branch = Branch::new_genesis_block(Block::from_precomputed(&genesis_block, 0))?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
         };
+
         Ok(Self {
             ledger: <GenesisLedger as Into<Ledger>>::into(config.genesis_ledger)
                 .apply_diff_from_precomputed(&genesis_block)?,
@@ -319,8 +319,13 @@ impl IndexerState {
 
     /// Creates a new indexer state without genesis events
     pub fn new_without_genesis_events(config: IndexerStateConfig) -> anyhow::Result<Self> {
-        let root_branch =
-            Branch::new_genesis(config.genesis_hash, MAINNET_GENESIS_PREV_STATE_HASH.into())?;
+        let root_branch = Branch::new_genesis(
+            config.version.genesis.state_hash.to_owned(),
+            config.version.genesis.prev_hash.to_owned(),
+            config.version.genesis.blockchain_lenth,
+            config.version.genesis.global_slot,
+            &config.version.genesis.last_vrf_output,
+        )?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
             node_id: root_branch.root.clone(),
@@ -365,7 +370,11 @@ impl IndexerState {
             let store = IndexerStore::new(path).unwrap();
             if let Some(ledger) = root_ledger.clone() {
                 store
-                    .add_staged_ledger_at_state_hash(&root_block.state_hash(), ledger)
+                    .add_staged_ledger_at_state_hash(
+                        &root_block.state_hash(),
+                        ledger,
+                        root_block.blockchain_length(),
+                    )
                     .expect("ledger add succeeds");
                 store
                     .set_best_block(&root_block.state_hash())
@@ -452,7 +461,7 @@ impl IndexerState {
                     indexer_store.add_canonical_block(
                         block.blockchain_length(),
                         block.global_slot_since_genesis(),
-                        &block.state_hash(),
+                        &state_hash,
                         &block.genesis_state_hash(),
                         None,
                     )?;
@@ -464,8 +473,11 @@ impl IndexerState {
                         }
 
                         ledger_diffs.clear();
-                        indexer_store
-                            .add_staged_ledger_at_state_hash(&state_hash, self.ledger.clone())?;
+                        indexer_store.add_staged_ledger_at_state_hash(
+                            &state_hash,
+                            self.ledger.clone(),
+                            block.blockchain_length(),
+                        )?;
                     }
 
                     // update root branch on last deep canonical block
@@ -579,6 +591,7 @@ impl IndexerState {
     ) -> anyhow::Result<bool> {
         if let Some(db_event) = self.add_block_to_store(block, block_bytes, false)? {
             self.bytes_processed += block_bytes;
+
             let (best_tip, new_canonical_blocks) = if db_event.is_new_block_event() {
                 if let Some(wt_event) = self.add_block_to_witness_tree(block, true, true)?.1 {
                     match wt_event {
@@ -915,6 +928,7 @@ impl IndexerState {
     /// Returns the best chain back to the root of the witness tree
     pub fn best_chain(&self) -> Vec<Block> {
         let mut best_chain = vec![self.best_tip_block().clone()];
+
         for b in self
             .root_branch
             .branches
@@ -1015,7 +1029,7 @@ impl IndexerState {
                 .ledger_paths
                 .map(|path| {
                     let staking_ledgers = self.staking_ledgers.clone();
-                    let genesis_state_hash = self.version.genesis_state_hash.clone();
+                    let genesis_state_hash = self.version.genesis.state_hash.clone();
                     let indexer_store = indexer_store.clone();
                     tokio::task::spawn(async move {
                         Self::process_staking_ledger(
@@ -1501,6 +1515,7 @@ impl IndexerState {
                     indexer_store.add_staged_ledger_at_state_hash(
                         &canonical_block.state_hash,
                         self.ledger.clone(),
+                        canonical_block.blockchain_length,
                     )?;
                 }
             }

@@ -10,7 +10,8 @@ use mina_indexer::{
         genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
     },
     server::{
-        initialize_indexer_database, start_indexer, IndexerConfiguration, InitializationMode,
+        initialize_indexer_database, start_indexer, GenesisVersion, IndexerConfiguration,
+        InitializationMode,
     },
     store::{restore_snapshot, version::IndexerStoreVersion, IndexerStore},
     unix_socket_server::remove_unix_socket,
@@ -444,7 +445,7 @@ fn process_indexer_configuration(
     mode: InitializationMode,
     domain_socket_path: PathBuf,
 ) -> anyhow::Result<IndexerConfiguration> {
-    let genesis_hash = args.db.genesis_hash.into();
+    let genesis_hash = args.db.genesis_hash;
     let blocks_dir = args.db.blocks_dir;
     let staking_ledgers_dir = args.db.staking_ledgers_dir;
     let genesis_constants = args.db.genesis_constants;
@@ -491,8 +492,12 @@ fn process_indexer_configuration(
     );
     let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger)?;
     Ok(IndexerConfiguration {
+        genesis_version: if genesis_hash == HARDFORK_GENSIS_HASH {
+            GenesisVersion::v2()
+        } else {
+            GenesisVersion::v1()
+        },
         genesis_ledger,
-        genesis_hash,
         genesis_constants,
         constraint_system_digests,
         protocol_txn_version_digest,
