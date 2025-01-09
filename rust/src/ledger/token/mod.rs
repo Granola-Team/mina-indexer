@@ -48,6 +48,10 @@ impl TokenAddress {
     }
 }
 
+/////////////////
+// conversions //
+/////////////////
+
 impl std::str::FromStr for TokenAddress {
     type Err = anyhow::Error;
 
@@ -91,16 +95,24 @@ impl From<TokenAddress> for u64 {
     }
 }
 
-impl std::fmt::Display for TokenAddress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+/////////////
+// default //
+/////////////
 
 impl std::default::Default for TokenAddress {
     /// MINA token address
     fn default() -> Self {
         Self(MINA_TOKEN_ADDRESS.into())
+    }
+}
+
+/////////////
+// display //
+/////////////
+
+impl std::fmt::Display for TokenAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

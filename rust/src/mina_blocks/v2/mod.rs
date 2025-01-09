@@ -2,6 +2,8 @@ pub mod precomputed_block;
 pub mod protocol_state;
 pub mod staged_ledger_diff;
 
+mod zkapp;
+
 use crate::{
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
@@ -14,6 +16,14 @@ use crate::{
 use protocol_state::ProtocolState;
 use serde::{Deserialize, Serialize};
 use staged_ledger_diff::StagedLedgerDiff;
+
+// re-export types
+
+pub type AppState = zkapp::app_state::AppState;
+pub type ActionState = zkapp::action_state::ActionState;
+pub type VerificationKey = zkapp::verification_key::VerificationKey;
+
+// v2 PCB (de)serialization
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrecomputedBlockV2 {
@@ -30,8 +40,6 @@ pub struct PrecomputedBlockDataV2 {
     pub proposed_protocol_version: Option<ProtocolVersion>,
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: StagedLedgerDiff,
-
-    /// values: ((pk, token), u64)
     pub accounts_created: Vec<AccountCreated>,
     pub accounts_accessed: Vec<(u64, AccountAccessed)>,
     pub tokens_used: Vec<TokenUsed>,
@@ -45,8 +53,9 @@ pub struct PrecomputedBlockDataV2 {
 
 // aliases
 
-pub type TokenUsed = (TokenAddress, Option<(PublicKey, TokenAddress)>);
+/// values: `((pk, token), account creation fee u64 as string)`
 pub type AccountCreated = ((PublicKey, TokenAddress), String);
+pub type TokenUsed = (TokenAddress, Option<(PublicKey, TokenAddress)>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountAccessed {
@@ -153,28 +162,8 @@ pub struct ZkappAccount {
     pub last_action_slot: u32,
 }
 
-/// 32 bytes
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct AppState(pub String);
-
-/// 32 bytes
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct ActionState(pub String);
-
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappUri(pub String);
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VerificationKey {
-    pub data: VerificationKeyData,
-    pub hash: VerificationKeyHash,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VerificationKeyData(pub String);
-
-#[derive(Default, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct VerificationKeyHash(pub String);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolVersion {
@@ -183,24 +172,15 @@ pub struct ProtocolVersion {
     pub patch: u32,
 }
 
-// conversions
+/////////////////
+// conversions //
+/////////////////
 
-impl From<String> for ZkappUri {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
-
-// defaults
-
-impl std::default::Default for AppState {
-    fn default() -> Self {
-        Self("0x0000000000000000000000000000000000000000000000000000000000000000".to_string())
-    }
-}
-
-impl std::default::Default for ActionState {
-    fn default() -> Self {
-        Self("0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9".to_string())
+impl<T> From<T> for ZkappUri
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
     }
 }

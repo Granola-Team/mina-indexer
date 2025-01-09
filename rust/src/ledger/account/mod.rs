@@ -555,10 +555,7 @@ mod tests {
             public_key::PublicKey,
             token::{symbol::TokenSymbol, TokenAddress},
         },
-        mina_blocks::v2::{
-            AppState, VerificationKey, VerificationKeyData, VerificationKeyHash, ZkappAccount,
-            ZkappUri,
-        },
+        mina_blocks::v2::{AppState, VerificationKey, ZkappAccount, ZkappUri},
     };
 
     #[test]
@@ -633,9 +630,8 @@ mod tests {
     #[test]
     fn zkapp_account_diff_app_state() {
         let pk = PublicKey::default();
-        let app_state_elem = AppState(
-            "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4".to_string(),
-        );
+        let app_state_elem: AppState =
+            "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4".into();
         let nonce = Nonce(1);
 
         // account before applying diff
@@ -732,8 +728,8 @@ mod tests {
     fn zkapp_account_diff_verification_key() {
         let pk = PublicKey::default();
         let verification_key = VerificationKey {
-            data: VerificationKeyData("VERIFICATION_KEY_DATA".to_string()),
-            hash: VerificationKeyHash("VERIFICATION_KEY_HASH".to_string()),
+            data: "VERIFICATION_KEY_DATA".into(),
+            hash: "0xVDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into(),
         };
         let nonce = Some(Nonce(1));
 
