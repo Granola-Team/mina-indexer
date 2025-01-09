@@ -1,8 +1,7 @@
 use crate::event_sourcing::{berkeley_block_models::BerkeleyBlock, mainnet_block_models::MainnetBlock};
 use anyhow::{anyhow, Result};
-use log::warn;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use sonic_rs::value::Value;
+use sonic_rs::{value::Value, JsonValueMutTrait};
 use std::{collections::VecDeque, fs::File, io::Read, path::Path};
 
 pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
@@ -73,18 +72,34 @@ where
     let mut contents = Vec::new();
     file.read_to_end(&mut contents)?;
 
-    match sonic_rs::from_slice::<T>(&contents) {
-        Ok(value) => Ok(value),
-        Err(e) => {
-            // Check if the error is due to invalid UTF-8
-            if e.to_string().contains("Invalid UTF-8") {
-                // Clean the JSON and try deserializing again
-                warn!("{path:?} contained invalid UTF-8");
-                let contents_str = String::from_utf8_lossy(&contents);
-                sonic_rs::from_str(&contents_str).map_err(|e| anyhow!("Failed to parse block: {}", e))
-            } else {
-                Err(anyhow!("Failed to deserialize JSON: {}", e))
+    unsafe {
+        match sonic_rs::from_slice_unchecked::<Value>(&contents) {
+            Ok(mut json_value) => {
+                remove_non_utf8_keys(&mut json_value);
+
+                // Serialize back to JSON
+                let cleaned_json = sonic_rs::to_string(&json_value).expect("Serialization failed");
+                Ok(sonic_rs::from_str(&cleaned_json).unwrap())
             }
+            Err(e) => Err(anyhow::Error::new(e)),
+        }
+    }
+}
+
+/// Recursively removes all "proofs" keys from a `sonic_rs::Value`.
+fn remove_non_utf8_keys(value: &mut Value) {
+    if let Some(map) = value.as_object_mut() {
+        let proofs = "proofs".to_string();
+        let sok_digest = "sok_digest".to_string();
+        map.remove(&proofs);
+        map.remove(&sok_digest);
+
+        for (_, v) in map.iter_mut() {
+            remove_non_utf8_keys(v);
+        }
+    } else if let Some(array) = value.as_array_mut() {
+        for v in array.iter_mut() {
+            remove_non_utf8_keys(v);
         }
     }
 }
