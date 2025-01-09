@@ -69,7 +69,10 @@ async fn hardfork() -> anyhow::Result<()> {
             "3NLe669kJ89t48btn8NX6jMy7vnWNjP9caBdGgsCw2VSMjzP1anW",
             "3NL8ym45gfcDR18fyn7WMJVwgweb4C4HYWUnwNEQuyb5TsF8Hemn",
             "3NLdgCbegvkfGm29x9NryzESJCoCC7DknrcB2TAmzyvcZjtsvJ76",
-            "3NKg81uwJ61tNNbM1SkS6862AHwfRhwNQEKZemJS9UwBAzaNK8ch"
+            "3NKg81uwJ61tNNbM1SkS6862AHwfRhwNQEKZemJS9UwBAzaNK8ch",
+            "3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot",
+            "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP",
+            "3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15",
         ]
     );
 
