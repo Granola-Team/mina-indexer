@@ -428,7 +428,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     Payment(PaymentPayload { amount, .. }) => amount,
                     StakeDelegation(_) => 0,
                 },
-                UserCommandData::ZkappCommandData(_data) => todo!("zkapp amount"),
+                UserCommandData::ZkappCommandData(_data) => 0,
             },
         }
     }
