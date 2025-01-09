@@ -36,15 +36,24 @@ pub struct LedgerDiff {
 
 impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
+        let unexpanded = Self::from_precomputed_unexpanded(block);
+        Self {
+            account_diffs: AccountDiff::expand(unexpanded.account_diffs),
+            ..unexpanded
+        }
+    }
+
+    /// Compute a ledger diff from the given precomputed block, without
+    /// expanding zkapp diffs
+    pub fn from_precomputed_unexpanded(block: &PrecomputedBlock) -> Self {
         let mut account_diffs = vec![];
 
         // transaction fees
-        let mut account_diff_fees: Vec<Vec<AccountDiff>> =
-            AccountDiff::from_block_fees(precomputed_block);
+        let mut account_diff_fees: Vec<Vec<AccountDiff>> = AccountDiff::from_block_fees(block);
 
         // applied user commands
-        let mut account_diff_txns: Vec<Vec<AccountDiff>> = precomputed_block
+        let mut account_diff_txns: Vec<Vec<AccountDiff>> = block
             .commands()
             .into_iter()
             .flat_map(|user_cmd_with_status| {
@@ -62,7 +71,7 @@ impl LedgerDiff {
             .collect::<Vec<_>>();
 
         // replace fee_transfer with fee_transfer_via_coinbase, if any
-        let coinbase = Coinbase::from_precomputed(precomputed_block);
+        let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
             coinbase.account_diffs_coinbase_mut(&mut account_diff_fees);
         }
@@ -74,15 +83,15 @@ impl LedgerDiff {
         }
         account_diffs.append(&mut account_diff_fees);
 
-        let accounts_created = precomputed_block.accounts_created();
+        let accounts_created = block.accounts_created();
         Self {
             account_diffs,
             new_pk_balances: accounts_created.0,
             new_coinbase_receiver: accounts_created.1,
-            state_hash: precomputed_block.state_hash(),
-            blockchain_length: precomputed_block.blockchain_length(),
-            staged_ledger_hash: precomputed_block.staged_ledger_hash(),
-            public_keys_seen: precomputed_block.active_public_keys(),
+            state_hash: block.state_hash(),
+            blockchain_length: block.blockchain_length(),
+            staged_ledger_hash: block.staged_ledger_hash(),
+            public_keys_seen: block.active_public_keys(),
         }
     }
 
