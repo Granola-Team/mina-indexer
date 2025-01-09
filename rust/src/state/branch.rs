@@ -28,23 +28,35 @@ impl Branch {
         Ok(Self { root, branches })
     }
 
-    /// Creates a new `Branch` from a genesis hash
-    pub fn new_genesis(root_hash: BlockHash, root_prev_hash: BlockHash) -> anyhow::Result<Self> {
+    /// Creates a new `Branch` from a genesis block
+    pub fn new_genesis_block(genesis_block: Block) -> anyhow::Result<Self> {
+        let mut branches = Tree::new();
+        let root = branches.insert(Node::new(genesis_block), AsRoot)?;
+
+        Ok(Self { root, branches })
+    }
+
+    /// Creates a new `Branch` from genesis block data
+    pub fn new_genesis(
+        root_hash: BlockHash,
+        root_prev_hash: BlockHash,
+        blockchain_length: u32,
+        global_slot_since_genesis: u32,
+        genesis_last_vrf_output: &str,
+    ) -> anyhow::Result<Self> {
         let genesis_block = Block {
             state_hash: root_hash.clone(),
             genesis_state_hash: root_hash.clone(),
             parent_hash: root_prev_hash,
             height: 0,
-            blockchain_length: 1,
-            global_slot_since_genesis: 0,
+            blockchain_length,
+            global_slot_since_genesis,
             hash_last_vrf_output: VrfOutput::new(
-                VrfOutput::base64_decode(MAINNET_GENESIS_LAST_VRF_OUTPUT)?.hex_digest(),
+                VrfOutput::base64_decode(genesis_last_vrf_output)?.hex_digest(),
             ),
         };
-        let mut branches = Tree::new();
-        let root = branches.insert(Node::new(genesis_block), AsRoot)?;
 
-        Ok(Self { root, branches })
+        Self::new_genesis_block(genesis_block)
     }
 
     /// Creates a new `Branch` from a `PrecomputedBlock` for testing
