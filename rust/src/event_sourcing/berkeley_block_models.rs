@@ -1,6 +1,7 @@
 use super::{
     block::BlockTrait,
     models::{AccountCreated, CommandStatus, CommandSummary, CommandType, CompletedWorksNanomina, ZkAppCommandSummary},
+    payloads::BerkeleyBlockPayload,
 };
 use crate::{
     constants::{MAINNET_COINBASE_REWARD, MINA_TOKEN_ID},
@@ -19,6 +20,32 @@ use std::{
 pub struct BerkeleyBlock {
     pub version: u32,
     pub data: Data,
+}
+
+impl BerkeleyBlock {
+    pub fn to_payload(&self, height: u64, state_hash: &str) -> BerkeleyBlockPayload {
+        BerkeleyBlockPayload {
+            height,
+            state_hash: state_hash.to_string(),
+            previous_state_hash: self.get_previous_state_hash(),
+            last_vrf_output: self.get_last_vrf_output(),
+            user_command_count: self.get_user_commands_count(),
+            user_commands: self.get_user_commands(),
+            zk_app_command_count: self.get_zk_app_commands_count(),
+            zk_app_commands: self.get_zk_app_commands().expect("Expected a vec of zk app commands"),
+            snark_work_count: self.get_aggregated_snark_work().len(),
+            snark_work: self.get_aggregated_snark_work(),
+            fee_transfers: self.get_fee_transfers(),
+            fee_transfer_via_coinbase: self.get_fee_transfers_via_coinbase(),
+            timestamp: self.get_timestamp(),
+            coinbase_receiver: self.get_coinbase_receiver(),
+            coinbase_reward_nanomina: self.get_coinbase_reward_nanomina(),
+            global_slot_since_genesis: self.get_global_slot_since_genesis(),
+            tokens_used: self.get_tokens_used(),
+            accessed_accounts: self.get_accessed_accounts(),
+            accounts_created: self.get_accounts_created(),
+        }
+    }
 }
 
 impl BlockTrait for BerkeleyBlock {

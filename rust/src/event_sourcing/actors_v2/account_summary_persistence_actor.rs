@@ -33,7 +33,7 @@ impl AccountSummaryPersistenceActor {
                 if accessed_account.balance() != balance as u64 {
                     incorrect_accounts.insert(accessed_account.public_key.to_string(), (accessed_account.balance(), balance as u64));
                 }
-            } else {
+            } else if accessed_account.balance() != 0 {
                 incorrect_accounts.insert(accessed_account.public_key.to_string(), (accessed_account.balance(), 0));
             }
         }
