@@ -86,7 +86,7 @@ pub enum Permission {
 }
 
 impl Account {
-    /// Display view of account
+    /// Display view of account, removes non-genesis account creation fee
     pub fn display(self) -> Self {
         Self {
             balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
