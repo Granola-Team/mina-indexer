@@ -28,6 +28,9 @@ use precomputed::PcbVersion;
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, path::Path};
 
+// re-export types
+pub type AccountCreated = post_hardfork::account_created::AccountCreated;
+
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
     pub parent_hash: BlockHash,

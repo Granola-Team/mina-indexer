@@ -91,10 +91,11 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     // check MINA account
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         assert_eq!(
-            mina_account.to_owned().display(),
+            mina_account.to_owned(),
             Account {
                 public_key: pk.clone(),
-                balance: 0.into(),
+                balance: 0.into(), // should be 1 MINA (1e9 as u64).into()
+                nonce: Some(1.into()),
                 delegate: pk,
                 genesis_account: false,
                 token: Some(mina_token.clone()),
@@ -119,9 +120,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 timing: None,
                 zkapp: Some(ZkappAccount::default()),
                 username: None,
-
-                // TODO should be 1
-                nonce: Some(4.into()),
             }
         )
     } else {
@@ -133,7 +131,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
                 public_key: pk.clone(),
-                balance: 0.into(),
+                balance: 0.into(), // should be 1 MINA (1e9 as u64).into()
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token),

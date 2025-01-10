@@ -5,9 +5,9 @@ use super::{
     amount::Amount,
     diff::{
         account::{
-            AccountDiff, UpdateType, ZkappActionsDiff, ZkappEventsDiff, ZkappPermissionsDiff,
-            ZkappStateDiff, ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff,
-            ZkappVerificationKeyDiff, ZkappVotingForDiff,
+            AccountDiff, UpdateType, ZkappActionsDiff, ZkappEventsDiff, ZkappIncrementNonce,
+            ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff, ZkappTokenSymbolDiff,
+            ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
         },
         LedgerDiff,
     },
@@ -312,7 +312,6 @@ impl Account {
         }
 
         Self {
-            nonce: diff.nonce.or(self.nonce),
             zkapp: Some(zkapp),
             ..self
         }
@@ -326,7 +325,6 @@ impl Account {
             zkapp.verification_key = diff.verification_key.to_owned();
 
             return Self {
-                nonce: diff.nonce.or(self.nonce),
                 zkapp: Some(zkapp),
                 ..self
             };
@@ -340,7 +338,6 @@ impl Account {
         assert_eq!(self.public_key, diff.public_key);
 
         Self {
-            nonce: diff.nonce.or(self.nonce),
             permissions: Some(diff.permissions.to_owned()),
             ..self
         }
@@ -354,7 +351,6 @@ impl Account {
             zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
 
             return Self {
-                nonce: diff.nonce.or(self.nonce),
                 zkapp: Some(zkapp),
                 ..self
             };
@@ -368,7 +364,6 @@ impl Account {
         assert_eq!(self.public_key, diff.public_key);
 
         Self {
-            nonce: diff.nonce.or(self.nonce),
             token_symbol: Some(diff.token_symbol.to_owned()),
             ..self
         }
@@ -379,7 +374,6 @@ impl Account {
         assert_eq!(self.public_key, diff.public_key);
 
         Self {
-            nonce: diff.nonce.or(self.nonce),
             timing: Some(diff.timing.to_owned()),
             ..self
         }
@@ -390,7 +384,6 @@ impl Account {
         assert_eq!(self.public_key, diff.public_key);
 
         Self {
-            nonce: diff.nonce.or(self.nonce),
             voting_for: Some(diff.voting_for.to_owned()),
             ..self
         }
@@ -408,7 +401,6 @@ impl Account {
             }
 
             return Self {
-                nonce: diff.nonce.or(self.nonce),
                 zkapp: Some(zkapp),
                 ..self
             };
@@ -420,6 +412,22 @@ impl Account {
     /// Apply zkapp events diff
     fn zkapp_events(self, diff: &ZkappEventsDiff) -> Self {
         todo!("events diff {:?}", diff)
+    }
+
+    /// Apply zkapp increment
+    fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
+        assert_eq!(diff.public_key, self.public_key);
+
+        if let Some(token) = self.token.as_ref() {
+            assert_eq!(diff.token, *token);
+        } else {
+            assert_eq!(diff.token, TokenAddress::default());
+        }
+
+        Self {
+            nonce: Some(self.nonce.unwrap_or_default() + 1),
+            ..self
+        }
     }
 
     /// Apply an account diff to an account
@@ -445,6 +453,7 @@ impl Account {
             ZkappVotingForDiff(diff) => self.zkapp_voting_for(diff),
             ZkappActionsDiff(diff) => self.zkapp_actions(diff),
             ZkappEventsDiff(diff) => self.zkapp_events(diff),
+            ZKappIncrementNonce(diff) => self.zkapp_nonce(diff),
             Zkapp(_) => unreachable!(),
         }
     }
@@ -548,8 +557,8 @@ mod tests {
         ledger::{
             account::{Permission, Permissions, Timing},
             diff::account::{
-                AccountDiff, PaymentDiff, UpdateType, ZkappDiff, ZkappPermissionsDiff,
-                ZkappVerificationKeyDiff,
+                AccountDiff, PaymentDiff, UpdateType, ZkappDiff, ZkappPaymentDiff,
+                ZkappPermissionsDiff, ZkappVerificationKeyDiff,
             },
             nonce::Nonce,
             public_key::PublicKey,
@@ -596,12 +605,12 @@ mod tests {
 
         let diff = ZkappDiff {
             public_key: pk.clone(),
-            payment_diffs: vec![PaymentDiff {
+            payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
                 public_key: pk.clone(),
                 update_type: UpdateType::Debit(Some(185.into())),
                 amount,
                 token: TokenAddress::default(),
-            }],
+            })],
             ..Default::default()
         };
 
@@ -632,7 +641,6 @@ mod tests {
         let pk = PublicKey::default();
         let app_state_elem: AppState =
             "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4".into();
-        let nonce = Nonce(1);
 
         // account before applying diff
         let before = Account {
@@ -646,7 +654,7 @@ mod tests {
         app_state_diff[0] = Some(app_state_elem.clone());
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Nonce(1),
             increment_nonce: true,
             public_key: pk.clone(),
             payment_diffs: vec![],
@@ -671,7 +679,6 @@ mod tests {
             app_state[0] = app_state_elem;
 
             Account {
-                nonce: Some(nonce),
                 zkapp: Some(ZkappAccount {
                     app_state,
                     ..before.zkapp.unwrap()
@@ -731,7 +738,6 @@ mod tests {
             data: "VERIFICATION_KEY_DATA".into(),
             hash: "0xVDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into(),
         };
-        let nonce = Some(Nonce(1));
 
         // account before applying diff
         let before = Account {
@@ -743,7 +749,6 @@ mod tests {
         let diff = AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
             token: TokenAddress::default(),
             public_key: pk.clone(),
-            nonce,
             verification_key: verification_key.clone(),
         });
 
@@ -754,7 +759,6 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                nonce,
                 zkapp: Some(ZkappAccount {
                     verification_key,
                     ..before.zkapp.unwrap()
@@ -771,7 +775,6 @@ mod tests {
             edit_state: Permission::Proof,
             ..Default::default()
         };
-        let nonce = Some(Nonce(1));
 
         // account before applying diff
         let before = Account {
@@ -783,7 +786,6 @@ mod tests {
         let diff = AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
             token: TokenAddress::default(),
             public_key: pk.clone(),
-            nonce,
             permissions: permissions.clone(),
         });
 
@@ -794,7 +796,6 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                nonce,
                 permissions: Some(permissions),
                 ..before
             }
@@ -805,7 +806,6 @@ mod tests {
     fn zkapp_account_diff_zkapp_uri() {
         let pk = PublicKey::default();
         let zkapp_uri = ZkappUri("ZKAPP_URI".to_string());
-        let nonce = Nonce(1);
 
         // account before applying diff
         let before = Account {
@@ -815,7 +815,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Nonce(1),
             zkapp_uri: Some(zkapp_uri.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -849,7 +849,6 @@ mod tests {
     fn zkapp_account_diff_token_symbol() {
         let pk = PublicKey::default();
         let token_symbol = TokenSymbol("TOKEN_SYMBOL".to_string());
-        let nonce = Nonce(1);
 
         // account before applying diff
         let before = Account {
@@ -859,7 +858,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Nonce(1),
             increment_nonce: true,
             token_symbol: Some(token_symbol.clone()),
             public_key: pk.clone(),
@@ -881,7 +880,6 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                nonce: Some(nonce),
                 token_symbol: Some(token_symbol),
                 ..before
             }
@@ -892,7 +890,6 @@ mod tests {
     fn zkapp_account_diff_timing() {
         let pk = PublicKey::default();
         let timing = Timing::default();
-        let nonce = Nonce(1);
 
         // account before applying diff
         let before = Account {
@@ -902,7 +899,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Nonce(1),
             timing: Some(timing.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -933,7 +930,6 @@ mod tests {
     fn zkapp_account_diff_voting_for() {
         let pk = PublicKey::default();
         let voting_for = String::new();
-        let nonce = Nonce(1);
 
         // account before applying diff
         let before = Account {
@@ -943,7 +939,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Nonce(1),
             voting_for: Some(voting_for.to_owned().into()),
             public_key: pk.clone(),
             increment_nonce: true,
@@ -965,7 +961,6 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                nonce: Some(nonce),
                 voting_for: Some(voting_for.to_owned().into()),
                 ..before
             }
