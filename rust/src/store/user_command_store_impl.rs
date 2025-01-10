@@ -88,6 +88,8 @@ impl UserCommandStore for IndexerStore {
                 block.global_slot_since_genesis().to_be_bytes(),
             );
 
+            // TODO zkapp txns
+
             // add sender index
             let sender = command.sender();
             batch.put_cf(

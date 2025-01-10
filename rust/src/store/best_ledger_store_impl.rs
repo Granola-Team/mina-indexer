@@ -253,6 +253,7 @@ impl BestLedgerStore for IndexerStore {
                     ZkappVotingForDiff(diff) => todo!("zkapp voting for diff unapply {:?}", diff),
                     ZkappActionsDiff(diff) => todo!("zkapp actions diff unapply {:?}", diff),
                     ZkappEventsDiff(diff) => todo!("zkapp events diff unapply {:?}", diff),
+                    ZKappIncrementNonce(diff) => todo!("zkapp increment nonce unapply {:?}", diff),
                 };
 
                 self.update_best_account(&pk, &token, account)?;
@@ -326,7 +327,8 @@ impl BestLedgerStore for IndexerStore {
                     | ZkappTimingDiff(_)
                     | ZkappVotingForDiff(_)
                     | ZkappActionsDiff(_)
-                    | ZkappEventsDiff(_) => None,
+                    | ZkappEventsDiff(_)
+                    | ZKappIncrementNonce(_) => None,
                 };
 
                 self.update_best_account(&pk, &token, account)?;

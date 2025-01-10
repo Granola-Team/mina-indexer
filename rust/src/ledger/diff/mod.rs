@@ -1,13 +1,13 @@
 pub mod account;
 
 use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
-use super::{coinbase::Coinbase, LedgerHash, PublicKey};
+use super::{amount::Amount, coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    block::{precomputed::PrecomputedBlock, AccountCreated, BlockHash},
     command::UserCommandWithStatusT,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
@@ -28,7 +28,7 @@ pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
 
     /// Map of new pk -> balance (after coinbase, before fee transfers)
-    pub new_pk_balances: BTreeMap<PublicKey, u64>,
+    pub new_pk_balances: BTreeMap<PublicKey, u64>, // TODO add TokenAddress keys
 
     /// Account updates
     pub account_diffs: Vec<Vec<AccountDiff>>,
@@ -51,6 +51,21 @@ impl LedgerDiff {
 
         // transaction fees
         let mut account_diff_fees: Vec<Vec<AccountDiff>> = AccountDiff::from_block_fees(block);
+
+        // v2 account creation fees
+        let mut accounts_created: HashMap<(PublicKey, TokenAddress), Amount> = block
+            .accounts_created_v2()
+            .into_iter()
+            .map(
+                |AccountCreated {
+                     public_key,
+                     token,
+                     creation_fee,
+                 }| ((public_key, token), creation_fee),
+            )
+            .collect();
+
+        // TODO how to include account creation fee?
 
         // applied user commands
         let mut account_diff_txns: Vec<Vec<AccountDiff>> = block
