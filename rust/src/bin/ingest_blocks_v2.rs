@@ -85,6 +85,8 @@ async fn main() {
         }
     }
 
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
     // 9) Give the DAG time to flush any in-flight operations
     info!("Giving some time for the DAG to flush...");
     dag.lock().await.wait_until_quiesced().await;
