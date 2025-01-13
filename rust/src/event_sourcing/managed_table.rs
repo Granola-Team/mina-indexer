@@ -166,10 +166,9 @@ impl ManagedTableBuilder {
     async fn create_table(&self, table_name: &str) -> Result<()> {
         let table_query = format!(
             "CREATE {} TABLE IF NOT EXISTS {} (
-                entry_id BIGSERIAL,
+                received_at TIMESTAMPTZ DEFAULT NOW(),
                 height BIGINT,
-                {},
-                PRIMARY KEY (entry_id)
+                {}
             );",
             if self.unlogged { "UNLOGGED" } else { "" },
             table_name,

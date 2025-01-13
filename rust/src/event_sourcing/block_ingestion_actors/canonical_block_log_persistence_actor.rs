@@ -281,7 +281,7 @@ mod canonical_block_log_persistence_tests {
 
         let row_last = rows.last().unwrap();
 
-        // Validate the returned row matches the payload with the highest entry_id
+        // Validate the returned row matches the payload with the highest receieved_at timestamp
         assert_eq!(row_last.get::<_, i64>("height"), payload2.height as i64);
         assert_eq!(row_last.get::<_, String>("state_hash"), payload2.state_hash);
         assert_eq!(row_last.get::<_, String>("previous_state_hash"), payload2.previous_state_hash);
@@ -332,7 +332,7 @@ mod canonical_block_log_persistence_tests {
         let db_logger = actor.db_logger.lock().await;
         let row = db_logger.get_client().query_one(query, &[&1_i64]).await.unwrap();
 
-        // Validate the returned row matches the payload with the highest entry_id
+        // Validate the returned row matches the payload with the highest receieved_at timestamp
         assert_eq!(row.get::<_, i64>("height"), payload2.height as i64);
         assert_eq!(row.get::<_, String>("state_hash"), payload2.state_hash);
         assert_eq!(row.get::<_, String>("previous_state_hash"), payload2.previous_state_hash);

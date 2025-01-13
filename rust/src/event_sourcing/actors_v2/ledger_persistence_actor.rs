@@ -182,7 +182,7 @@ mod ledger_persistence_actor_tests_v2 {
 
         // For demonstration, we'll just grab (address, balance_delta) to confirm row count
         let rows = client
-            .query("SELECT address, balance_delta FROM blockchain_ledger ORDER BY entry_id ASC", &[])
+            .query("SELECT address, balance_delta FROM blockchain_ledger ORDER BY received_at ASC", &[])
             .await
             .expect("Failed to query ledger rows");
 

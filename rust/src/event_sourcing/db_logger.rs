@@ -90,7 +90,7 @@ impl DbLoggerBuilder {
             "CREATE OR REPLACE VIEW {} AS
                 SELECT DISTINCT ON ({}) *
                 FROM {}
-                ORDER BY {}, entry_id DESC;",
+                ORDER BY {}, received_at DESC;",
             view_name, distinct_columns, table_name, distinct_columns
         );
 
