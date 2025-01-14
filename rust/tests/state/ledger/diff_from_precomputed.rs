@@ -147,7 +147,8 @@ async fn account_diffs() {
             | ZkappVotingForDiff(_)
             | ZkappActionsDiff(_)
             | ZkappEventsDiff(_)
-            | ZKappIncrementNonce(_) => unimplemented!(),
+            | ZkappIncrementNonce(_)
+            | ZkappAccountCreationFee(_) => unimplemented!(),
         }
     }
 
