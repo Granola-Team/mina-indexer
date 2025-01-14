@@ -5,9 +5,9 @@ use super::{
     amount::Amount,
     diff::{
         account::{
-            AccountDiff, UpdateType, ZkappActionsDiff, ZkappEventsDiff, ZkappIncrementNonce,
-            ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff, ZkappTokenSymbolDiff,
-            ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
+            AccountDiff, UpdateType, ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff,
+            ZkappIncrementNonce, ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff,
+            ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
         },
         LedgerDiff,
     },
@@ -430,6 +430,22 @@ impl Account {
         }
     }
 
+    /// Apply zkapp account creation fee
+    fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
+        assert_eq!(diff.public_key, self.public_key);
+
+        if let Some(token) = self.token.as_ref() {
+            assert_eq!(diff.token, *token);
+        } else {
+            assert_eq!(diff.token, TokenAddress::default());
+        }
+
+        Self {
+            balance: self.balance + diff.amount,
+            ..self
+        }
+    }
+
     /// Apply an account diff to an account
     pub fn apply_account_diff(self, diff: &AccountDiff) -> Self {
         use AccountDiff::*;
@@ -453,7 +469,8 @@ impl Account {
             ZkappVotingForDiff(diff) => self.zkapp_voting_for(diff),
             ZkappActionsDiff(diff) => self.zkapp_actions(diff),
             ZkappEventsDiff(diff) => self.zkapp_events(diff),
-            ZKappIncrementNonce(diff) => self.zkapp_nonce(diff),
+            ZkappIncrementNonce(diff) => self.zkapp_nonce(diff),
+            ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff),
             Zkapp(_) => unreachable!(),
         }
     }
