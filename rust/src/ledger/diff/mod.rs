@@ -6,8 +6,9 @@ use crate::{
     block::{precomputed::PrecomputedBlock, AccountCreated, BlockHash},
     command::UserCommandWithStatusT,
 };
+use account::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
@@ -28,7 +29,7 @@ pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
 
     /// Map of new pk -> balance (after coinbase, before fee transfers)
-    pub new_pk_balances: BTreeMap<PublicKey, u64>, // TODO add TokenAddress keys
+    pub new_pk_balances: BTreeMap<PublicKey, u64>,
 
     /// Account updates
     pub account_diffs: Vec<Vec<AccountDiff>>,
@@ -38,8 +39,64 @@ impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
         let unexpanded = Self::from_precomputed_unexpanded(block);
+        let mut account_diffs = AccountDiff::expand(unexpanded.account_diffs);
+
+        // v2 account creation fees (via payments & zkapps)
+        let all_accounts_created: HashMap<(PublicKey, TokenAddress), Amount> = block
+            .accounts_created_v2()
+            .into_iter()
+            .map(
+                |AccountCreated {
+                     public_key,
+                     token,
+                     creation_fee,
+                 }| ((public_key, token), creation_fee),
+            )
+            .collect();
+        let accounts_created: HashSet<_> = all_accounts_created.keys().cloned().collect();
+
+        // only the zkapp command token accounts
+        let zkapp_token_accounts: HashSet<_> = account_diffs
+            .iter()
+            .flatten()
+            .flat_map(|diff| {
+                use AccountDiff::*;
+                match diff {
+                    Payment(_)
+                    | Delegation(_)
+                    | Coinbase(_)
+                    | FeeTransfer(_)
+                    | FeeTransferViaCoinbase(_)
+                    | FailedTransactionNonce(_) => None,
+                    _ => Some((diff.public_key(), diff.token_address())),
+                }
+            })
+            .collect();
+
+        // token accounts created via zkapp command
+        let mut zkapp_token_accounts_created: Vec<_> = {
+            accounts_created
+                .intersection(&zkapp_token_accounts)
+                .map(|key| {
+                    AccountDiff::ZkappAccountCreationFee(ZkappAccountCreationFee {
+                        public_key: key.0.to_owned(),
+                        token: key.1.to_owned(),
+                        amount: all_accounts_created.get(key).cloned().unwrap(),
+                    })
+                })
+        }
+        .collect();
+
+        // sort for determinism
+        zkapp_token_accounts_created.sort();
+
+        // prepend zkapp account creation fees
+        if !zkapp_token_accounts_created.is_empty() {
+            account_diffs.insert(0, zkapp_token_accounts_created)
+        }
+
         Self {
-            account_diffs: AccountDiff::expand(unexpanded.account_diffs),
+            account_diffs,
             ..unexpanded
         }
     }
@@ -51,21 +108,6 @@ impl LedgerDiff {
 
         // transaction fees
         let mut account_diff_fees: Vec<Vec<AccountDiff>> = AccountDiff::from_block_fees(block);
-
-        // v2 account creation fees
-        let mut accounts_created: HashMap<(PublicKey, TokenAddress), Amount> = block
-            .accounts_created_v2()
-            .into_iter()
-            .map(
-                |AccountCreated {
-                     public_key,
-                     token,
-                     creation_fee,
-                 }| ((public_key, token), creation_fee),
-            )
-            .collect();
-
-        // TODO how to include account creation fee?
 
         // applied user commands
         let mut account_diff_txns: Vec<Vec<AccountDiff>> = block
