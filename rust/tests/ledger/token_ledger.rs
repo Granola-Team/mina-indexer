@@ -90,38 +90,44 @@ async fn check_token_accounts() -> anyhow::Result<()> {
 
     // check MINA account
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
+        let expect = Account {
+            public_key: pk.clone(),
+            balance: MAINNET_ACCOUNT_CREATION_FEE,
+            nonce: Some(1.into()),
+            delegate: pk,
+            genesis_account: false,
+            token: Some(mina_token.clone()),
+            token_symbol: Some("MINU".into()),
+            receipt_chain_hash: None,
+            voting_for: None,
+            permissions: Some(Permissions {
+                edit_state: Permission::Proof,
+                access: Permission::None,
+                send: Permission::Proof,
+                receive: Permission::None,
+                set_delegate: Permission::Signature,
+                set_permissions: Permission::Signature,
+                set_verification_key: (Permission::Signature, "3".into()),
+                set_zkapp_uri: Permission::Signature,
+                edit_action_state: Permission::Proof,
+                set_token_symbol: Permission::Signature,
+                increment_nonce: Permission::Signature,
+                set_voting_for: Permission::Signature,
+                set_timing: Permission::Signature,
+            }),
+            timing: None,
+            zkapp: Some(ZkappAccount::default()),
+            username: None,
+        };
+
+        assert_eq!(*mina_account, expect);
         assert_eq!(
-            mina_account.to_owned(),
+            mina_account.clone().display(),
             Account {
-                public_key: pk.clone(),
-                balance: 0.into(), // should be 1 MINA (1e9 as u64).into()
-                nonce: Some(1.into()),
-                delegate: pk,
-                genesis_account: false,
-                token: Some(mina_token.clone()),
-                token_symbol: Some("MINU".into()),
-                receipt_chain_hash: None,
-                voting_for: None,
-                permissions: Some(Permissions {
-                    edit_state: Permission::Proof,
-                    access: Permission::None,
-                    send: Permission::Proof,
-                    receive: Permission::None,
-                    set_delegate: Permission::Signature,
-                    set_permissions: Permission::Signature,
-                    set_verification_key: (Permission::Signature, "3".into()),
-                    set_zkapp_uri: Permission::Signature,
-                    edit_action_state: Permission::Proof,
-                    set_token_symbol: Permission::Signature,
-                    increment_nonce: Permission::Signature,
-                    set_voting_for: Permission::Signature,
-                    set_timing: Permission::Signature,
-                }),
-                timing: None,
-                zkapp: Some(ZkappAccount::default()),
-                username: None,
+                balance: 0.into(),
+                ..expect
             }
-        )
+        );
     } else {
         panic!("MINA zkapp account does not exist");
     }
@@ -131,7 +137,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
                 public_key: pk.clone(),
-                balance: 0.into(), // should be 1 MINA (1e9 as u64).into()
+                balance: (1e9 as u64).into(),
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token),
@@ -170,7 +176,14 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 ..Default::default()
             };
 
-        assert_eq!(mina_account.to_owned().display(), expect)
+        assert_eq!(*mina_account, expect);
+        assert_eq!(
+            mina_account.clone().display(),
+            Account {
+                balance: 0.into(),
+                ..expect
+            }
+        );
     } else {
         panic!(
             "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P zkapp account does not exist"
