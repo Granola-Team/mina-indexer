@@ -19,6 +19,7 @@ use crate::{
     ledger::{
         coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
         public_key::PublicKey,
+        token::TokenAddress,
         username::Username,
         LedgerHash,
     },
@@ -383,7 +384,12 @@ impl PrecomputedBlock {
     /// Returns the pair of
     /// - new pk balances (after applying coinbase, before fee transfers)
     /// - new coinbase receiver option
-    pub fn accounts_created(&self) -> (BTreeMap<PublicKey, u64>, Option<PublicKey>) {
+    pub fn accounts_created(
+        &self,
+    ) -> (
+        BTreeMap<PublicKey, BTreeMap<TokenAddress, u64>>,
+        Option<PublicKey>,
+    ) {
         let mut new_coinbase_receiver = None;
         let mut account_balances = BTreeMap::new();
 
@@ -396,26 +402,53 @@ impl PrecomputedBlock {
             ]
             .contains(&bal)
             {
-                account_balances.insert(self.coinbase_receiver(), bal);
+                account_balances.insert(
+                    self.coinbase_receiver(),
+                    BTreeMap::from([(TokenAddress::default(), bal)]),
+                );
                 new_coinbase_receiver = Some(self.coinbase_receiver());
             }
         }
 
         // from user commands
-        self.commands().iter().for_each(|cmd| {
-            let status = cmd.status_data();
-            if status.fee_payer_account_creation_fee_paid().is_some() {
-                account_balances.insert(
-                    cmd.fee_payer_pk(),
-                    status.fee_payer_balance().unwrap_or_default(),
-                );
-            } else if status.receiver_account_creation_fee_paid().is_some() {
-                account_balances.insert(
-                    cmd.receiver().first().expect("receiver").to_owned(),
-                    status.receiver_balance().unwrap_or_default(),
-                );
-            }
-        });
+        match self {
+            Self::V1(_) => self.commands().iter().for_each(|cmd| {
+                let status = cmd.status_data();
+                if status.fee_payer_account_creation_fee_paid().is_some() {
+                    account_balances.insert(
+                        cmd.fee_payer_pk(),
+                        BTreeMap::from([(
+                            TokenAddress::default(),
+                            status.fee_payer_balance().unwrap_or_default(),
+                        )]),
+                    );
+                } else if status.receiver_account_creation_fee_paid().is_some() {
+                    account_balances.insert(
+                        cmd.receiver().first().expect("receiver").to_owned(),
+                        BTreeMap::from([(
+                            TokenAddress::default(),
+                            status.receiver_balance().unwrap_or_default(),
+                        )]),
+                    );
+                }
+            }),
+            Self::V2(_) => self.accounts_created_v2().into_iter().for_each(
+                |AccountCreated {
+                     public_key,
+                     token,
+                     creation_fee,
+                 }| {
+                    if let Some(pk_token_account_creation_fee) =
+                        account_balances.get_mut(&public_key)
+                    {
+                        pk_token_account_creation_fee.insert(token, creation_fee.0);
+                    } else {
+                        account_balances
+                            .insert(public_key, BTreeMap::from([(token, creation_fee.0)]));
+                    }
+                },
+            ),
+        }
 
         (account_balances, new_coinbase_receiver)
     }

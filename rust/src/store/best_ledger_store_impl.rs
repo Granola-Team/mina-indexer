@@ -19,7 +19,7 @@ use crate::{
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(
@@ -131,7 +131,15 @@ impl BestLedgerStore for IndexerStore {
                     diff.map(|d| {
                         (
                             d.account_diffs.into_iter().flatten().collect(),
-                            d.new_pk_balances.into_keys().collect(),
+                            d.new_pk_balances
+                                .into_iter()
+                                .flat_map(|(pk, tokens)| {
+                                    tokens
+                                        .into_keys()
+                                        .map(|token| (pk.to_owned(), token))
+                                        .collect::<HashSet<_>>()
+                                })
+                                .collect(),
                         )
                     })
                 })
@@ -144,7 +152,15 @@ impl BestLedgerStore for IndexerStore {
                     diff.map(|d| {
                         (
                             d.account_diffs.into_iter().flatten().collect(),
-                            d.new_pk_balances.into_keys().collect(),
+                            d.new_pk_balances
+                                .into_iter()
+                                .flat_map(|(pk, tokens)| {
+                                    tokens
+                                        .into_keys()
+                                        .map(|token| (pk.to_owned(), token))
+                                        .collect::<HashSet<_>>()
+                                })
+                                .collect(),
                         )
                     })
                 })
@@ -262,10 +278,9 @@ impl BestLedgerStore for IndexerStore {
                 self.update_best_account(&pk, &token, account)?;
             }
 
-            // TODO generalize over tokens
             // remove accounts
-            for pk in remove_pks.iter() {
-                self.update_best_account(pk, &TokenAddress::default(), None)?;
+            for (pk, token) in remove_pks.iter() {
+                self.update_best_account(pk, token, None)?;
             }
         }
 

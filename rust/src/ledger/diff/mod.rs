@@ -1,14 +1,14 @@
 pub mod account;
 
 use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
-use super::{amount::Amount, coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
+use super::{coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
 use crate::{
     block::{precomputed::PrecomputedBlock, AccountCreated, BlockHash},
     command::UserCommandWithStatusT,
 };
 use account::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
@@ -29,7 +29,7 @@ pub struct LedgerDiff {
     pub public_keys_seen: Vec<PublicKey>,
 
     /// Map of new pk -> balance (after coinbase, before fee transfers)
-    pub new_pk_balances: BTreeMap<PublicKey, u64>,
+    pub new_pk_balances: BTreeMap<PublicKey, BTreeMap<TokenAddress, u64>>,
 
     /// Account updates
     pub account_diffs: Vec<Vec<AccountDiff>>,
@@ -42,7 +42,7 @@ impl LedgerDiff {
         let mut account_diffs = AccountDiff::expand(unexpanded.account_diffs);
 
         // v2 account creation fees (via payments & zkapps)
-        let all_accounts_created: HashMap<(PublicKey, TokenAddress), Amount> = block
+        let all_accounts_created: BTreeMap<_, _> = block
             .accounts_created_v2()
             .into_iter()
             .map(
