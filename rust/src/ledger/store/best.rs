@@ -89,13 +89,11 @@ pub trait BestLedgerStore {
 }
 
 /// Applied & unapplied block account diffs & new block accounts
-pub type DbAccountUpdate = DbUpdate<(Vec<AccountDiff>, HashSet<PublicKey>)>;
+type AccountUpdate = (Vec<AccountDiff>, HashSet<(PublicKey, TokenAddress)>);
+pub type DbAccountUpdate = DbUpdate<AccountUpdate>;
 
 impl DbAccountUpdate {
-    pub fn new(
-        apply: Vec<(Vec<AccountDiff>, HashSet<PublicKey>)>,
-        unapply: Vec<(Vec<AccountDiff>, HashSet<PublicKey>)>,
-    ) -> Self {
+    pub fn new(apply: Vec<AccountUpdate>, unapply: Vec<AccountUpdate>) -> Self {
         Self { apply, unapply }
     }
 }
