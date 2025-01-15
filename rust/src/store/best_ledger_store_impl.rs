@@ -276,7 +276,7 @@ impl BestLedgerStore for IndexerStore {
 
                 let acct = self
                     .get_best_account(&pk, &token)?
-                    .unwrap_or(Account::empty(pk.clone(), token.clone()));
+                    .unwrap_or(Account::empty(pk.to_owned(), token.to_owned()));
 
                 let account = match diff {
                     Payment(diff) => match diff.update_type {
@@ -318,20 +318,65 @@ impl BestLedgerStore for IndexerStore {
                         nonce: Some(diff.nonce),
                         ..acct
                     }),
+                    ZkappStateDiff(diff) => {
+                        let mut zkapp = acct.zkapp.unwrap_or_default();
 
-                    // TODO zkapp apply
-                    Zkapp(_)
-                    | ZkappStateDiff(_)
-                    | ZkappPermissionsDiff(_)
-                    | ZkappVerificationKeyDiff(_)
-                    | ZkappUriDiff(_)
-                    | ZkappTokenSymbolDiff(_)
-                    | ZkappTimingDiff(_)
-                    | ZkappVotingForDiff(_)
-                    | ZkappActionsDiff(_)
-                    | ZkappEventsDiff(_)
-                    | ZkappIncrementNonce(_)
-                    | ZkappAccountCreationFee(_) => None,
+                        for (idx, diff) in diff.diffs.iter().enumerate() {
+                            if let Some(app_state) = diff.to_owned() {
+                                zkapp.app_state[idx] = app_state;
+                            }
+                        }
+
+                        Some(Account {
+                            zkapp: Some(zkapp),
+                            ..acct
+                        })
+                    }
+                    ZkappPermissionsDiff(diff) => Some(Account {
+                        permissions: Some(diff.permissions.to_owned()),
+                        ..acct
+                    }),
+                    ZkappVerificationKeyDiff(diff) => {
+                        let mut zkapp = acct.zkapp.unwrap_or_default();
+                        zkapp.verification_key = diff.verification_key.to_owned();
+
+                        Some(Account {
+                            zkapp: Some(zkapp),
+                            ..acct
+                        })
+                    }
+                    ZkappUriDiff(diff) => {
+                        let mut zkapp = acct.zkapp.unwrap_or_default();
+                        zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
+
+                        Some(Account {
+                            zkapp: Some(zkapp),
+                            ..acct
+                        })
+                    }
+                    ZkappTokenSymbolDiff(diff) => Some(Account {
+                        token_symbol: Some(diff.token_symbol.to_owned()),
+                        ..acct
+                    }),
+                    ZkappTimingDiff(diff) => Some(Account {
+                        timing: Some(diff.timing.to_owned()),
+                        ..acct
+                    }),
+                    ZkappVotingForDiff(diff) => Some(Account {
+                        voting_for: Some(diff.voting_for.to_owned()),
+                        ..acct
+                    }),
+                    ZkappIncrementNonce(_) => Some(Account {
+                        nonce: Some(acct.nonce.unwrap_or_default() + 1),
+                        ..acct
+                    }),
+                    ZkappAccountCreationFee(diff) => Some(Account {
+                        balance: acct.balance + diff.amount,
+                        ..acct
+                    }),
+
+                    // these account diffs do not modify the account
+                    ZkappActionsDiff(_) | ZkappEventsDiff(_) | Zkapp(_) => Some(acct),
                 };
 
                 self.update_best_account(&pk, &token, account)?;
