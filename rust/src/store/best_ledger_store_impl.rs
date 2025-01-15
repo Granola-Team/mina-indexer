@@ -131,15 +131,7 @@ impl BestLedgerStore for IndexerStore {
                     diff.map(|d| {
                         (
                             d.account_diffs.into_iter().flatten().collect(),
-                            d.new_pk_balances
-                                .into_iter()
-                                .flat_map(|(pk, tokens)| {
-                                    tokens
-                                        .into_keys()
-                                        .map(|token| (pk.to_owned(), token))
-                                        .collect::<HashSet<_>>()
-                                })
-                                .collect(),
+                            update_token_accounts(d.new_pk_balances),
                         )
                     })
                 })
@@ -152,15 +144,7 @@ impl BestLedgerStore for IndexerStore {
                     diff.map(|d| {
                         (
                             d.account_diffs.into_iter().flatten().collect(),
-                            d.new_pk_balances
-                                .into_iter()
-                                .flat_map(|(pk, tokens)| {
-                                    tokens
-                                        .into_keys()
-                                        .map(|token| (pk.to_owned(), token))
-                                        .collect::<HashSet<_>>()
-                                })
-                                .collect(),
+                            update_token_accounts(d.new_pk_balances),
                         )
                     })
                 })
@@ -475,4 +459,20 @@ impl BestLedgerStore for IndexerStore {
         self.database
             .iterator_cf(self.best_ledger_accounts_balance_sort_cf(), mode)
     }
+}
+
+use std::collections::BTreeMap;
+
+fn update_token_accounts(
+    new_pk_balances: BTreeMap<PublicKey, BTreeMap<TokenAddress, u64>>,
+) -> HashSet<(PublicKey, TokenAddress)> {
+    new_pk_balances
+        .into_iter()
+        .flat_map(|(pk, tokens)| {
+            tokens
+                .into_keys()
+                .map(|token| (pk.to_owned(), token))
+                .collect::<HashSet<_>>()
+        })
+        .collect()
 }
