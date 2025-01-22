@@ -174,6 +174,19 @@ pub struct ProtocolVersion {
     pub patch: u32,
 }
 
+///////////
+// impls //
+///////////
+
+impl ZkappAccount {
+    pub fn from_proved_state(proved_state: bool) -> Self {
+        Self {
+            proved_state,
+            ..Default::default()
+        }
+    }
+}
+
 /////////////////
 // conversions //
 /////////////////

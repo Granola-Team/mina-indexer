@@ -303,12 +303,20 @@ impl Account {
     pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
         self.checks(&diff.public_key, &diff.token);
 
-        let mut zkapp = self.zkapp.unwrap_or_default();
+        let mut zkapp = self
+            .zkapp
+            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
 
+        // modify app state
         for (idx, diff) in diff.diffs.iter().enumerate() {
             if let Some(app_state) = diff.to_owned() {
                 zkapp.app_state[idx] = app_state;
             }
+        }
+
+        // modify proved if necessary
+        if diff.proved_state {
+            zkapp.proved_state = true;
         }
 
         Self {
@@ -321,16 +329,22 @@ impl Account {
     pub fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
         self.checks(&diff.public_key, &diff.token);
 
-        if let Some(mut zkapp) = self.zkapp {
-            zkapp.verification_key = diff.verification_key.to_owned();
+        let mut zkapp = self
+            .zkapp
+            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
 
-            return Self {
-                zkapp: Some(zkapp),
-                ..self
-            };
+        // modify verification key
+        zkapp.verification_key = diff.verification_key.to_owned();
+
+        // modify proved if necessary
+        if diff.proved_state {
+            zkapp.proved_state = true;
         }
 
-        self
+        Self {
+            zkapp: Some(zkapp),
+            ..self
+        }
     }
 
     /// Apply zkapp permissions diff
@@ -347,16 +361,22 @@ impl Account {
     pub fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
         self.checks(&diff.public_key, &diff.token);
 
-        if let Some(mut zkapp) = self.zkapp {
-            zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
+        let mut zkapp = self
+            .zkapp
+            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
 
-            return Self {
-                zkapp: Some(zkapp),
-                ..self
-            };
+        // modify zkapp uri
+        zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
+
+        // modify proved if necessary
+        if diff.proved_state {
+            zkapp.proved_state = true;
         }
 
-        self
+        Self {
+            zkapp: Some(zkapp),
+            ..self
+        }
     }
 
     /// Apply zkapp token symbol diff
@@ -393,20 +413,25 @@ impl Account {
     fn zkapp_actions(self, diff: &ZkappActionsDiff) -> Self {
         self.checks(&diff.public_key, &diff.token);
 
-        if let Some(mut zkapp) = self.zkapp {
-            let n = zkapp.action_state.len();
+        let mut zkapp = self
+            .zkapp
+            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
 
-            for (idx, action_state) in diff.actions.iter().enumerate() {
-                zkapp.action_state[idx % n] = action_state.to_owned();
-            }
-
-            return Self {
-                zkapp: Some(zkapp),
-                ..self
-            };
+        // modify action state
+        let n = zkapp.action_state.len();
+        for (idx, action_state) in diff.actions.iter().enumerate() {
+            zkapp.action_state[idx % n] = action_state.to_owned();
         }
 
-        self
+        // modify proved if necessary
+        if diff.proved_state {
+            zkapp.proved_state = true;
+        }
+
+        Self {
+            zkapp: Some(zkapp),
+            ..self
+        }
     }
 
     /// Apply zkapp events diff
@@ -767,6 +792,7 @@ mod tests {
         let diff = AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
             token: TokenAddress::default(),
             public_key: pk.clone(),
+            proved_state: false,
             verification_key: verification_key.clone(),
         });
 
