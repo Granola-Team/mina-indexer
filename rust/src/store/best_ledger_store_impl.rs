@@ -31,7 +31,10 @@ impl BestLedgerStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?
-            .and_then(|bytes| serde_json::from_slice::<Account>(&bytes).ok()))
+            .map(|bytes| {
+                serde_json::from_slice::<Account>(&bytes)
+                    .unwrap_or_else(|_| panic!("{} token {} missing", pk, token))
+            }))
     }
 
     fn get_best_account_display(
@@ -68,31 +71,31 @@ impl BestLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        account: Option<Account>,
+        before_balance: Option<u64>,
+        after: Option<Account>,
     ) -> anyhow::Result<()> {
         // remove account
-        if account.is_none() {
-            if let Some(acct) = self.get_best_account(pk, token)? {
+        if after.is_none() {
+            if let Some(before_balance) = before_balance {
                 self.database
                     .delete_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?;
                 self.database.delete_cf(
                     self.best_ledger_accounts_balance_sort_cf(),
-                    best_account_sort_key(token, acct.balance.0, pk),
+                    best_account_sort_key(token, before_balance, pk),
                 )?;
             }
             return Ok(());
         }
 
         // update best account
-        let account = account.unwrap();
-        let balance = account.balance.0;
-        let acct = self.get_best_account(pk, token)?;
+        let after = after.unwrap();
+        let balance = after.balance.0;
 
-        if let Some(acct) = acct.as_ref() {
+        if let Some(before_balance) = before_balance {
             // delete stale balance sorting data
             self.database.delete_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
-                best_account_sort_key(token, acct.balance.0, pk),
+                best_account_sort_key(token, before_balance, pk),
             )?;
         }
 
@@ -100,17 +103,17 @@ impl BestLedgerStore for IndexerStore {
         self.database.put_cf(
             self.best_ledger_accounts_cf(),
             best_account_key(token, pk),
-            serde_json::to_vec(&account)?,
+            serde_json::to_vec(&after)?,
         )?;
 
-        if let Some(_zkapp) = account.zkapp {
+        if let Some(_zkapp) = after.zkapp {
             // populate index for best_ledger_zkapps_balance_sort_cf
             // populate index for best_ledger_tokens_balance_sort_cf
         } else {
             self.database.put_cf(
                 self.best_ledger_accounts_balance_sort_cf(),
                 best_account_sort_key(token, balance, pk),
-                serde_json::to_vec(&account)?,
+                serde_json::to_vec(&after)?,
             )?;
         }
 
@@ -182,6 +185,7 @@ impl BestLedgerStore for IndexerStore {
                 let acct = self
                     .get_best_account(&pk, &token)?
                     .unwrap_or(Account::empty(pk.clone(), token.clone()));
+                let before_balance = acct.balance.0;
 
                 let account = match diff {
                     Payment(diff) => match diff.update_type {
@@ -259,12 +263,12 @@ impl BestLedgerStore for IndexerStore {
                     }
                 };
 
-                self.update_best_account(&pk, &token, account)?;
+                self.update_best_account(&pk, &token, Some(before_balance), account)?;
             }
 
             // remove accounts
             for (pk, token) in remove_pks.iter() {
-                self.update_best_account(pk, token, None)?;
+                self.update_best_account(pk, token, None, None)?;
             }
         }
 
@@ -274,112 +278,34 @@ impl BestLedgerStore for IndexerStore {
                 let pk = diff.public_key();
                 let token = diff.token_address();
 
-                let acct = self
-                    .get_best_account(&pk, &token)?
-                    .unwrap_or(Account::empty(pk.to_owned(), token.to_owned()));
+                let before = self.get_best_account(&pk, &token)?;
+                let (before_balance, before) = (
+                    before.as_ref().map(|a| a.balance.0),
+                    before.unwrap_or(Account::empty(pk.clone(), token.clone())),
+                );
 
-                let account = match diff {
-                    Payment(diff) => match diff.update_type {
-                        UpdateType::Credit => Some(Account {
-                            balance: acct.balance + diff.amount,
-                            ..acct
-                        }),
-                        UpdateType::Debit(nonce) => Some(Account {
-                            balance: acct.balance - diff.amount,
-                            nonce: nonce.or(acct.nonce),
-                            ..acct
-                        }),
-                    },
-                    Coinbase(diff) => Some(Account {
-                        balance: acct.balance + diff.amount,
-                        ..acct
-                    }),
-                    Delegation(diff) => Some(Account {
-                        nonce: Some(diff.nonce),
-                        delegate: diff.delegate.clone(),
-                        ..acct
-                    }),
-                    FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
-                        UpdateType::Credit => Some(Account {
-                            balance: acct.balance + diff.amount,
-                            ..acct
-                        }),
-                        UpdateType::Debit(Some(nonce)) => Some(Account {
-                            balance: acct.balance - diff.amount,
-                            nonce: Some(nonce + 1),
-                            ..acct
-                        }),
-                        UpdateType::Debit(None) => Some(Account {
-                            balance: acct.balance - diff.amount,
-                            ..acct
-                        }),
-                    },
-                    FailedTransactionNonce(diff) => Some(Account {
-                        nonce: Some(diff.nonce),
-                        ..acct
-                    }),
-                    ZkappStateDiff(diff) => {
-                        let mut zkapp = acct.zkapp.unwrap_or_default();
-
-                        for (idx, diff) in diff.diffs.iter().enumerate() {
-                            if let Some(app_state) = diff.to_owned() {
-                                zkapp.app_state[idx] = app_state;
-                            }
-                        }
-
-                        Some(Account {
-                            zkapp: Some(zkapp),
-                            ..acct
-                        })
+                let after = Some(match diff {
+                    Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                        before.payment(diff)
                     }
-                    ZkappPermissionsDiff(diff) => Some(Account {
-                        permissions: Some(diff.permissions.to_owned()),
-                        ..acct
-                    }),
-                    ZkappVerificationKeyDiff(diff) => {
-                        let mut zkapp = acct.zkapp.unwrap_or_default();
-                        zkapp.verification_key = diff.verification_key.to_owned();
-
-                        Some(Account {
-                            zkapp: Some(zkapp),
-                            ..acct
-                        })
-                    }
-                    ZkappUriDiff(diff) => {
-                        let mut zkapp = acct.zkapp.unwrap_or_default();
-                        zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
-
-                        Some(Account {
-                            zkapp: Some(zkapp),
-                            ..acct
-                        })
-                    }
-                    ZkappTokenSymbolDiff(diff) => Some(Account {
-                        token_symbol: Some(diff.token_symbol.to_owned()),
-                        ..acct
-                    }),
-                    ZkappTimingDiff(diff) => Some(Account {
-                        timing: Some(diff.timing.to_owned()),
-                        ..acct
-                    }),
-                    ZkappVotingForDiff(diff) => Some(Account {
-                        voting_for: Some(diff.voting_for.to_owned()),
-                        ..acct
-                    }),
-                    ZkappIncrementNonce(_) => Some(Account {
-                        nonce: Some(acct.nonce.unwrap_or_default() + 1),
-                        ..acct
-                    }),
-                    ZkappAccountCreationFee(diff) => Some(Account {
-                        balance: acct.balance + diff.amount,
-                        ..acct
-                    }),
+                    Coinbase(diff) => before.coinbase(diff.amount),
+                    Delegation(diff) => before.delegation(diff.delegate.clone(), diff.nonce),
+                    FailedTransactionNonce(diff) => before.failed_transaction(diff.nonce),
+                    ZkappStateDiff(diff) => before.zkapp_state(diff),
+                    ZkappPermissionsDiff(diff) => before.zkapp_permissions(diff),
+                    ZkappVerificationKeyDiff(diff) => before.zkapp_verification_key(diff),
+                    ZkappUriDiff(diff) => before.zkapp_uri(diff),
+                    ZkappTokenSymbolDiff(diff) => before.zkapp_token_symbol(diff),
+                    ZkappTimingDiff(diff) => before.zkapp_timing(diff),
+                    ZkappVotingForDiff(diff) => before.zkapp_voting_for(diff),
+                    ZkappIncrementNonce(diff) => before.zkapp_nonce(diff),
+                    ZkappAccountCreationFee(diff) => before.zkapp_account_creation(diff),
 
                     // these account diffs do not modify the account
-                    ZkappActionsDiff(_) | ZkappEventsDiff(_) | Zkapp(_) => Some(acct),
-                };
+                    ZkappActionsDiff(_) | ZkappEventsDiff(_) | Zkapp(_) => before,
+                });
 
-                self.update_best_account(&pk, &token, account)?;
+                self.update_best_account(&pk, &token, before_balance, after)?;
             }
         }
         Ok(())
