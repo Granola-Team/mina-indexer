@@ -6,7 +6,7 @@ use crate::{
     },
     ledger::{
         account::Account,
-        diff::account::{AccountDiff, UpdateType},
+        diff::account::AccountDiff,
         public_key::PublicKey,
         store::{
             best::{BestLedgerStore, DbAccountUpdate},
@@ -182,63 +182,22 @@ impl BestLedgerStore for IndexerStore {
                 let pk: PublicKey = diff.public_key();
                 let token = diff.token_address();
 
-                let acct = self
-                    .get_best_account(&pk, &token)?
-                    .unwrap_or(Account::empty(pk.clone(), token.clone()));
-                let before_balance = acct.balance.0;
+                let before = self.get_best_account(&pk, &token)?;
+                let (before_balance, before) = (
+                    before.as_ref().map(|a| a.balance.0),
+                    before.unwrap_or(Account::empty(pk.clone(), token.clone())),
+                );
 
-                let account = match diff {
-                    Payment(diff) => match diff.update_type {
-                        UpdateType::Credit => Some(Account {
-                            balance: acct.balance - diff.amount,
-                            ..acct
-                        }),
-                        UpdateType::Debit(nonce) => Some(Account {
-                            balance: acct.balance + diff.amount,
-                            nonce: nonce.map_or(acct.nonce, |nonce| {
-                                if acct.nonce.map(|n| n.0) == Some(0) {
-                                    None
-                                } else {
-                                    Some(nonce - 1)
-                                }
-                            }),
-                            ..acct
-                        }),
-                    },
-                    Coinbase(diff) => Some(Account {
-                        balance: acct.balance - diff.amount,
-                        ..acct
-                    }),
+                let after = Some(match diff {
+                    Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                        before.payment_unapply(diff)
+                    }
+                    Coinbase(diff) => before.coinbase_unapply(diff),
                     Delegation(diff) => {
                         self.remove_pk_delegate(pk.clone())?;
-                        Some(Account {
-                            nonce: if acct.nonce.map(|n| n.0) == Some(0) {
-                                None
-                            } else {
-                                Some(diff.nonce - 1)
-                            },
-                            delegate: acct.public_key.clone(),
-                            ..acct
-                        })
+                        before.delegation_unapply(diff)
                     }
-                    FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => match diff.update_type {
-                        UpdateType::Credit => Some(Account {
-                            balance: acct.balance - diff.amount,
-                            ..acct
-                        }),
-                        UpdateType::Debit(_) => Some(Account {
-                            balance: acct.balance + diff.amount,
-                            ..acct
-                        }),
-                    },
-                    FailedTransactionNonce(diff) => Some(Account {
-                        nonce: if acct.nonce.map(|n| n.0) == Some(0) {
-                            None
-                        } else {
-                            Some(diff.nonce - 1)
-                        },
-                        ..acct
-                    }),
+                    FailedTransactionNonce(diff) => before.failed_transaction_unapply(diff),
 
                     // TODO zkapp unapply
                     Zkapp(diff) => todo!("zkapp diff unapply {:?}", diff),
@@ -263,7 +222,7 @@ impl BestLedgerStore for IndexerStore {
                     }
                 };
 
-                self.update_best_account(&pk, &token, Some(before_balance), account)?;
+                self.update_best_account(&pk, &token, before_balance, after)?;
             }
 
             // remove accounts
