@@ -464,14 +464,12 @@ impl Account {
         use AccountDiff::*;
 
         match diff {
-            Payment(payment_diff) => self.payment(payment_diff),
+            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => self.payment(diff),
             Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
             }
             Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
-            FeeTransfer(fee_transfer_diff) => self.payment(fee_transfer_diff),
-            FeeTransferViaCoinbase(fee_transfer_diff) => self.payment(fee_transfer_diff),
             FailedTransactionNonce(failed_diff) => self.failed_transaction(failed_diff.nonce),
             ZkappStateDiff(diff) => self.zkapp_state(diff),
             ZkappPermissionsDiff(diff) => self.zkapp_permissions(diff),
@@ -496,11 +494,11 @@ impl Account {
 
         use AccountDiff::*;
         Some(match diff {
-            Payment(payment_diff) => self.payment_unapply(payment_diff),
+            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                self.payment_unapply(diff)
+            }
             Delegation(delegation_diff) => self.delegation_unapply(Some(delegation_diff.nonce)),
             Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
-            FeeTransfer(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
-            FeeTransferViaCoinbase(fee_transfer_diff) => self.payment_unapply(fee_transfer_diff),
             FailedTransactionNonce(diff) => self.failed_transaction_unapply(
                 if diff.nonce.0 > 0 {
                     Some(diff.nonce - 1)

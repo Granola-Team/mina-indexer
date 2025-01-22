@@ -23,7 +23,6 @@ use crate::{
         token::TokenAddress,
     },
 };
-use diff::account::ZkappDiff;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
@@ -140,12 +139,6 @@ impl Ledger {
 
     /// Apply an account diff to a mutable ledger
     pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
-        // zkapp account diff
-        if let AccountDiff::Zkapp(zkapp) = acct_diff {
-            return self.apply_zkapp_diff(zkapp.as_ref());
-        }
-
-        // non-zkapp account diff
         let pk = acct_diff.public_key();
         let token = acct_diff.token_address();
 
@@ -159,10 +152,6 @@ impl Ledger {
         }
 
         Ok(())
-    }
-
-    fn apply_zkapp_diff(&mut self, zkapp: &ZkappDiff) -> anyhow::Result<()> {
-        todo!("apply zkapp {:?}", zkapp)
     }
 
     /// Unapply a ledger diff to a mutable ledger
