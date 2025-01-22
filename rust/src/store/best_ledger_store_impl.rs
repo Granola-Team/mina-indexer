@@ -200,27 +200,19 @@ impl BestLedgerStore for IndexerStore {
                     FailedTransactionNonce(diff) => before.failed_transaction_unapply(diff),
 
                     // TODO zkapp unapply
-                    Zkapp(diff) => todo!("zkapp diff unapply {:?}", diff),
-                    ZkappStateDiff(diff) => todo!("zkapp state diff unapply {:?}", diff),
-                    ZkappPermissionsDiff(diff) => {
-                        todo!("zkapp permissions diff unapply {:?}", diff)
-                    }
-                    ZkappVerificationKeyDiff(diff) => {
-                        todo!("zkapp verification key diff unapply {:?}", diff)
-                    }
-                    ZkappUriDiff(diff) => todo!("zkapp uri diff unapply {:?}", diff),
-                    ZkappTokenSymbolDiff(diff) => {
-                        todo!("zkapp token symbol diff unapply {:?}", diff)
-                    }
-                    ZkappTimingDiff(diff) => todo!("zkapp timing diff unapply {:?}", diff),
-                    ZkappVotingForDiff(diff) => todo!("zkapp voting for diff unapply {:?}", diff),
-                    ZkappActionsDiff(diff) => todo!("zkapp actions diff unapply {:?}", diff),
-                    ZkappEventsDiff(diff) => todo!("zkapp events diff unapply {:?}", diff),
-                    ZkappIncrementNonce(diff) => todo!("zkapp increment nonce unapply {:?}", diff),
-                    ZkappAccountCreationFee(diff) => {
-                        todo!("zkapp account creation fee unapply {:?}", diff)
-                    }
-                };
+                    ZkappStateDiff(_)
+                    | ZkappPermissionsDiff(_)
+                    | ZkappVerificationKeyDiff(_)
+                    | ZkappUriDiff(_)
+                    | ZkappTokenSymbolDiff(_)
+                    | ZkappTimingDiff(_)
+                    | ZkappVotingForDiff(_)
+                    | ZkappActionsDiff(_)
+                    | ZkappEventsDiff(_)
+                    | ZkappIncrementNonce(_)
+                    | ZkappAccountCreationFee(_) => before,
+                    Zkapp(_) => unreachable!(),
+                });
 
                 self.update_best_account(&pk, &token, before_balance, after)?;
             }
