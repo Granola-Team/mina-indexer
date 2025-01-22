@@ -178,7 +178,7 @@ impl Account {
     pub fn payment(self, payment_diff: &PaymentDiff) -> Self {
         match payment_diff.update_type {
             UpdateType::Credit => self.credit(payment_diff.amount),
-            UpdateType::Debit(nonce) => self.clone().debit(payment_diff.amount, nonce),
+            UpdateType::Debit(nonce) => self.debit(payment_diff.amount, nonce),
         }
     }
 
@@ -300,8 +300,8 @@ impl Account {
     }
 
     /// Apply zkapp state diff
-    fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -318,8 +318,8 @@ impl Account {
     }
 
     /// Apply zkapp verification key diff
-    fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         if let Some(mut zkapp) = self.zkapp {
             zkapp.verification_key = diff.verification_key.to_owned();
@@ -334,8 +334,8 @@ impl Account {
     }
 
     /// Apply zkapp permissions diff
-    fn zkapp_permissions(self, diff: &ZkappPermissionsDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_permissions(self, diff: &ZkappPermissionsDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             permissions: Some(diff.permissions.to_owned()),
@@ -344,8 +344,8 @@ impl Account {
     }
 
     /// Apply zkapp uri diff
-    fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         if let Some(mut zkapp) = self.zkapp {
             zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
@@ -360,8 +360,8 @@ impl Account {
     }
 
     /// Apply zkapp token symbol diff
-    fn zkapp_token_symbol(self, diff: &ZkappTokenSymbolDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_token_symbol(self, diff: &ZkappTokenSymbolDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             token_symbol: Some(diff.token_symbol.to_owned()),
@@ -370,8 +370,8 @@ impl Account {
     }
 
     /// Apply zkapp timing diff
-    fn zkapp_timing(self, diff: &ZkappTimingDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_timing(self, diff: &ZkappTimingDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             timing: Some(diff.timing.to_owned()),
@@ -380,8 +380,8 @@ impl Account {
     }
 
     /// Apply zkapp voting for diff
-    fn zkapp_voting_for(self, diff: &ZkappVotingForDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+    pub fn zkapp_voting_for(self, diff: &ZkappVotingForDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             voting_for: Some(diff.voting_for.to_owned()),
@@ -391,7 +391,7 @@ impl Account {
 
     /// Apply zkapp actions diff
     fn zkapp_actions(self, diff: &ZkappActionsDiff) -> Self {
-        assert_eq!(self.public_key, diff.public_key);
+        self.checks(&diff.public_key, &diff.token);
 
         if let Some(mut zkapp) = self.zkapp {
             let n = zkapp.action_state.len();
@@ -415,14 +415,8 @@ impl Account {
     }
 
     /// Apply zkapp increment
-    fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
-        assert_eq!(diff.public_key, self.public_key);
-
-        if let Some(token) = self.token.as_ref() {
-            assert_eq!(diff.token, *token);
-        } else {
-            assert_eq!(diff.token, TokenAddress::default());
-        }
+    pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             nonce: Some(self.nonce.unwrap_or_default() + 1),
@@ -431,14 +425,8 @@ impl Account {
     }
 
     /// Apply zkapp account creation fee
-    fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
-        assert_eq!(diff.public_key, self.public_key);
-
-        if let Some(token) = self.token.as_ref() {
-            assert_eq!(diff.token, *token);
-        } else {
-            assert_eq!(diff.token, TokenAddress::default());
-        }
+    pub fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
+        self.checks(&diff.public_key, &diff.token);
 
         Self {
             balance: self.balance + diff.amount,
@@ -510,6 +498,19 @@ impl Account {
             }
         }
         acct
+    }
+
+    /// Checks application to the expected token account
+    fn checks(&self, public_key: &PublicKey, token: &TokenAddress) {
+        assert_eq!(*public_key, self.public_key);
+        self.check_token(token);
+    }
+
+    fn check_token(&self, token: &TokenAddress) {
+        match self.token.as_ref() {
+            None => assert_eq!(*token, TokenAddress::default()),
+            Some(account_token) => assert_eq!(account_token, token),
+        }
     }
 }
 
