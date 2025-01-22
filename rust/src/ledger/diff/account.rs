@@ -1266,7 +1266,7 @@ mod tests {
             is_new_account: true,
             receiver: receiver.clone(),
             receiver_balance: Some(1440 * (1e9 as u64)),
-            kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
+            kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
                 receiver_pk: snarker.clone(),
                 fee,
             })),
@@ -1358,7 +1358,7 @@ mod tests {
             is_new_account: false,
             receiver_balance: None,
             receiver: receiver.clone(),
-            kind: CoinbaseKind::Coinbase(None),
+            kind: CoinbaseKind::One(None),
         });
         let expected_account_diff = vec![vec![AccountDiff::Coinbase(CoinbaseDiff {
             public_key: receiver.clone(),
