@@ -573,8 +573,8 @@ impl PrecomputedBlock {
     pub fn pre_diff_coinbase(&self) -> CoinbaseKind {
         match self {
             Self::V1(v1) => match &v1.staged_ledger_diff.diff.t.0.t.t.coinbase.t {
-                mina_rs::CoinBase::None => CoinbaseKind::None,
-                mina_rs::CoinBase::Coinbase(cb) => CoinbaseKind::Coinbase(cb.as_ref().map(|cb| {
+                mina_rs::CoinBase::None => CoinbaseKind::Zero,
+                mina_rs::CoinBase::Coinbase(cb) => CoinbaseKind::One(cb.as_ref().map(|cb| {
                     let mina_rs::CoinBaseFeeTransfer { receiver_pk, fee } = cb.t.t.to_owned();
                     CoinbaseFeeTransfer {
                         receiver_pk: PublicKey::from(receiver_pk),
@@ -582,7 +582,7 @@ impl PrecomputedBlock {
                     }
                 })),
                 mina_rs::CoinBase::CoinbaseAndFeeTransferViaCoinbase(fst, snd) => {
-                    CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
+                    CoinbaseKind::Two(
                         fst.as_ref().map(|c| c.t.t.to_owned().into()),
                         snd.as_ref().map(|c| c.t.t.to_owned().into()),
                     )
@@ -608,8 +608,8 @@ impl PrecomputedBlock {
                 .map(|diff| diff.t.t.coinbase.t.to_owned())
             {
                 None => None,
-                Some(mina_rs::CoinBase::None) => Some(CoinbaseKind::None),
-                Some(mina_rs::CoinBase::Coinbase(x)) => Some(CoinbaseKind::Coinbase(x.map(|cb| {
+                Some(mina_rs::CoinBase::None) => Some(CoinbaseKind::Zero),
+                Some(mina_rs::CoinBase::Coinbase(x)) => Some(CoinbaseKind::One(x.map(|cb| {
                     let mina_rs::CoinBaseFeeTransfer { receiver_pk, fee } = cb.inner().inner();
                     CoinbaseFeeTransfer {
                         receiver_pk: PublicKey::from(receiver_pk),
@@ -617,7 +617,7 @@ impl PrecomputedBlock {
                     }
                 }))),
                 Some(mina_rs::CoinBase::CoinbaseAndFeeTransferViaCoinbase(x, y)) => {
-                    Some(CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
+                    Some(CoinbaseKind::Two(
                         x.map(|c| c.inner().inner().into()),
                         y.map(|c| c.inner().inner().into()),
                     ))

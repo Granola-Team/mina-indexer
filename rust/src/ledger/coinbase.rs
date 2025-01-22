@@ -22,33 +22,34 @@ pub struct Coinbase {
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub enum CoinbaseKind {
-    None,
-    Coinbase(Option<CoinbaseFeeTransfer>),
-    CoinbaseAndFeeTransferViaCoinbase(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
+    Zero,
+    One(Option<CoinbaseFeeTransfer>),
+    Two(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
 }
 
 impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
     fn from(value: v2::staged_ledger_diff::Coinbase) -> Self {
         match value {
-            v2::staged_ledger_diff::Coinbase::Zero(_) => Self::None,
+            v2::staged_ledger_diff::Coinbase::Zero(_) => Self::Zero,
             v2::staged_ledger_diff::Coinbase::One(_, one) => {
-                Self::Coinbase(one.map(|o| CoinbaseFeeTransfer {
+                Self::One(one.map(|o| CoinbaseFeeTransfer {
                     receiver_pk: o.receiver_pk,
                     fee: o.fee,
                 }))
             }
-            v2::staged_ledger_diff::Coinbase::Two(_, fst, snd) => {
-                Self::CoinbaseAndFeeTransferViaCoinbase(
-                    fst.map(|f| CoinbaseFeeTransfer {
-                        receiver_pk: f.receiver_pk,
-                        fee: f.fee,
+            v2::staged_ledger_diff::Coinbase::Two(_, two) => match two {
+                None => Self::Two(None, None),
+                Some((fst, snd)) => Self::Two(
+                    Some(CoinbaseFeeTransfer {
+                        receiver_pk: fst.receiver_pk,
+                        fee: fst.fee,
                     }),
                     snd.map(|s| CoinbaseFeeTransfer {
                         receiver_pk: s.receiver_pk,
                         fee: s.fee,
                     }),
-                )
-            }
+                ),
+            },
         }
     }
 }
@@ -146,12 +147,9 @@ impl Coinbase {
 
     fn get_transfers(&self) -> Vec<&CoinbaseFeeTransfer> {
         let transfers = match &self.kind {
-            CoinbaseKind::None => vec![],
-            CoinbaseKind::Coinbase(coinbase) => vec![coinbase.as_ref()],
-            CoinbaseKind::CoinbaseAndFeeTransferViaCoinbase(
-                coinbase,
-                fee_transfer_via_coinbase,
-            ) => {
+            CoinbaseKind::Zero => vec![],
+            CoinbaseKind::One(coinbase) => vec![coinbase.as_ref()],
+            CoinbaseKind::Two(coinbase, fee_transfer_via_coinbase) => {
                 vec![coinbase.as_ref(), fee_transfer_via_coinbase.as_ref()]
             }
         };
@@ -159,7 +157,7 @@ impl Coinbase {
     }
 
     pub fn is_coinbase_applied(&self) -> bool {
-        !matches!(self.kind, CoinbaseKind::None)
+        !matches!(self.kind, CoinbaseKind::Zero)
     }
 
     pub fn has_fee_transfer(&self) -> bool {
@@ -197,7 +195,7 @@ mod coinbase_tests {
             fee: 100,
         };
         let coinbase = Coinbase {
-            kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
+            kind: CoinbaseKind::One(Some(transfer.clone())),
             receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
@@ -221,7 +219,7 @@ mod coinbase_tests {
     #[test]
     fn test_coinbase_is_coinbase_applied() {
         let coinbase = Coinbase {
-            kind: CoinbaseKind::None,
+            kind: CoinbaseKind::Zero,
             receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
@@ -230,7 +228,7 @@ mod coinbase_tests {
         assert!(!coinbase.is_coinbase_applied());
 
         let coinbase = Coinbase {
-            kind: CoinbaseKind::Coinbase(None),
+            kind: CoinbaseKind::One(None),
             ..coinbase
         };
         assert!(coinbase.is_coinbase_applied());
@@ -243,7 +241,7 @@ mod coinbase_tests {
             fee: 100,
         };
         let coinbase = Coinbase {
-            kind: CoinbaseKind::Coinbase(Some(transfer.clone())),
+            kind: CoinbaseKind::One(Some(transfer.clone())),
             receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
@@ -268,7 +266,7 @@ mod coinbase_tests {
     #[test]
     fn test_coinbase_has_fee_transfer() {
         let coinbase = Coinbase {
-            kind: CoinbaseKind::None,
+            kind: CoinbaseKind::Zero,
             receiver: PublicKey::default(),
             supercharge: false,
             is_new_account: false,
@@ -277,7 +275,7 @@ mod coinbase_tests {
         assert!(!coinbase.has_fee_transfer());
 
         let coinbase = Coinbase {
-            kind: CoinbaseKind::Coinbase(Some(CoinbaseFeeTransfer {
+            kind: CoinbaseKind::One(Some(CoinbaseFeeTransfer {
                 receiver_pk: PublicKey::default(),
                 fee: 100,
             })),
@@ -292,7 +290,7 @@ mod coinbase_tests {
         let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let expect = Coinbase {
-            kind: CoinbaseKind::Coinbase(None),
+            kind: CoinbaseKind::One(None),
             receiver: PublicKey::from("B62qjHdYUPTHQkwDWUbDYscteT2LFj3ro1vz9fnxMyHTACe6C2fLbSd"),
             supercharge: false,
             is_new_account: false,
