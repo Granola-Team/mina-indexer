@@ -156,9 +156,11 @@ pub struct ZkappAccount {
     pub zkapp_uri: ZkappUri,
 
     #[serde(deserialize_with = "from_str")]
+    #[serde(serialize_with = "to_str")]
     pub zkapp_version: u32,
 
     #[serde(deserialize_with = "from_str")]
+    #[serde(serialize_with = "to_str")]
     pub last_action_slot: u32,
 }
 
