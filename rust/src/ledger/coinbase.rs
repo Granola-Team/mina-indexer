@@ -285,8 +285,9 @@ mod coinbase_tests {
     }
 
     #[test]
-    fn coinbase_from_precomputed() -> anyhow::Result<()> {
+    fn coinbase_from_precomputed_v1() -> anyhow::Result<()> {
         use crate::block::precomputed::PcbVersion;
+
         let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let expect = Coinbase {
@@ -296,6 +297,25 @@ mod coinbase_tests {
             is_new_account: false,
             receiver_balance: Some(16790466359034),
         };
+
+        assert_eq!(Coinbase::from_precomputed(&block), expect);
+        Ok(())
+    }
+
+    #[test]
+    fn coinbase_from_precomputed_v2() -> anyhow::Result<()> {
+        use crate::block::precomputed::PcbVersion;
+
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let expect = Coinbase {
+            kind: CoinbaseKind::Zero,
+            receiver: PublicKey::from("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: None,
+        };
+
         assert_eq!(Coinbase::from_precomputed(&block), expect);
         Ok(())
     }
