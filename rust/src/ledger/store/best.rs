@@ -37,7 +37,8 @@ pub trait BestLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        account: Option<Account>,
+        before_balance: Option<u64>,
+        after: Option<Account>,
     ) -> anyhow::Result<()>;
 
     /// Updates best ledger accounts

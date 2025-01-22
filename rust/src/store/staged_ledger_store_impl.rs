@@ -307,7 +307,7 @@ impl StagedLedgerStore for IndexerStore {
         // initialize account balances for best ledger & sorting
         let token = TokenAddress::default();
         for (pk, acct) in genesis_ledger.accounts.iter() {
-            self.update_best_account(pk, &token, Some(acct.clone()))?;
+            self.update_best_account(pk, &token, None, Some(acct.clone()))?;
         }
 
         self.add_staged_ledger_at_state_hash(
