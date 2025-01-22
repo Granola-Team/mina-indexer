@@ -186,8 +186,7 @@
                     "completed_works": [],
                     "commands": [],
                     "coinbase": [
-                        "Zero",
-                        null
+                        "Zero"
                     ],
                     "internal_command_statuses": []
                 },
