@@ -36,8 +36,7 @@ pub enum Coinbase {
     One(CoinbaseKind, Option<CoinbasePayload>),
     Two(
         CoinbaseKind,
-        Option<CoinbasePayload>,
-        Option<CoinbasePayload>,
+        Option<(CoinbasePayload, Option<CoinbasePayload>)>,
     ),
 }
 
