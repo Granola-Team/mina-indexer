@@ -5,9 +5,10 @@ use super::{
     amount::Amount,
     diff::{
         account::{
-            AccountDiff, UpdateType, ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff,
-            ZkappIncrementNonce, ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff,
-            ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
+            AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
+            ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappIncrementNonce,
+            ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff, ZkappTokenSymbolDiff,
+            ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
         },
         LedgerDiff,
     },
@@ -123,7 +124,7 @@ impl Account {
     /// A new `Account` instance with the specified public key and token,
     /// default values for other fields.
     pub fn empty(public_key: PublicKey, token: TokenAddress) -> Self {
-        Account {
+        Self {
             public_key: public_key.clone(),
             delegate: public_key,
             token: Some(token),
@@ -151,15 +152,16 @@ impl Account {
     ///
     /// A new `Account` instance with the updated balance.
     pub fn coinbase(self, amount: Amount) -> Self {
-        Account {
+        Self {
             balance: self.balance + amount,
             ..self
         }
     }
 
-    pub fn coinbase_unapply(self, amount: Amount) -> Self {
-        Account {
-            balance: self.balance - amount,
+    /// Unapply a coinbase
+    pub fn coinbase_unapply(self, diff: &CoinbaseDiff) -> Self {
+        Self {
+            balance: self.balance - diff.amount,
             ..self
         }
     }
@@ -192,15 +194,21 @@ impl Account {
     /// # Returns
     ///
     /// A new `Account` instance with the updated state.
-    pub fn payment_unapply(self, payment_diff: &PaymentDiff) -> Self {
-        match payment_diff.update_type {
-            UpdateType::Credit => Account {
-                balance: self.balance - payment_diff.amount,
+    pub fn payment_unapply(self, diff: &PaymentDiff) -> Self {
+        match diff.update_type {
+            UpdateType::Credit => Self {
+                balance: self.balance - diff.amount,
                 ..self
             },
             UpdateType::Debit(nonce) => Self {
-                balance: self.balance + payment_diff.amount,
-                nonce: nonce.or(self.nonce).map(|n| n - 1),
+                balance: self.balance + diff.amount,
+                nonce: nonce.map_or(self.nonce, |nonce| {
+                    if self.nonce.map(|n| n.0) == Some(0) {
+                        None
+                    } else {
+                        Some(nonce - 1)
+                    }
+                }),
                 ..self
             },
         }
@@ -222,7 +230,7 @@ impl Account {
     /// successful, or `None` if the debit amount exceeds the current
     /// balance.
     fn debit(self, amount: Amount, nonce: Option<Nonce>) -> Self {
-        Account {
+        Self {
             balance: self.balance - amount,
             nonce: nonce.or(self.nonce),
             ..self
@@ -241,7 +249,7 @@ impl Account {
     ///
     /// A new `Account` instance with the updated balance.
     fn credit(self, amount: Amount) -> Self {
-        Account {
+        Self {
             balance: self.balance + amount,
             ..self
         }
@@ -261,17 +269,22 @@ impl Account {
     ///
     /// A new `Account` instance with the updated delegate and nonce.
     pub fn delegation(self, delegate: PublicKey, updated_nonce: Nonce) -> Self {
-        Account {
+        Self {
             delegate,
             nonce: Some(updated_nonce),
             ..self
         }
     }
 
-    pub fn delegation_unapply(self, nonce: Option<Nonce>) -> Self {
-        Account {
+    /// Unapply a delegation
+    pub fn delegation_unapply(self, diff: &DelegationDiff) -> Self {
+        Self {
+            nonce: if self.nonce.map(|n| n.0) == Some(0) {
+                None
+            } else {
+                Some(diff.nonce - 1)
+            },
             delegate: self.public_key.clone(),
-            nonce,
             ..self
         }
     }
@@ -289,14 +302,21 @@ impl Account {
     ///
     /// A new `Account` instance with the updated nonce.
     pub fn failed_transaction(self, updated_nonce: Nonce) -> Self {
-        Account {
+        Self {
             nonce: Some(updated_nonce),
             ..self
         }
     }
 
-    pub fn failed_transaction_unapply(self, nonce: Option<Nonce>) -> Self {
-        Account { nonce, ..self }
+    /// Unapply a failed transaction
+    pub fn failed_transaction_unapply(self, diff: &FailedTransactionNonceDiff) -> Self {
+        let nonce = if diff.nonce.0 > 0 {
+            Some(diff.nonce - 1)
+        } else {
+            None
+        };
+
+        Self { nonce, ..self }
     }
 
     /// Apply zkapp state diff
@@ -435,8 +455,9 @@ impl Account {
     }
 
     /// Apply zkapp events diff
-    fn zkapp_events(self, diff: &ZkappEventsDiff) -> Self {
-        todo!("events diff {:?}", diff)
+    fn zkapp_events(self, _diff: &ZkappEventsDiff) -> Self {
+        // todo!("events diff {:?}", diff)
+        self
     }
 
     /// Apply zkapp increment
@@ -497,17 +518,23 @@ impl Account {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
                 self.payment_unapply(diff)
             }
-            Delegation(delegation_diff) => self.delegation_unapply(Some(delegation_diff.nonce)),
-            Coinbase(coinbase_diff) => self.coinbase_unapply(coinbase_diff.amount),
-            FailedTransactionNonce(diff) => self.failed_transaction_unapply(
-                if diff.nonce.0 > 0 {
-                    Some(diff.nonce - 1)
-                } else {
-                    None
-                },
-            ),
-            Zkapp(zkapp_diff) => todo!("unapply zkapp account diff {zkapp_diff:?}"),
-            _ => todo!(),
+            Delegation(diff) => self.delegation_unapply(diff),
+            Coinbase(diff) => self.coinbase_unapply(diff),
+            FailedTransactionNonce(diff) => self.failed_transaction_unapply(diff),
+
+            // TODO zkapp unapply
+            ZkappStateDiff(_)
+            | ZkappPermissionsDiff(_)
+            | ZkappVerificationKeyDiff(_)
+            | ZkappUriDiff(_)
+            | ZkappTokenSymbolDiff(_)
+            | ZkappTimingDiff(_)
+            | ZkappVotingForDiff(_)
+            | ZkappActionsDiff(_)
+            | ZkappEventsDiff(_)
+            | ZkappIncrementNonce(_)
+            | ZkappAccountCreationFee(_) => self,
+            Zkapp(_) => unreachable!(),
         })
     }
 
@@ -541,7 +568,7 @@ impl From<GenesisBlock> for Account {
     fn from(value: GenesisBlock) -> Self {
         // magic mina
         let block_creator = value.0.block_creator();
-        Account {
+        Self {
             public_key: block_creator.clone(),
             balance: Amount(1000_u64),
             delegate: block_creator,
@@ -571,7 +598,7 @@ impl Ord for Account {
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let deducted = Account {
+        let deducted = Self {
             balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
             ..self.clone()
         };
