@@ -203,6 +203,12 @@ impl BestLedgerStore for IndexerStore {
                     }
                     FailedTransactionNonce(diff) => before.failed_transaction_unapply(diff),
 
+                    // zkapp diffs
+                    ZkappActionsDiff(diff) => {
+                        self.remove_actions(&pk, &token, diff.actions.len() as u32)?;
+                        before
+                    }
+
                     // TODO zkapp unapply
                     ZkappStateDiff(_)
                     | ZkappPermissionsDiff(_)
@@ -211,7 +217,6 @@ impl BestLedgerStore for IndexerStore {
                     | ZkappTokenSymbolDiff(_)
                     | ZkappTimingDiff(_)
                     | ZkappVotingForDiff(_)
-                    | ZkappActionsDiff(_)
                     | ZkappEventsDiff(_)
                     | ZkappIncrementNonce(_)
                     | ZkappAccountCreationFee(_) => before,
