@@ -145,6 +145,16 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting user commands by sender public key
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily;
 
+    /////////////////////
+    // Zkapp store CFs //
+    /////////////////////
+
+    /// CF for storing zkapp actions
+    fn zkapp_actions_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing a zkapp account's current action num
+    fn zkapp_actions_pk_num_cf(&self) -> &ColumnFamily;
+
     ////////////////////////////////
     // Internal command store CFs //
     ////////////////////////////////
@@ -417,9 +427,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing chain_id -> network
     fn chain_id_to_network_cf(&self) -> &ColumnFamily;
 
-    /////////////////////
-    // Event store CFs //
-    /////////////////////
+    /////////////////////////////
+    // Indexer event store CFs //
+    /////////////////////////////
 
     /// CF for storing indexer store events by sequence number
     fn events_cf(&self) -> &ColumnFamily;
