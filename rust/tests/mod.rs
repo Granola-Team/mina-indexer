@@ -12,6 +12,7 @@ mod protocol;
 mod snark_work;
 mod state;
 mod usernames;
+mod zkapps;
 
 //////////////////
 // Test helpers //
