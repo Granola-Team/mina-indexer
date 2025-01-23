@@ -3,7 +3,7 @@ pub mod symbol;
 use super::{amount::Amount, public_key::PublicKey};
 use crate::{
     constants::MINA_TOKEN_ADDRESS, protocol::serialization_types::version_bytes::TOKEN_ID_KEY,
-    utility::store::U64_LEN,
+    utility::store::common::U64_LEN,
 };
 use anyhow::bail;
 use serde::{Deserialize, Serialize};

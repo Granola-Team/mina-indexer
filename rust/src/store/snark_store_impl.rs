@@ -13,8 +13,11 @@ use crate::{
         SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
     utility::store::{
-        block_index_key, pk_index_key, snarks::*, u32_from_be_bytes, u32_prefix_key,
-        u64_from_be_bytes, u64_prefix_key, U32_LEN, U64_LEN,
+        common::{
+            block_index_key, pk_index_key, u32_from_be_bytes, u32_prefix_key, u64_from_be_bytes,
+            u64_prefix_key, U32_LEN, U64_LEN,
+        },
+        snarks::*,
     },
 };
 use log::trace;

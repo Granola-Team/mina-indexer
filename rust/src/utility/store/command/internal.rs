@@ -1,7 +1,7 @@
 use crate::{
     block::BlockHash,
     ledger::public_key::PublicKey,
-    utility::store::{u32_from_be_bytes, U32_LEN},
+    utility::store::common::{u32_from_be_bytes, U32_LEN},
 };
 
 pub fn internal_commmand_block_key(

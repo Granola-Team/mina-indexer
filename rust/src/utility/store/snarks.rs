@@ -1,7 +1,7 @@
 use crate::{
     block::BlockHash,
     ledger::public_key::PublicKey,
-    utility::store::{U32_LEN, U64_LEN},
+    utility::store::common::{U32_LEN, U64_LEN},
 };
 
 /// Key format

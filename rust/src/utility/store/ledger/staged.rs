@@ -1,7 +1,7 @@
 use crate::{
     block::BlockHash,
     ledger::{public_key::PublicKey, token::TokenAddress},
-    utility::store::{balance_key_prefix, pk_key_prefix, U64_LEN},
+    utility::store::common::{balance_key_prefix, pk_key_prefix, U64_LEN},
 };
 
 /// Key format for storing staged ledger accounts by state hash

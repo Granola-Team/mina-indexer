@@ -12,7 +12,7 @@ use crate::{
         token::TokenAddress,
         Ledger, LedgerHash, TokenLedger,
     },
-    utility::store::{from_be_bytes, ledger::staged::*},
+    utility::store::{common::from_be_bytes, ledger::staged::*},
 };
 use anyhow::{bail, Context};
 use log::{error, trace};

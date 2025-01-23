@@ -13,7 +13,7 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::store::SnarkStore,
     store::IndexerStore,
-    utility::store::{from_be_bytes, U32_LEN},
+    utility::store::common::{from_be_bytes, U32_LEN},
     web::graphql::db,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};

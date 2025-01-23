@@ -39,8 +39,8 @@ use crate::{
     utility::{
         functions::pretty_print_duration,
         store::{
-            block_u32_prefix_from_key, ledger::staking::split_staking_ledger_epoch_key,
-            state_hash_suffix, u64_from_be_bytes,
+            common::{block_u32_prefix_from_key, state_hash_suffix, u64_from_be_bytes},
+            ledger::staking::split_staking_ledger_epoch_key,
         },
     },
 };

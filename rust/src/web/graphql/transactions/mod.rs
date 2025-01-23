@@ -14,7 +14,7 @@ use crate::{
             pk_txn_sort_key_prefix, txn_hash_of_key, user_commands_iterator_state_hash,
             user_commands_iterator_txn_hash,
         },
-        state_hash_suffix, U32_LEN,
+        common::{state_hash_suffix, U32_LEN},
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };

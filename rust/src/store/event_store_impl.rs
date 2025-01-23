@@ -7,7 +7,7 @@ use crate::{
         IndexerEvent,
     },
     store::IndexerStore,
-    utility::store::from_be_bytes,
+    utility::store::common::from_be_bytes,
 };
 use log::trace;
 

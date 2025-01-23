@@ -3,7 +3,7 @@ use crate::{
     block::store::BlockStore,
     ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
     store::username::UsernameStore,
-    utility::store::{from_be_bytes, U32_LEN},
+    utility::store::common::{from_be_bytes, U32_LEN},
 };
 use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};

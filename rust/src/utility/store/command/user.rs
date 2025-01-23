@@ -2,7 +2,7 @@ use crate::{
     block::BlockHash,
     command::signed::TxnHash,
     ledger::{nonce::Nonce, public_key::PublicKey},
-    utility::store::{state_hash_suffix, u32_from_be_bytes, U32_LEN},
+    utility::store::common::{state_hash_suffix, u32_from_be_bytes, U32_LEN},
 };
 
 /// Key format for sorting txns by block height/global slot & txn hash

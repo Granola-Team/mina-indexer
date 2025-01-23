@@ -12,7 +12,9 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
-    utility::store::{block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN},
+    utility::store::common::{
+        block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN,
+    },
     web::graphql::{
         gen::{BlockProtocolStateConsensusStateQueryInput, BlockQueryInput},
         get_block,
