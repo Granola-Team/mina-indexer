@@ -15,6 +15,7 @@ use crate::{
         token::TokenAddress,
         Ledger, TokenLedger,
     },
+    store::zkapp::actions::ZkappActionStore,
     utility::store::{
         common::{from_be_bytes, pk_index_key},
         ledger::best::*,
@@ -256,7 +257,11 @@ impl BestLedgerStore for IndexerStore {
                     ZkappAccountCreationFee(diff) => before.zkapp_account_creation(diff),
 
                     // these account diffs do not modify the account
-                    ZkappActionsDiff(_) | ZkappEventsDiff(_) | Zkapp(_) => before,
+                    ZkappActionsDiff(diff) => {
+                        self.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
+                        before
+                    }
+                    ZkappEventsDiff(_) | Zkapp(_) => before,
                 });
 
                 self.update_best_account(&pk, &token, before_balance, after)?;
