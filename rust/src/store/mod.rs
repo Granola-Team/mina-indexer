@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 125] = [
+    const COLUMN_FAMILIES: [&'static str; 127] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -112,6 +112,8 @@ impl IndexerStore {
         /////////////////////
         "zkapp-actions",
         "zkapp-actions-pk-num",
+        "zkapp-events",
+        "zkapp-events-pk-num",
         ////////////////////////////////
         // Internal command store CFs //
         ////////////////////////////////

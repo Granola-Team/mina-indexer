@@ -401,7 +401,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}
-    /// val: [Vec<ActionState>] serde bytes
+    /// val: [u32] BE bytes
     /// where:
     /// - token: [TokenAddress] bytes
     /// - pk:    [PublicKey] bytes
@@ -409,6 +409,33 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("zkapp-actions-pk-num")
             .expect("zkapp-actions-pk-num column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [Vec<ZkappEvent>] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_events_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-events")
+            .expect("zkapp-events column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_events_pk_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-events-pk-num")
+            .expect("zkapp-events-pk-num column family exists")
     }
 
     ////////////////////////////////

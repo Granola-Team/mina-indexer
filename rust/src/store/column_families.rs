@@ -155,6 +155,12 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing a zkapp account's current action num
     fn zkapp_actions_pk_num_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing zkapp events
+    fn zkapp_events_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing a zkapp account's current event num
+    fn zkapp_events_pk_num_cf(&self) -> &ColumnFamily;
+
     ////////////////////////////////
     // Internal command store CFs //
     ////////////////////////////////
