@@ -380,6 +380,37 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("txn-to-height-sort column family exists")
     }
 
+    /////////////////////
+    // Zkapp store CFs //
+    /////////////////////
+
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [Vec<ActionState>] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_actions_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-actions")
+            .expect("zkapp-actions column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [Vec<ActionState>] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_actions_pk_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-actions-pk-num")
+            .expect("zkapp-actions-pk-num column family exists")
+    }
+
     ////////////////////////////////
     // Internal command store CFs //
     ////////////////////////////////

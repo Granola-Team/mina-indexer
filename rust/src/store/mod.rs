@@ -6,6 +6,7 @@ pub mod column_families;
 pub mod fixed_keys;
 pub mod username;
 pub mod version;
+pub mod zkapp;
 
 // impls
 pub mod best_ledger_store_impl;
@@ -21,6 +22,7 @@ pub mod staking_ledger_store_impl;
 pub mod user_command_store_impl;
 pub mod username_store_impl;
 pub mod version_store_impl;
+pub mod zkapp_store_impl;
 
 use self::fixed_keys::FixedKeys;
 use anyhow::{anyhow, bail, Context};
@@ -33,6 +35,8 @@ use std::{
     path::{Path, PathBuf},
 };
 use version::{IndexerStoreVersion, VersionStore};
+
+type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -50,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 123] = [
+    const COLUMN_FAMILIES: [&'static str; 125] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -103,6 +107,11 @@ impl IndexerStore {
         "txn-from-height-sort",
         "txn-to-slot-sort",
         "txn-to-height-sort",
+        /////////////////////
+        // Zkapp store CFs //
+        /////////////////////
+        "zkapp-actions",
+        "zkapp-actions-pk-num",
         ////////////////////////////////
         // Internal command store CFs //
         ////////////////////////////////
@@ -216,7 +225,7 @@ impl IndexerStore {
     ];
 
     /// Creates a new _primary_ indexer store
-    pub fn new(path: &Path) -> anyhow::Result<Self> {
+    pub fn new(path: &Path) -> Result<Self> {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_write_buffer_size(256 * 1024 * 1024); // 256MB
         cf_opts.set_max_write_buffer_number(16); // 256Mb * 16 ~= 4GB
@@ -254,7 +263,7 @@ impl IndexerStore {
     }
 
     /// Create a snapshot of the Indexer store
-    pub fn create_snapshot(&self, output_file: &Path) -> Result<String, anyhow::Error> {
+    pub fn create_snapshot(&self, output_file: &Path) -> Result<String> {
         use speedb::checkpoint::Checkpoint;
 
         let mut snapshot_temp_dir = output_file.to_path_buf();
@@ -275,7 +284,7 @@ impl IndexerStore {
     }
 
     /// Create a read-only instance of an indexer store
-    pub fn read_only(primary: &Path, secondary: &Path) -> anyhow::Result<Self> {
+    pub fn read_only(primary: &Path, secondary: &Path) -> Result<Self> {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_max_write_buffer_number(16);
         cf_opts.set_compression_type(DBCompressionType::Zstd);
@@ -304,7 +313,7 @@ impl IndexerStore {
 }
 
 /// Restore a snapshot of the Indexer store
-pub fn restore_snapshot(snapshot_file: &PathBuf, restore_dir: &PathBuf) -> anyhow::Result<()> {
+pub fn restore_snapshot(snapshot_file: &PathBuf, restore_dir: &PathBuf) -> Result<()> {
     if !snapshot_file.exists() {
         bail!("Snapshot file {snapshot_file:#?} does not exist")
     } else if restore_dir.is_dir() {
@@ -376,7 +385,7 @@ fn user_command_db_key_pk(pk: &str, n: u32) -> Vec<u8> {
 pub fn persist_indexer_version(
     indexer_version: &IndexerStoreVersion,
     path: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     let mut versioned = path.as_ref().to_path_buf();
     versioned.push("INDEXER_VERSION");
     if !versioned.exists() {
