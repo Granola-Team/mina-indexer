@@ -1,4 +1,7 @@
-use crate::{block::BlockHash, ledger::public_key::PublicKey};
+use crate::{
+    block::BlockHash,
+    ledger::{public_key::PublicKey, token::TokenAddress},
+};
 use anyhow::bail;
 use std::mem::size_of;
 
@@ -34,6 +37,45 @@ pub fn i64_from_be_bytes(i64_be_bytes: &[u8]) -> anyhow::Result<i64> {
     let mut be_bytes = [0; I64_LEN];
     be_bytes.copy_from_slice(i64_be_bytes);
     Ok(i64::from_be_bytes(be_bytes))
+}
+
+/// Key format
+/// ```
+/// {token}{pk}
+/// where
+/// - token: [TokenAddress] bytes
+/// - pk:    [PublicKey] bytes
+pub fn token_pk_key(
+    token: &TokenAddress,
+    pk: &PublicKey,
+) -> [u8; TokenAddress::LEN + PublicKey::LEN] {
+    let mut key = [0; TokenAddress::LEN + PublicKey::LEN];
+
+    key[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
+    key[TokenAddress::LEN..].copy_from_slice(pk.0.as_bytes());
+
+    key
+}
+
+/// Key format
+/// ```
+/// {token}{pk}{index}
+/// where
+/// - token: [TokenAddress] bytes
+/// - pk:    [PublicKey] bytes
+/// - index: [u32] BE bytes
+pub fn token_pk_index_key(
+    token: &TokenAddress,
+    pk: &PublicKey,
+    index: u32,
+) -> [u8; TokenAddress::LEN + PublicKey::LEN + U32_LEN] {
+    let mut key = [0; TokenAddress::LEN + PublicKey::LEN + U32_LEN];
+
+    key[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
+    key[TokenAddress::LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+    key[TokenAddress::LEN..][PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
+
+    key
 }
 
 /// Key format
