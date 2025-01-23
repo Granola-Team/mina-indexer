@@ -249,7 +249,10 @@ impl BestLedgerStore for IndexerStore {
                         before.payment(diff)
                     }
                     Coinbase(diff) => before.coinbase(diff.amount),
-                    Delegation(diff) => before.delegation(diff.delegate.clone(), diff.nonce),
+                    Delegation(diff) => {
+                        self.add_pk_delegate(&pk, &diff.delegate)?;
+                        before.delegation(diff.delegate.clone(), diff.nonce)
+                    }
                     FailedTransactionNonce(diff) => before.failed_transaction(diff.nonce),
                     ZkappStateDiff(diff) => before.zkapp_state(diff),
                     ZkappPermissionsDiff(diff) => before.zkapp_permissions(diff),
