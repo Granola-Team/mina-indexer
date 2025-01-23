@@ -1,3 +1,7 @@
+//////////////////
+// Test modules //
+//////////////////
+
 mod block;
 mod canonicity;
 mod command;
@@ -8,6 +12,12 @@ mod protocol;
 mod snark_work;
 mod state;
 mod usernames;
+
+//////////////////
+// Test helpers //
+//////////////////
+
+pub mod generators;
 
 pub mod helpers {
     /// Sets up a new temp dir, deleted when it goes out of scope
