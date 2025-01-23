@@ -13,7 +13,7 @@ use crate::{
         self,
         protocol_state::SupplyAdjustmentSign,
         staged_ledger_diff::{Authorization, Elt, UpdateKind},
-        ActionState, AppState, VerificationKey, ZkappUri,
+        ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri,
     },
     snark_work::SnarkWorkSummary,
 };
@@ -72,7 +72,7 @@ pub struct ZkappDiff {
     pub timing: Option<Timing>,
     pub voting_for: Option<BlockHash>,
     pub actions: Vec<ActionState>,
-    pub events: Vec<EventState>,
+    pub events: Vec<ZkappEvent>,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -146,7 +146,7 @@ pub struct ZkappActionsDiff {
 pub struct ZkappEventsDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub events: Vec<EventState>,
+    pub events: Vec<ZkappEvent>,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -161,9 +161,6 @@ pub struct ZkappAccountCreationFee {
     pub token: TokenAddress,
     pub amount: Amount,
 }
-
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct EventState(pub String);
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct CoinbaseDiff {
@@ -845,7 +842,7 @@ impl ZkappDiff {
         account_diffs: &mut Vec<AccountDiff>,
         token: TokenAddress,
         pk: PublicKey,
-        events: Vec<EventState>,
+        events: Vec<ZkappEvent>,
     ) {
         if !events.is_empty() {
             account_diffs.push(AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
@@ -1066,7 +1063,7 @@ impl From<(PublicKey, Nonce, &Elt)> for AccountDiff {
 
         // update events
         let events = if let Some(events) = value.2.account_update.body.events.first() {
-            events.0.iter().cloned().map(EventState).collect()
+            events.0.iter().cloned().map(Into::into).collect()
         } else {
             vec![]
         };
