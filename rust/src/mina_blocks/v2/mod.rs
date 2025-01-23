@@ -21,6 +21,7 @@ use staged_ledger_diff::StagedLedgerDiff;
 
 pub type AppState = zkapp::app_state::AppState;
 pub type ActionState = zkapp::action_state::ActionState;
+pub type ZkappEvent = zkapp::event::ZkappEvent;
 pub type VerificationKey = zkapp::verification_key::VerificationKey;
 
 // v2 PCB (de)serialization
