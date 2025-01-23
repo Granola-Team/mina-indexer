@@ -15,7 +15,7 @@ use crate::{
         token::TokenAddress,
         Ledger, TokenLedger,
     },
-    store::zkapp::actions::ZkappActionStore,
+    store::zkapp::{actions::ZkappActionStore, events::ZkappEventStore},
     utility::store::{
         common::{from_be_bytes, pk_index_key},
         ledger::best::*,
@@ -208,6 +208,10 @@ impl BestLedgerStore for IndexerStore {
                         self.remove_actions(&pk, &token, diff.actions.len() as u32)?;
                         before
                     }
+                    ZkappEventsDiff(diff) => {
+                        self.remove_events(&pk, &token, diff.events.len() as u32)?;
+                        before
+                    }
 
                     // TODO zkapp unapply
                     ZkappStateDiff(_)
@@ -217,7 +221,6 @@ impl BestLedgerStore for IndexerStore {
                     | ZkappTokenSymbolDiff(_)
                     | ZkappTimingDiff(_)
                     | ZkappVotingForDiff(_)
-                    | ZkappEventsDiff(_)
                     | ZkappIncrementNonce(_)
                     | ZkappAccountCreationFee(_) => before,
                     Zkapp(_) => unreachable!(),
@@ -254,6 +257,8 @@ impl BestLedgerStore for IndexerStore {
                         before.delegation(diff.delegate.clone(), diff.nonce)
                     }
                     FailedTransactionNonce(diff) => before.failed_transaction(diff.nonce),
+
+                    // zkapp diffs
                     ZkappStateDiff(diff) => before.zkapp_state(diff),
                     ZkappPermissionsDiff(diff) => before.zkapp_permissions(diff),
                     ZkappVerificationKeyDiff(diff) => before.zkapp_verification_key(diff),
@@ -264,12 +269,16 @@ impl BestLedgerStore for IndexerStore {
                     ZkappIncrementNonce(diff) => before.zkapp_nonce(diff),
                     ZkappAccountCreationFee(diff) => before.zkapp_account_creation(diff),
 
-                    // these account diffs do not modify the account
+                    // these diffs do not modify the account
                     ZkappActionsDiff(diff) => {
                         self.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
                         before
                     }
-                    ZkappEventsDiff(_) | Zkapp(_) => before,
+                    ZkappEventsDiff(diff) => {
+                        self.add_events(&diff.public_key, &diff.token, &diff.events)?;
+                        before
+                    }
+                    Zkapp(_) => unreachable!(),
                 });
 
                 self.update_best_account(&pk, &token, before_balance, after)?;
