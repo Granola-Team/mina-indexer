@@ -3,6 +3,7 @@ pub mod command;
 pub mod common;
 pub mod ledger;
 pub mod snarks;
+pub mod zkapp;
 
 #[cfg(test)]
 mod tests {
