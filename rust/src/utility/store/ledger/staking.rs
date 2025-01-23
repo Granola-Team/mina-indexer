@@ -1,7 +1,9 @@
 use crate::{
     block::BlockHash,
     ledger::{public_key::PublicKey, LedgerHash},
-    utility::store::{balance_key_prefix, pk_key_prefix, u32_from_be_bytes, U32_LEN, U64_LEN},
+    utility::store::common::{
+        balance_key_prefix, pk_key_prefix, u32_from_be_bytes, U32_LEN, U64_LEN,
+    },
 };
 use anyhow::bail;
 

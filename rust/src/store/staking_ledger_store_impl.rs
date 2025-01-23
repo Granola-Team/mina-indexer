@@ -11,7 +11,10 @@ use crate::{
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
         LedgerHash,
     },
-    utility::store::{from_be_bytes, ledger::staking::*, u64_from_be_bytes},
+    utility::store::{
+        common::{from_be_bytes, u64_from_be_bytes},
+        ledger::staking::*,
+    },
 };
 use anyhow::Context;
 use log::{error, trace};

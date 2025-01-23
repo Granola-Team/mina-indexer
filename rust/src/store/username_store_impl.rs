@@ -9,7 +9,7 @@ use crate::{
         BlockHash,
     },
     ledger::{public_key::PublicKey, username::Username},
-    utility::store::{from_be_bytes, pk_index_key},
+    utility::store::common::{from_be_bytes, pk_index_key},
 };
 use log::{error, trace};
 use speedb::WriteBatch;

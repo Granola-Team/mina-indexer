@@ -20,8 +20,12 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     utility::store::{
-        block::*, block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, pk_index_key,
-        state_hash_suffix, u32_from_be_bytes, u32_prefix_key, u64_from_be_bytes, U32_LEN, U64_LEN,
+        block::*,
+        common::{
+            block_u32_prefix_from_key, from_be_bytes, i64_from_be_bytes, pk_index_key,
+            state_hash_suffix, u32_from_be_bytes, u32_prefix_key, u64_from_be_bytes, U32_LEN,
+            U64_LEN,
+        },
     },
 };
 use anyhow::{bail, Context};

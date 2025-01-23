@@ -5,7 +5,7 @@ use crate::{
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::IndexerStore,
-    utility::store::{from_be_bytes, state_hash_suffix, U32_LEN},
+    utility::store::common::{from_be_bytes, state_hash_suffix, U32_LEN},
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use std::sync::Arc;
