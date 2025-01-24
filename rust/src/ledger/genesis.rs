@@ -22,7 +22,7 @@ pub struct GenesisRoot {
     pub ledger: GenesisAccounts,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccount {
     pub pk: String,
     pub balance: String,
@@ -53,7 +53,7 @@ pub struct GenesisAccounts {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
-    ledger: TokenLedger,
+    pub ledger: TokenLedger,
 }
 
 impl std::str::FromStr for GenesisRoot {
@@ -182,7 +182,7 @@ impl GenesisLedger {
                     receipt_chain_hash: account.receipt_chain_hash,
                     voting_for: account.voting_for.map(Into::into),
                     permissions: account.permissions,
-                    timing: account.timing.map(|t| t.into()),
+                    timing: account.timing.map(Into::into),
                     zkapp: account.zkapp,
                     genesis_account: true,
                 },
@@ -192,6 +192,33 @@ impl GenesisLedger {
         Self {
             ledger: TokenLedger { accounts },
         }
+    }
+
+    /// Only use for testing
+    pub fn into_hardfork_ledger(self) -> Ledger {
+        let ledger = TokenLedger {
+            accounts: self
+                .ledger
+                .accounts
+                .into_iter()
+                .map(|(pk, acct)| {
+                    (
+                        pk,
+                        Account {
+                            // conditionally add display fee
+                            balance: if acct.genesis_account {
+                                acct.balance + MAINNET_ACCOUNT_CREATION_FEE
+                            } else {
+                                acct.balance
+                            },
+                            ..acct
+                        },
+                    )
+                })
+                .collect(),
+        };
+
+        Ledger::from_mina_ledger(ledger)
     }
 }
 
