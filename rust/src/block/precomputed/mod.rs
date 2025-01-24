@@ -1,5 +1,8 @@
 //! Indexer internal precomputed block representation
 
+mod v1;
+mod v2;
+
 use super::{
     epoch_data::EpochSeed,
     extract_network_height_hash,
@@ -15,7 +18,7 @@ use crate::{
         signed::{SignedCommand, TxnHash},
         UserCommandWithStatus, UserCommandWithStatusT,
     },
-    constants::{berkeley::*, *},
+    constants::*,
     ledger::{
         coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
         public_key::PublicKey,
@@ -23,11 +26,7 @@ use crate::{
         username::Username,
         LedgerHash,
     },
-    mina_blocks::{common::from_str, v2},
-    protocol::serialization_types::{
-        protocol_state::{ProtocolState, ProtocolStateJson},
-        staged_ledger_diff as mina_rs,
-    },
+    protocol::serialization_types::staged_ledger_diff as mina_rs,
     snark_work::SnarkWorkSummary,
     store::username::UsernameUpdate,
 };
@@ -36,51 +35,14 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     path::Path,
 };
+use v1::{BlockFileV1, PrecomputedBlockV1, PrecomputedBlockWithCanonicityV1};
+use v2::{BlockFileDataV2, BlockFileV2, PrecomputedBlockV2, PrecomputedBlockWithCanonicityV2};
 
 pub struct BlockFileContents {
     pub(crate) network: Network,
     pub(crate) state_hash: BlockHash,
     pub(crate) blockchain_length: u32,
     pub(crate) contents: Vec<u8>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BlockFileV1 {
-    #[serde(default = "mainnet_genesis_timestamp")]
-    #[serde(deserialize_with = "from_str")]
-    scheduled_time: u64,
-
-    protocol_state: ProtocolStateJson,
-    staged_ledger_diff: mina_rs::StagedLedgerDiffJson,
-}
-
-fn mainnet_genesis_timestamp() -> u64 {
-    MAINNET_GENESIS_TIMESTAMP
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BlockFileV2 {
-    version: u32,
-    data: BlockFileDataV2,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct BlockFileDataV2 {
-    #[serde(default = "berkeley_genesis_timestamp")]
-    #[serde(deserialize_with = "from_str")]
-    scheduled_time: u64,
-
-    protocol_state: v2::protocol_state::ProtocolState,
-    staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
-
-    // new post-hardfork data
-    tokens_used: Vec<v2::TokenUsed>,
-    accounts_accessed: Vec<(u64, v2::AccountAccessed)>,
-    accounts_created: Vec<v2::AccountCreated>,
-}
-
-fn berkeley_genesis_timestamp() -> u64 {
-    BERKELEY_GENESIS_TIMESTAMP
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -98,60 +60,10 @@ pub enum PrecomputedBlock {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlockV1 {
-    // metadata
-    pub network: Network,
-    pub state_hash: BlockHash,
-    pub blockchain_length: u32,
-    // from PCB
-    pub scheduled_time: u64,
-    pub protocol_state: ProtocolState,
-    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlockV2 {
-    // metadata
-    pub network: Network,
-    pub state_hash: BlockHash,
-    pub blockchain_length: u32,
-    // from PCB
-    pub scheduled_time: u64,
-    pub protocol_state: v2::protocol_state::ProtocolState,
-    pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
-    // new post-hardfork data
-    pub tokens_used: Vec<v2::TokenUsed>,
-    pub accounts_accessed: Vec<(u64, v2::AccountAccessed)>,
-    pub accounts_created: Vec<v2::AccountCreated>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum PrecomputedBlockWithCanonicity {
     V1(Box<PrecomputedBlockWithCanonicityV1>),
     V2(PrecomputedBlockWithCanonicityV2),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlockWithCanonicityV1 {
-    pub canonicity: Option<Canonicity>,
-    pub network: Network,
-    pub state_hash: BlockHash,
-    pub scheduled_time: u64,
-    pub blockchain_length: u32,
-    pub protocol_state: ProtocolState,
-    pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PrecomputedBlockWithCanonicityV2 {
-    pub canonicity: Option<Canonicity>,
-    pub network: Network,
-    pub state_hash: BlockHash,
-    pub scheduled_time: u64,
-    pub blockchain_length: u32,
-    pub protocol_state: v2::protocol_state::ProtocolState,
-    pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
 }
 
 impl PrecomputedBlock {
@@ -1318,7 +1230,7 @@ impl PrecomputedBlock {
                 .body
                 .consensus_state
                 .last_vrf_output
-                .to_owned(),
+                .base64_encode(),
         }
     }
 
@@ -1341,10 +1253,12 @@ impl PrecomputedBlock {
                 );
                 VrfOutput::new(last_vrf_output.hex_digest())
             }
-            Self::V2(v2) => {
-                VrfOutput::base64_decode(&v2.protocol_state.body.consensus_state.last_vrf_output)
-                    .expect("V2 last VRF output decodes")
-            }
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .consensus_state
+                .last_vrf_output
+                .to_owned(),
         }
     }
 
