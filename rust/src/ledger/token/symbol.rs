@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize)]
 pub struct TokenSymbol(pub String);
 
 impl TokenSymbol {
@@ -9,6 +9,19 @@ impl TokenSymbol {
         S: Into<String>,
     {
         Self(symbol.into())
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for TokenSymbol {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
     }
 }
 
