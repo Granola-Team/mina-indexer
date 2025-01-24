@@ -22,7 +22,7 @@ pub fn best_account_key(
 
 /// Key format for sorting best ledger accounts
 /// ```
-/// {token}{pk}
+/// {token}{balance}{pk}
 /// where
 /// - token:   [TokenAddress::LEN] bytes
 /// - balance: [u64] BE bytes
