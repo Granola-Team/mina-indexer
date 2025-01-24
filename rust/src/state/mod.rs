@@ -165,6 +165,7 @@ pub struct IndexerStateConfig {
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
     pub do_not_ingest_orphan_blocks: bool,
+    pub using_hardfork_ledger: bool,
 }
 
 impl IndexerStateConfig {
@@ -175,6 +176,7 @@ impl IndexerStateConfig {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        using_hardfork_ledger: bool,
     ) -> Self {
         IndexerStateConfig {
             version,
@@ -187,6 +189,7 @@ impl IndexerStateConfig {
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             ledger_cadence: LEDGER_CADENCE,
             reporting_freq: BLOCK_REPORTING_FREQ_NUM,
+            using_hardfork_ledger,
         }
     }
 }
@@ -199,6 +202,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        using_hardfork_ledger: bool,
     ) -> anyhow::Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
@@ -207,6 +211,7 @@ impl IndexerState {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
+            using_hardfork_ledger,
         ))
     }
 
@@ -270,9 +275,14 @@ impl IndexerState {
             Some(&genesis_block.previous_state_hash()),
         )?;
 
+        let genesis_ledger = if config.using_hardfork_ledger {
+            config.genesis_ledger.into_hardfork_ledger()
+        } else {
+            config.genesis_ledger.into()
+        };
         config.indexer_store.add_genesis_ledger(
             &genesis_block.previous_state_hash(),
-            config.genesis_ledger.clone().into(),
+            genesis_ledger.clone(),
             config.version.genesis.blockchain_lenth,
         )?;
         info!("Genesis ledger added to indexer store");
@@ -290,8 +300,7 @@ impl IndexerState {
         };
 
         Ok(Self {
-            ledger: <GenesisLedger as Into<Ledger>>::into(config.genesis_ledger)
-                .apply_diff_from_precomputed(&genesis_block)?,
+            ledger: genesis_ledger.apply_diff_from_precomputed(&genesis_block)?,
             diffs_map: HashMap::from([(
                 genesis_block.state_hash(),
                 LedgerDiff::from_precomputed(&genesis_block),
