@@ -67,10 +67,10 @@ pub mod helpers {
 
     #[derive(Deserialize)]
     struct SimpleGenesisAccount {
-        nonce: u32,
-        #[serde(deserialize_with = "from_decimal_str")]
+        #[serde(deserialize_with = "from_nanomina_str")]
         balance: u64,
-        #[serde(deserialize_with = "from_str")]
+
+        nonce: u32,
         delegate: PublicKey,
         genesis_account: bool,
     }

@@ -49,10 +49,10 @@ pub enum CoinbaseKind {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoinbasePayload {
-    #[serde(deserialize_with = "from_str")]
     pub receiver_pk: PublicKey,
 
-    #[serde(deserialize_with = "from_decimal_str")]
+    #[serde(serialize_with = "to_nanomina_str")]
+    #[serde(deserialize_with = "from_nanomina_str")]
     pub fee: u64,
 }
 
@@ -97,7 +97,6 @@ impl std::cmp::Eq for UserCommandData {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignedCommandData {
-    #[serde(deserialize_with = "from_str")]
     pub signer: PublicKey,
 
     pub payload: SignedCommandPayload,
@@ -135,16 +134,15 @@ pub enum SetDelegate {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PaymentPayload {
-    #[serde(deserialize_with = "from_str")]
     pub receiver_pk: PublicKey,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub amount: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StakeDelegationPayload {
-    #[serde(deserialize_with = "from_str")]
     pub new_delegate: PublicKey,
 }
 
@@ -169,15 +167,17 @@ pub struct FeePayer {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FeePayerBody {
-    #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
 
-    #[serde(deserialize_with = "from_decimal_str")]
+    #[serde(serialize_with = "to_nanomina_str")]
+    #[serde(deserialize_with = "from_nanomina_str")]
     pub fee: u64,
 
+    #[serde(serialize_with = "to_str_opt")]
     #[serde(deserialize_with = "from_str_opt")]
     pub valid_until: Option<u64>,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub nonce: u32,
 }
@@ -222,11 +222,8 @@ pub enum Authorization {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountUpdateBody {
-    #[serde(deserialize_with = "from_str")]
     pub public_key: PublicKey,
-    #[serde(deserialize_with = "from_str")]
     pub token_id: TokenAddress,
-
     pub update: Update,
     pub balance_change: SupplyAdjustment,
     pub increment_nonce: bool,
@@ -350,8 +347,11 @@ pub enum Precondition<T> {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NumericBounds {
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     lower: u32,
+
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     upper: u32,
 }
@@ -372,15 +372,17 @@ pub struct Call {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignedCommandPayloadCommon {
-    #[serde(deserialize_with = "from_decimal_str")]
+    #[serde(serialize_with = "to_nanomina_str")]
+    #[serde(deserialize_with = "from_nanomina_str")]
     pub fee: u64,
 
-    #[serde(deserialize_with = "from_str")]
     pub fee_payer_pk: PublicKey,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub nonce: u32,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub valid_until: u64,
 

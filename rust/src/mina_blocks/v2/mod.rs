@@ -34,6 +34,7 @@ pub struct PrecomputedBlockV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrecomputedBlockDataV2 {
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub scheduled_time: u64,
 
@@ -60,27 +61,19 @@ pub type TokenUsed = (TokenAddress, Option<(PublicKey, TokenAddress)>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountAccessed {
-    #[serde(deserialize_with = "from_str")]
-    pub public_key: PublicKey,
-
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub balance: u64,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub nonce: u32,
 
-    #[serde(deserialize_with = "from_str")]
+    pub public_key: PublicKey,
     pub receipt_chain_hash: ReceiptChainHash,
-
-    #[serde(deserialize_with = "from_str_opt")]
     pub delegate: Option<PublicKey>,
-
-    #[serde(deserialize_with = "from_str")]
     pub token_id: TokenAddress,
-
-    #[serde(deserialize_with = "from_str")]
     pub token_symbol: TokenSymbol,
-
     pub voting_for: String,
     pub permissions: Permissions,
     pub timing: AccountAccessedTiming,
@@ -96,18 +89,23 @@ pub enum AccountAccessedTiming {
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Timing {
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub initial_minimum_balance: u64,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub cliff_time: u32,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub cliff_amount: u64,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub vesting_period: u32,
 
+    #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]
     pub vesting_increment: u64,
 }
@@ -156,12 +154,12 @@ pub struct ZkappAccount {
     pub proved_state: bool,
     pub zkapp_uri: ZkappUri,
 
-    #[serde(deserialize_with = "from_str")]
     #[serde(serialize_with = "to_str")]
+    #[serde(deserialize_with = "from_str")]
     pub zkapp_version: u32,
 
-    #[serde(deserialize_with = "from_str")]
     #[serde(serialize_with = "to_str")]
+    #[serde(deserialize_with = "from_str")]
     pub last_action_slot: u32,
 }
 
