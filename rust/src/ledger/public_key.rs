@@ -5,7 +5,7 @@ use crate::{
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PublicKey(pub String);
 
 impl PublicKey {
@@ -44,6 +44,19 @@ impl PublicKey {
     /// [PublicKey] lower bound
     pub fn lower_bound() -> Self {
         Self("B62q000000000000000000000000000000000000000000000000000".into())
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
     }
 }
 
@@ -166,6 +179,25 @@ mod test {
                 "from_bytes"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn serde() -> anyhow::Result<()> {
+        let pk = PublicKey::default();
+
+        // roundtrip
+        let bytes = serde_json::to_vec(&pk)?;
+        let res = serde_json::from_slice::<PublicKey>(&bytes)?;
+
+        assert_eq!(pk, res);
+
+        // matches string deserialization
+        let str = pk.0.clone();
+        let str_bytes = serde_json::to_vec(&str)?;
+
+        assert_eq!(bytes, str_bytes);
+
         Ok(())
     }
 }
