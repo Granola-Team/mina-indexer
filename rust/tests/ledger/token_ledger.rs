@@ -1,47 +1,24 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::*;
+use anyhow::Context;
 use mina_indexer::{
     block::parser::BlockParser,
     constants::*,
     ledger::{
         account::{Account, Permission, Permissions},
-        genesis::{GenesisAccounts, GenesisLedger, GenesisRoot, GenesisTimestamp},
         token::TokenAddress,
     },
     mina_blocks::v2::{VerificationKey, ZkappAccount},
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
 };
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr};
 
 #[ignore = "passing in tier 1, failing in tier 2"]
 #[tokio::test]
 async fn check_token_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("token-ledger")?;
     let blocks_dir = &PathBuf::from("./tests/data/hardfork");
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
 
-    // start with an empty ledger
-    let genesis_ledger = GenesisRoot {
-        genesis: GenesisTimestamp {
-            genesis_state_timestamp: "2024-06-05T00:00:00Z".to_string(),
-        },
-        ledger: GenesisAccounts {
-            name: "mainnet_v2".to_string(),
-            accounts: vec![],
-        },
-    };
-    let genesis_ledger: GenesisLedger = genesis_ledger.into();
-
-    let mut state = IndexerState::new(
-        genesis_ledger,
-        IndexerVersion::v2(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        10,
-        false,
-        false,
-    )?;
+    // start with the hardfork genesis ledger
+    let mut state = hardfork_genesis_state(store_dir.path())?;
 
     let mut bp = BlockParser::new_testing(blocks_dir)?;
 
@@ -61,12 +38,10 @@ async fn check_token_accounts() -> anyhow::Result<()> {
 
     assert_eq!(tracked_tokens, vec![mina_token.clone(), minu_token.clone()]);
 
-    // check MINA token ledger
-    assert_eq!(best_ledger.get_token_ledger(&mina_token).unwrap().len(), 78);
-
     // check MINU token ledger/account
     assert_eq!(best_ledger.get_token_ledger(&minu_token).unwrap().len(), 1);
 
+    // check MINU account balance
     if let Some(minu_account) = best_ledger.get_account(&pk, &minu_token) {
         assert_eq!(
             *minu_account,
@@ -76,7 +51,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 nonce: None,
                 delegate: pk.clone(),
                 genesis_account: false,
-                token: Some(minu_token),
+                token: Some(minu_token.clone()),
                 token_symbol: None,
                 receipt_chain_hash: None,
                 voting_for: None,
@@ -90,7 +65,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         panic!("MINU account does not exist");
     }
 
-    // check MINA account
+    // check MINA account is a zkapp
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
             public_key: pk.clone(),
@@ -118,7 +93,14 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 set_timing: Permission::Signature,
             }),
             timing: None,
-            zkapp: Some(ZkappAccount::default()),
+            zkapp: Some(ZkappAccount {
+                proved_state: true,
+                verification_key: VerificationKey {
+                    data: "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".into(),
+                    hash: "0x1C9320E5FD23AF1F8D8B1145484181C3E6B0F1C8C24FE4BDFFEF4281A61C3EBC".into()
+                },
+                ..Default::default()
+            }),
             username: None,
         };
 
@@ -142,7 +124,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 balance: (1e9 as u64).into(),
                 nonce: Some(1.into()),
                 delegate: pk,
-                token: Some(mina_token),
+                token: Some(mina_token.clone()),
                 permissions: Some(Permissions {
                     edit_state: Permission::Proof,
                     access: Permission::None,
@@ -190,6 +172,24 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         panic!(
             "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P zkapp account does not exist"
         );
+    }
+
+    // check best ledger store against state best ledger
+    let indexer_store = state.indexer_store.as_ref().unwrap();
+
+    for (token, token_ledger) in best_ledger.tokens.iter() {
+        for (pk, state_account) in token_ledger.accounts.iter() {
+            let store_best_account = {
+                use mina_indexer::ledger::store::best::BestLedgerStore;
+
+                indexer_store
+                    .get_best_account(pk, token)?
+                    .context(format!("missing best token account ({pk}, {token})"))
+                    .unwrap()
+            };
+
+            assert_eq!(store_best_account, *state_account);
+        }
     }
 
     Ok(())
