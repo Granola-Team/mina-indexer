@@ -28,6 +28,7 @@ async fn check_staged_accounts() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     )?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,

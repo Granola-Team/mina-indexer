@@ -23,6 +23,7 @@ fn block_added() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
         false,
+        false,
     )?;
 
     assert_eq!(

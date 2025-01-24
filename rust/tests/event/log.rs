@@ -51,6 +51,7 @@ async fn test() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
         false,
+        false,
     )?;
     let mut state1 = IndexerState::new(
         genesis_ledger.into(),
@@ -58,6 +59,7 @@ async fn test() -> anyhow::Result<()> {
         indexer_store1.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
+        false,
         false,
     )?;
 

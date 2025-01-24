@@ -26,6 +26,7 @@ async fn not_added_to_witness_tree() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     )?;
 
     // add all blocks to the state

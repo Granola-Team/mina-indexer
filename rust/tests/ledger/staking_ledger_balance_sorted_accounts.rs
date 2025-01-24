@@ -28,6 +28,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     )?;
     let epoch = 0;
 

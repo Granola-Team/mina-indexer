@@ -34,6 +34,7 @@ async fn set_usernames() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
         false,
+        false,
     )?;
 
     // ingest the blocks
