@@ -1211,7 +1211,7 @@ impl IndexerState {
                         let (genesis_state_hash, epoch, ledger_hash) =
                             split_staking_ledger_epoch_key(&key)?;
                         if genesis_state_hash.0 == MAINNET_GENESIS_HASH
-                            || genesis_state_hash.0 == HARDFORK_GENSIS_HASH
+                            || genesis_state_hash.0 == HARDFORK_GENESIS_HASH
                         {
                             staking_ledgers.insert(epoch, ledger_hash);
                         } else {

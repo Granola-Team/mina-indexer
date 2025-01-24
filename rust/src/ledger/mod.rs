@@ -475,7 +475,6 @@ mod tests {
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
-        hash::is_valid_ledger_hash,
         public_key::PublicKey,
         Amount, LedgerHash,
     };
@@ -488,7 +487,7 @@ mod tests {
 
     #[test]
     fn default_ledger_hash_is_valid_public_key() {
-        assert!(is_valid_ledger_hash(&LedgerHash::default().0))
+        assert!(LedgerHash::is_valid(&LedgerHash::default().0))
     }
 
     #[test]

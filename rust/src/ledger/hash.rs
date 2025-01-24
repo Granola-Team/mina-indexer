@@ -18,7 +18,7 @@ impl LedgerHash {
     {
         let hash: String = hash.into();
 
-        if is_valid_ledger_hash(&hash) {
+        if Self::is_valid(&hash) {
             return Ok(Self(hash));
         }
 
@@ -43,6 +43,11 @@ impl LedgerHash {
     pub fn from_bytes_or_panic(bytes: Vec<u8>) -> Self {
         Self::from_bytes(bytes).expect("ledger hash bytes")
     }
+
+    pub fn is_valid(input: &str) -> bool {
+        let prefix: String = input.chars().take(2).collect();
+        input.len() == LedgerHash::LEN && LedgerHash::PREFIX.contains(&prefix.as_str())
+    }
 }
 
 ///////////
@@ -58,11 +63,15 @@ impl<'de> Deserialize<'de> for LedgerHash {
     }
 }
 
+/////////////////
+// conversions //
+/////////////////
+
 impl std::str::FromStr for LedgerHash {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if is_valid_ledger_hash(s) {
+        if Self::is_valid(s) {
             Ok(Self(s.to_string()))
         } else {
             bail!("Invalid ledger hash: {s}")
@@ -70,16 +79,19 @@ impl std::str::FromStr for LedgerHash {
     }
 }
 
-pub fn is_valid_ledger_hash(input: &str) -> bool {
-    let prefix: String = input.chars().take(2).collect();
-    input.len() == LedgerHash::LEN && LedgerHash::PREFIX.contains(&prefix.as_str())
-}
+/////////////
+// default //
+/////////////
 
 impl std::default::Default for LedgerHash {
     fn default() -> Self {
         Self("jxDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
     }
 }
+
+/////////////
+// display //
+/////////////
 
 impl std::fmt::Display for LedgerHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

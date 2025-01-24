@@ -3,7 +3,7 @@ use super::{
     MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT, PK,
 };
 use crate::{
-    block::{is_valid_state_hash, precomputed::PrecomputedBlock, store::BlockStore},
+    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
     command::{
         internal::{store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData},
         signed::SignedCommandWithData,
@@ -48,7 +48,7 @@ impl BlocksQueryRoot {
 
         // Use constant time access if we have the state hash
         if let Some(state_hash) = query.as_ref().and_then(|input| input.state_hash.clone()) {
-            if !is_valid_state_hash(&state_hash) {
+            if !BlockHash::is_valid(&state_hash) {
                 return Ok(None);
             }
 

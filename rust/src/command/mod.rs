@@ -969,9 +969,8 @@ fn fee_convert(value: Value) -> Value {
         Value::Object(mut obj) => {
             obj.iter_mut().for_each(|(key, x)| {
                 if key == "fee" {
-                    *x = {
-                        let nanomina = x.clone().to_string().parse::<u64>().unwrap();
-                        Value::String(nanomina_to_mina(nanomina))
+                    if let Ok(nanomina) = x.clone().to_string().parse::<u64>() {
+                        *x = Value::String(nanomina_to_mina(nanomina));
                     }
                 } else {
                     *x = fee_convert(x.clone())

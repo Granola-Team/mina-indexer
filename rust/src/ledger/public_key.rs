@@ -30,10 +30,17 @@ impl PublicKey {
     /// Convert from bytes (length [Self::LEN])
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
         let res = String::from_utf8(bytes.to_vec())?;
-        if is_valid_public_key(&res) {
+
+        if Self::is_valid(&res) {
             return Ok(Self(res));
         }
+
         bail!("Invalid public key from bytes")
+    }
+
+    /// Checks length & prefix
+    pub fn is_valid(pk: &str) -> bool {
+        pk.starts_with(Self::PREFIX) && pk.len() == Self::LEN
     }
 
     /// [PublicKey] upper bound
@@ -60,17 +67,25 @@ impl<'de> Deserialize<'de> for PublicKey {
     }
 }
 
+/////////////
+// default //
+/////////////
+
 impl std::default::Default for PublicKey {
     fn default() -> Self {
         Self("B62qDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTPK".into())
     }
 }
 
+/////////////////
+// conversions //
+/////////////////
+
 impl std::str::FromStr for PublicKey {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if is_valid_public_key(s) {
+        if Self::is_valid(s) {
             Ok(Self(s.to_string()))
         } else {
             bail!("Invalid public key: {}", s)
@@ -99,12 +114,6 @@ impl std::hash::Hash for PublicKey {
 impl From<PublicKey> for String {
     fn from(value: PublicKey) -> Self {
         value.0
-    }
-}
-
-impl std::fmt::Display for PublicKey {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_address())
     }
 }
 
@@ -141,20 +150,25 @@ impl From<PublicKey> for PubKey {
     }
 }
 
-pub fn is_valid_public_key(pk: &str) -> bool {
-    pk.starts_with(PublicKey::PREFIX) && pk.len() == PublicKey::LEN
+///////////////////
+// debug/display //
+///////////////////
+
+impl std::fmt::Display for PublicKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::PublicKey;
-    use crate::ledger::public_key::is_valid_public_key;
 
     #[test]
     fn fixed_pks_are_valid() {
-        assert!(is_valid_public_key(&PublicKey::default().0));
-        assert!(is_valid_public_key(&PublicKey::lower_bound().0));
-        assert!(is_valid_public_key(&PublicKey::upper_bound().0));
+        assert!(PublicKey::is_valid(&PublicKey::default().0));
+        assert!(PublicKey::is_valid(&PublicKey::lower_bound().0));
+        assert!(PublicKey::is_valid(&PublicKey::upper_bound().0));
     }
 
     #[test]

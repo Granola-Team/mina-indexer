@@ -677,7 +677,7 @@ impl GenesisVersion {
 
     pub fn v2() -> Self {
         Self {
-            state_hash: HARDFORK_GENSIS_HASH.into(),
+            state_hash: HARDFORK_GENESIS_HASH.into(),
             prev_hash: HARDFORK_GENESIS_PREV_STATE_HASH.into(),
             last_vrf_output: HARDFORK_GENESIS_LAST_VRF_OUTPUT.into(),
             blockchain_lenth: HARDFORK_GENESIS_BLOCKCHAIN_LENGTH,
