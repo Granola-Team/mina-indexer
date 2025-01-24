@@ -60,7 +60,7 @@ impl BlockHash {
 
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
         let res = String::from_utf8(bytes.to_vec())?;
-        if is_valid_state_hash(&res) {
+        if Self::is_valid(&res) {
             return Ok(Self(res));
         }
         bail!("Invalid state hash from bytes")
@@ -77,9 +77,14 @@ impl BlockHash {
     }
 
     pub fn to_bytes(self) -> [u8; BlockHash::LEN] {
-        let mut res = [0u8; BlockHash::LEN]; // Pre-allocate the array with the correct size
+        let mut res = [0u8; BlockHash::LEN];
+
         res.copy_from_slice(self.0.as_bytes());
         res
+    }
+
+    pub fn is_valid(input: &str) -> bool {
+        input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
     }
 }
 
@@ -220,7 +225,7 @@ impl std::str::FromStr for BlockHash {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if is_valid_state_hash(s) {
+        if Self::is_valid(s) {
             Ok(Self(s.to_string()))
         } else {
             bail!("Invalid state hash: {s}")
@@ -236,6 +241,10 @@ where
         Self(value.into())
     }
 }
+
+/////////////////
+// comparisons //
+/////////////////
 
 impl std::cmp::PartialOrd for BlockComparison {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -274,7 +283,7 @@ impl std::cmp::Ord for Block {
     /// A < B means A is better than B
     /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.genesis_state_hash.0 == HARDFORK_GENSIS_HASH
+        if self.genesis_state_hash.0 == HARDFORK_GENESIS_HASH
             && other.genesis_state_hash.0 == MAINNET_GENESIS_HASH
         {
             // hardfork blocks are better than pre-hardfork blocks
@@ -299,6 +308,10 @@ impl std::default::Default for BlockHash {
         Self("3NLDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
     }
 }
+
+///////////////////
+// debug/display //
+///////////////////
 
 impl std::fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -350,12 +363,15 @@ impl std::fmt::Display for BlockHash {
     }
 }
 
-pub fn is_valid_state_hash(input: &str) -> bool {
-    input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
-}
+/////////////
+// helpers //
+/////////////
 
-pub fn is_valid_block_file(path: &Path) -> bool {
-    is_valid_file_name(path, &is_valid_state_hash)
+pub fn is_valid_block_file<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    is_valid_file_name(path, &BlockHash::is_valid)
 }
 
 pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf]) {
@@ -435,7 +451,7 @@ mod block_tests {
 
     #[test]
     fn default_block_hash_is_valid_public_key() {
-        assert!(is_valid_state_hash(&BlockHash::default().0))
+        assert!(BlockHash::is_valid(&BlockHash::default().0))
     }
 
     #[test]

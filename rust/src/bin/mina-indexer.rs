@@ -492,7 +492,7 @@ fn process_indexer_configuration(
     );
     let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger)?;
     Ok(IndexerConfiguration {
-        genesis_version: if genesis_hash == HARDFORK_GENSIS_HASH {
+        genesis_version: if genesis_hash == HARDFORK_GENESIS_HASH {
             GenesisVersion::v2()
         } else {
             GenesisVersion::v1()

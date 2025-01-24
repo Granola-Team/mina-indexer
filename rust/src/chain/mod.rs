@@ -57,7 +57,7 @@ impl std::default::Default for ChainData {
             None,
             None,
         );
-        let v2_genesis_state_hash: BlockHash = HARDFORK_GENSIS_HASH.into();
+        let v2_genesis_state_hash: BlockHash = HARDFORK_GENESIS_HASH.into();
         let v2_chain_id = chain_id(
             &v2_genesis_state_hash.0,
             MAINNET_PROTOCOL_CONSTANTS,
@@ -209,7 +209,7 @@ mod tests {
         assert_eq!(
             HARDFORK_CHAIN_ID,
             chain_id(
-                HARDFORK_GENSIS_HASH,
+                HARDFORK_GENESIS_HASH,
                 MAINNET_PROTOCOL_CONSTANTS,
                 HARDFORK_CONSTRAINT_SYSTEM_DIGESTS,
                 HARDFORK_GENESIS_TIMESTAMP as i64,

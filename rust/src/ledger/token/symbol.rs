@@ -25,12 +25,20 @@ impl<'de> Deserialize<'de> for TokenSymbol {
     }
 }
 
+/////////////
+// default //
+/////////////
+
 impl std::default::Default for TokenSymbol {
     /// MINA token symbol
     fn default() -> Self {
         Self::new("MINA")
     }
 }
+
+/////////////////
+// conversions //
+/////////////////
 
 impl std::str::FromStr for TokenSymbol {
     type Err = anyhow::Error;
@@ -48,6 +56,10 @@ where
         Self(value.into())
     }
 }
+
+/////////////
+// display //
+/////////////
 
 impl std::fmt::Display for TokenSymbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

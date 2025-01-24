@@ -1,6 +1,6 @@
 use crate::{
     block::{
-        self, precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockHash,
+        precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockHash,
         BlockWithoutHeight,
     },
     canonicity::store::CanonicityStore,
@@ -12,8 +12,7 @@ use crate::{
         Command,
     },
     ledger::{
-        self,
-        public_key::{self, PublicKey},
+        public_key::PublicKey,
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::TokenAddress,
@@ -100,7 +99,7 @@ pub async fn handle_connection(
             ClientCli::Accounts(__) => match __ {
                 Accounts::PublicKey { public_key: pk } => {
                     info!("Received account command for {pk}");
-                    if !public_key::is_valid_public_key(&pk) {
+                    if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
                     } else {
                         let pk: PublicKey = pk.into();
@@ -150,7 +149,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received block-state-hash command");
-                    if !block::is_valid_state_hash(&state_hash) {
+                    if !BlockHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else if let Ok(Some((ref block, _))) =
                         db.get_block(&state_hash.clone().into())
@@ -321,7 +320,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received blocks-at-public-key command {pk}");
-                    if !public_key::is_valid_public_key(&pk) {
+                    if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
                     } else {
                         let blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
@@ -471,7 +470,7 @@ pub async fn handle_connection(
                                 best_tip.state_hash().0
                             } else {
                                 let end_state_hash = &end_state_hash.unwrap();
-                                if !block::is_valid_state_hash(end_state_hash) {
+                                if !BlockHash::is_valid(end_state_hash) {
                                     best_tip.state_hash().0
                                 } else {
                                     end_state_hash.into()
@@ -479,7 +478,7 @@ pub async fn handle_connection(
                             }
                         };
 
-                        if !block::is_valid_state_hash(&start_state_hash.0) {
+                        if !BlockHash::is_valid(&start_state_hash.0) {
                             invalid_state_hash(&start_state_hash.0)
                         } else if let (Some((end_block, _)), Some((start_block, _))) = (
                             db.get_block(&end_state_hash.into())?,
@@ -620,7 +619,7 @@ pub async fn handle_connection(
                     }
 
                     // check if ledger or state hash and use appropriate getter
-                    if block::is_valid_state_hash(&hash) {
+                    if BlockHash::is_valid(&hash) {
                         trace!("{hash} is a state hash");
                         if let Some(ledger) =
                             db.get_staged_ledger_at_state_hash(&hash.clone().into(), memoize)?
@@ -630,7 +629,7 @@ pub async fn handle_connection(
                             error!("Ledger at state hash {hash} is not in the store");
                             Some(format!("Ledger at state hash {hash} is not in the store"))
                         }
-                    } else if ledger::hash::is_valid_ledger_hash(&hash) {
+                    } else if LedgerHash::is_valid(&hash) {
                         trace!("{hash} is a ledger hash");
                         if let Some(ledger) = db.get_staged_ledger_at_ledger_hash(
                             &LedgerHash::new_or_panic(hash.clone()),
@@ -683,7 +682,7 @@ pub async fn handle_connection(
             ClientCli::StakingLedgers(__) => match __ {
                 StakingLedgers::Hash { hash, path } => {
                     info!("Received staking-ledgers-hash command for {hash}");
-                    if ledger::hash::is_valid_ledger_hash(&hash) {
+                    if LedgerHash::is_valid(&hash) {
                         trace!("{hash} is a ledger hash");
                         if let Some(staking_ledger) =
                             db.get_staking_ledger(&hash.clone().into(), None, None)?
@@ -720,7 +719,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received staking-ledgers-epoch {epoch} command");
-                    if !block::is_valid_state_hash(&genesis_state_hash) {
+                    if !BlockHash::is_valid(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if let Some(staking_ledger) =
                         db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
@@ -754,9 +753,9 @@ pub async fn handle_connection(
                     public_key: pk,
                 } => {
                     info!("Received staking ledger account command for pk {pk} epoch {epoch}");
-                    if !block::is_valid_state_hash(&genesis_state_hash) {
+                    if !BlockHash::is_valid(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
-                    } else if !public_key::is_valid_public_key(&pk) {
+                    } else if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
                     } else if let Some(aggregated_delegations) =
                         db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?
@@ -839,7 +838,7 @@ pub async fn handle_connection(
                 } => {
                     info!("Received SNARK work command for public key {pk}");
 
-                    if !public_key::is_valid_public_key(&pk) {
+                    if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
                     } else {
                         let snarks = db.get_snark_work_by_public_key(&pk.clone().into())?;
@@ -866,7 +865,7 @@ pub async fn handle_connection(
                 Snarks::StateHash { state_hash, path } => {
                     info!("Received SNARK work command for state hash {state_hash}");
 
-                    if !block::is_valid_state_hash(&state_hash) {
+                    if !BlockHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
                         db.get_block_snark_work(&state_hash.clone().into())?
@@ -961,11 +960,11 @@ pub async fn handle_connection(
                     };
                     info!("Received tx-public-key command for {pk}");
 
-                    if !public_key::is_valid_public_key(&pk) {
+                    if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
-                    } else if !block::is_valid_state_hash(&start_state_hash.0) {
+                    } else if !BlockHash::is_valid(&start_state_hash.0) {
                         invalid_state_hash(&start_state_hash.0)
-                    } else if !block::is_valid_state_hash(&end_state_hash.0) {
+                    } else if !BlockHash::is_valid(&end_state_hash.0) {
                         invalid_state_hash(&end_state_hash.0)
                     } else if csv {
                         match db.write_user_commands_csv(&pk.clone().into(), path) {
@@ -1021,7 +1020,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received tx-state-hash command for {state_hash}");
-                    if !block::is_valid_state_hash(&state_hash) {
+                    if !BlockHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
                         let block_hash = BlockHash(state_hash.to_owned());
@@ -1059,7 +1058,7 @@ pub async fn handle_connection(
                     public_key: pk,
                     csv,
                 } => {
-                    if !public_key::is_valid_public_key(&pk) {
+                    if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
                     } else if csv {
                         match db.write_internal_commands_csv(pk.clone().into(), path) {
@@ -1092,7 +1091,7 @@ pub async fn handle_connection(
                 }
                 InternalCommands::StateHash { path, state_hash } => {
                     info!("Received internal-state-hash command for {}", state_hash);
-                    if !block::is_valid_state_hash(&state_hash) {
+                    if !BlockHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
                         let state_hash = BlockHash(state_hash);

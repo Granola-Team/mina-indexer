@@ -63,8 +63,11 @@ pub fn calculate_total_size(paths: &[PathBuf]) -> u64 {
     })
 }
 
-pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) -> bool {
-    if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+pub fn is_valid_file_name<P>(path: P, hash_validator: &dyn Fn(&str) -> bool) -> bool
+where
+    P: AsRef<Path>,
+{
+    if let Some(ext) = path.as_ref().extension().and_then(|ext| ext.to_str()) {
         if ext != "json" {
             return false;
         }
@@ -72,7 +75,7 @@ pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) ->
         return false;
     }
 
-    if let Some(file_stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+    if let Some(file_stem) = path.as_ref().file_stem().and_then(|stem| stem.to_str()) {
         let parts: Vec<&str> = file_stem.split('-').collect();
 
         match parts.as_slice() {
@@ -89,8 +92,8 @@ pub fn is_valid_file_name(path: &Path, hash_validator: &dyn Fn(&str) -> bool) ->
 #[cfg(test)]
 mod utility_function_tests {
     use super::*;
-    use crate::block::is_valid_state_hash;
-    use std::{fs::File, io::Write, path::Path};
+    use crate::block::is_valid_block_file;
+    use std::{fs::File, io::Write};
     use tempfile::TempDir;
 
     #[test]
@@ -175,40 +178,37 @@ mod utility_function_tests {
     #[test]
     fn test_is_valid_file_name() {
         // Valid cases
-        assert!(is_valid_file_name(
-            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.json"),
-            &is_valid_state_hash
+        assert!(is_valid_block_file(
+            "mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.json"
         ));
 
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-3Nabcdef12345678901234567890123456789012345678901234.json"),
-            &is_valid_state_hash
+        assert!(!is_valid_block_file(
+            "mainnet-3Nabcdef12345678901234567890123456789012345678901234.json"
         ));
 
-        // Invalid cases
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-42-abcdef1234567890123456789012345678901234567890123456.json"), /* Invalid hash (does not start with 3N) */
-            &is_valid_state_hash
+        ///////////////////
+        // Invalid cases //
+        ///////////////////
+
+        // Invalid hash (does not start with 3N)
+        assert!(!is_valid_block_file(
+            "mainnet-42-abcdef1234567890123456789012345678901234567890123456.json"
         ));
 
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-42-3Nabcdef1234.json"), // Hash too short
-            &is_valid_state_hash
+        // Hash too short
+        assert!(!is_valid_block_file("mainnet-42-3Nabcdef1234.json"));
+
+        // Missing hash part
+        assert!(!is_valid_block_file("mainnet-42.json"));
+
+        // Invalid extension
+        assert!(!is_valid_block_file(
+            "mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.txt"
         ));
 
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-42.json"), // Missing hash part
-            &is_valid_state_hash
-        ));
-
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234.txt"), /* Invalid extension */
-            &is_valid_state_hash
-        ));
-
-        assert!(!is_valid_file_name(
-            Path::new("mainnet-42-3Nabcdef12345678901234567890123456789012345678901234-123.json"), /* Too many parts */
-            &is_valid_state_hash
+        // Too many parts
+        assert!(!is_valid_block_file(
+            "mainnet-42-3Nabcdef12345678901234567890123456789012345678901234-123.json"
         ));
     }
 }
