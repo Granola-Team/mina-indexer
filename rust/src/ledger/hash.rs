@@ -5,7 +5,7 @@ use crate::protocol::serialization_types::{
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub struct LedgerHash(pub String);
 
 impl LedgerHash {
@@ -42,6 +42,19 @@ impl LedgerHash {
 
     pub fn from_bytes_or_panic(bytes: Vec<u8>) -> Self {
         Self::from_bytes(bytes).expect("ledger hash bytes")
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for LedgerHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
     }
 }
 
