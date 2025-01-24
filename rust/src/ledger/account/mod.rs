@@ -45,8 +45,6 @@ pub struct Account {
     pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
-
-    #[serde(skip_deserializing)]
     pub token_symbol: Option<TokenSymbol>,
 
     // for zkapp accounts
@@ -473,6 +471,7 @@ impl Account {
     /// Apply zkapp account creation fee
     pub fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
         self.checks(&diff.public_key, &diff.token);
+        assert_eq!(diff.amount, MAINNET_ACCOUNT_CREATION_FEE);
 
         Self {
             balance: self.balance + diff.amount,
