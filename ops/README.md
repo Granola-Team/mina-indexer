@@ -23,7 +23,7 @@ Files in this directory:
 ./recycle-pcbs.rb
 ./stage-blocks.rb
 ./traverse-canonical-chain.sh
-./unformat-pcbs.sh
+./unformat-pcbs.rb
 ./upload-mina-blocks.sh
 ./upload-staking-ledgers.sh
 ```
@@ -91,8 +91,8 @@ Files in this directory:
 ./traverse-canonical-chain.sh
   TBD
 
-./unformat-pcbs.sh
-  TBD
+./unformat-pcbs.rb
+  Compact JSON into single line
 
 ./upload-mina-blocks.sh
   Utility to upload precomputed block logs to Granola's object storage.
