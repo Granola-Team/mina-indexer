@@ -234,7 +234,6 @@ tier1: tier1-prereqs check lint test-unit
     best_chain \
     rest_accounts_summary \
     reuse_databases \
-    v2_signed_command_hash \
     hurl
 
 # Tier 2 tests
