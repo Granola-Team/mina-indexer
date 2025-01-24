@@ -40,6 +40,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     )?;
 
     let mut bp = BlockParser::new_testing(blocks_dir)?;
