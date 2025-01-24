@@ -11,7 +11,7 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, str::FromStr};
 
-#[ignore = "passing in tier 1, failing in tier 2"]
+#[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
 #[tokio::test]
 async fn check_token_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("token-ledger")?;

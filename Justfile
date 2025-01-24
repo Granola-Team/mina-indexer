@@ -207,7 +207,7 @@ test-unit:
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
   @echo "--- Invoking 'cargo nextest'"
-  cd rust && time cargo nextest run
+  cd rust && time cargo nextest run --run-ignored all
 
 # Lint & run debug unit test(s)
 test-unit-dev test='': lint
