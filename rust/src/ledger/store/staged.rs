@@ -4,7 +4,7 @@ use crate::{
     block::BlockHash,
     ledger::{
         account::Account, diff::LedgerDiff, public_key::PublicKey, token::TokenAddress, Ledger,
-        LedgerHash, TokenLedger,
+        LedgerHash,
     },
 };
 use speedb::{DBIterator, Direction, WriteBatch};
@@ -110,7 +110,7 @@ pub trait StagedLedgerStore {
     fn add_genesis_ledger(
         &self,
         state_hash: &BlockHash,
-        genesis_ledger: TokenLedger,
+        genesis_ledger: Ledger,
         block_height: u32,
     ) -> anyhow::Result<()>;
 
