@@ -18,7 +18,7 @@ pub struct Token {
 }
 
 /// Also referred to as `TokenId`
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct TokenAddress(pub String);
 
 impl TokenAddress {
@@ -45,6 +45,19 @@ impl TokenAddress {
     /// Used to surpass the [TokenAddress] bytes in a db key
     pub fn upper_bound() -> [u8; TokenAddress::LEN] {
         [u8::MAX; TokenAddress::LEN]
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for TokenAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
     }
 }
 
