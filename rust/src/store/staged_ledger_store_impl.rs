@@ -10,7 +10,7 @@ use crate::{
         public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
         token::TokenAddress,
-        Ledger, LedgerHash, TokenLedger,
+        Ledger, LedgerHash,
     },
     utility::store::{common::from_be_bytes, ledger::staged::*},
 };
@@ -290,7 +290,7 @@ impl StagedLedgerStore for IndexerStore {
     fn add_genesis_ledger(
         &self,
         state_hash: &BlockHash,
-        genesis_ledger: TokenLedger,
+        genesis_ledger: Ledger,
         height: u32,
     ) -> anyhow::Result<()> {
         // add prev genesis state hash
@@ -305,16 +305,13 @@ impl StagedLedgerStore for IndexerStore {
         }
 
         // initialize account balances for best ledger & sorting
-        let token = TokenAddress::default();
-        for (pk, acct) in genesis_ledger.accounts.iter() {
-            self.update_best_account(pk, &token, None, Some(acct.clone()))?;
+        for (token, token_ledger) in genesis_ledger.tokens.iter() {
+            for (pk, acct) in token_ledger.accounts.iter() {
+                self.update_best_account(pk, token, None, Some(acct.clone()))?;
+            }
         }
 
-        self.add_staged_ledger_at_state_hash(
-            state_hash,
-            Ledger::from_mina_ledger(genesis_ledger),
-            height,
-        )?;
+        self.add_staged_ledger_at_state_hash(state_hash, genesis_ledger, height)?;
         Ok(())
     }
 
