@@ -31,6 +31,7 @@ async fn test() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     )?;
 
     state.add_blocks(&mut block_parser).await?;
