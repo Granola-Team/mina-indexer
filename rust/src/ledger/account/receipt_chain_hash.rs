@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ReceiptChainHash(pub String);
 
 impl<T> From<T> for ReceiptChainHash
@@ -9,5 +9,18 @@ where
 {
     fn from(value: T) -> Self {
         Self(value.into())
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for ReceiptChainHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
     }
 }
