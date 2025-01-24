@@ -51,7 +51,7 @@ pub struct BlockWithoutHeight {
     pub global_slot_since_genesis: u32,
 }
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
 pub struct BlockHash(pub String);
 
 impl BlockHash {
@@ -147,6 +147,23 @@ pub struct BlockComparison {
     pub hash_last_vrf_output: VrfOutput,
     pub version: PcbVersion,
 }
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for BlockHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::mina_blocks::common::from_str(deserializer)
+    }
+}
+
+/////////////////
+// conversions //
+/////////////////
 
 impl From<PrecomputedBlock> for Block {
     fn from(value: PrecomputedBlock) -> Self {
