@@ -23,7 +23,7 @@ use crate::{
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(
@@ -157,13 +157,13 @@ impl BestLedgerStore for IndexerStore {
                 })
                 .collect(),
         };
-        self.update_best_accounts(state_hash, &account_updates)
+        self.update_best_accounts(state_hash, account_updates)
     }
 
     fn update_best_accounts(
         &self,
         state_hash: &BlockHash,
-        updates: &DbAccountUpdate,
+        updates: DbAccountUpdate,
     ) -> anyhow::Result<()> {
         use AccountDiff::*;
         trace!("Updating best ledger accounts for block {state_hash}");
@@ -181,52 +181,54 @@ impl BestLedgerStore for IndexerStore {
 
         // update accounts
         // unapply
-        for (block_diffs, remove_pks) in updates.unapply.iter() {
-            for diff in block_diffs {
-                let pk: PublicKey = diff.public_key();
-                let token = diff.token_address();
+        for (unapply_block_diffs, remove_pks) in updates.unapply {
+            let token_account_diffs = aggregate_token_account_diffs(unapply_block_diffs);
 
+            for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
                 let (before_balance, before) = (
                     before.as_ref().map(|a| a.balance.0),
                     before.unwrap_or(Account::empty(pk.clone(), token.clone())),
                 );
 
-                let after = Some(match diff {
-                    Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                        before.payment_unapply(diff)
-                    }
-                    Coinbase(diff) => before.coinbase_unapply(diff),
-                    Delegation(diff) => {
-                        self.remove_pk_delegate(pk.clone())?;
-                        before.delegation_unapply(diff)
-                    }
-                    FailedTransactionNonce(diff) => before.failed_transaction_unapply(diff),
+                let mut after = before.clone();
+                for diff in diffs.iter() {
+                    after = match diff {
+                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                            after.payment_unapply(diff)
+                        }
+                        Coinbase(diff) => after.coinbase_unapply(diff),
+                        Delegation(diff) => {
+                            self.remove_pk_delegate(pk.clone())?;
+                            after.delegation_unapply(diff)
+                        }
+                        FailedTransactionNonce(diff) => after.failed_transaction_unapply(diff),
 
-                    // zkapp diffs
-                    ZkappActionsDiff(diff) => {
-                        self.remove_actions(&pk, &token, diff.actions.len() as u32)?;
-                        before
-                    }
-                    ZkappEventsDiff(diff) => {
-                        self.remove_events(&pk, &token, diff.events.len() as u32)?;
-                        before
-                    }
+                        // zkapp diffs
+                        ZkappActionsDiff(diff) => {
+                            self.remove_actions(&pk, &token, diff.actions.len() as u32)?;
+                            after
+                        }
+                        ZkappEventsDiff(diff) => {
+                            self.remove_events(&pk, &token, diff.events.len() as u32)?;
+                            after
+                        }
 
-                    // TODO zkapp unapply
-                    ZkappStateDiff(_)
-                    | ZkappPermissionsDiff(_)
-                    | ZkappVerificationKeyDiff(_)
-                    | ZkappUriDiff(_)
-                    | ZkappTokenSymbolDiff(_)
-                    | ZkappTimingDiff(_)
-                    | ZkappVotingForDiff(_)
-                    | ZkappIncrementNonce(_)
-                    | ZkappAccountCreationFee(_) => before,
-                    Zkapp(_) => unreachable!(),
-                });
+                        // TODO zkapp unapply
+                        ZkappStateDiff(_)
+                        | ZkappPermissionsDiff(_)
+                        | ZkappVerificationKeyDiff(_)
+                        | ZkappUriDiff(_)
+                        | ZkappTokenSymbolDiff(_)
+                        | ZkappTimingDiff(_)
+                        | ZkappVotingForDiff(_)
+                        | ZkappIncrementNonce(_)
+                        | ZkappAccountCreationFee(_) => after,
+                        Zkapp(_) => unreachable!(),
+                    };
+                }
 
-                self.update_best_account(&pk, &token, before_balance, after)?;
+                self.update_best_account(&pk, &token, before_balance, Some(after))?;
             }
 
             // remove accounts
@@ -236,52 +238,49 @@ impl BestLedgerStore for IndexerStore {
         }
 
         // apply
-        for (block_apply_diffs, _) in updates.apply.iter() {
-            for diff in block_apply_diffs {
-                let pk = diff.public_key();
-                let token = diff.token_address();
+        for (block_apply_diffs, _) in updates.apply.into_iter() {
+            let token_account_diffs = aggregate_token_account_diffs(block_apply_diffs);
 
+            for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
                 let (before_balance, before) = (
                     before.as_ref().map(|a| a.balance.0),
                     before.unwrap_or(Account::empty(pk.clone(), token.clone())),
                 );
 
-                let after = Some(match diff {
-                    Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                        before.payment(diff)
-                    }
-                    Coinbase(diff) => before.coinbase(diff.amount),
-                    Delegation(diff) => {
-                        self.add_pk_delegate(&pk, &diff.delegate)?;
-                        before.delegation(diff.delegate.clone(), diff.nonce)
-                    }
-                    FailedTransactionNonce(diff) => before.failed_transaction(diff.nonce),
+                let mut after = before.clone();
+                for diff in diffs.iter() {
+                    after = match diff {
+                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                            after.payment(diff)
+                        }
+                        Coinbase(diff) => after.coinbase(diff.amount),
+                        Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
+                        FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
+                        ZkappStateDiff(diff) => after.zkapp_state(diff),
+                        ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff),
+                        ZkappVerificationKeyDiff(diff) => after.zkapp_verification_key(diff),
+                        ZkappUriDiff(diff) => after.zkapp_uri(diff),
+                        ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff),
+                        ZkappTimingDiff(diff) => after.zkapp_timing(diff),
+                        ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff),
+                        ZkappIncrementNonce(diff) => after.zkapp_nonce(diff),
+                        ZkappAccountCreationFee(diff) => after.zkapp_account_creation(diff),
 
-                    // zkapp diffs
-                    ZkappStateDiff(diff) => before.zkapp_state(diff),
-                    ZkappPermissionsDiff(diff) => before.zkapp_permissions(diff),
-                    ZkappVerificationKeyDiff(diff) => before.zkapp_verification_key(diff),
-                    ZkappUriDiff(diff) => before.zkapp_uri(diff),
-                    ZkappTokenSymbolDiff(diff) => before.zkapp_token_symbol(diff),
-                    ZkappTimingDiff(diff) => before.zkapp_timing(diff),
-                    ZkappVotingForDiff(diff) => before.zkapp_voting_for(diff),
-                    ZkappIncrementNonce(diff) => before.zkapp_nonce(diff),
-                    ZkappAccountCreationFee(diff) => before.zkapp_account_creation(diff),
+                        // these diffs do not modify the account
+                        ZkappActionsDiff(diff) => {
+                            self.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
+                            after
+                        }
+                        ZkappEventsDiff(diff) => {
+                            self.add_events(&diff.public_key, &diff.token, &diff.events)?;
+                            after
+                        }
+                        Zkapp(_) => unreachable!(),
+                    };
+                }
 
-                    // these diffs do not modify the account
-                    ZkappActionsDiff(diff) => {
-                        self.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
-                        before
-                    }
-                    ZkappEventsDiff(diff) => {
-                        self.add_events(&diff.public_key, &diff.token, &diff.events)?;
-                        before
-                    }
-                    Zkapp(_) => unreachable!(),
-                });
-
-                self.update_best_account(&pk, &token, before_balance, after)?;
+                self.update_best_account(&pk, &token, before_balance, Some(after))?;
             }
         }
         Ok(())
@@ -406,6 +405,29 @@ impl BestLedgerStore for IndexerStore {
         self.database
             .iterator_cf(self.best_ledger_accounts_balance_sort_cf(), mode)
     }
+}
+
+use std::collections::HashMap;
+
+/// Aggregate diffs per token account
+fn aggregate_token_account_diffs(
+    account_diffs: Vec<AccountDiff>,
+) -> HashMap<(PublicKey, TokenAddress), Vec<AccountDiff>> {
+    let mut token_account_diffs = <HashMap<(_, _), Vec<_>>>::with_capacity(account_diffs.len());
+
+    for diff in account_diffs {
+        let pk = diff.public_key();
+        let token = diff.token_address();
+
+        if let Some(mut diffs) = token_account_diffs.remove(&(pk.to_owned(), token.to_owned())) {
+            diffs.push(diff);
+            token_account_diffs.insert((pk, token), diffs);
+        } else {
+            token_account_diffs.insert((pk, token), vec![diff]);
+        }
+    }
+
+    token_account_diffs
 }
 
 use std::collections::BTreeMap;
