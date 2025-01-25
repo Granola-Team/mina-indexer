@@ -1,5 +1,5 @@
 require 'json'
-require_relative '../remove-proofs-from-pcbs'
+require_relative '../remove-proofs-from-pcbs.rb'
 
 RSpec.describe 'Remove Proofs Script' do
   let(:test_directory) { 'spec/test_json' }

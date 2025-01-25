@@ -2,7 +2,7 @@
 
 # -*- mode: ruby -*-
 
-# Downloads Mina staking ledger logs from the Granola store.
+# Downloads Mina staking ledgers stored in the Granola Cloudflare R2 Storage bucket by using `rclone`.
 # ARGV[0] = destination directory
 
 DEST = ARGV[0]
@@ -54,7 +54,7 @@ else
     "cloudflare:mina-staking-ledgers",
     "--files-from-raw", "ledgers-to-fetch.list",
     DEST
-  ) || abort("Files sync failed in download-mina-staking-ledgers.rb")
+  ) || abort("Files sync failed in download-staking-ledgers.rb")
   File.delete("ledgers-to-fetch.list")
 
   # Files should be read-only.

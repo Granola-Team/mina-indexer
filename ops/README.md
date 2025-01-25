@@ -4,100 +4,123 @@
 
 Files in this directory:
 
-```
-./calculate-archive-ledgers.sh
-./correct-file-names.sh
-./deploy.rb
-./download-mina-blocks.rb
-./download-staking-ledgers.rb
-./format-graphql-in-hurl-files.rb
-./granola-rclone.rb
-./hashes.list
-./indexer-ledger-normalizer.rb
-./maybe-dupes.list
-./mina-ledger-normalizer.rb
-./minaexplorer/download-staking-ledgers.sh
-./minaexplorer/ledgers.json
-./o1-labs/download-mina-blocks.sh
-./rclone.conf
-./recycle-pcbs.rb
-./stage-blocks.rb
-./traverse-canonical-chain.sh
-./unformat-pcbs.rb
-./upload-mina-blocks.sh
-./upload-staking-ledgers.sh
-```
+- `./calculate-archive-ledgers.sh`
+- `./correct-file-names.sh`
+- `./deploy.rb`
+- `./download-mina-blocks.rb`
+- `./download-staking-ledgers.rb`
+- `./format-graphql-in-hurl-files.rb`
+- `./granola-rclone.rb`
+- `./hashes.list`
+- `./indexer-ledger-normalizer.rb`
+- `./maybe-dupes.list`
+- `./mina-ledger-normalizer.rb`
+- `./minaexplorer/download-staking-ledgers.sh`
+- `./minaexplorer/ledgers.json`
+- `./o1-labs/download-mina-blocks.sh`
+- `./rclone.conf`
+- `./recycle-pcbs.rb`
+- `./regression-test.rb`
+- `./remove-proofs-from-pcbs.rb`
+- `./stage-blocks.rb`
+- `./traverse-canonical-chain.sh`
+- `./unformat-pcbs.rb`
+- `./upload-mina-blocks.sh`
+- `./upload-staking-ledgers.sh`
+- `./utils.rb`
 
-./calculate-archive-ledgers.sh
-  TBD
+### `./calculate-archive-ledgers.sh`
 
-./correct-file-names.sh
-  TBD
+TBD
 
-./deploy.rb
-  Utility to manage the running of a production instance of Mina Indexer. See
-  the instructions in the script.
+### `./correct-file-names.sh`
 
-./download-mina-blocks.rb
-  Downloads Mina blocks stored in the Granola cloud object storage bucket by
-  using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY` etc.). See the
-  instructions at the top of the script.
+TBD
 
-./download-staking-ledgers.rb
-  Downloads Mina staking ledgers stored in the Granola cloud object storage
-  bucket by using `rclone`. Requires credentials (`LINODE_OBJ_ACCESS_KEY`
-  etc.). See the instructions at the top of the script.
+### `./deploy.rb`
 
-./format-graphql-in-hurl-files.rb
-  Standardize formatting of GraphQL in `hurl` files .
+Utility to manage the running of a production instance of Mina Indexer. See the instructions in the script.
 
-./granola-rclone.rb
-  Utility to wrap `rclone`. (See https://rclone.org)
+### `./download-mina-blocks.rb`
 
-./hashes.list
-  TBD
+Downloads historical Mina PCBs in the Granola Cloudflare R2 Storage bucket by using `rclone`. See the instructions at the top of the script.
 
-/.indexer-ledger-normalizer.rb
-  TBD
+### `./download-staking-ledgers.rb`
 
-./maybe-dupes.list
-  TBD
+Downloads Mina staking ledgers stored in the Granola Cloudflare R2 Storage bucket by using `rclone`. See the instructions at the top of the script.
 
-./minaexplorer
-  Directory for scripts that make use of MinaExplorer.com's data.
+### `./format-graphql-in-hurl-files.rb`
 
-./minaexplorer/download-staking-ledgers.sh
-  Utility to download historical staking ledgers from MinaExplorer.com's bucket.
+Standardize formatting of GraphQL in `hurl` files.
 
-./minaexplorer/ledgers.json
-  JSON list of known staking ledgers available.
+### `./granola-rclone.rb`
 
-./o1-labs
-  Directory for utilities that make use of O1Labs's data.
+Utility to wrap `rclone`. See [rclone](https://rclone.org).
 
-./o1-labs/download-mina-blocks.sh
-  Utility to download historical Mina precomputed block logs from the bucket
-  maintained by O1Labs.
+### `./hashes.list`
 
-./rclone.conf
-  A mandatory config file used by `granola-rclone.rb`.
+TBD
 
-./recycle-pcbs.rb
-  TBD
+### `/.indexer-ledger-normalizer.rb`
 
-./stage-block.sh
-  TBD
+TBD
 
-./traverse-canonical-chain.sh
-  TBD
+### `./maybe-dupes.list`
 
-./unformat-pcbs.rb
-  Compact JSON into single line
+TBD
 
-./upload-mina-blocks.sh
-  Utility to upload precomputed block logs to Granola's object storage.
-  Requires appropriate credentials.
+### `./mina/mina_txn_hasher.exe`
 
-./upload-staking-ledgers.sh
-  Utility to upload staking ledger logs to Granola's object storage. Requires
-  appropriate credentials.
+Computes Berkeley hashes for different types of commands (e.g. user or zkApp).
+
+### `./minaexplorer/download-staking-ledgers.sh`
+
+Utility to download historical staking ledgers from MinaExplorer.com's Google Cloud Storage bucket.
+
+### `./minaexplorer/ledgers.json`
+
+JSON list of known staking ledgers available. See [MinaExplorer docs](https://docs.minaexplorer.com/minaexplorer/data-archive).
+
+### `./o1-labs/download-mina-blocks.sh`
+
+Downloads historical Mina PCBs from the O1Labs' [Google Cloud Storage bucket](https://storage.googleapis.com/storage/v1/b/mina_network_block_data/o?prefix=mainnet) using [gsutil](https://cloud.google.com/storage/docs/gsutil).
+
+### `./rclone.conf`
+
+A mandatory config file used by `granola-rclone.rb`.
+
+### `./recycle-pcbs.rb`
+
+TBD
+
+### `./regression-test.rb`
+
+TBD
+
+### `./remove-proofs-from-pcbs.rb`
+
+Remove any "proofs" array from the PCB JSON files in a directory. This significantly shrinks files and helps ensure no invalid unicde characters exist.
+
+### `./stage-block.sh`
+
+TBD
+
+### `./traverse-canonical-chain.sh`
+
+TBD
+
+### `./unformat-pcbs.rb`
+
+Compact JSON into single line
+
+### `./upload-mina-blocks.sh`
+
+Utility to upload PCBs to Granola's Cloudflare R2 Storage bucket. Requires appropriate credentials.
+
+### `./upload-staking-ledgers.sh`
+
+Utility to upload staking ledger logs to Granola's Cloudflare R2 Storage bucket. Requires appropriate credentials.
+
+### `./utils.rb`
+
+TBD
