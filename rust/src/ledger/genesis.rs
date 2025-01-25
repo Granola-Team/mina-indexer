@@ -6,10 +6,26 @@ use super::{
     token::TokenAddress,
     Ledger, TokenLedger,
 };
-use crate::{block::genesis::GenesisBlock, constants::*, mina_blocks::v2::ZkappAccount};
+use crate::{
+    block::{genesis::GenesisBlock, BlockHash},
+    constants::*,
+    mina_blocks::v2::ZkappAccount,
+};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisLedger {
+    pub ledger: TokenLedger,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisRoot {
+    pub genesis: Option<GenesisTimestamp>,
+    pub proof: Option<GenesisProof>,
+    pub ledger: GenesisAccounts,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisTimestamp {
@@ -17,9 +33,22 @@ pub struct GenesisTimestamp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenesisRoot {
-    pub genesis: GenesisTimestamp,
-    pub ledger: GenesisAccounts,
+pub struct GenesisProof {
+    pub fork: GenesisForkProof,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisForkProof {
+    pub state_hash: BlockHash,
+    pub blockchain_length: u32,
+    pub global_slot_since_genesis: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenesisAccounts {
+    pub name: Option<String>,
+    pub accounts: Vec<GenesisAccount>,
+    pub seed: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -29,12 +58,16 @@ pub struct GenesisAccount {
     pub nonce: Option<Nonce>,
     pub delegate: Option<String>,
     pub token: Option<u64>,
+    pub token_permissions: TokenPermissions,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<String>,
+    pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
     pub zkapp: Option<ZkappAccount>,
 }
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct TokenPermissions {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccountTiming {
@@ -43,25 +76,6 @@ pub struct GenesisAccountTiming {
     pub cliff_amount: String,
     pub vesting_period: String,
     pub vesting_increment: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenesisAccounts {
-    pub name: String,
-    pub accounts: Vec<GenesisAccount>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GenesisLedger {
-    pub ledger: TokenLedger,
-}
-
-impl std::str::FromStr for GenesisRoot {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(|e| anyhow!("Error parsing genesis root: {e}"))
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -113,6 +127,14 @@ impl std::default::Default for GenesisConstants {
     }
 }
 
+impl std::str::FromStr for GenesisRoot {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(|e| anyhow!("Error parsing genesis root: {e}"))
+    }
+}
+
 impl From<GenesisRoot> for GenesisLedger {
     fn from(value: GenesisRoot) -> Self {
         Self::new(value.ledger)
@@ -121,9 +143,7 @@ impl From<GenesisRoot> for GenesisLedger {
 
 impl From<GenesisLedger> for Ledger {
     fn from(value: GenesisLedger) -> Self {
-        let token_ledger: TokenLedger = value.into();
-
-        Ledger::from_mina_ledger(token_ledger)
+        Ledger::from_mina_ledger(value.into())
     }
 }
 
