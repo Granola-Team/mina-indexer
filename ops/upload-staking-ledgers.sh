@@ -15,12 +15,12 @@ trap exit_handler EXIT
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
 # Verify that we can connect.
-"$MY_DIR"/granola-rclone.rb lsd linode:
+"$MY_DIR"/granola-rclone.rb lsd cloudflare:
 
 # Perform the upload.
 "$MY_DIR"/granola-rclone.rb \
 	sync \
 	--metadata \
 	"$1" \
-	linode:staking-ledgers.minasearch.com
+	cloudflare:mina-staking-ledgers
 RESULT='Staking ledgers uploaded.'

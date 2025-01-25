@@ -15,7 +15,7 @@ FileUtils.mkdir_p(DEST)
 blocks_list = "#{DEST}/../blocks.list"
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
-  cmd = "#{__dir__}/granola-rclone.rb lsf linode:granola-mina-blocks"
+  cmd = "#{__dir__}/granola-rclone.rb lsf cloudflare:mina-blocks"
   warn "download-mina-blocks issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
@@ -54,7 +54,7 @@ else
   system(
     "#{__dir__}/granola-rclone.rb",
     "sync",
-    "linode:granola-mina-blocks",
+    "cloudflare:mina-blocks",
     "--files-from-raw", "files-to-fetch.list",
     DEST
   ) || abort("Files sync failed in download-mina-blocks.rb")
