@@ -3,7 +3,6 @@ pub mod coinbase;
 pub mod diff;
 pub mod genesis;
 pub mod hash;
-pub mod nonce;
 pub mod public_key;
 pub mod staking;
 pub mod store;
@@ -11,13 +10,12 @@ pub mod token;
 pub mod username;
 
 use crate::{
-    base::amount::Amount,
+    base::{amount::Amount, nonce::Nonce},
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
         diff::{account::AccountDiff, LedgerDiff},
-        nonce::Nonce,
         public_key::PublicKey,
         token::TokenAddress,
     },
@@ -478,9 +476,9 @@ mod tests {
         Amount, LedgerHash,
     };
     use crate::{
-        base::state_hash::StateHash,
+        base::{nonce::Nonce, state_hash::StateHash},
         constants::MINA_SCALE,
-        ledger::{nonce::Nonce, token::TokenAddress, TokenLedger},
+        ledger::{token::TokenAddress, TokenLedger},
     };
     use std::collections::{BTreeMap, HashMap};
 

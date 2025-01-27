@@ -2,13 +2,12 @@ pub mod parser;
 pub mod permissions;
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{nonce::Nonce, state_hash::StateHash},
     block::{extract_height_and_hash, extract_network},
     chain::Network,
     constants::MINA_SCALE_DEC,
     ledger::{
         account::{ReceiptChainHash, Timing},
-        nonce::Nonce,
         public_key::PublicKey,
         LedgerHash,
     },

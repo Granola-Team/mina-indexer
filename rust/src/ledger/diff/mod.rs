@@ -193,11 +193,9 @@ impl LedgerDiff {
 #[cfg(test)]
 mod tests {
     use crate::{
+        base::nonce::Nonce,
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        ledger::{
-            diff::{account::AccountDiffType::*, LedgerDiff},
-            nonce::Nonce,
-        },
+        ledger::diff::{account::AccountDiffType::*, LedgerDiff},
     };
     use std::path::PathBuf;
 

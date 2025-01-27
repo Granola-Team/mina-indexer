@@ -11,12 +11,11 @@ use super::{
         },
         LedgerDiff,
     },
-    nonce::Nonce,
     token::{symbol::TokenSymbol, TokenAddress},
     username::Username,
 };
 use crate::{
-    base::{amount::Amount, state_hash::StateHash},
+    base::{amount::Amount, nonce::Nonce, state_hash::StateHash},
     block::genesis::GenesisBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},
@@ -620,6 +619,7 @@ impl std::fmt::Debug for Account {
 mod tests {
     use super::{Account, Amount};
     use crate::{
+        base::nonce::Nonce,
         constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
         ledger::{
             account::{Permission, Permissions, Timing},
@@ -627,7 +627,6 @@ mod tests {
                 AccountDiff, PaymentDiff, UpdateType, ZkappDiff, ZkappPaymentDiff,
                 ZkappPermissionsDiff, ZkappVerificationKeyDiff,
             },
-            nonce::Nonce,
             public_key::PublicKey,
             token::{symbol::TokenSymbol, TokenAddress},
         },

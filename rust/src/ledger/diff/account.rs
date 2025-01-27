@@ -1,12 +1,11 @@
 use crate::{
-    base::state_hash::StateHash,
+    base::{nonce::Nonce, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
     command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::{Permissions, Timing},
         coinbase::Coinbase,
-        nonce::Nonce,
         token::{symbol::TokenSymbol, TokenAddress},
         Amount, PublicKey,
     },
@@ -1195,6 +1194,7 @@ impl std::fmt::Debug for UpdateType {
 mod tests {
     use super::*;
     use crate::{
+        base::nonce::Nonce,
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::{Command, Delegation, Payment},
         constants::MAINNET_COINBASE_REWARD,
@@ -1202,7 +1202,6 @@ mod tests {
             account::Permission,
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
             diff::LedgerDiff,
-            nonce::Nonce,
             token::TokenAddress,
             Amount, PublicKey,
         },
