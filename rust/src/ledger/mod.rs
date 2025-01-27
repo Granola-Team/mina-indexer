@@ -478,7 +478,7 @@ mod tests {
         Amount, LedgerHash,
     };
     use crate::{
-        block::BlockHash,
+        base::state_hash::StateHash,
         constants::MINA_SCALE,
         ledger::{nonce::Nonce, token::TokenAddress, TokenLedger},
     };
@@ -509,7 +509,7 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
-            state_hash: BlockHash::default(),
+            state_hash: StateHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
@@ -552,7 +552,7 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
-            state_hash: BlockHash::default(),
+            state_hash: StateHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),

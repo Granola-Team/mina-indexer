@@ -2,7 +2,8 @@ pub mod parser;
 pub mod permissions;
 
 use crate::{
-    block::{extract_height_and_hash, extract_network, BlockHash},
+    base::state_hash::StateHash,
+    block::{extract_height_and_hash, extract_network},
     chain::Network,
     constants::MINA_SCALE_DEC,
     ledger::{
@@ -29,7 +30,7 @@ pub struct StakingLedger {
     pub network: Network,
     pub ledger_hash: LedgerHash,
     pub total_currency: u64,
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
@@ -42,7 +43,7 @@ pub struct StakingAccount {
     pub token: Option<u64>,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
-    pub voting_for: BlockHash,
+    pub voting_for: StateHash,
     pub nonce: Option<Nonce>,
     pub timing: Option<Timing>,
     pub zkapp: Option<ZkappAccount>,
@@ -57,7 +58,7 @@ pub struct StakingAccountJson {
     pub token: String,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
-    pub voting_for: BlockHash,
+    pub voting_for: StateHash,
     pub nonce: Option<String>,
     pub timing: Option<TimingJson>,
 }
@@ -76,7 +77,7 @@ pub struct AggregatedEpochStakeDelegations {
     pub epoch: u32,
     pub network: Network,
     pub ledger_hash: LedgerHash,
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
     pub total_delegations: u64,
 }
@@ -158,7 +159,7 @@ pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
 impl StakingLedger {
     pub async fn parse_file(
         path: &Path,
-        genesis_state_hash: BlockHash,
+        genesis_state_hash: StateHash,
     ) -> anyhow::Result<StakingLedger> {
         trace!(
             "Parsing staking ledger {:?}",

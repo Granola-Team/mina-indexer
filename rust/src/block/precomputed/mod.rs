@@ -9,7 +9,7 @@ use super::{
     post_hardfork::{
         account_accessed::AccountAccessed, account_created::AccountCreated, token_used::TokenUsed,
     },
-    Block, BlockHash, VrfOutput,
+    Block, StateHash, VrfOutput,
 };
 use crate::{
     canonicity::Canonicity,
@@ -40,7 +40,7 @@ use v2::{BlockFileDataV2, BlockFileV2, PrecomputedBlockV2, PrecomputedBlockWithC
 
 pub struct BlockFileContents {
     pub(crate) network: Network,
-    pub(crate) state_hash: BlockHash,
+    pub(crate) state_hash: StateHash,
     pub(crate) blockchain_length: u32,
     pub(crate) contents: Vec<u8>,
 }
@@ -160,10 +160,10 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn previous_state_hash(&self) -> BlockHash {
+    pub fn previous_state_hash(&self) -> StateHash {
         match self {
             Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
+                StateHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
             }
             Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
         }
@@ -677,10 +677,10 @@ impl PrecomputedBlock {
         public_keys
     }
 
-    pub fn genesis_state_hash(&self) -> BlockHash {
+    pub fn genesis_state_hash(&self) -> StateHash {
         match self {
             Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
+                StateHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
             }
             Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.to_owned(),
         }
@@ -968,9 +968,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn next_epoch_start_checkpoint(&self) -> BlockHash {
+    pub fn next_epoch_start_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -994,9 +994,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn next_epoch_lock_checkpoint(&self) -> BlockHash {
+    pub fn next_epoch_lock_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1136,9 +1136,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn staking_epoch_start_checkpoint(&self) -> BlockHash {
+    pub fn staking_epoch_start_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1162,9 +1162,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn staking_epoch_lock_checkpoint(&self) -> BlockHash {
+    pub fn staking_epoch_lock_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1322,7 +1322,7 @@ impl PrecomputedBlock {
         )
     }
 
-    pub fn state_hash(&self) -> BlockHash {
+    pub fn state_hash(&self) -> StateHash {
         match self {
             PrecomputedBlock::V1(v1) => v1.state_hash.to_owned(),
             PrecomputedBlock::V2(v2) => v2.state_hash.to_owned(),

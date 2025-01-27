@@ -1,6 +1,7 @@
 use crate::helpers::{state::*, store::*};
 use mina_indexer::{
-    block::{parser::BlockParser, store::BlockStore, BlockHash},
+    base::state_hash::StateHash,
+    block::{parser::BlockParser, store::BlockStore},
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
 };
@@ -59,7 +60,7 @@ async fn test() -> anyhow::Result<()> {
         assert_eq!(
             Some(Canonicity::Canonical),
             state
-                .get_block_status(&BlockHash(
+                .get_block_status(&StateHash(
                     canonical_hashes.get((n - 1) as usize).unwrap().to_string(),
                 ))
                 .unwrap()

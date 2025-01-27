@@ -1,6 +1,7 @@
 use super::DbUpdate;
 use crate::{
-    block::{store::DbBlockUpdate, BlockHash},
+    base::state_hash::StateHash,
+    block::store::DbBlockUpdate,
     ledger::{public_key::PublicKey, username::Username},
 };
 use serde::{Deserialize, Serialize};
@@ -25,7 +26,7 @@ pub trait UsernameStore {
     /// Set the user name updates in the block
     fn set_block_username_updates_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         username_updates: &UsernameUpdate,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
@@ -33,7 +34,7 @@ pub trait UsernameStore {
     /// Get the block's username updates
     fn get_block_username_updates(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>>;
 
     /// Update block usernames

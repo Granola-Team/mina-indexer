@@ -4,10 +4,8 @@ use super::{
     DbUpdate, IndexerStore,
 };
 use crate::{
-    block::{
-        store::{BlockUpdate, DbBlockUpdate},
-        BlockHash,
-    },
+    base::state_hash::StateHash,
+    block::store::{BlockUpdate, DbBlockUpdate},
     ledger::{public_key::PublicKey, username::Username},
     utility::store::common::{from_be_bytes, pk_index_key},
 };
@@ -26,7 +24,7 @@ impl UsernameStore for IndexerStore {
 
     fn set_block_username_updates_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         username_updates: &UsernameUpdate,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -41,7 +39,7 @@ impl UsernameStore for IndexerStore {
 
     fn get_block_username_updates(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
         trace!("Getting block username updates {state_hash}");
         Ok(self

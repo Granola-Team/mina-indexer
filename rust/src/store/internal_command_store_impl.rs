@@ -1,9 +1,9 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
+    base::state_hash::StateHash,
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, DbBlockUpdate},
-        BlockHash,
     },
     command::internal::{
         store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData,
@@ -127,7 +127,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_block_internal_command(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         trace!("Getting internal command block {state_hash} index {index}");
@@ -176,7 +176,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_internal_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands in block {state_hash}");
         let mut res = vec![];
@@ -422,7 +422,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_block_internal_commands_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<u32>> {
         trace!("Getting block internal command count");
         Ok(self
@@ -436,7 +436,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn set_block_internal_commands_count_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {

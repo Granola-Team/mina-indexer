@@ -1,3 +1,5 @@
+//! Indexer state hash type
+
 use crate::protocol::serialization_types::{
     common::{Base58EncodableVersionedType, HashV1},
     version_bytes,
@@ -44,6 +46,19 @@ impl StateHash {
     }
 }
 
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for StateHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::utility::serde::from_str(deserializer)
+    }
+}
+
 /////////////////
 // conversions //
 /////////////////
@@ -69,15 +84,27 @@ where
     }
 }
 
-///////////
-// serde //
-///////////
+#[cfg(test)]
+mod tests {
+    use super::StateHash;
 
-impl<'de> Deserialize<'de> for StateHash {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        crate::mina_blocks::common::from_str(deserializer)
+    #[test]
+    fn roundtrip() -> anyhow::Result<()> {
+        let hash = StateHash::default();
+        let hash_str = hash.to_string();
+
+        // serialize
+        let ser = serde_json::to_vec(&hash)?;
+
+        // deserialize
+        let res: StateHash = serde_json::from_slice(&ser)?;
+
+        // roundtrip
+        assert_eq!(hash, res);
+
+        // same serialization as string
+        assert_eq!(ser, serde_json::to_vec(&hash_str)?);
+
+        Ok(())
     }
 }

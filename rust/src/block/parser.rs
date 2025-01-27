@@ -330,7 +330,7 @@ impl From<ParsedBlock> for PrecomputedBlock {
 
 #[cfg(test)]
 mod tests {
-    use crate::{block::BlockHash, chain::Network};
+    use crate::{base::state_hash::StateHash, chain::Network};
     use quickcheck::{Arbitrary, Gen};
     use std::path::PathBuf;
     impl Arbitrary for Network {
@@ -350,7 +350,7 @@ mod tests {
     #[allow(dead_code)]
     struct BlockFileName(PathBuf);
 
-    impl Arbitrary for BlockHash {
+    impl Arbitrary for StateHash {
         fn arbitrary(g: &mut Gen) -> Self {
             let mut hash = "3N".to_string();
             for _ in 0..50 {
@@ -368,7 +368,7 @@ mod tests {
         fn arbitrary(g: &mut Gen) -> Self {
             let network = Network::arbitrary(g);
             let height = u32::arbitrary(g);
-            let hash = BlockHash::arbitrary(g);
+            let hash = StateHash::arbitrary(g);
             let is_first_pattern = bool::arbitrary(g);
             let path = if is_first_pattern {
                 format!("{}-{}-{}.json", network, height, hash)

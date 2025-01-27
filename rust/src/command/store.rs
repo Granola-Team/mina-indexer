@@ -1,5 +1,6 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
     command::{
         signed::{SignedCommandWithData, TxnHash},
         UserCommandWithStatus,
@@ -29,7 +30,7 @@ pub trait UserCommandStore {
     /// Get indexed user commands from the given block
     fn get_block_user_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>>;
 
     /// Get user command by its hash & index
@@ -43,7 +44,7 @@ pub trait UserCommandStore {
     fn get_user_command_state_hash(
         &self,
         txn_hash: &TxnHash,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>>;
 
     /// Get indexed user commands involving the public key as a sender or
@@ -58,14 +59,14 @@ pub trait UserCommandStore {
     fn get_user_commands_with_bounds(
         &self,
         pk: &PublicKey,
-        start_state_hash: &BlockHash,
-        end_state_hash: &BlockHash,
+        start_state_hash: &StateHash,
+        end_state_hash: &StateHash,
     ) -> anyhow::Result<Vec<SignedCommandWithData>>;
 
     /// Set block containing `txn_hash`
     fn set_user_command_state_hash_batch(
         &self,
-        state_hash: BlockHash,
+        state_hash: StateHash,
         txn_hash: &TxnHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
@@ -74,7 +75,7 @@ pub trait UserCommandStore {
     fn get_user_command_state_hashes(
         &self,
         txn_hash: &TxnHash,
-    ) -> anyhow::Result<Option<Vec<BlockHash>>>;
+    ) -> anyhow::Result<Option<Vec<StateHash>>>;
 
     /// Get number of blocks containing `txn_hash`
     fn get_user_commands_num_containing_blocks(
@@ -153,13 +154,13 @@ pub trait UserCommandStore {
     /// Increment user commands per block
     fn set_block_user_commands_count_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
 
     /// Get user commands per block
-    fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+    fn get_block_user_commands_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>>;
 
     /// Increment user commands counts given `command` in `epoch`
     fn increment_user_commands_counts(

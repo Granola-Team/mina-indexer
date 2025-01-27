@@ -1,9 +1,9 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
+    base::state_hash::StateHash,
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
-        BlockHash,
     },
     canonicity::store::CanonicityStore,
     constants::MAINNET_EPOCH_SLOT_COUNT,
@@ -158,7 +158,7 @@ impl SnarkStore for IndexerStore {
 
     fn get_block_snark_work(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
         trace!("Getting SNARK work in block {state_hash}");
         let mut snarks: Vec<SnarkWorkSummary> = vec![];
@@ -1041,7 +1041,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_block_snarks_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_snarks_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block SNARKs count {state_hash}");
         Ok(self
             .database
@@ -1049,7 +1049,7 @@ impl SnarkStore for IndexerStore {
             .map(|bytes| u32_from_be_bytes(&bytes).expect("block SNARK count")))
     }
 
-    fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()> {
+    fn set_block_snarks_count(&self, state_hash: &StateHash, count: u32) -> anyhow::Result<()> {
         trace!("Setting block SNARKs count {state_hash} -> {count}");
         Ok(self.database.put_cf(
             self.block_snark_counts_cf(),

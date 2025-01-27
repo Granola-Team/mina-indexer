@@ -2,13 +2,14 @@ pub mod branch;
 pub mod summary;
 
 use crate::{
+    base::state_hash::StateHash,
     block::{
         genesis::GenesisBlock,
         genesis_state_hash::GenesisStateHash,
         parser::{BlockParser, ParsedBlock},
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
-        Block, BlockHash, BlockWithoutHeight,
+        Block, BlockWithoutHeight,
     },
     canonicity::{store::CanonicityStore, Canonicity},
     chain::{store::ChainStore, ChainData},
@@ -74,7 +75,7 @@ pub struct IndexerState {
     pub ledger_cadence: u32,
 
     /// Map of ledger diffs following the canonical root
-    pub diffs_map: HashMap<BlockHash, LedgerDiff>,
+    pub diffs_map: HashMap<StateHash, LedgerDiff>,
 
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
@@ -125,7 +126,7 @@ pub struct IndexerState {
 
 #[derive(Debug, Clone)]
 pub struct Tip {
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub node_id: NodeId,
 }
 
@@ -958,7 +959,7 @@ impl IndexerState {
     }
 
     /// Get the status of a block: Canonical, Pending, or Orphaned
-    pub fn get_block_status(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+    pub fn get_block_status(&self, state_hash: &StateHash) -> anyhow::Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_block_canonicity(state_hash);
         }
@@ -1094,7 +1095,7 @@ impl IndexerState {
         path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         let (epoch, hash) = extract_epoch_hash(path);
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
@@ -1130,8 +1131,8 @@ impl IndexerState {
     fn add_canonical_block_to_store(
         &self,
         block: &Block,
-        genesis_state_hash: &BlockHash,
-        genesis_prev_state_hash: Option<&BlockHash>,
+        genesis_state_hash: &StateHash,
+        genesis_prev_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_canonical_block(
@@ -1147,7 +1148,7 @@ impl IndexerState {
 
     pub fn update_best_block_in_store(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.set_best_block(state_hash)?;

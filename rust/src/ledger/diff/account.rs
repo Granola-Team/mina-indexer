@@ -1,5 +1,6 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    base::state_hash::StateHash,
+    block::precomputed::PrecomputedBlock,
     command::{Command, UserCommandWithStatus, UserCommandWithStatusT},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
@@ -70,7 +71,7 @@ pub struct ZkappDiff {
     pub zkapp_uri: Option<ZkappUri>,
     pub token_symbol: Option<TokenSymbol>,
     pub timing: Option<Timing>,
-    pub voting_for: Option<BlockHash>,
+    pub voting_for: Option<StateHash>,
     pub actions: Vec<ActionState>,
     pub events: Vec<ZkappEvent>,
 }
@@ -131,7 +132,7 @@ pub struct ZkappTimingDiff {
 pub struct ZkappVotingForDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub voting_for: BlockHash,
+    pub voting_for: StateHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -810,7 +811,7 @@ impl ZkappDiff {
         account_diffs: &mut Vec<AccountDiff>,
         token: TokenAddress,
         pk: PublicKey,
-        voting_for: Option<BlockHash>,
+        voting_for: Option<StateHash>,
     ) {
         if let Some(voting_for) = voting_for {
             account_diffs.push(AccountDiff::ZkappVotingForDiff(ZkappVotingForDiff {

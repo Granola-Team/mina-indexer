@@ -1,5 +1,5 @@
 use crate::{
-    block::BlockHash,
+    base::state_hash::StateHash,
     ledger::{public_key::PublicKey, LedgerHash},
     mina_blocks::common::*,
 };
@@ -25,15 +25,9 @@ pub struct ConsensusState {
     #[serde(deserialize_with = "vec_from_str")]
     pub sub_window_densities: Vec<u32>,
 
-    #[serde(deserialize_with = "from_str")]
     pub block_stake_winner: PublicKey,
-
-    #[serde(deserialize_with = "from_str")]
     pub block_creator: PublicKey,
-
-    #[serde(deserialize_with = "from_str")]
     pub coinbase_receiver: PublicKey,
-
     pub last_vrf_output: String,
     pub curr_global_slot: CurrGlobalSlot,
     pub staking_epoch_data: StakingEpochData,
@@ -57,10 +51,10 @@ pub struct StakingEpochData {
     pub seed: String,
 
     #[serde(deserialize_with = "from_str")]
-    pub start_checkpoint: BlockHash,
+    pub start_checkpoint: StateHash,
 
     #[serde(deserialize_with = "from_str")]
-    pub lock_checkpoint: BlockHash,
+    pub lock_checkpoint: StateHash,
 
     #[serde(deserialize_with = "from_str")]
     pub epoch_length: u32,

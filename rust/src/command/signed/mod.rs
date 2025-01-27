@@ -35,14 +35,14 @@ pub struct SignedCommandWithCreationData {
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithStateHash {
     pub command: SignedCommand,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub is_new_receiver_account: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithData {
     pub command: SignedCommand,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub status: CommandStatusData,
     pub tx_hash: TxnHash,
     pub blockchain_length: u32,

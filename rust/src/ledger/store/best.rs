@@ -1,7 +1,8 @@
 //! Store of the best ledger
 
 use crate::{
-    block::{store::DbBlockUpdate, BlockHash},
+    base::state_hash::StateHash,
+    block::store::DbBlockUpdate,
     ledger::{
         account::Account, diff::account::AccountDiff, public_key::PublicKey, token::TokenAddress,
         Ledger,
@@ -44,13 +45,13 @@ pub trait BestLedgerStore {
     /// Updates best ledger accounts
     fn update_best_accounts(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         updates: DbAccountUpdate,
     ) -> anyhow::Result<()>;
 
     fn update_block_best_accounts(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         blocks: &DbBlockUpdate,
     ) -> anyhow::Result<()>;
 

@@ -1,5 +1,6 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, vrf_output::VrfOutput, Block, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, vrf_output::VrfOutput, Block},
     constants::*,
 };
 use id_tree::{
@@ -38,8 +39,8 @@ impl Branch {
 
     /// Creates a new `Branch` from genesis block data
     pub fn new_genesis(
-        root_hash: BlockHash,
-        root_prev_hash: BlockHash,
+        root_hash: StateHash,
+        root_prev_hash: StateHash,
         blockchain_length: u32,
         global_slot_since_genesis: u32,
         genesis_last_vrf_output: &str,
@@ -377,9 +378,9 @@ impl Branch {
         leaves.first().cloned()
     }
 
-    /// Returns the `BlockHash`es of the longest chain in the branch,
+    /// Returns the `StateHash`es of the longest chain in the branch,
     /// sorted from highest to lowest
-    pub fn longest_chain(&self) -> Vec<BlockHash> {
+    pub fn longest_chain(&self) -> Vec<StateHash> {
         let mut longest_chain = Vec::new();
         if let Some((node_id, _)) = self.best_tip_with_id() {
             // push the tip itself
@@ -409,7 +410,7 @@ impl Branch {
         self.branches.height() as u32
     }
 
-    pub fn mem(&self, state_hash: &BlockHash) -> bool {
+    pub fn mem(&self, state_hash: &StateHash) -> bool {
         for node in self
             .branches
             .traverse_post_order(self.branches.root_node_id().unwrap())

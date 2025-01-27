@@ -4,7 +4,7 @@ pub mod constants;
 
 use self::{blockchain_state::*, consensus_state::*, constants::*};
 use crate::{
-    block::BlockHash,
+    base::state_hash::StateHash,
     mina_blocks::common::from_str,
     // protocol::serialization_types::protocol_state as mina_rs,
 };
@@ -16,14 +16,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolState {
     #[serde(deserialize_with = "from_str")]
-    pub previous_state_hash: BlockHash,
+    pub previous_state_hash: StateHash,
     pub body: ProtocolStateBody,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolStateBody {
     #[serde(deserialize_with = "from_str")]
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub blockchain_state: BlockchainState,
     pub consensus_state: ConsensusState,
     pub constants: Constants,

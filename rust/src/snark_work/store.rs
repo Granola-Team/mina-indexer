@@ -1,6 +1,7 @@
 use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
     ledger::public_key::PublicKey,
     store::DbUpdate,
 };
@@ -16,7 +17,7 @@ pub struct SnarkProverFees {
 }
 
 pub struct SnarkUpdate {
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
     pub works: Vec<SnarkWorkSummary>,
@@ -36,7 +37,7 @@ pub trait SnarkStore {
     /// Get SNARK work in a given block
     fn get_block_snark_work(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>>;
 
     /// Get SNARK work associated with a prover key
@@ -282,10 +283,10 @@ pub trait SnarkStore {
     fn get_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32>;
 
     /// Set SNARK count for a block
-    fn set_block_snarks_count(&self, state_hash: &BlockHash, count: u32) -> anyhow::Result<()>;
+    fn set_block_snarks_count(&self, state_hash: &StateHash, count: u32) -> anyhow::Result<()>;
 
     /// Get num SNARKs per block
-    fn get_block_snarks_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>>;
+    fn get_block_snarks_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>>;
 
     /// Increment snarks counts given `snark` in `epoch`
     fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> anyhow::Result<()>;

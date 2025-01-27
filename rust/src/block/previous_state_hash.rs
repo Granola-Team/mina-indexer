@@ -1,4 +1,4 @@
-use crate::block::BlockHash;
+use crate::block::StateHash;
 use anyhow::bail;
 use std::{
     fs::File,
@@ -7,10 +7,10 @@ use std::{
 };
 
 #[derive(PartialEq, Eq)]
-pub struct PreviousStateHash(BlockHash);
+pub struct PreviousStateHash(StateHash);
 
 impl PreviousStateHash {
-    pub fn from_path(path: &Path) -> anyhow::Result<BlockHash> {
+    pub fn from_path(path: &Path) -> anyhow::Result<StateHash> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         let mut buffer = String::with_capacity(200);
@@ -26,8 +26,8 @@ impl PreviousStateHash {
             // Find the first quote after the colon
             if let Some(quote_start) = buffer[hash_start..].find('"') {
                 let start = hash_start + quote_start + 1;
-                if start + BlockHash::LEN <= buffer.len() {
-                    let previous_state_hash = &buffer[start..][..BlockHash::LEN];
+                if start + StateHash::LEN <= buffer.len() {
+                    let previous_state_hash = &buffer[start..][..StateHash::LEN];
                     return Ok(previous_state_hash.into());
                 }
             }

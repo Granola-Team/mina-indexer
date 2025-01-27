@@ -1,6 +1,7 @@
 use crate::helpers::store::*;
 use mina_indexer::{
-    block::{vrf_output::VrfOutput, Block, BlockHash},
+    base::state_hash::StateHash,
+    block::{vrf_output::VrfOutput, Block},
     event::{db::*, store::*, witness_tree::*, *},
     ledger::LedgerHash,
     store::IndexerStore,
@@ -12,16 +13,16 @@ fn add_and_get_events() -> anyhow::Result<()> {
     let db = IndexerStore::new(store_dir.path())?;
     let event0 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
         blockchain_length: 23,
-        state_hash: BlockHash::default(),
+        state_hash: StateHash::default(),
     }));
     let event1 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
         ledger_hash: LedgerHash::default(),
-        state_hash: BlockHash::default(),
+        state_hash: StateHash::default(),
         blockchain_length: 42,
     }));
     let event2 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
-        state_hash: BlockHash::default(),
+        state_hash: StateHash::default(),
     }));
     let block = Block {
         parent_hash: "parent_hash".into(),

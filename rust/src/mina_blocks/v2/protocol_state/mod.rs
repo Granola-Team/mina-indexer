@@ -1,7 +1,8 @@
 pub mod constants;
 
 use crate::{
-    block::{vrf_output::VrfOutput, BlockHash},
+    base::state_hash::StateHash,
+    block::vrf_output::VrfOutput,
     ledger::{public_key::PublicKey, LedgerHash},
     mina_blocks::common::*,
 };
@@ -10,13 +11,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolState {
-    pub previous_state_hash: BlockHash,
+    pub previous_state_hash: StateHash,
     pub body: ProtocolStateBody,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolStateBody {
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub blockchain_state: BlockchainState,
     pub consensus_state: ConsensusState,
     pub constants: Constants,
@@ -168,8 +169,8 @@ pub struct GlobalSlotNumbers {
 pub struct EpochData {
     pub ledger: LedgerData,
     pub seed: String,
-    pub start_checkpoint: BlockHash,
-    pub lock_checkpoint: BlockHash,
+    pub start_checkpoint: StateHash,
+    pub lock_checkpoint: StateHash,
 
     #[serde(serialize_with = "to_str")]
     #[serde(deserialize_with = "from_str")]

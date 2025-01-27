@@ -4,8 +4,8 @@ pub mod store;
 pub mod zkapp;
 
 use crate::{
-    base::amount::Amount,
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    base::{amount::Amount, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
     command::signed::{SignedCommand, SignedCommandWithKind},
     ledger::{nonce::Nonce, public_key::PublicKey},
     mina_blocks::v2::{
@@ -52,7 +52,7 @@ pub enum Command {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CommandWithStateHash {
     pub command: Command,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]

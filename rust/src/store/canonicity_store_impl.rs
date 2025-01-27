@@ -1,9 +1,7 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    block::{
-        store::{BlockStore, BlockUpdate, DbBlockUpdate},
-        BlockHash,
-    },
+    base::state_hash::StateHash,
+    block::store::{BlockStore, BlockUpdate, DbBlockUpdate},
     canonicity::{store::CanonicityStore, Canonicity, CanonicityDiff, CanonicityUpdate},
     command::internal::{store::InternalCommandStore, DbInternalCommandWithData},
     constants::MAINNET_COINBASE_REWARD,
@@ -16,9 +14,9 @@ impl CanonicityStore for IndexerStore {
         &self,
         height: u32,
         global_slot: u32,
-        state_hash: &BlockHash,
-        genesis_state_hash: &BlockHash,
-        genesis_prev_state_hash: Option<&BlockHash>,
+        state_hash: &StateHash,
+        genesis_state_hash: &StateHash,
+        genesis_prev_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<()> {
         if state_hash == genesis_state_hash && genesis_prev_state_hash.is_some() {
             trace!("Adding new genesis block (length {height}): {state_hash}");
@@ -91,7 +89,7 @@ impl CanonicityStore for IndexerStore {
         Ok(())
     }
 
-    fn get_known_genesis_state_hashes(&self) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_known_genesis_state_hashes(&self) -> anyhow::Result<Vec<StateHash>> {
         trace!("Getting known genesis state hashes");
         Ok(self
             .database
@@ -101,7 +99,7 @@ impl CanonicityStore for IndexerStore {
             }))
     }
 
-    fn get_known_genesis_prev_state_hashes(&self) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_known_genesis_prev_state_hashes(&self) -> anyhow::Result<Vec<StateHash>> {
         trace!("Getting known genesis prev state hashes");
         Ok(self
             .database
@@ -111,23 +109,23 @@ impl CanonicityStore for IndexerStore {
             }))
     }
 
-    fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<BlockHash>> {
+    fn get_canonical_hash_at_height(&self, height: u32) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting canonical state hash at height {height}");
         Ok(self
             .database
             .get_pinned_cf(&self.canonicity_length_cf(), height.to_be_bytes())?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
-    fn get_canonical_hash_at_slot(&self, global_slot: u32) -> anyhow::Result<Option<BlockHash>> {
+    fn get_canonical_hash_at_slot(&self, global_slot: u32) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting canonical state hash at slot {global_slot}");
         Ok(self
             .database
             .get_pinned_cf(&self.canonicity_slot_cf(), global_slot.to_be_bytes())?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
-    fn get_block_canonicity(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Canonicity>> {
+    fn get_block_canonicity(&self, state_hash: &StateHash) -> anyhow::Result<Option<Canonicity>> {
         trace!("Getting canonicity of block {state_hash}");
         if let Ok(Some(height)) = self.get_block_height(state_hash) {
             return Ok(self

@@ -5,8 +5,8 @@ use super::{
     Ledger, TokenLedger,
 };
 use crate::{
-    base::amount::Amount,
-    block::{genesis::GenesisBlock, BlockHash},
+    base::{amount::Amount, state_hash::StateHash},
+    block::genesis::GenesisBlock,
     constants::*,
     mina_blocks::common::from_str_opt,
     utility::compression::decompress_gzip,
@@ -39,7 +39,7 @@ pub struct GenesisProof {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisForkProof {
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
 }
@@ -58,7 +58,7 @@ pub struct GenesisAccount {
     pub delegate: Option<String>,
     pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<BlockHash>,
+    pub voting_for: Option<StateHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
 

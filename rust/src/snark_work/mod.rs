@@ -1,7 +1,7 @@
 pub mod store;
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    base::state_hash::StateHash, block::precomputed::PrecomputedBlock,
     ledger::public_key::PublicKey,
     mina_blocks::v2::staged_ledger_diff::completed_work::CompletedWork,
     protocol::serialization_types::snark_work as mina_rs,
@@ -98,8 +98,8 @@ impl From<SnarkWorkSummaryWithStateHash> for SnarkWorkSummary {
     }
 }
 
-impl From<(SnarkWorkSummary, BlockHash)> for SnarkWorkSummaryWithStateHash {
-    fn from(value: (SnarkWorkSummary, BlockHash)) -> Self {
+impl From<(SnarkWorkSummary, StateHash)> for SnarkWorkSummaryWithStateHash {
+    fn from(value: (SnarkWorkSummary, StateHash)) -> Self {
         Self {
             fee: value.0.fee,
             prover: value.0.prover,
@@ -182,7 +182,7 @@ mod test {
                 value
             }
         }
-        fn add_state_hash(value: Value, state_hash: &BlockHash) -> Value {
+        fn add_state_hash(value: Value, state_hash: &StateHash) -> Value {
             if let Value::Object(mut obj) = value {
                 obj.insert("state_hash".into(), Value::String(state_hash.0.clone()));
                 Value::Object(obj)

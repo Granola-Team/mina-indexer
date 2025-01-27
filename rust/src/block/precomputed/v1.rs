@@ -2,7 +2,7 @@
 
 use super::MAINNET_GENESIS_TIMESTAMP;
 use crate::{
-    block::BlockHash,
+    base::state_hash::StateHash,
     canonicity::Canonicity,
     chain::Network,
     mina_blocks::common::*,
@@ -31,7 +31,7 @@ fn mainnet_genesis_timestamp() -> u64 {
 pub struct PrecomputedBlockV1 {
     // metadata
     pub network: Network,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     // from PCB
     pub scheduled_time: u64,
@@ -43,7 +43,7 @@ pub struct PrecomputedBlockV1 {
 pub struct PrecomputedBlockWithCanonicityV1 {
     pub canonicity: Option<Canonicity>,
     pub network: Network,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
     pub protocol_state: ProtocolState,

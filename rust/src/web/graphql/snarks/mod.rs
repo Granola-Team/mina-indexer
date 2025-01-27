@@ -1,6 +1,7 @@
 use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
     ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
@@ -407,7 +408,7 @@ fn snark_summary_matches_query(
     query: &Option<SnarkQueryInput>,
     snark: SnarkWorkSummaryWithStateHash,
 ) -> anyhow::Result<Option<SnarkWithCanonicity>> {
-    let state_hash = BlockHash::from(snark.state_hash.clone());
+    let state_hash = StateHash::from(snark.state_hash.clone());
     let canonical = get_block_canonicity(db, &state_hash);
     let snark_with_canonicity = SnarkWithCanonicity {
         pcb: get_block(db, &state_hash),
@@ -430,8 +431,8 @@ fn snark_summary_matches_query(
     }
 }
 
-impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
-    fn from(snark: (SnarkWorkSummary, BlockHash, u32, u32)) -> Self {
+impl From<(SnarkWorkSummary, StateHash, u32, u32)> for Snark {
+    fn from(snark: (SnarkWorkSummary, StateHash, u32, u32)) -> Self {
         Snark {
             fee: snark.0.fee,
             prover: snark.0.prover.0,

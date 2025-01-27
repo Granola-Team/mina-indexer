@@ -1,7 +1,7 @@
 //! Indexer internal V2 precomputed block representation
 
 use crate::{
-    block::BlockHash,
+    base::state_hash::StateHash,
     canonicity::Canonicity,
     chain::Network,
     constants::berkeley::*,
@@ -38,7 +38,7 @@ fn berkeley_genesis_timestamp() -> u64 {
 pub struct PrecomputedBlockV2 {
     // metadata
     pub network: Network,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     // from PCB
     pub scheduled_time: u64,
@@ -54,7 +54,7 @@ pub struct PrecomputedBlockV2 {
 pub struct PrecomputedBlockWithCanonicityV2 {
     pub canonicity: Option<Canonicity>,
     pub network: Network,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub scheduled_time: u64,
     pub blockchain_length: u32,
     pub protocol_state: v2::protocol_state::ProtocolState,

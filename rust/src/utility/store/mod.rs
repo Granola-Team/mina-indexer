@@ -8,7 +8,7 @@ pub mod zkapp;
 #[cfg(test)]
 mod tests {
     use crate::{
-        block::BlockHash,
+        base::state_hash::StateHash,
         command::signed::TxnHash,
         ledger::public_key::PublicKey,
         utility::store::{
@@ -20,7 +20,7 @@ mod tests {
     #[test]
     fn test_txn_sort_key() {
         let prefix = 99;
-        let state_hash = BlockHash::default();
+        let state_hash = StateHash::default();
         let txn_hash = TxnHash::V1("a".repeat(TxnHash::V1_LEN));
         let key = txn_sort_key(prefix, &txn_hash, &state_hash);
 
@@ -38,7 +38,7 @@ mod tests {
         let nonce = 987654321;
         let pk = PublicKey::default();
         let txn_hash = TxnHash::V1("b".repeat(TxnHash::V1_LEN));
-        let state_hash = BlockHash::default();
+        let state_hash = StateHash::default();
         let key = pk_txn_sort_key(&pk, sort, nonce, &txn_hash, &state_hash);
 
         assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());

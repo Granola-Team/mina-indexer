@@ -1,5 +1,6 @@
 use crate::{
-    block::{self, parser::BlockParser, precomputed::PcbVersion, BlockHash},
+    base::state_hash::StateHash,
+    block::{self, parser::BlockParser, precomputed::PcbVersion},
     chain::{chain_id, ChainId, Network},
     constants::*,
     ledger::{
@@ -39,8 +40,8 @@ pub struct IndexerVersion {
 
 #[derive(Clone, Debug)]
 pub struct GenesisVersion {
-    pub state_hash: BlockHash,
-    pub prev_hash: BlockHash,
+    pub state_hash: StateHash,
+    pub prev_hash: StateHash,
     pub blockchain_lenth: u32,
     pub global_slot: u32,
     pub last_vrf_output: String,
@@ -473,7 +474,7 @@ async fn run_indexer<P: AsRef<Path>>(
 
 async fn retry_parse_staking_ledger(
     path: &Path,
-    genesis_state_hash: BlockHash,
+    genesis_state_hash: StateHash,
 ) -> anyhow::Result<StakingLedger> {
     for attempt in 1..=5 {
         match StakingLedger::parse_file(path, genesis_state_hash.clone()).await {

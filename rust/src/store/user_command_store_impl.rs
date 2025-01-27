@@ -3,10 +3,11 @@ use super::{
     username::UsernameStore, IndexerStore,
 };
 use crate::{
+    base::state_hash::StateHash,
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, DbBlockUpdate},
-        BlockComparison, BlockHash,
+        BlockComparison,
     },
     command::{
         signed::{SignedCommand, SignedCommandWithData, TxnHash},
@@ -204,7 +205,7 @@ impl UserCommandStore for IndexerStore {
     fn get_user_command_state_hash(
         &self,
         txn_hash: &TxnHash,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<SignedCommandWithData>> {
         trace!("Getting user command {txn_hash} in block {state_hash}");
         Ok(self
@@ -216,7 +217,7 @@ impl UserCommandStore for IndexerStore {
     fn get_user_command_state_hashes(
         &self,
         txn_hash: &TxnHash,
-    ) -> anyhow::Result<Option<Vec<BlockHash>>> {
+    ) -> anyhow::Result<Option<Vec<StateHash>>> {
         trace!("Getting user command blocks {txn_hash}");
         Ok(self
             .database
@@ -229,7 +230,7 @@ impl UserCommandStore for IndexerStore {
 
     fn set_user_command_state_hash_batch(
         &self,
-        state_hash: BlockHash,
+        state_hash: StateHash,
         txn_hash: &TxnHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -247,7 +248,7 @@ impl UserCommandStore for IndexerStore {
         block_cmps.sort();
 
         // set num containing blocks
-        let blocks: Vec<BlockHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
+        let blocks: Vec<StateHash> = block_cmps.into_iter().map(|c| c.state_hash).collect();
         batch.put_cf(
             self.user_commands_num_containing_blocks_cf(),
             txn_hash.ref_inner().as_bytes(),
@@ -280,7 +281,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_block_user_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>> {
         trace!("Getting block user commands {state_hash}");
         Ok(self
@@ -324,8 +325,8 @@ impl UserCommandStore for IndexerStore {
     fn get_user_commands_with_bounds(
         &self,
         pk: &PublicKey,
-        start_state_hash: &BlockHash,
-        end_state_hash: &BlockHash,
+        start_state_hash: &StateHash,
+        end_state_hash: &StateHash,
     ) -> anyhow::Result<Vec<SignedCommandWithData>> {
         let start_block_opt = self.get_block(start_state_hash)?.map(|b| b.0);
         let end_block_opt = self.get_block(end_state_hash)?.map(|b| b.0);
@@ -346,7 +347,7 @@ impl UserCommandStore for IndexerStore {
 
             let mut num = end_height - start_height;
             let mut prev_hash = end_block.previous_state_hash();
-            let mut state_hashes: Vec<BlockHash> = vec![end_block.state_hash()];
+            let mut state_hashes: Vec<StateHash> = vec![end_block.state_hash()];
             while let Some((block, _)) = self.get_block(&prev_hash)? {
                 if num == 0 {
                     break;
@@ -570,7 +571,7 @@ impl UserCommandStore for IndexerStore {
 
     fn set_block_user_commands_count_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -583,7 +584,7 @@ impl UserCommandStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_user_commands_count(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_user_commands_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block user command count {state_hash}");
         Ok(self
             .database
