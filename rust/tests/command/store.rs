@@ -1,4 +1,4 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::store::*;
 use mina_indexer::{
     block::{
         parser::BlockParser,
@@ -7,7 +7,7 @@ use mina_indexer::{
     },
     command::{signed::SignedCommand, store::UserCommandStore},
     constants::*,
-    ledger::genesis::parse_file,
+    ledger::genesis::GenesisLedger,
     server::IndexerVersion,
     state::IndexerState,
     store::*,
@@ -25,14 +25,14 @@ async fn add_and_get() -> anyhow::Result<()> {
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
-    let genesis_root = parse_file(genesis_ledger_path)?;
+    let genesis_ledger = GenesisLedger::parse_file(genesis_ledger_path)?;
+
     let mut indexer = IndexerState::new(
-        genesis_root.into(),
+        genesis_ledger,
         IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-        false,
         false,
     )?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(

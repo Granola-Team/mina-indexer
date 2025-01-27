@@ -1,8 +1,8 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::store::*;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
-    ledger::genesis::parse_file,
+    ledger::genesis::GenesisLedger,
     server::IndexerVersion,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     state::IndexerState,
@@ -16,14 +16,14 @@ async fn store() -> anyhow::Result<()> {
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
     let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
-    let genesis_root = parse_file(genesis_ledger_path)?;
+    let genesis_ledger = GenesisLedger::parse_file(genesis_ledger_path)?;
+
     let mut indexer = IndexerState::new(
-        genesis_root.into(),
+        genesis_ledger,
         IndexerVersion::default(),
         indexer_store.clone(),
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
-        false,
         false,
     )?;
 
@@ -35,6 +35,7 @@ async fn store() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
+
     let state_hash = "3NL4HLb7MQrxmAqVw8D4vEXCj2tdT8zgP9DFWGRoDxP72b4wxyUw";
     let (block, block_bytes) = bp.get_precomputed_block(state_hash).await?;
     let block_snarks = SnarkWorkSummary::from_precomputed(&block);

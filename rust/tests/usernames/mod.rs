@@ -1,44 +1,34 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use mina_indexer::{
     block::{
         parser::BlockParser,
         precomputed::{PcbVersion, PrecomputedBlock},
     },
     constants::*,
-    ledger::genesis::{GenesisLedger, GenesisRoot},
     server::IndexerVersion,
-    state::IndexerState,
-    store::{username::UsernameStore, DbUpdate, IndexerStore},
+    store::{username::UsernameStore, DbUpdate},
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn set_usernames() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("usernames-db")?;
-    let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
-    let store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+    let block_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
+
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
-        blocks_dir,
+        block_dir,
         IndexerVersion::default().version,
         MAINNET_CANONICAL_THRESHOLD,
         false,
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
-    let mut state = IndexerState::new(
-        genesis_ledger.clone().into(),
-        IndexerVersion::default(),
-        store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_TRANSITION_FRONTIER_K,
-        false,
-        false,
-    )?;
 
     // ingest the blocks
     state.add_blocks(&mut bp).await?;
+
+    let store = state.indexer_store.as_ref().unwrap();
 
     // update usernames
     let block = PrecomputedBlock::parse_file(&PathBuf::from("./tests/data/non_sequential_blocks/mainnet-338728-3NLe2WXRaJq85Ldj1ycEQRa2R6vmemVAoXpvkncccuuKNuWs6WYf.json"), PcbVersion::V1)?;

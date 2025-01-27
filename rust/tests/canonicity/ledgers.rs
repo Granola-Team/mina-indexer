@@ -1,38 +1,21 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    constants::*,
     ledger::{
-        diff::LedgerDiff,
-        genesis::{GenesisLedger, GenesisRoot},
-        public_key::PublicKey,
-        store::staged::StagedLedgerStore,
+        diff::LedgerDiff, public_key::PublicKey, store::staged::StagedLedgerStore,
         token::TokenAddress,
     },
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn test() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("./test_canonical_ledgers_store")?;
-    let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new_testing(&log_dir)?;
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-    let mut state = IndexerState::new(
-        genesis_ledger.clone().into(),
-        IndexerVersion::default(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        10,
-        false,
-        false,
-    )?;
+    let block_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
+    let mut block_parser = BlockParser::new_testing(&block_dir)?;
 
     state.add_blocks(&mut block_parser).await?;
 

@@ -1,39 +1,21 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
     block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
-    ledger::{
-        account::Account,
-        genesis::{GenesisLedger, GenesisRoot},
-        store::best::BestLedgerStore,
-    },
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
+    ledger::{account::Account, store::best::BestLedgerStore},
     utility::store::ledger::best::split_best_account_sort_key,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn check_best_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("best-ledger-balance-sorted-db")?;
-    let blocks_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-    let genesis_ledger: GenesisLedger = genesis_ledger.into();
-    let mut state = IndexerState::new(
-        genesis_ledger.clone(),
-        IndexerVersion::default(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        10,
-        false,
-        false,
-    )?;
+    let block_dir = &PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
-        blocks_dir,
+        block_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         false,
@@ -44,11 +26,13 @@ async fn check_best_accounts() -> anyhow::Result<()> {
     // ingest the blocks
     state.add_blocks(&mut bp).await?;
 
+    let store = state.indexer_store.as_ref().unwrap();
+
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
-    let store_best_ledger = indexer_store.build_best_ledger()?.unwrap();
+    let store_best_ledger = store.build_best_ledger()?.unwrap();
 
-    for (n, (key, value)) in indexer_store
+    for (n, (key, value)) in store
         .best_ledger_account_balance_iterator(speedb::IteratorMode::End)
         .flatten()
         .enumerate()
@@ -56,7 +40,7 @@ async fn check_best_accounts() -> anyhow::Result<()> {
         let (token, balance, pk) = split_best_account_sort_key(&key).unwrap();
 
         let pk_value_account = serde_json::from_slice::<Account>(&value)?;
-        let pk_store_account = indexer_store.get_best_account(&pk, &token)?.unwrap();
+        let pk_store_account = store.get_best_account(&pk, &token)?.unwrap();
         let pk_best_account = store_best_ledger
             .get_account(&pk, &token)
             .with_context(|| format!("pk: {pk}"))
@@ -87,20 +71,14 @@ async fn check_best_accounts() -> anyhow::Result<()> {
     // check store best ledger accounts equal sorted store best accounts
     for (token, token_ledger) in store_best_ledger.tokens.iter() {
         for (pk, best_acct) in token_ledger.accounts.iter() {
-            assert_eq!(
-                *best_acct,
-                indexer_store.get_best_account(pk, token)?.unwrap()
-            );
+            assert_eq!(*best_acct, store.get_best_account(pk, token)?.unwrap());
         }
     }
 
     // check best ledger accounts equal sorted store best accounts
     for (token, token_ledger) in state.best_ledger().tokens.iter() {
         for (pk, best_acct) in token_ledger.accounts.iter() {
-            assert_eq!(
-                *best_acct,
-                indexer_store.get_best_account(pk, token)?.unwrap()
-            );
+            assert_eq!(*best_acct, store.get_best_account(pk, token)?.unwrap());
         }
     }
 

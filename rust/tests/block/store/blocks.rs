@@ -1,4 +1,4 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::store::*;
 use mina_indexer::{
     block::{
         parser::BlockParser,
