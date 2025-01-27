@@ -59,6 +59,7 @@ notify = "6.1.1"
 tar = "0.4.41"
 libc = "0.2.158"
 tokio-graceful-shutdown = "0.15.1"
+flate2 = "1.0.35"
 
 [dev-dependencies]
 quickcheck = "1.0.3"
