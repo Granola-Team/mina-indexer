@@ -1,5 +1,6 @@
 extern crate core;
 
+pub mod base;
 pub mod block;
 pub mod canonicity;
 pub mod chain;

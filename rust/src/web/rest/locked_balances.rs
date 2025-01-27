@@ -1,4 +1,4 @@
-use crate::ledger::amount::Amount;
+use crate::base::amount::Amount;
 use csv::Reader;
 use serde::Deserialize;
 use std::collections::HashMap;

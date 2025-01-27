@@ -1,5 +1,6 @@
 use crate::{
-    ledger::{amount::Amount, public_key::PublicKey, token::TokenAddress},
+    base::amount::Amount,
+    ledger::{public_key::PublicKey, token::TokenAddress},
     mina_blocks::v2,
 };
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,5 @@
 use mina_indexer::{
+    base::amount::Amount,
     block::{parser::BlockParser, precomputed::PrecomputedBlock},
     constants::MINA_SCALE,
     ledger::{

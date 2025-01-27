@@ -2,7 +2,6 @@ mod receipt_chain_hash;
 mod timing;
 
 use super::{
-    amount::Amount,
     diff::{
         account::{
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
@@ -17,6 +16,7 @@ use super::{
     username::Username,
 };
 use crate::{
+    base::amount::Amount,
     block::{genesis::GenesisBlock, BlockHash},
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{diff::account::PaymentDiff, public_key::PublicKey},

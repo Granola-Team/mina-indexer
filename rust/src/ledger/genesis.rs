@@ -1,11 +1,11 @@
 use super::{
     account::{Account, ReceiptChainHash, Timing},
-    amount::Amount,
     public_key::PublicKey,
     token::TokenAddress,
     Ledger, TokenLedger,
 };
 use crate::{
+    base::amount::Amount,
     block::{genesis::GenesisBlock, BlockHash},
     constants::*,
     mina_blocks::common::from_str_opt,

@@ -4,9 +4,10 @@ pub mod store;
 pub mod zkapp;
 
 use crate::{
+    base::amount::Amount,
     block::{precomputed::PrecomputedBlock, BlockHash},
     command::signed::{SignedCommand, SignedCommandWithKind},
-    ledger::{amount::Amount, nonce::Nonce, public_key::PublicKey},
+    ledger::{nonce::Nonce, public_key::PublicKey},
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{

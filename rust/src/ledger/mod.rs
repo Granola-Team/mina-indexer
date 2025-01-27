@@ -1,5 +1,4 @@
 pub mod account;
-pub mod amount;
 pub mod coinbase;
 pub mod diff;
 pub mod genesis;
@@ -12,11 +11,11 @@ pub mod token;
 pub mod username;
 
 use crate::{
+    base::amount::Amount,
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
-        amount::Amount,
         diff::{account::AccountDiff, LedgerDiff},
         nonce::Nonce,
         public_key::PublicKey,
