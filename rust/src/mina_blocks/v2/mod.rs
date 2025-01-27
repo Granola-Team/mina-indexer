@@ -5,6 +5,7 @@ pub mod staged_ledger_diff;
 mod zkapp;
 
 use crate::{
+    base::scheduled_time::ScheduledTime,
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
@@ -34,10 +35,7 @@ pub struct PrecomputedBlockV2 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PrecomputedBlockDataV2 {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub scheduled_time: u64,
-
+    pub scheduled_time: ScheduledTime,
     pub protocol_version: ProtocolVersion,
     pub proposed_protocol_version: Option<ProtocolVersion>,
     pub protocol_state: ProtocolState,

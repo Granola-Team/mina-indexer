@@ -20,7 +20,7 @@ where
 }
 
 /// Serialize to `str`
-pub(crate) fn to_str<T, S>(value: T, ser: S) -> Result<S::Ok, S::Error>
+pub(crate) fn to_str<T, S>(value: &T, ser: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
     T: ToString,
