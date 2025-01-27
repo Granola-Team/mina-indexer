@@ -144,6 +144,7 @@ pub struct ConsensusState {
     #[serde(deserialize_with = "from_str")]
     pub global_slot_since_genesis: u32,
 
+    pub blockchain_length: BlockchainLength,
     pub curr_global_slot_since_hard_fork: GlobalSlotNumbers,
     pub staking_epoch_data: EpochData,
     pub next_epoch_data: EpochData,

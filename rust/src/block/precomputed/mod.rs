@@ -383,7 +383,7 @@ impl PrecomputedBlock {
                     .t
                     .t
             }
-            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp,
+            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp.0,
         }
     }
 
