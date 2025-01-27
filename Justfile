@@ -47,6 +47,12 @@ UTILS := "./ops/utils.rb"
 default:
   @just --list --justfile {{justfile()}}
 
+add crate='':
+  cd rust && cargo add {{crate}}
+
+rm crate='':
+  cd rust && cargo rm {{crate}}
+
 # Check for presence of tier 1 dependencies.
 tier1-prereqs:
   @echo "--- Checking for tier-1 prereqs"
