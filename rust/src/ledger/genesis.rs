@@ -1,7 +1,6 @@
 use super::{
-    account::{Account, Permissions, ReceiptChainHash, Timing},
+    account::{Account, ReceiptChainHash, Timing},
     amount::Amount,
-    nonce::Nonce,
     public_key::PublicKey,
     token::TokenAddress,
     Ledger, TokenLedger,
@@ -9,15 +8,16 @@ use super::{
 use crate::{
     block::{genesis::GenesisBlock, BlockHash},
     constants::*,
-    mina_blocks::v2::ZkappAccount,
+    mina_blocks::common::from_str_opt,
+    utility::compression::decompress_gzip,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Ok};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, str::FromStr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisLedger {
-    pub ledger: TokenLedger,
+    ledger: TokenLedger,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -55,19 +55,41 @@ pub struct GenesisAccounts {
 pub struct GenesisAccount {
     pub pk: String,
     pub balance: String,
-    pub nonce: Option<Nonce>,
     pub delegate: Option<String>,
-    pub token: Option<u64>,
-    pub token_permissions: TokenPermissions,
+    pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
     pub voting_for: Option<BlockHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
-    pub zkapp: Option<ZkappAccount>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "from_str_opt")]
+    pub nonce: Option<u32>,
+
+    #[serde(default)]
+    #[serde(deserialize_with = "from_str_opt")]
+    pub token: Option<u64>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct TokenPermissions {}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct Permissions {
+    pub stake: bool,
+    pub edit_state: Permission,
+    pub send: Permission,
+    pub set_delegate: Permission,
+    pub set_permissions: Permission,
+    pub set_verification_key: Permission,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Permission {
+    #[default]
+    Signature,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisAccountTiming {
@@ -86,6 +108,10 @@ pub struct GenesisConstants {
     pub delta: Option<u32>,
     pub txpool_max_size: Option<u32>,
 }
+
+///////////
+// impls //
+///////////
 
 impl GenesisConstants {
     pub fn override_with(&mut self, constants: Self) {
@@ -115,6 +141,96 @@ impl GenesisConstants {
     }
 }
 
+impl GenesisLedger {
+    pub const MAINNET_GENESIS_LEDGER_CONTENTS: &'static str =
+        include_str!("../../data/genesis_ledgers/mainnet.json");
+
+    pub const HARDFORK_GENESIS_LEDGER_CONTENTS: &'static [u8] =
+        include_bytes!("../../data/genesis_ledgers/hardfork.json.gz");
+
+    /// Original mainnet genesis ledger
+    pub fn new_v1() -> anyhow::Result<Self> {
+        Self::from_str(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)
+    }
+
+    /// Hardfork genesis ledger
+    pub fn new_v2() -> anyhow::Result<Self> {
+        Self::from_gzip_bytes(Self::HARDFORK_GENESIS_LEDGER_CONTENTS)
+    }
+
+    /// This is the only way to construct a genesis ledger
+    pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
+        let mut accounts = HashMap::new();
+
+        // Add genesis block winner
+        let block_creator = Account::from(GenesisBlock::new_v1().unwrap());
+        accounts.insert(block_creator.public_key.clone(), block_creator);
+
+        for account in genesis.accounts {
+            let balance = account
+                .balance
+                .parse::<Amount>()
+                .unwrap_or_else(|_| panic!("Unable to parse Genesis Balance"));
+
+            let public_key = PublicKey::from(account.pk);
+            let delegate = account
+                .delegate
+                .map_or_else(|| public_key.to_owned(), PublicKey);
+
+            accounts.insert(
+                public_key.clone(),
+                Account {
+                    public_key,
+                    balance,
+                    delegate,
+                    nonce: account.nonce.map(Into::into),
+                    token: account.token.map(TokenAddress::from),
+                    receipt_chain_hash: account.receipt_chain_hash,
+                    voting_for: account.voting_for.map(Into::into),
+                    timing: account.timing.map(Into::into),
+                    genesis_account: true,
+                    token_symbol: None,
+                    permissions: None,
+                    username: None,
+                    zkapp: None,
+                },
+            );
+        }
+
+        Self {
+            ledger: TokenLedger { accounts },
+        }
+    }
+
+    pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        GenesisRoot::parse_file(path).map(Into::into)
+    }
+
+    pub fn from_gzip_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        let root = decompress_gzip(bytes)?;
+        let root: GenesisRoot = serde_json::from_slice(&root)?;
+        Ok(root.into())
+    }
+}
+
+impl GenesisRoot {
+    pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let bytes = std::fs::read(path.as_ref())?;
+
+        // decompress if gzip'd
+        if path.as_ref().extension().map_or(false, |ext| ext == "gz") {
+            let bytes = decompress_gzip(&bytes[..])?;
+            return Ok(serde_json::from_slice(&bytes)?);
+        }
+
+        Ok(serde_json::from_slice(&bytes)?)
+    }
+}
+
+//////////////
+// defaults //
+//////////////
+
 impl std::default::Default for GenesisConstants {
     fn default() -> Self {
         Self {
@@ -127,11 +243,23 @@ impl std::default::Default for GenesisConstants {
     }
 }
 
-impl std::str::FromStr for GenesisRoot {
+/////////////////
+// conversions //
+/////////////////
+
+impl FromStr for GenesisRoot {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s).map_err(|e| anyhow!("Error parsing genesis root: {e}"))
+    }
+}
+
+impl FromStr for GenesisLedger {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        GenesisRoot::from_str(s).map(Into::into)
     }
 }
 
@@ -169,84 +297,6 @@ impl From<GenesisLedger> for TokenLedger {
     }
 }
 
-impl GenesisLedger {
-    pub const MAINNET_V1_GENESIS_LEDGER_CONTENTS: &'static str =
-        include_str!("../../data/genesis_ledgers/mainnet.json");
-
-    /// This is the only way to construct a genesis ledger
-    pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
-        let mut accounts = HashMap::new();
-
-        // Add genesis block winner
-        let block_creator = Account::from(GenesisBlock::new_v1().unwrap());
-        accounts.insert(block_creator.public_key.clone(), block_creator);
-
-        for account in genesis.accounts {
-            let balance = account
-                .balance
-                .parse::<Amount>()
-                .unwrap_or_else(|_| panic!("Unable to parse Genesis Balance"));
-
-            let public_key = PublicKey::from(account.pk);
-            accounts.insert(
-                public_key.clone(),
-                Account {
-                    balance,
-                    username: None,
-                    nonce: None,
-                    public_key: public_key.clone(),
-                    // If delegate is None, delegate to yourself
-                    delegate: account.delegate.map_or(public_key, PublicKey),
-                    token: account.token.map(TokenAddress::from),
-                    token_symbol: None,
-                    receipt_chain_hash: account.receipt_chain_hash,
-                    voting_for: account.voting_for.map(Into::into),
-                    permissions: account.permissions,
-                    timing: account.timing.map(Into::into),
-                    zkapp: account.zkapp,
-                    genesis_account: true,
-                },
-            );
-        }
-
-        Self {
-            ledger: TokenLedger { accounts },
-        }
-    }
-
-    /// Only use for testing
-    pub fn into_hardfork_ledger(self) -> Ledger {
-        let ledger = TokenLedger {
-            accounts: self
-                .ledger
-                .accounts
-                .into_iter()
-                .map(|(pk, acct)| {
-                    (
-                        pk,
-                        Account {
-                            // conditionally add display fee
-                            balance: if acct.genesis_account {
-                                acct.balance + MAINNET_ACCOUNT_CREATION_FEE
-                            } else {
-                                acct.balance
-                            },
-                            ..acct
-                        },
-                    )
-                })
-                .collect(),
-        };
-
-        Ledger::from_mina_ledger(ledger)
-    }
-}
-
-pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<GenesisRoot> {
-    let data = std::fs::read(path)?;
-    Ok(serde_json::from_slice(&data)?)
-}
-
 impl From<GenesisAccountTiming> for Timing {
     fn from(value: GenesisAccountTiming) -> Self {
         Self {
@@ -274,8 +324,19 @@ impl From<GenesisAccountTiming> for Timing {
 #[cfg(test)]
 mod tests {
     use super::{GenesisConstants, GenesisLedger, GenesisRoot};
-    use crate::ledger::public_key::PublicKey;
     use std::path::PathBuf;
+
+    #[test]
+    fn parse_v1() -> anyhow::Result<()> {
+        GenesisLedger::parse_file("./data/genesis_ledgers/mainnet.json")?;
+        Ok(())
+    }
+
+    #[test]
+    fn parse_v2() -> anyhow::Result<()> {
+        GenesisLedger::parse_file("./data/genesis_ledgers/hardfork.json.gz")?;
+        Ok(())
+    }
 
     #[test]
     fn test_genesis_ledger_default_delegation_test() -> anyhow::Result<()> {
@@ -291,30 +352,30 @@ mod tests {
             }
         }"#;
 
+        // before turning into a [Ledger]
         let root: GenesisRoot = serde_json::from_str(ledger_json)?;
-
         assert_eq!(
             "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
             root.ledger.accounts.first().unwrap().pk
         );
         assert_eq!(None, root.ledger.accounts.first().unwrap().delegate);
 
+        // after turning into a [Ledger]
         let ledger = GenesisLedger::new(root.ledger);
-        let map = ledger.ledger.accounts;
-        let value = map
-            .get(&PublicKey::from(
-                "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
-            ))
+        let account = ledger
+            .ledger
+            .accounts
+            .get(&"B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1".into())
             .unwrap();
 
         // The delete should be the same as the public key
         assert_eq!(
             "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
-            value.public_key.0
+            account.public_key.0
         );
         assert_eq!(
             "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
-            value.delegate.0
+            account.delegate.0
         );
 
         Ok(())
