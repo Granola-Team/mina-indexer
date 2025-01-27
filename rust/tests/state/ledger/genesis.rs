@@ -3,7 +3,7 @@ use mina_indexer::{
     chain::Network,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
-        genesis::{self, GenesisLedger},
+        genesis::{GenesisLedger, GenesisRoot},
         public_key::PublicKey,
         token::TokenAddress,
         Ledger,
@@ -11,7 +11,7 @@ use mina_indexer::{
 };
 #[test]
 fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
-    let genesis_root = genesis::parse_file("./data/genesis_ledgers/mainnet.json")?;
+    let genesis_root = GenesisRoot::parse_file("./data/genesis_ledgers/mainnet.json")?;
     let genesis_ledger: GenesisLedger = genesis_root.clone().into();
     let ledger: Ledger = genesis_ledger.into();
     let mina_accounts = &ledger
@@ -27,11 +27,12 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
 
     assert_eq!(
         Network::Mainnet.to_string(),
-        genesis_root.ledger.name,
+        genesis_root.ledger.name.unwrap(),
         "Network name"
     );
     assert_eq!(
-        "2021-03-17T00:00:00Z", genesis_root.genesis.genesis_state_timestamp,
+        "2021-03-17T00:00:00Z",
+        genesis_root.genesis.unwrap().genesis_state_timestamp,
         "Genesis timestamp"
     );
 
@@ -51,5 +52,6 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
         total_supply,
         "Mina inital distribution"
     );
+
     Ok(())
 }

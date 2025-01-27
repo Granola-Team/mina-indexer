@@ -1,4 +1,4 @@
-use crate::helpers::*;
+use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
     block::parser::BlockParser,
@@ -19,7 +19,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
 
     // start with the hardfork genesis ledger
     let mut state = hardfork_genesis_state(store_dir.path())?;
-
     let mut bp = BlockParser::new_testing(blocks_dir)?;
 
     // ingest the blocks

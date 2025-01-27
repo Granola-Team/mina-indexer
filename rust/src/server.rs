@@ -236,7 +236,6 @@ async fn initialize(
         canonical_update_threshold,
         ledger_cadence,
         reporting_freq,
-        using_hardfork_ledger: false,
     };
 
     let mut state = match initialization_mode {
@@ -295,7 +294,6 @@ async fn initialize(
                     ledger_cadence,
                     reporting_freq,
                     do_not_ingest_orphan_blocks,
-                    using_hardfork_ledger: false,
                 })
             {
                 let min_length_filter = state.replay_events(replay_state)?;

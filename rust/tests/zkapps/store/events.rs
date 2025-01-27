@@ -1,4 +1,4 @@
-use crate::{generators::TestGen, helpers::setup_new_db_dir};
+use crate::{generators::TestGen, helpers::store::*};
 use mina_indexer::{
     ledger::{public_key::PublicKey, token::TokenAddress},
     mina_blocks::v2::ZkappEvent,

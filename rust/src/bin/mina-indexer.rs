@@ -5,10 +5,7 @@ use mina_indexer::{
     chain::Network,
     client,
     constants::*,
-    ledger::{
-        self,
-        genesis::{GenesisConstants, GenesisLedger, GenesisRoot},
-    },
+    ledger::genesis::{GenesisConstants, GenesisLedger},
     server::{
         initialize_indexer_database, start_indexer, GenesisVersion, IndexerConfiguration,
         InitializationMode,
@@ -525,25 +522,22 @@ fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> 
     let genesis_ledger = if let Some(path) = path {
         assert!(path.is_file(), "Ledger file does not exist at {path:#?}");
         info!("Parsing ledger file at {path:#?}");
-        match ledger::genesis::parse_file(&path) {
+
+        match GenesisLedger::parse_file(&path) {
             Err(err) => {
                 error!("Unable to parse genesis ledger: {err}");
                 std::process::exit(100)
             }
-            Ok(genesis_root) => {
-                info!(
-                    "Successfully parsed {} genesis ledger",
-                    genesis_root.ledger.name,
-                );
-                genesis_root.into()
+            Ok(genesis) => {
+                info!("Successfully parsed genesis ledger");
+                genesis
             }
         }
     } else {
-        let genesis_root =
-            GenesisRoot::from_str(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-        info!("Using default {} genesis ledger", genesis_root.ledger.name);
-        genesis_root.into()
+        info!("Using default genesis ledger");
+        GenesisLedger::from_str(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)?
     };
+
     Ok(genesis_ledger)
 }
 

@@ -1,35 +1,17 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
-    constants::*,
-    ledger::{
-        genesis::{GenesisLedger, GenesisRoot},
-        store::staking::StakingLedgerStore,
-    },
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
+    ledger::store::staking::StakingLedgerStore,
     utility::store::ledger::staking::split_staking_ledger_sort_key,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn check_staking_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("staking-ledger-balance-sorted-db")?;
     let ledgers_dir = PathBuf::from("./tests/data/staking_ledgers");
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-    let genesis_ledger: GenesisLedger = genesis_ledger.into();
-    let mut state = IndexerState::new(
-        genesis_ledger.clone(),
-        IndexerVersion::default(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        10,
-        false,
-        false,
-    )?;
+
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
     let epoch = 0;
 
     // ingest the blocks
@@ -37,10 +19,12 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
         .add_startup_staking_ledgers_to_store(&ledgers_dir)
         .await?;
 
+    let store = state.indexer_store.as_ref().unwrap();
+
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
-    let staking_ledger = indexer_store.build_staking_ledger(epoch, None)?.unwrap();
-    for (n, (key, _)) in indexer_store
+    let staking_ledger = store.build_staking_ledger(epoch, None)?.unwrap();
+    for (n, (key, _)) in store
         .staking_ledger_account_balance_iterator(epoch, speedb::Direction::Reverse)
         .flatten()
         .enumerate()
@@ -50,9 +34,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
             panic!("Only epoch 0 staking ledger present");
         }
 
-        let pk_store_account = indexer_store
-            .get_staking_account(&pk, epoch, None)?
-            .unwrap();
+        let pk_store_account = store.get_staking_account(&pk, epoch, None)?.unwrap();
         let pk_staking_account = staking_ledger
             .staking_ledger
             .get(&pk)
@@ -79,12 +61,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
 
     // check staking ledger accounts equal balance-sorted store accounts
     for (pk, acct) in staking_ledger.staking_ledger {
-        assert_eq!(
-            acct,
-            indexer_store
-                .get_staking_account(&pk, epoch, None)?
-                .unwrap()
-        );
+        assert_eq!(acct, store.get_staking_account(&pk, epoch, None)?.unwrap());
     }
     Ok(())
 }

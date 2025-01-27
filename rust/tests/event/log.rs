@@ -1,4 +1,4 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use mina_indexer::{
     block::{
         parser::BlockParser,
@@ -8,19 +8,16 @@ use mina_indexer::{
     canonicity::store::CanonicityStore,
     constants::*,
     event::{store::EventStore, witness_tree::*},
-    ledger::genesis::{GenesisLedger, GenesisRoot},
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn test() -> anyhow::Result<()> {
-    let blocks_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+    let block_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+
     let store_dir0 = setup_new_db_dir("event-log-store0")?;
     let mut block_parser0 = BlockParser::new_with_canonical_chain_discovery(
-        &blocks_dir,
+        &block_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         false,
@@ -30,7 +27,7 @@ async fn test() -> anyhow::Result<()> {
 
     let store_dir1 = setup_new_db_dir("event-log-store1")?;
     let mut block_parser1 = BlockParser::new_with_canonical_chain_discovery(
-        &blocks_dir,
+        &block_dir,
         PcbVersion::V1,
         MAINNET_CANONICAL_THRESHOLD,
         false,
@@ -38,30 +35,8 @@ async fn test() -> anyhow::Result<()> {
     )
     .await?;
 
-    let indexer_store0 = Arc::new(IndexerStore::new(store_dir0.path())?);
-    let indexer_store1 = Arc::new(IndexerStore::new(store_dir1.path())?);
-
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-
-    let mut state0 = IndexerState::new(
-        genesis_ledger.clone().into(),
-        IndexerVersion::default(),
-        indexer_store0.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_TRANSITION_FRONTIER_K,
-        false,
-        false,
-    )?;
-    let mut state1 = IndexerState::new(
-        genesis_ledger.into(),
-        IndexerVersion::default(),
-        indexer_store1.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_TRANSITION_FRONTIER_K,
-        false,
-        false,
-    )?;
+    let mut state0 = mainnet_genesis_state(store_dir0.path())?;
+    let mut state1 = mainnet_genesis_state(store_dir1.path())?;
 
     // add parser0 blocks to state0
     state0.add_blocks(&mut block_parser0).await?;
@@ -107,11 +82,14 @@ async fn test() -> anyhow::Result<()> {
         }
     }
 
+    let store0 = state0.indexer_store.as_ref().unwrap();
+    let store1 = state1.indexer_store.as_ref().unwrap();
+
     // check event logs match
-    let event_log0 = indexer_store0
+    let event_log0 = store0
         .event_log_iterator(speedb::IteratorMode::Start)
         .flatten();
-    let event_log1 = indexer_store1
+    let event_log1 = store1
         .event_log_iterator(speedb::IteratorMode::Start)
         .flatten();
 

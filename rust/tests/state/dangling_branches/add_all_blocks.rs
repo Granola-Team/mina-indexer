@@ -19,12 +19,12 @@ use std::path::PathBuf;
 /// - verifies the length of the longest chain
 #[tokio::test]
 async fn extension() -> anyhow::Result<()> {
-    let blocks_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&blocks_dir)?;
+    let block_dir = PathBuf::from("./tests/data/sequential_blocks");
+    let mut block_parser = BlockParser::new_testing(&block_dir)?;
 
     // root ledger
     let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
+        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)?;
     let genesis_ledger: GenesisLedger = genesis_ledger.into();
     let mut ledger: Ledger = genesis_ledger.into();
 

@@ -1,38 +1,25 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use mina_indexer::{
     block::parser::BlockParser,
-    constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
-    ledger::genesis::{GenesisLedger, GenesisRoot},
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn test() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("event-witness-tree")?;
-    let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new_testing(&log_dir)?;
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-    let mut state = IndexerState::new(
-        genesis_ledger.clone().into(),
-        IndexerVersion::default(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        10,
-        false,
-        false,
-    )?;
+    let block_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+
+    let mut block_parser = BlockParser::new_testing(&block_dir)?;
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
 
     // add all blocks to the state
     state.add_blocks(&mut block_parser).await?;
 
+    let store = state.indexer_store.as_ref().unwrap();
+
     // last update best tip
-    let event_log = indexer_store.get_event_log()?;
+    let event_log = store.get_event_log()?;
     let last_best_tip = event_log
         .iter()
         .filter_map(|event| match event {

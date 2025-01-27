@@ -1,32 +1,18 @@
-use crate::helpers::setup_new_db_dir;
+use crate::helpers::{state::*, store::*};
 use mina_indexer::{
     block::{parser::BlockParser, store::BlockStore, BlockHash},
     canonicity::{store::CanonicityStore, Canonicity},
     constants::*,
-    ledger::genesis::{GenesisLedger, GenesisRoot},
-    server::IndexerVersion,
-    state::IndexerState,
-    store::IndexerStore,
 };
-use std::{path::PathBuf, sync::Arc};
+use std::path::PathBuf;
 
 #[tokio::test]
 async fn test() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("canonicity-blocks")?;
-    let log_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
-    let mut block_parser = BlockParser::new_testing(&log_dir)?;
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_V1_GENESIS_LEDGER_CONTENTS)?;
-    let mut state = IndexerState::new(
-        genesis_ledger.into(),
-        IndexerVersion::default(),
-        indexer_store.clone(),
-        MAINNET_CANONICAL_THRESHOLD,
-        MAINNET_TRANSITION_FRONTIER_K,
-        false,
-        false,
-    )?;
+    let block_dir = PathBuf::from("./tests/data/canonical_chain_discovery/contiguous");
+
+    let mut block_parser = BlockParser::new_testing(&block_dir)?;
+    let mut state = mainnet_genesis_state(store_dir.as_ref())?;
 
     state.add_blocks(&mut block_parser).await?;
 
@@ -36,8 +22,8 @@ async fn test() -> anyhow::Result<()> {
 
     assert_eq!(block_parser.total_num_blocks, 20);
 
-    let indexer_store = state.indexer_store.as_ref().unwrap();
-    let best_block_height = indexer_store.get_best_block_height()?.unwrap();
+    let store = state.indexer_store.as_ref().unwrap();
+    let best_block_height = store.get_best_block_height()?.unwrap();
     let canonical_hashes = vec![
         MAINNET_GENESIS_HASH.to_string(),
         "3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH".to_string(),
@@ -65,11 +51,7 @@ async fn test() -> anyhow::Result<()> {
     assert_eq!(best_block_height, canonical_hashes.len() as u32);
 
     for n in 1..=best_block_height {
-        let hash = &indexer_store
-            .get_canonical_hash_at_height(n)
-            .unwrap()
-            .unwrap()
-            .0;
+        let hash = &store.get_canonical_hash_at_height(n).unwrap().unwrap().0;
         assert_eq!(hash, canonical_hashes.get((n - 1) as usize).unwrap());
     }
 
