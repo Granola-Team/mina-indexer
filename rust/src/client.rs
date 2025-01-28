@@ -33,11 +33,6 @@ pub enum ClientCli {
         output_path: PathBuf,
     },
 
-    /// Hash a v2 txn (signed/zkapp command)
-    #[clap(hide = true)]
-    #[clap(subcommand)]
-    Hash(HashTxn),
-
     /// Query best & staged ledgers
     #[clap(subcommand)]
     Ledgers(Ledgers),

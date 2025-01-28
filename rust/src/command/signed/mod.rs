@@ -348,7 +348,8 @@ impl SignedCommand {
     }
 }
 
-pub fn hash_signed_command_v2(cmd_str: String) -> anyhow::Result<TxnHash> {
+/// Hash a V2 transaction JSON string via `mina_txn_hasher.exe`
+fn hash_signed_command_v2(cmd_str: String) -> anyhow::Result<TxnHash> {
     let mut proc = std::process::Command::new("mina_txn_hasher.exe");
     proc.arg(&cmd_str);
 
