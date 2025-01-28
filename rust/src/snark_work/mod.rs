@@ -1,8 +1,8 @@
 pub mod store;
 
 use crate::{
-    base::state_hash::StateHash, block::precomputed::PrecomputedBlock,
-    ledger::public_key::PublicKey,
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
     mina_blocks::v2::staged_ledger_diff::completed_work::CompletedWork,
     protocol::serialization_types::snark_work as mina_rs,
 };
@@ -12,36 +12,36 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, AutoFrom)]
 #[auto_from(CompletedWork)]
 pub struct SnarkWorkSummary {
-    pub fee: u64,
+    pub fee: Amount,
     pub prover: PublicKey,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkTotal {
-    pub total_fees: u64,
+    pub total_fees: Amount,
     pub prover: PublicKey,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWork {
-    pub fee: u64,
-    pub proofs: serde_json::Value,
+    pub fee: Amount,
     pub prover: PublicKey,
+    pub proofs: serde_json::Value,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkSummaryWithStateHash {
-    pub fee: u64,
+    pub fee: Amount,
     pub prover: PublicKey,
-    pub state_hash: String,
+    pub state_hash: StateHash,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnarkWorkWithStateHash {
-    pub fee: u64,
-    pub proofs: serde_json::Value,
+    pub fee: Amount,
     pub prover: PublicKey,
-    pub state_hash: String,
+    pub state_hash: StateHash,
+    pub proofs: serde_json::Value,
 }
 
 impl SnarkWorkSummary {
@@ -66,7 +66,7 @@ impl SnarkWorkSummaryWithStateHash {
             .map(|snark| Self {
                 fee: snark.fee,
                 prover: snark.prover,
-                state_hash: block.state_hash().to_string(),
+                state_hash: block.state_hash(),
             })
             .collect()
     }
@@ -83,7 +83,7 @@ impl SnarkWorkSummaryWithStateHash {
 impl From<mina_rs::TransactionSnarkWork> for SnarkWorkSummary {
     fn from(value: mina_rs::TransactionSnarkWork) -> Self {
         Self {
-            fee: value.fee.t.t,
+            fee: value.fee.t.t.into(),
             prover: value.prover.into(),
         }
     }
@@ -103,7 +103,7 @@ impl From<(SnarkWorkSummary, StateHash)> for SnarkWorkSummaryWithStateHash {
         Self {
             fee: value.0.fee,
             prover: value.0.prover,
-            state_hash: value.1.to_string(),
+            state_hash: value.1,
         }
     }
 }
@@ -115,7 +115,7 @@ impl From<SnarkWorkSummary> for serde_json::Value {
         use serde_json::*;
 
         let mut obj = Map::new();
-        obj.insert("fee".into(), Value::Number(Number::from(value.fee)));
+        obj.insert("fee".into(), Value::Number(value.fee.0.into()));
         obj.insert("prover".into(), Value::String(value.prover.into()));
         Value::Object(obj)
     }
@@ -126,9 +126,9 @@ impl From<SnarkWorkSummaryWithStateHash> for serde_json::Value {
         use serde_json::*;
 
         let mut obj = Map::new();
-        obj.insert("fee".into(), Value::Number(Number::from(value.fee)));
+        obj.insert("fee".into(), Value::Number(value.fee.0.into()));
         obj.insert("prover".into(), Value::String(value.prover.into()));
-        obj.insert("state_hash".into(), Value::String(value.state_hash));
+        obj.insert("state_hash".into(), Value::String(value.state_hash.0));
         Value::Object(obj)
     }
 }

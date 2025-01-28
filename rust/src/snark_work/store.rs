@@ -1,8 +1,7 @@
 use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal};
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
-    ledger::public_key::PublicKey,
     store::DbUpdate,
 };
 use serde::{Deserialize, Serialize};

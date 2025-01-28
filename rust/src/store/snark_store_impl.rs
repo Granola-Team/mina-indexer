@@ -1,13 +1,12 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
     },
     canonicity::store::CanonicityStore,
     constants::MAINNET_EPOCH_SLOT_COUNT,
-    ledger::public_key::PublicKey,
     snark_work::{
         store::{DbSnarkUpdate, SnarkApplication, SnarkProverFees, SnarkStore, SnarkUpdate},
         SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
@@ -66,7 +65,7 @@ impl SnarkStore for IndexerStore {
             self.database.put_cf(
                 self.snark_work_fees_block_height_sort_cf(),
                 snark_fee_sort_key(
-                    snark.fee,
+                    snark.fee.0,
                     block_height,
                     &snark.prover,
                     &state_hash,
@@ -77,7 +76,7 @@ impl SnarkStore for IndexerStore {
             self.database.put_cf(
                 self.snark_work_fees_global_slot_sort_cf(),
                 snark_fee_sort_key(
-                    snark.fee,
+                    snark.fee.0,
                     global_slot,
                     &snark.prover,
                     &state_hash,
@@ -186,20 +185,20 @@ impl SnarkStore for IndexerStore {
         for snark in snarks.iter() {
             if let Some(fees) = prover_fees.get_mut(&snark.prover) {
                 // update new total, max & min fees
-                fees.total += snark.fee;
-                if snark.fee > fees.max {
-                    fees.max = snark.fee;
+                fees.total += snark.fee.0;
+                if snark.fee.0 > fees.max {
+                    fees.max = snark.fee.0;
                 }
-                if snark.fee < fees.min {
-                    fees.min = snark.fee;
+                if snark.fee.0 < fees.min {
+                    fees.min = snark.fee.0;
                 }
             } else {
                 prover_fees.insert(
                     snark.prover.clone(),
                     SnarkProverFees {
-                        total: snark.fee,
-                        max: snark.fee,
-                        min: snark.fee,
+                        total: snark.fee.0,
+                        max: snark.fee.0,
+                        min: snark.fee.0,
                     },
                 );
             }
@@ -526,7 +525,7 @@ impl SnarkStore for IndexerStore {
                     total_fees_bytes.copy_from_slice(&bytes[..U64_LEN]);
                     SnarkWorkTotal {
                         prover: PublicKey::from_bytes(&bytes[U64_LEN..]).expect("public key"),
-                        total_fees: u64::from_be_bytes(total_fees_bytes),
+                        total_fees: u64::from_be_bytes(total_fees_bytes).into(),
                     }
                 })
                 .expect("snark work iterator")

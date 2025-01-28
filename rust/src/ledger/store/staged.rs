@@ -1,11 +1,8 @@
 //! Store of staged ledgers
 
 use crate::{
-    base::state_hash::StateHash,
-    ledger::{
-        account::Account, diff::LedgerDiff, public_key::PublicKey, token::TokenAddress, Ledger,
-        LedgerHash,
-    },
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::{account::Account, diff::LedgerDiff, token::TokenAddress, Ledger, LedgerHash},
 };
 use speedb::{DBIterator, Direction, WriteBatch};
 

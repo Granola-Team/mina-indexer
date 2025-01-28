@@ -1,11 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::{BlockStore, BlockUpdate, DbBlockUpdate},
     ledger::{
         account::Account,
         diff::account::AccountDiff,
-        public_key::PublicKey,
         store::{
             best::{BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,

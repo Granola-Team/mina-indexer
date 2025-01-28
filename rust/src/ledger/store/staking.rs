@@ -1,9 +1,8 @@
 //! Store of staking ledgers and delegations
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     ledger::{
-        public_key::PublicKey,
         staking::{
             AggregatedEpochStakeDelegations, EpochStakeDelegation, StakingAccount, StakingLedger,
         },

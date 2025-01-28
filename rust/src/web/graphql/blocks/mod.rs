@@ -3,14 +3,13 @@ use super::{
     MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT, PK,
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     command::{
         internal::{store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData},
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
-    ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
     utility::store::common::{
@@ -1253,7 +1252,7 @@ impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
             block_state_hash: value.1,
             block_height: value.2,
             date_time: value.3,
-            fee: value.0.fee,
+            fee: value.0.fee.0,
             prover: value.0.prover.to_string(),
         }
     }

@@ -1,9 +1,9 @@
 pub mod store;
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
-    ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
+    ledger::{coinbase::Coinbase, diff::account::*},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

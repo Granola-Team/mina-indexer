@@ -1,8 +1,7 @@
 //! Zkapp action store trait
 
 use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
-    mina_blocks::v2::ActionState,
+    base::public_key::PublicKey, ledger::token::TokenAddress, mina_blocks::v2::ActionState,
     store::Result,
 };
 

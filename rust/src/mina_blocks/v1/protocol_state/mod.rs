@@ -3,11 +3,7 @@ pub mod consensus_state;
 pub mod constants;
 
 use self::{blockchain_state::*, consensus_state::*, constants::*};
-use crate::{
-    base::state_hash::StateHash,
-    mina_blocks::common::from_str,
-    // protocol::serialization_types::protocol_state as mina_rs,
-};
+use crate::base::state_hash::StateHash;
 use serde::{Deserialize, Serialize};
 
 /// The Protocol State represents a snapshot of the blockchain's current state,
@@ -15,14 +11,12 @@ use serde::{Deserialize, Serialize};
 /// previous blocks.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolState {
-    #[serde(deserialize_with = "from_str")]
     pub previous_state_hash: StateHash,
     pub body: ProtocolStateBody,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolStateBody {
-    #[serde(deserialize_with = "from_str")]
     pub genesis_state_hash: StateHash,
     pub blockchain_state: BlockchainState,
     pub consensus_state: ConsensusState,

@@ -1,6 +1,6 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
     canonicity::store::CanonicityStore,
     constants::*,
@@ -8,7 +8,6 @@ use crate::{
     ledger::{
         account::Account,
         diff::LedgerDiff,
-        public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
         token::TokenAddress,
         Ledger, LedgerHash,

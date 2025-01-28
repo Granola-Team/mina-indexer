@@ -1,5 +1,5 @@
 use super::{protocol_state::ProtocolState, staged_ledger_diff::StagedLedgerDiff};
-use crate::mina_blocks::common::*;
+use crate::base::scheduled_time::ScheduledTime;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -12,9 +12,7 @@ pub struct PrecomputedBlock {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PrecomputedBlockData {
     /// Time the block is scheduled to be produced
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub scheduled_time: u64,
+    pub scheduled_time: ScheduledTime,
 
     /// Summary of the current state
     pub protocol_state: ProtocolState,

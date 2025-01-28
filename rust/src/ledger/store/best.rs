@@ -1,12 +1,9 @@
 //! Store of the best ledger
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::DbBlockUpdate,
-    ledger::{
-        account::Account, diff::account::AccountDiff, public_key::PublicKey, token::TokenAddress,
-        Ledger,
-    },
+    ledger::{account::Account, diff::account::AccountDiff, token::TokenAddress, Ledger},
     store::DbUpdate,
 };
 use speedb::{DBIterator, IteratorMode};

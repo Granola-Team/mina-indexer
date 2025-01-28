@@ -1,5 +1,6 @@
 use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::public_key::PublicKey,
+    ledger::token::TokenAddress,
     utility::store::common::{token_pk_index_key, token_pk_key, U32_LEN},
 };
 

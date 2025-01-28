@@ -1,11 +1,10 @@
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
     command::{
         signed::{SignedCommandWithData, TxnHash},
         UserCommandWithStatus,
     },
-    ledger::public_key::PublicKey,
 };
 use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::path::PathBuf;

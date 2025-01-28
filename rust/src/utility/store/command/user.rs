@@ -1,7 +1,6 @@
 use crate::{
-    base::{nonce::Nonce, state_hash::StateHash},
+    base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     command::signed::TxnHash,
-    ledger::public_key::PublicKey,
     utility::store::common::{state_hash_suffix, u32_from_be_bytes, U32_LEN},
 };
 

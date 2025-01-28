@@ -325,7 +325,7 @@ test_account_balance_cli() {
     wait_for_socket
 
     result=$(idxr accounts public-key --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
-    assert '148837200000000' $result
+    assert '148837.2' $result
 }
 
 # Indexer server returns the correct account
@@ -648,14 +648,14 @@ test_ledgers() {
 
     hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert 607904750000000 $hash_balance
-    assert 607904750000000 $height_balance
+    assert '607904.75' $hash_balance
+    assert '607904.75' $height_balance
 
     # genesis ledger account
     hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
     height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
-    assert 502777775000000 $hash_balance
-    assert 502777775000000 $height_balance
+    assert '502777.775' $hash_balance
+    assert '502777.775' $height_balance
 
     # best ledgers match
     best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -665,38 +665,38 @@ test_ledgers() {
     hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
     height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
 
-    assert 607904750000000 $best_balance
-    assert 607904750000000 $hash_balance
-    assert 607904750000000 $height_balance
+    assert '607904.75' $best_balance
+    assert '607904.75' $hash_balance
+    assert '607904.75' $height_balance
 
     # genesis ledger account
     best_balance=$(idxr ledgers best | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
     hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
     height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
-    assert 502777775000000 $best_balance
-    assert 502777775000000 $hash_balance
-    assert 502777775000000 $height_balance
+    assert '502777.775' $best_balance
+    assert '502777.775' $hash_balance
+    assert '502777.775' $height_balance
 
     # write ledgers to file
     file=./ledgers/best-block-$best_height-$best_hash.json
     idxr ledgers best --path $file
 
     file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert 607904750000000 $file_result
+    assert '607904.75' $file_result
     rm -f $file
 
     file=./ledgers/best-ledger-$best_height-$best_hash.json
     idxr ledgers hash --hash $best_hash --path $file
 
     file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert 607904750000000 $file_result
+    assert '607904.75' $file_result
     rm -f $file
 
     file=./ledgers/ledger-height-$best_height-$best_hash.json
     idxr ledgers height --height $best_height --path $file
 
     file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert 607904750000000 $file_result
+    assert '607904.75' $file_result
     rm -f $file
 
     rm -rf ledgers
@@ -1001,7 +1001,7 @@ test_rest_accounts_summary() {
 
     # results
     assert 'null' "$(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .nonce)"
-    assert '1440050000000' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
+    assert '1440.05' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .balance)
     assert 'B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy' $(curl --silent http://localhost:${port}/accounts/B62qrQBarKiVK11xP943pMQxnmNrfYpT7hskHLWdFXbx2K1E9wR1Vdy | jq -r .delegate)
 
     # blocks
@@ -1203,11 +1203,11 @@ test_best_chain_many_blocks() {
     # check ledgers are present
     # mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
     balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert '502777775000000' $balance
+    assert '502777.775' $balance
 
     # mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
     balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-    assert '502777775000000' $balance
+    assert '502777.775' $balance
 }
 
 test_genesis_block_creator() {
@@ -1218,7 +1218,7 @@ test_genesis_block_creator() {
     balance=$(idxr ledgers height --height 1 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
 
     # verify that the genesis block winner account gets 1000 magic nanomina
-    assert '1000' $balance
+    assert '0.000001' $balance
 }
 
 test_txn_nonces() {
@@ -1266,7 +1266,7 @@ test_startup_staking_ledgers() {
     assert 1 $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
     assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
     assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
-    assert 1000 $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
+    assert '1000' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
     assert $epoch0 $(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
     assert 'mainnet' $(cat ./epoch_0_ledger.json | jq -r .network)
     assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for

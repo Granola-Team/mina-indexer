@@ -1,6 +1,7 @@
 use crate::{generators::TestGen, helpers::store::*};
 use mina_indexer::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::public_key::PublicKey,
+    ledger::token::TokenAddress,
     mina_blocks::v2::ZkappEvent,
     store::{zkapp::events::ZkappEventStore, IndexerStore},
 };

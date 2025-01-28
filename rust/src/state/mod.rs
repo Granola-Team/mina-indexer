@@ -2,7 +2,7 @@ pub mod branch;
 pub mod summary;
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         genesis::GenesisBlock,
         genesis_state_hash::GenesisStateHash,
@@ -18,7 +18,6 @@ use crate::{
     ledger::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
-        public_key::PublicKey,
         staking::{
             parser::{extract_epoch_hash, StakingLedgerParser},
             StakingLedger,

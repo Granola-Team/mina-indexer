@@ -4,9 +4,9 @@ use super::{
     DbUpdate, IndexerStore,
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::{BlockUpdate, DbBlockUpdate},
-    ledger::{public_key::PublicKey, username::Username},
+    ledger::username::Username,
     utility::store::common::{from_be_bytes, pk_index_key},
 };
 use log::{error, trace};

@@ -1,6 +1,6 @@
 use crate::{
-    base::state_hash::StateHash,
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::token::TokenAddress,
     utility::store::common::{balance_key_prefix, pk_key_prefix, U64_LEN},
 };
 
@@ -68,7 +68,7 @@ pub fn split_staged_account_balance_sort_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{base::state_hash::StateHash, ledger::public_key::PublicKey};
+    use crate::base::{public_key::PublicKey, state_hash::StateHash};
 
     #[test]
     fn test_staged_account_key_length() {

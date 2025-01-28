@@ -1,17 +1,13 @@
 use crate::{
-    ledger::{public_key::PublicKey, LedgerHash},
-    mina_blocks::common::*,
+    base::{amount::Amount, public_key::PublicKey},
+    ledger::LedgerHash,
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CompletedWork {
-    #[serde(serialize_with = "to_nanomina_str")]
-    #[serde(deserialize_with = "from_nanomina_str")]
-    pub fee: u64,
-
+    pub fee: Amount,
     pub prover: PublicKey,
-    // pub proofs: Proofs,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

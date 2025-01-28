@@ -6,7 +6,7 @@ use crate::{
     ledger::{
         account::{Permissions, Timing},
         coinbase::Coinbase,
-        token::{symbol::TokenSymbol, TokenAddress},
+        token::{TokenAddress, TokenSymbol},
         Amount, PublicKey,
     },
     mina_blocks::v2::{
@@ -275,7 +275,7 @@ impl AccountDiff {
                 .iter()
                 .map(|update| {
                     let fee_payer = zkapp.fee_payer.body.public_key.to_owned();
-                    let nonce = zkapp.fee_payer.body.nonce.into();
+                    let nonce = zkapp.fee_payer.body.nonce;
 
                     let mut diffs = vec![];
                     diffs.push((fee_payer.to_owned(), nonce, &update.elt).into());
@@ -443,17 +443,17 @@ impl AccountDiff {
                 let mut res = vec![];
 
                 // No need to issue Debits and Credits if the fee is 0
-                if *total_fee > 0 {
+                if total_fee.0 > 0 {
                     res.push(vec![
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: prover.clone(),
-                            amount: (*total_fee).into(),
+                            amount: *total_fee,
                             update_type: UpdateType::Credit,
                             token: TokenAddress::default(), // always MINA
                         }),
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: precomputed_block.coinbase_receiver(),
-                            amount: (*total_fee).into(),
+                            amount: *total_fee,
                             update_type: UpdateType::Debit(None),
                             token: TokenAddress::default(), // always MINA
                         }),
@@ -939,7 +939,14 @@ impl From<(PublicKey, Nonce, &Elt)> for AccountDiff {
         let token = value.2.account_update.body.token_id.to_owned();
 
         // token payments
-        let amount = value.2.account_update.body.balance_change.magnitude.into();
+        let amount = value
+            .2
+            .account_update
+            .body
+            .balance_change
+            .magnitude
+            .0
+            .into();
 
         // pay creation fee of receiver zkapp
         if value.2.account_update.body.implicit_account_creation_fee {
@@ -1606,8 +1613,8 @@ mod tests {
                     set_voting_for: Permission::Signature,
                     set_timing: Permission::Signature
                 }),
-                zkapp_uri: Some(ZkappUri("https://minainu.com".to_string())),
-                token_symbol: Some(TokenSymbol("MINU".to_string())),
+                zkapp_uri: Some("https://minainu.com".into()),
+                token_symbol: Some("MINU".into()),
                 increment_nonce: true,
                 ..Default::default()
             }))],

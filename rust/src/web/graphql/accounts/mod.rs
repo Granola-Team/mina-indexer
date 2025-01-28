@@ -1,8 +1,9 @@
 use super::db;
 use crate::{
+    base::public_key::PublicKey,
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::username::UsernameStore,
     web::graphql::Timing,
@@ -311,11 +312,11 @@ impl
 impl From<account::Timing> for Timing {
     fn from(timing: account::Timing) -> Self {
         Self {
-            initial_minimum_balance: Some(timing.initial_minimum_balance),
-            cliff_time: Some(timing.cliff_time),
-            cliff_amount: Some(timing.cliff_amount),
-            vesting_period: Some(timing.vesting_period),
-            vesting_increment: Some(timing.vesting_increment),
+            initial_minimum_balance: Some(timing.initial_minimum_balance.0),
+            cliff_time: Some(timing.cliff_time.0),
+            cliff_amount: Some(timing.cliff_amount.0),
+            vesting_period: Some(timing.vesting_period.0),
+            vesting_increment: Some(timing.vesting_increment.0),
         }
     }
 }

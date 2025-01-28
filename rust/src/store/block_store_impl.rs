@@ -3,7 +3,7 @@ use super::{
     IndexerStore,
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
@@ -16,7 +16,6 @@ use crate::{
     ledger::{
         coinbase::Coinbase,
         diff::{account::AccountDiff, LedgerDiff},
-        public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
     },
     snark_work::store::SnarkStore,

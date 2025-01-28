@@ -6,8 +6,7 @@ use crate::{
         scheduled_time::ScheduledTime, state_hash::StateHash, Balance,
     },
     block::vrf_output::VrfOutput,
-    ledger::{public_key::PublicKey, LedgerHash},
-    mina_blocks::common::*,
+    ledger::LedgerHash,
 };
 use constants::Constants;
 use serde::{Deserialize, Serialize};
@@ -28,10 +27,7 @@ pub struct ProtocolStateBody {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockchainState {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub timestamp: u64,
-
+    pub timestamp: ScheduledTime,
     pub genesis_ledger_hash: LedgerHash,
     pub ledger_proof_statement: LedgerProofStatement,
     pub staged_ledger_hash: StagedLedgerHash,
@@ -56,10 +52,7 @@ pub struct FeeExcess {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct SupplyAdjustment {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub magnitude: u64,
-
+    pub magnitude: Balance,
     pub sgn: (SupplyAdjustmentSign,),
 }
 
@@ -125,16 +118,7 @@ pub struct ConsensusState {
     pub global_slot_since_genesis: Numeric<u32>,
     pub blockchain_length: BlockchainLength,
     pub last_vrf_output: VrfOutput,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub total_currency: u64,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub global_slot_since_genesis: u32,
-
-    pub blockchain_length: BlockchainLength,
+    pub total_currency: Balance,
     pub curr_global_slot_since_hard_fork: GlobalSlotNumbers,
     pub staking_epoch_data: EpochData,
     pub next_epoch_data: EpochData,
@@ -162,7 +146,7 @@ pub struct EpochData {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LedgerData {
-    pub total_currency: Numeric<u64>,
+    pub total_currency: Balance,
     pub hash: LedgerHash,
 }
 
@@ -173,8 +157,8 @@ pub struct LedgerData {
 impl From<&SupplyAdjustment> for i64 {
     fn from(value: &SupplyAdjustment) -> Self {
         match value.sgn.0 {
-            SupplyAdjustmentSign::Neg => -(value.magnitude as i64),
-            SupplyAdjustmentSign::Pos => value.magnitude as i64,
+            SupplyAdjustmentSign::Neg => -(value.magnitude.0 as i64),
+            SupplyAdjustmentSign::Pos => value.magnitude.0 as i64,
         }
     }
 }

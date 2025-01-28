@@ -1,6 +1,6 @@
 use crate::{
-    base::state_hash::StateHash,
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::token::TokenAddress,
 };
 use anyhow::bail;
 use std::mem::size_of;

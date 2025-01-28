@@ -36,20 +36,13 @@ pub struct CurrGlobalSlot {
 pub struct StakingEpochData {
     pub ledger: Ledger,
     pub seed: String,
-
-    #[serde(deserialize_with = "from_str")]
     pub start_checkpoint: StateHash,
-
-    #[serde(deserialize_with = "from_str")]
     pub lock_checkpoint: StateHash,
     pub epoch_length: Numeric<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ledger {
-    #[serde(deserialize_with = "from_str")]
     pub hash: LedgerHash,
-
-    #[serde(deserialize_with = "from_str")]
-    pub total_currency: u64,
+    pub total_currency: Balance,
 }

@@ -21,6 +21,6 @@ impl<'de> Deserialize<'de> for ReceiptChainHash {
     where
         D: serde::Deserializer<'de>,
     {
-        crate::mina_blocks::common::from_str(deserializer)
+        crate::utility::serde::from_str(deserializer)
     }
 }

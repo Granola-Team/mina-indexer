@@ -5,14 +5,15 @@ pub mod staged_ledger_diff;
 mod zkapp;
 
 use crate::{
-    base::{nonce::Nonce, numeric::Numeric, public_key::PublicKey, scheduled_time::ScheduledTime},
+    base::{
+        nonce::Nonce, numeric::Numeric, public_key::PublicKey, scheduled_time::ScheduledTime,
+        Balance,
+    },
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
-        public_key::PublicKey,
-        token::{symbol::TokenSymbol, TokenAddress},
+        token::{TokenAddress, TokenSymbol},
     },
-    mina_blocks::common::*,
 };
 use protocol_state::ProtocolState;
 use serde::{Deserialize, Serialize};
@@ -59,7 +60,7 @@ pub type TokenUsed = (TokenAddress, Option<(PublicKey, TokenAddress)>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountAccessed {
-    pub balance: Numeric<u64>,
+    pub balance: Balance,
     pub nonce: Nonce,
     pub public_key: PublicKey,
     pub receipt_chain_hash: ReceiptChainHash,
@@ -81,11 +82,11 @@ pub enum AccountAccessedTiming {
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Timing {
-    pub initial_minimum_balance: Numeric<u64>,
+    pub initial_minimum_balance: Balance,
     pub cliff_time: Numeric<u32>,
     pub vesting_period: Numeric<u32>,
-    pub cliff_amount: Numeric<u64>,
-    pub vesting_increment: Numeric<u64>,
+    pub cliff_amount: Balance,
+    pub vesting_increment: Balance,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

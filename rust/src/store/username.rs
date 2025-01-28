@@ -1,8 +1,8 @@
 use super::DbUpdate;
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::DbBlockUpdate,
-    ledger::{public_key::PublicKey, username::Username},
+    ledger::username::Username,
 };
 use serde::{Deserialize, Serialize};
 use speedb::WriteBatch;

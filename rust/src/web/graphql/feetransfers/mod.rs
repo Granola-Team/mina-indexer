@@ -4,14 +4,13 @@ use super::{
     get_block, get_block_canonicity,
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     command::{
         internal::{store::InternalCommandStore, DbInternalCommandWithData},
         store::UserCommandStore,
     },
     constants::*,
-    ledger::public_key::PublicKey,
     snark_work::store::SnarkStore,
     store::IndexerStore,
     utility::store::common::{from_be_bytes, U32_LEN},

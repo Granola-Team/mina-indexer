@@ -1,5 +1,8 @@
+//! Zkapp event store impol
+
 use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::public_key::PublicKey,
+    ledger::token::TokenAddress,
     mina_blocks::v2::ZkappEvent,
     store::{
         column_families::ColumnFamilyHelpers, zkapp::events::ZkappEventStore, IndexerStore, Result,

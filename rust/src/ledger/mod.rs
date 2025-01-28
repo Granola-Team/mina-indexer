@@ -3,20 +3,18 @@ pub mod coinbase;
 pub mod diff;
 pub mod genesis;
 pub mod hash;
-pub mod public_key;
 pub mod staking;
 pub mod store;
 pub mod token;
 pub mod username;
 
 use crate::{
-    base::{amount::Amount, nonce::Nonce},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey},
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
         diff::{account::AccountDiff, LedgerDiff},
-        public_key::PublicKey,
         token::TokenAddress,
     },
 };
@@ -472,11 +470,10 @@ mod tests {
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
-        public_key::PublicKey,
         Amount, LedgerHash,
     };
     use crate::{
-        base::{nonce::Nonce, state_hash::StateHash},
+        base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
         constants::MINA_SCALE,
         ledger::{token::TokenAddress, TokenLedger},
     };

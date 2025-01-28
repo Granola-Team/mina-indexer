@@ -1,6 +1,7 @@
 use mina_indexer::{
+    base::public_key::PublicKey,
     block::parser::BlockParser,
-    ledger::{diff::LedgerDiff, public_key::PublicKey, Ledger},
+    ledger::{diff::LedgerDiff, Ledger},
 };
 use std::{collections::HashSet, path::PathBuf, str::FromStr};
 

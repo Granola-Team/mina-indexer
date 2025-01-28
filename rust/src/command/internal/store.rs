@@ -1,9 +1,8 @@
 //! Store for internal commands
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
     command::internal::DbInternalCommandWithData,
-    ledger::public_key::PublicKey,
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;

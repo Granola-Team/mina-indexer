@@ -3,7 +3,7 @@ use super::{
     username::UsernameStore, IndexerStore,
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, DbBlockUpdate},
@@ -15,7 +15,6 @@ use crate::{
         UserCommandWithStatus, UserCommandWithStatusT,
     },
     constants::millis_to_iso_date_string,
-    ledger::public_key::PublicKey,
     utility::store::{
         command::user::*,
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key},

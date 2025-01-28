@@ -1,11 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, IndexerStore};
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
     chain::store::ChainStore,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
-        public_key::PublicKey,
         staking::{
             AggregatedEpochStakeDelegations, EpochStakeDelegation, StakingAccount, StakingLedger,
         },

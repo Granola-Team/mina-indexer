@@ -1,11 +1,9 @@
 use crate::helpers::{state::*, store::*};
 use mina_indexer::{
+    base::public_key::PublicKey,
     block::{parser::BlockParser, store::BlockStore},
     canonicity::store::CanonicityStore,
-    ledger::{
-        diff::LedgerDiff, public_key::PublicKey, store::staged::StagedLedgerStore,
-        token::TokenAddress,
-    },
+    ledger::{diff::LedgerDiff, store::staged::StagedLedgerStore, token::TokenAddress},
 };
 use std::path::PathBuf;
 

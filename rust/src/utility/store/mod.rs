@@ -8,9 +8,8 @@ pub mod zkapp;
 #[cfg(test)]
 mod tests {
     use crate::{
-        base::state_hash::StateHash,
+        base::{public_key::PublicKey, state_hash::StateHash},
         command::signed::TxnHash,
-        ledger::public_key::PublicKey,
         utility::store::{
             command::user::{pk_txn_sort_key, pk_txn_sort_key_prefix, txn_sort_key},
             common::{u32_prefix_key, u64_prefix_key, U32_LEN, U64_LEN},

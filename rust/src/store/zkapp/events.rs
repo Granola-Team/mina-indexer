@@ -1,8 +1,7 @@
 //! Zkapp event store trait
 
 use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
-    mina_blocks::v2::ZkappEvent,
+    base::public_key::PublicKey, ledger::token::TokenAddress, mina_blocks::v2::ZkappEvent,
     store::Result,
 };
 

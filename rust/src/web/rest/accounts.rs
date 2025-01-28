@@ -1,7 +1,8 @@
 use crate::{
+    base::public_key::PublicKey,
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::IndexerStore,
 };

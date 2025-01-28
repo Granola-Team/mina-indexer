@@ -1,6 +1,7 @@
 use crate::{
-    base::state_hash::StateHash, block::precomputed::PrecomputedBlock,
-    ledger::public_key::PublicKey, utility::store::common::U32_LEN,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
+    utility::store::common::U32_LEN,
 };
 
 /// `{block height BE}{state hash}`

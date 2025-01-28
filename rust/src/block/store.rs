@@ -1,11 +1,9 @@
 use super::{precomputed::PcbVersion, BlockComparison};
 use crate::{
+    base::public_key::PublicKey,
     block::{precomputed::PrecomputedBlock, StateHash},
     event::db::DbEvent,
-    ledger::{
-        diff::{account::AccountDiff, LedgerDiff},
-        public_key::PublicKey,
-    },
+    ledger::diff::{account::AccountDiff, LedgerDiff},
     store::DbUpdate,
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};

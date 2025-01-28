@@ -1,6 +1,6 @@
 use crate::{
-    base::state_hash::StateHash,
-    ledger::{public_key::PublicKey, LedgerHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::LedgerHash,
     utility::store::common::{
         balance_key_prefix, pk_key_prefix, u32_from_be_bytes, U32_LEN, U64_LEN,
     },

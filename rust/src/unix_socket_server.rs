@@ -1,5 +1,5 @@
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockWithoutHeight},
     canonicity::store::CanonicityStore,
     client::*,
@@ -10,7 +10,6 @@ use crate::{
         Command,
     },
     ledger::{
-        public_key::PublicKey,
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::TokenAddress,
