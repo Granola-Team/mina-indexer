@@ -5,7 +5,7 @@ pub mod staged_ledger_diff;
 mod zkapp;
 
 use crate::{
-    base::scheduled_time::ScheduledTime,
+    base::{nonce::Nonce, numeric::Numeric, public_key::PublicKey, scheduled_time::ScheduledTime},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
@@ -59,14 +59,8 @@ pub type TokenUsed = (TokenAddress, Option<(PublicKey, TokenAddress)>);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AccountAccessed {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub balance: u64,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub nonce: u32,
-
+    pub balance: Numeric<u64>,
+    pub nonce: Nonce,
     pub public_key: PublicKey,
     pub receipt_chain_hash: ReceiptChainHash,
     pub delegate: Option<PublicKey>,
@@ -87,25 +81,11 @@ pub enum AccountAccessedTiming {
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, PartialOrd, Serialize, Deserialize)]
 pub struct Timing {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub initial_minimum_balance: u64,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub cliff_time: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub cliff_amount: u64,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub vesting_period: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub vesting_increment: u64,
+    pub initial_minimum_balance: Numeric<u64>,
+    pub cliff_time: Numeric<u32>,
+    pub vesting_period: Numeric<u32>,
+    pub cliff_amount: Numeric<u64>,
+    pub vesting_increment: Numeric<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -151,14 +131,8 @@ pub struct ZkappAccount {
     pub verification_key: VerificationKey,
     pub proved_state: bool,
     pub zkapp_uri: ZkappUri,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub zkapp_version: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub last_action_slot: u32,
+    pub zkapp_version: Numeric<u32>,
+    pub last_action_slot: Numeric<u32>,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]

@@ -1,7 +1,10 @@
 pub mod constants;
 
 use crate::{
-    base::state_hash::StateHash,
+    base::{
+        blockchain_length::BlockchainLength, numeric::Numeric, public_key::PublicKey,
+        scheduled_time::ScheduledTime, state_hash::StateHash, Balance,
+    },
     block::vrf_output::VrfOutput,
     ledger::{public_key::PublicKey, LedgerHash},
     mina_blocks::common::*,
@@ -116,24 +119,11 @@ pub struct NonSnark {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConsensusState {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub blockchain_length: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub epoch_count: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub min_window_density: u32,
-
-    #[serde(serialize_with = "vec_to_str")]
-    #[serde(deserialize_with = "vec_from_str")]
-    pub sub_window_densities: Vec<u32>,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
+    pub epoch_count: Numeric<u32>,
+    pub min_window_density: Numeric<u32>,
+    pub sub_window_densities: Vec<Numeric<u32>>,
+    pub global_slot_since_genesis: Numeric<u32>,
+    pub blockchain_length: BlockchainLength,
     pub last_vrf_output: VrfOutput,
 
     #[serde(serialize_with = "to_str")]
@@ -157,13 +147,8 @@ pub struct ConsensusState {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GlobalSlotNumbers {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub slot_number: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub slots_per_epoch: u32,
+    pub slot_number: Numeric<u32>,
+    pub slots_per_epoch: Numeric<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -172,18 +157,12 @@ pub struct EpochData {
     pub seed: String,
     pub start_checkpoint: StateHash,
     pub lock_checkpoint: StateHash,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub epoch_length: u32,
+    pub epoch_length: Numeric<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LedgerData {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub total_currency: u64,
-
+    pub total_currency: Numeric<u64>,
     pub hash: LedgerHash,
 }
 

@@ -3,6 +3,10 @@ pub mod completed_work;
 
 use super::{protocol_state::SupplyAdjustment, AppState, Permissions, Timing, VerificationKey};
 use crate::{
+    base::{
+        amount::Amount, nonce::Nonce, numeric::Numeric, public_key::PublicKey,
+        scheduled_time::ScheduledTime, Balance,
+    },
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{public_key::PublicKey, token::TokenAddress},
@@ -347,13 +351,8 @@ pub enum Precondition<T> {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NumericBounds {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    lower: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    upper: u32,
+    lower: Numeric<u32>,
+    upper: Numeric<u32>,
 }
 
 impl std::str::FromStr for NumericBounds {

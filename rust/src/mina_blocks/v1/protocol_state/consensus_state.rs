@@ -1,30 +1,20 @@
 use crate::{
-    base::state_hash::StateHash,
-    ledger::{public_key::PublicKey, LedgerHash},
-    mina_blocks::common::*,
+    base::{
+        blockchain_length::BlockchainLength, numeric::Numeric, public_key::PublicKey,
+        state_hash::StateHash, Balance,
+    },
+    ledger::LedgerHash,
 };
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConsensusState {
-    #[serde(deserialize_with = "from_str")]
-    pub blockchain_length: u32,
-
-    #[serde(deserialize_with = "from_str")]
-    pub epoch_count: u32,
-
-    #[serde(deserialize_with = "from_str")]
-    pub min_window_density: u32,
-
-    #[serde(deserialize_with = "from_str")]
-    pub total_currency: u64,
-
-    #[serde(deserialize_with = "from_str")]
-    pub global_slot_since_genesis: u32,
-
-    #[serde(deserialize_with = "vec_from_str")]
-    pub sub_window_densities: Vec<u32>,
-
+    pub blockchain_length: BlockchainLength,
+    pub epoch_count: Numeric<u32>,
+    pub min_window_density: Numeric<u32>,
+    pub total_currency: Balance,
+    pub global_slot_since_genesis: Numeric<u32>,
+    pub sub_window_densities: Vec<Numeric<u32>>,
     pub block_stake_winner: PublicKey,
     pub block_creator: PublicKey,
     pub coinbase_receiver: PublicKey,
@@ -38,11 +28,8 @@ pub struct ConsensusState {
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CurrGlobalSlot {
-    #[serde(deserialize_with = "from_str")]
-    pub slot_number: u32,
-
-    #[serde(deserialize_with = "from_str")]
-    pub slots_per_epoch: u32,
+    pub slot_number: Numeric<u32>,
+    pub slots_per_epoch: Numeric<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,9 +42,7 @@ pub struct StakingEpochData {
 
     #[serde(deserialize_with = "from_str")]
     pub lock_checkpoint: StateHash,
-
-    #[serde(deserialize_with = "from_str")]
-    pub epoch_length: u32,
+    pub epoch_length: Numeric<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
