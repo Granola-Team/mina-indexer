@@ -15,8 +15,7 @@ async fn store() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("snark-store")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
     let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
-    let genesis_ledger_path = &PathBuf::from("./data/genesis_ledgers/mainnet.json");
-    let genesis_ledger = GenesisLedger::parse_file(genesis_ledger_path)?;
+    let genesis_ledger = GenesisLedger::new_v1()?;
 
     let mut indexer = IndexerState::new(
         genesis_ledger,

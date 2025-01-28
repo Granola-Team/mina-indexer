@@ -149,7 +149,10 @@ impl GenesisLedger {
 
     /// Hardfork genesis ledger
     pub fn new_v2() -> anyhow::Result<Self> {
-        GenesisLedger::parse_file("../../data/genesis_ledgers/hardfork.json.gz")
+        let bytes = include_bytes!("../../data/genesis_ledgers/hardfork.json.gz");
+        let root = decompress_gzip(bytes)?;
+        let root: GenesisRoot = serde_json::from_slice(&root)?;
+        Ok(root.into())
     }
 
     /// This is the only way to construct a genesis ledger
