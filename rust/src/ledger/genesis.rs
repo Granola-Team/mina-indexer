@@ -142,20 +142,14 @@ impl GenesisConstants {
 }
 
 impl GenesisLedger {
-    pub const MAINNET_GENESIS_LEDGER_CONTENTS: &'static str =
-        include_str!("../../data/genesis_ledgers/mainnet.json");
-
-    pub const HARDFORK_GENESIS_LEDGER_CONTENTS: &'static [u8] =
-        include_bytes!("../../data/genesis_ledgers/hardfork.json.gz");
-
     /// Original mainnet genesis ledger
     pub fn new_v1() -> anyhow::Result<Self> {
-        Self::from_str(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)
+        Self::from_str(include_str!("../../data/genesis_ledgers/mainnet.json"))
     }
 
     /// Hardfork genesis ledger
     pub fn new_v2() -> anyhow::Result<Self> {
-        Self::from_gzip_bytes(Self::HARDFORK_GENESIS_LEDGER_CONTENTS)
+        GenesisLedger::parse_file("../../data/genesis_ledgers/hardfork.json.gz")
     }
 
     /// This is the only way to construct a genesis ledger
@@ -204,12 +198,6 @@ impl GenesisLedger {
 
     pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         GenesisRoot::parse_file(path).map(Into::into)
-    }
-
-    pub fn from_gzip_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
-        let root = decompress_gzip(bytes)?;
-        let root: GenesisRoot = serde_json::from_slice(&root)?;
-        Ok(root.into())
     }
 }
 
@@ -328,13 +316,13 @@ mod tests {
 
     #[test]
     fn parse_v1() -> anyhow::Result<()> {
-        GenesisLedger::parse_file("./data/genesis_ledgers/mainnet.json")?;
+        GenesisLedger::new_v1()?;
         Ok(())
     }
 
     #[test]
     fn parse_v2() -> anyhow::Result<()> {
-        GenesisLedger::parse_file("./data/genesis_ledgers/hardfork.json.gz")?;
+        GenesisLedger::new_v2()?;
         Ok(())
     }
 

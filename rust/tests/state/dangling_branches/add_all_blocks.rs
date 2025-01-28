@@ -2,11 +2,7 @@ use mina_indexer::{
     block::{parser::BlockParser, precomputed::PrecomputedBlock},
     constants::MINA_SCALE,
     ledger::{
-        account::Account,
-        amount::Amount,
-        genesis::{GenesisLedger, GenesisRoot},
-        token::TokenAddress,
-        Ledger,
+        account::Account, amount::Amount, genesis::GenesisLedger, token::TokenAddress, Ledger,
     },
     state::IndexerState,
 };
@@ -23,9 +19,7 @@ async fn extension() -> anyhow::Result<()> {
     let mut block_parser = BlockParser::new_testing(&block_dir)?;
 
     // root ledger
-    let genesis_ledger =
-        serde_json::from_str::<GenesisRoot>(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)?;
-    let genesis_ledger: GenesisLedger = genesis_ledger.into();
+    let genesis_ledger = GenesisLedger::new_v1()?;
     let mut ledger: Ledger = genesis_ledger.into();
 
     // add required accounts with sufficient balance

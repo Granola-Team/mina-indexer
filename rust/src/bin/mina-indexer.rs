@@ -535,7 +535,7 @@ fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> 
         }
     } else {
         info!("Using default genesis ledger");
-        GenesisLedger::from_str(GenesisLedger::MAINNET_GENESIS_LEDGER_CONTENTS)?
+        GenesisLedger::new_v1()?
     };
 
     Ok(genesis_ledger)
