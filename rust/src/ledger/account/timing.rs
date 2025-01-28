@@ -1,4 +1,7 @@
-use crate::mina_blocks::v2;
+use crate::{
+    base::{numeric::Numeric, Balance},
+    mina_blocks::v2,
+};
 use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
 
@@ -7,9 +10,9 @@ use serde::{Deserialize, Serialize};
 )]
 #[auto_from(v2::Timing)]
 pub struct Timing {
-    pub initial_minimum_balance: u64,
-    pub cliff_time: u32,
-    pub cliff_amount: u64,
-    pub vesting_period: u32,
-    pub vesting_increment: u64,
+    pub cliff_time: Numeric<u32>,
+    pub vesting_period: Numeric<u32>,
+    pub cliff_amount: Balance,
+    pub vesting_increment: Balance,
+    pub initial_minimum_balance: Balance,
 }

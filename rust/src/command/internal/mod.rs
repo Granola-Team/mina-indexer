@@ -1,8 +1,9 @@
 pub mod store;
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    ledger::{coinbase::Coinbase, diff::account::*, public_key::PublicKey},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
+    ledger::{coinbase::Coinbase, diff::account::*},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -146,7 +147,7 @@ pub enum DbInternalCommandWithData {
     FeeTransfer {
         receiver: PublicKey,
         amount: u64,
-        state_hash: BlockHash,
+        state_hash: StateHash,
         kind: InternalCommandKind,
         date_time: i64,
         block_height: u32,
@@ -154,7 +155,7 @@ pub enum DbInternalCommandWithData {
     Coinbase {
         receiver: PublicKey,
         amount: u64,
-        state_hash: BlockHash,
+        state_hash: StateHash,
         kind: InternalCommandKind,
         date_time: i64,
         block_height: u32,
@@ -164,7 +165,7 @@ pub enum DbInternalCommandWithData {
 impl DbInternalCommandWithData {
     pub fn from_internal_cmd(
         cmd: DbInternalCommand,
-        state_hash: BlockHash,
+        state_hash: StateHash,
         block_height: u32,
         date_time: i64,
     ) -> Self {

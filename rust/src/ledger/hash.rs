@@ -59,7 +59,7 @@ impl<'de> Deserialize<'de> for LedgerHash {
     where
         D: serde::Deserializer<'de>,
     {
-        crate::mina_blocks::common::from_str(deserializer)
+        crate::utility::serde::from_str(deserializer)
     }
 }
 
@@ -96,5 +96,30 @@ impl std::default::Default for LedgerHash {
 impl std::fmt::Display for LedgerHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::LedgerHash;
+
+    #[test]
+    fn roundtrip() -> anyhow::Result<()> {
+        let hash = LedgerHash::default();
+        let hash_str = hash.to_string();
+
+        // serialize
+        let ser = serde_json::to_vec(&hash)?;
+
+        // deserialize
+        let res: LedgerHash = serde_json::from_slice(&ser)?;
+
+        // roundtrip
+        assert_eq!(hash, res);
+
+        // same serialization as string
+        assert_eq!(ser, serde_json::to_vec(&hash_str)?);
+
+        Ok(())
     }
 }

@@ -4,13 +4,13 @@ use super::{
     get_block, get_block_canonicity,
 };
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::{precomputed::PrecomputedBlock, store::BlockStore},
     command::{
         internal::{store::InternalCommandStore, DbInternalCommandWithData},
         store::UserCommandStore,
     },
     constants::*,
-    ledger::public_key::PublicKey,
     snark_work::store::SnarkStore,
     store::IndexerStore,
     utility::store::common::{from_be_bytes, U32_LEN},
@@ -232,7 +232,7 @@ impl FeetransferQueryRoot {
             };
 
             for (key, value) in iter.flatten() {
-                let state_hash = BlockHash::from_bytes(&key[U32_LEN..][..BlockHash::LEN])?;
+                let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
 
                 // avoid deserializing internal command & PCB if possible
                 let canonical = get_block_canonicity(db, &state_hash);
@@ -294,7 +294,7 @@ impl FeetransferQueryRoot {
                 }
 
                 let state_hash =
-                    BlockHash::from_bytes(&key[PublicKey::LEN..][U32_LEN..][..BlockHash::LEN])?;
+                    StateHash::from_bytes(&key[PublicKey::LEN..][U32_LEN..][..StateHash::LEN])?;
                 let canonical = get_block_canonicity(db, &state_hash);
                 if let Some(q) = query.as_ref() {
                     if let Some(query_canonicity) = q.canonical {
@@ -361,7 +361,7 @@ fn get_default_fee_transfers(
     };
 
     for (key, value) in db.internal_commands_block_height_iterator(mode).flatten() {
-        let state_hash = BlockHash::from_bytes(&key[U32_LEN..][..BlockHash::LEN])?;
+        let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
         let canonical = get_block_canonicity(db, &state_hash);
         if let Some(q) = query.as_ref() {
             if let Some(query_canonicity) = q.canonical {
@@ -404,7 +404,7 @@ fn get_default_fee_transfers(
 fn get_fee_transfers_for_state_hash(
     db: &Arc<IndexerStore>,
     query: &Option<FeetransferQueryInput>,
-    state_hash: &BlockHash,
+    state_hash: &StateHash,
     sort_by: Option<FeetransferSortByInput>,
     limit: usize,
     epoch_num_internal_commands: u32,

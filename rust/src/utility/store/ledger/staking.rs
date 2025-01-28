@@ -1,6 +1,6 @@
 use crate::{
-    block::BlockHash,
-    ledger::{public_key::PublicKey, LedgerHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::LedgerHash,
     utility::store::common::{
         balance_key_prefix, pk_key_prefix, u32_from_be_bytes, U32_LEN, U64_LEN,
     },
@@ -8,11 +8,11 @@ use crate::{
 use anyhow::bail;
 
 /// Split [staking_ledger_epoch_key] into constituent parts
-pub fn split_staking_ledger_epoch_key(key: &[u8]) -> anyhow::Result<(BlockHash, u32, LedgerHash)> {
-    if key.len() == BlockHash::LEN + U32_LEN + LedgerHash::LEN {
-        let genesis_state_hash = BlockHash::from_bytes(&key[..BlockHash::LEN])?;
-        let epoch = u32_from_be_bytes(&key[BlockHash::LEN..][..U32_LEN])?;
-        let ledger_hash = LedgerHash::from_bytes(key[BlockHash::LEN..][U32_LEN..].to_vec())?;
+pub fn split_staking_ledger_epoch_key(key: &[u8]) -> anyhow::Result<(StateHash, u32, LedgerHash)> {
+    if key.len() == StateHash::LEN + U32_LEN + LedgerHash::LEN {
+        let genesis_state_hash = StateHash::from_bytes(&key[..StateHash::LEN])?;
+        let epoch = u32_from_be_bytes(&key[StateHash::LEN..][..U32_LEN])?;
+        let ledger_hash = LedgerHash::from_bytes(key[StateHash::LEN..][U32_LEN..].to_vec())?;
         return Ok((genesis_state_hash, epoch, ledger_hash));
     }
     bail!("Invlid staking_ledger_epoch_key length")
@@ -52,21 +52,21 @@ pub fn staking_ledger_sort_key(
 /// ```
 /// {genesis_hash}{epoch}{ledger_hash}{pk}
 /// where
-/// - genesis_hash: [BlockHash::LEN] bytes
+/// - genesis_hash: [StateHash::LEN] bytes
 /// - epoch:        [u32] BE bytes
 /// - ledger_hash:  [LedgerHash::LEN] bytes
 /// - pk:           [PublicKey::LEN] bytes
 pub fn staking_ledger_account_key(
-    genesis_state_hash: &BlockHash,
+    genesis_state_hash: &StateHash,
     epoch: u32,
     ledger_hash: &LedgerHash,
     pk: &PublicKey,
-) -> [u8; BlockHash::LEN + U32_LEN + LedgerHash::LEN + PublicKey::LEN] {
-    let mut key = [0; BlockHash::LEN + U32_LEN + LedgerHash::LEN + PublicKey::LEN];
-    key[..BlockHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
-    key[BlockHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
-    key[BlockHash::LEN..][U32_LEN..][..LedgerHash::LEN].copy_from_slice(ledger_hash.0.as_bytes());
-    key[BlockHash::LEN..][U32_LEN..][LedgerHash::LEN..].copy_from_slice(pk.0.as_bytes());
+) -> [u8; StateHash::LEN + U32_LEN + LedgerHash::LEN + PublicKey::LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + LedgerHash::LEN + PublicKey::LEN];
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][..LedgerHash::LEN].copy_from_slice(ledger_hash.0.as_bytes());
+    key[StateHash::LEN..][U32_LEN..][LedgerHash::LEN..].copy_from_slice(pk.0.as_bytes());
     key
 }
 
@@ -74,18 +74,18 @@ pub fn staking_ledger_account_key(
 /// ```
 /// {genesis_hash}{epoch}{ledger_hash}
 /// where
-/// - genesis_hash: [BlockHash::LEN] bytes
+/// - genesis_hash: [StateHash::LEN] bytes
 /// - epoch:        [u32] BE bytes
 /// - ledger_hash:  [LedgerHash::LEN] bytes
 pub fn staking_ledger_epoch_key(
-    genesis_state_hash: &BlockHash,
+    genesis_state_hash: &StateHash,
     epoch: u32,
     ledger_hash: &LedgerHash,
-) -> [u8; BlockHash::LEN + U32_LEN + LedgerHash::LEN] {
-    let mut key = [0; BlockHash::LEN + U32_LEN + LedgerHash::LEN];
-    key[..BlockHash::LEN + U32_LEN]
+) -> [u8; StateHash::LEN + U32_LEN + LedgerHash::LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + LedgerHash::LEN];
+    key[..StateHash::LEN + U32_LEN]
         .copy_from_slice(&staking_ledger_epoch_key_prefix(genesis_state_hash, epoch));
-    key[BlockHash::LEN..][U32_LEN..].copy_from_slice(ledger_hash.0.as_bytes());
+    key[StateHash::LEN..][U32_LEN..].copy_from_slice(ledger_hash.0.as_bytes());
     key
 }
 
@@ -94,15 +94,15 @@ pub fn staking_ledger_epoch_key(
 /// - key: {genesis_hash}{epoch}
 /// - val: aggregated epoch delegations serde bytes
 /// where
-/// - genesis_hash: [BlockHash::LEN] bytes
+/// - genesis_hash: [StateHash::LEN] bytes
 /// - epoch:        [u32] BE bytes
 pub fn staking_ledger_epoch_key_prefix(
-    genesis_state_hash: &BlockHash,
+    genesis_state_hash: &StateHash,
     epoch: u32,
-) -> [u8; BlockHash::LEN + U32_LEN] {
-    let mut key = [0; BlockHash::LEN + U32_LEN];
-    key[..BlockHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
-    key[BlockHash::LEN..].copy_from_slice(&epoch.to_be_bytes());
+) -> [u8; StateHash::LEN + U32_LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN];
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..].copy_from_slice(&epoch.to_be_bytes());
     key
 }
 
@@ -113,44 +113,44 @@ mod staking_ledger_store_impl_tests {
     #[test]
     fn test_staking_ledger_epoch_key_prefix() {
         let epoch = 42;
-        let genesis_state_hash = BlockHash::default();
+        let genesis_state_hash = StateHash::default();
         let key = staking_ledger_epoch_key_prefix(&genesis_state_hash, epoch);
 
         // key == {gensis_state_hash}{epoch BE bytes}
-        assert_eq!(&key[..BlockHash::LEN], genesis_state_hash.0.as_bytes());
-        assert_eq!(&key[BlockHash::LEN..], &epoch.to_be_bytes());
+        assert_eq!(&key[..StateHash::LEN], genesis_state_hash.0.as_bytes());
+        assert_eq!(&key[StateHash::LEN..], &epoch.to_be_bytes());
     }
 
     #[test]
     fn test_staking_ledger_epoch_key() {
         let epoch = 42;
         let ledger_hash = LedgerHash::default();
-        let genesis_state_hash = BlockHash::default();
+        let genesis_state_hash = StateHash::default();
         let key = staking_ledger_epoch_key(&genesis_state_hash, epoch, &ledger_hash);
 
         // key == {gensis_state_hash bytes}{epoch BE bytes}{ledger_hash bytes}
-        assert_eq!(&key[..BlockHash::LEN], genesis_state_hash.0.as_bytes());
-        assert_eq!(&key[BlockHash::LEN..][..U32_LEN], &epoch.to_be_bytes());
-        assert_eq!(&key[BlockHash::LEN..][U32_LEN..], ledger_hash.0.as_bytes());
+        assert_eq!(&key[..StateHash::LEN], genesis_state_hash.0.as_bytes());
+        assert_eq!(&key[StateHash::LEN..][..U32_LEN], &epoch.to_be_bytes());
+        assert_eq!(&key[StateHash::LEN..][U32_LEN..], ledger_hash.0.as_bytes());
     }
 
     #[test]
     fn test_staking_ledger_account_key() {
         let epoch = 42;
         let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
+        let state_hash = StateHash::default();
         let ledger_hash = LedgerHash::default();
         let key = staking_ledger_account_key(&state_hash, epoch, &ledger_hash, &pk);
 
         // key == {gensis_state_hash}{epoch BE bytes}{ledger_hash bytes}{pk bytes}
-        assert_eq!(&key[..BlockHash::LEN], state_hash.0.as_bytes());
-        assert_eq!(&key[BlockHash::LEN..][..U32_LEN], epoch.to_be_bytes());
+        assert_eq!(&key[..StateHash::LEN], state_hash.0.as_bytes());
+        assert_eq!(&key[StateHash::LEN..][..U32_LEN], epoch.to_be_bytes());
         assert_eq!(
-            &key[BlockHash::LEN..][U32_LEN..][..LedgerHash::LEN],
+            &key[StateHash::LEN..][U32_LEN..][..LedgerHash::LEN],
             ledger_hash.0.as_bytes()
         );
         assert_eq!(
-            &key[BlockHash::LEN..][U32_LEN..][LedgerHash::LEN..],
+            &key[StateHash::LEN..][U32_LEN..][LedgerHash::LEN..],
             pk.0.as_bytes()
         );
     }

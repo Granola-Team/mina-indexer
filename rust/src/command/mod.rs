@@ -4,9 +4,9 @@ pub mod store;
 pub mod zkapp;
 
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
     command::signed::{SignedCommand, SignedCommandWithKind},
-    ledger::{amount::Amount, nonce::Nonce, public_key::PublicKey},
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{
@@ -24,7 +24,6 @@ use signed::SignedCommandWithCreationData;
 // re-export types
 pub type TxnHash = signed::TxnHash;
 
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum UserCommand {
     SignedCommand(SignedCommand),
@@ -51,7 +50,7 @@ pub enum Command {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CommandWithStateHash {
     pub command: Command,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -281,7 +280,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         amount,
                     }) => Command::Payment(Payment {
                         nonce: self.nonce(),
-                        amount: (*amount).into(),
+                        amount: amount.0.into(),
                         source: self.fee_payer_pk(),
                         receiver: receiver_pk.to_owned(),
                         is_new_receiver_account: self.receiver_account_creation_fee_paid(),
@@ -397,8 +396,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 v1.t.t.payload.t.t.common.t.t.t.fee.t.t
             }
             Self::V2(v2) => match &v2.data.1 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.fee,
-                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee,
+                UserCommandData::SignedCommandData(data) => data.payload.common.fee.0,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee.0,
             },
         }
     }
@@ -410,8 +409,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 Nonce(v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32)
             }
             Self::V2(v2) => match &v2.data.1 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.nonce.into(),
-                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce.into(),
+                UserCommandData::SignedCommandData(data) => data.payload.common.nonce,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce,
             },
         }
     }
@@ -424,8 +423,8 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 v1.t.t.payload.t.t.common.t.t.t.fee.t.t
             }
             Self::V2(cmd) => match &cmd.data.1 {
-                UserCommandData::SignedCommandData(data) => match data.payload.body.1 {
-                    Payment(PaymentPayload { amount, .. }) => amount,
+                UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
+                    Payment(PaymentPayload { amount, .. }) => amount.0,
                     StakeDelegation(_) => 0,
                 },
                 UserCommandData::ZkappCommandData(_data) => 0,
@@ -553,7 +552,7 @@ impl Command {
                             SignedCommandPayloadBody::Payment(payload) => {
                                 let source = command.fee_payer_pk();
                                 let receiver = payload.receiver_pk.to_owned();
-                                let amount = payload.amount;
+                                let amount = payload.amount.0;
 
                                 trace!("Payment {{ source: {source}, receiver: {receiver}, amount: {amount} }}");
                                 Self::Payment(Payment {
@@ -791,8 +790,8 @@ impl From<Command> for serde_json::Value {
 
                 payment.insert("source".into(), Value::String(source.to_address()));
                 payment.insert("receiver".into(), Value::String(receiver.to_address()));
-                payment.insert("amount".into(), Value::Number(Number::from(amount.0)));
-                payment.insert("nonce".into(), Value::Number(Number::from(nonce)));
+                payment.insert("amount".into(), Value::Number(amount.0.into()));
+                payment.insert("nonce".into(), Value::Number(nonce.0.into()));
                 json.insert("Payment".into(), Value::Object(payment));
 
                 Value::Object(json)
@@ -807,7 +806,7 @@ impl From<Command> for serde_json::Value {
 
                 delegation.insert("delegate".into(), Value::String(delegate.to_address()));
                 delegation.insert("delegator".into(), Value::String(delegator.to_address()));
-                delegation.insert("nonce".into(), Value::Number(Number::from(nonce)));
+                delegation.insert("nonce".into(), Value::Number(nonce.0.into()));
                 json.insert("Stake_delegation".into(), Value::Object(delegation));
 
                 Value::Object(json)

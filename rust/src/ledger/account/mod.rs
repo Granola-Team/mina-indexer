@@ -2,7 +2,6 @@ mod receipt_chain_hash;
 mod timing;
 
 use super::{
-    amount::Amount,
     diff::{
         account::{
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
@@ -12,14 +11,14 @@ use super::{
         },
         LedgerDiff,
     },
-    nonce::Nonce,
-    token::{symbol::TokenSymbol, TokenAddress},
+    token::{TokenAddress, TokenSymbol},
     username::Username,
 };
 use crate::{
-    block::{genesis::GenesisBlock, BlockHash},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    block::genesis::GenesisBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
-    ledger::{diff::account::PaymentDiff, public_key::PublicKey},
+    ledger::diff::account::PaymentDiff,
     mina_blocks::v2::{self, ZkappAccount},
 };
 use mina_serialization_proc_macros::AutoFrom;
@@ -42,7 +41,7 @@ pub struct Account {
     // optional
     pub token: Option<TokenAddress>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<BlockHash>,
+    pub voting_for: Option<StateHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
     pub token_symbol: Option<TokenSymbol>,
@@ -97,12 +96,12 @@ impl Account {
     /// as per https://docs.minaprotocol.com/mina-protocol/time-locked-accounts
     pub fn current_minimum_balance(&self, curr_global_slot: u32) -> u64 {
         self.timing.as_ref().map_or(0, |t| {
-            if curr_global_slot < t.cliff_time {
-                t.initial_minimum_balance
+            if curr_global_slot < t.cliff_time.0 {
+                t.initial_minimum_balance.0
             } else {
-                t.initial_minimum_balance.saturating_sub(
-                    ((curr_global_slot - t.cliff_time) / t.vesting_period) as u64
-                        * t.vesting_increment,
+                t.initial_minimum_balance.0.saturating_sub(
+                    ((curr_global_slot - t.cliff_time.0) / t.vesting_period.0) as u64
+                        * t.vesting_increment.0,
                 )
             }
         })
@@ -620,6 +619,7 @@ impl std::fmt::Debug for Account {
 mod tests {
     use super::{Account, Amount};
     use crate::{
+        base::{nonce::Nonce, public_key::PublicKey},
         constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
         ledger::{
             account::{Permission, Permissions, Timing},
@@ -627,9 +627,7 @@ mod tests {
                 AccountDiff, PaymentDiff, UpdateType, ZkappDiff, ZkappPaymentDiff,
                 ZkappPermissionsDiff, ZkappVerificationKeyDiff,
             },
-            nonce::Nonce,
-            public_key::PublicKey,
-            token::{symbol::TokenSymbol, TokenAddress},
+            token::{TokenAddress, TokenSymbol},
         },
         mina_blocks::v2::{AppState, VerificationKey, ZkappAccount, ZkappUri},
     };
@@ -916,7 +914,7 @@ mod tests {
     #[test]
     fn zkapp_account_diff_token_symbol() {
         let pk = PublicKey::default();
-        let token_symbol = TokenSymbol("TOKEN_SYMBOL".to_string());
+        let token_symbol = TokenSymbol::from("TOKEN_SYMBOL");
 
         // account before applying diff
         let before = Account {

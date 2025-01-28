@@ -3,10 +3,11 @@ use super::{
     IndexerStore,
 };
 use crate::{
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
-        BlockComparison, BlockHash,
+        BlockComparison,
     },
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
@@ -15,7 +16,6 @@ use crate::{
     ledger::{
         coinbase::Coinbase,
         diff::{account::AccountDiff, LedgerDiff},
-        public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
     },
     snark_work::store::SnarkStore,
@@ -189,7 +189,7 @@ impl BlockStore for IndexerStore {
         Ok(Some(db_event))
     }
 
-    fn get_block(&self, state_hash: &BlockHash) -> anyhow::Result<Option<(PrecomputedBlock, u64)>> {
+    fn get_block(&self, state_hash: &StateHash) -> anyhow::Result<Option<(PrecomputedBlock, u64)>> {
         trace!("Getting block {state_hash}");
         Ok(self
             .database
@@ -219,12 +219,12 @@ impl BlockStore for IndexerStore {
         }
     }
 
-    fn get_best_block_hash(&self) -> anyhow::Result<Option<BlockHash>> {
+    fn get_best_block_hash(&self) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting best block hash");
         Ok(self
             .database
             .get(Self::BEST_TIP_STATE_HASH_KEY)?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
     fn get_best_block_height(&self) -> anyhow::Result<Option<u32>> {
@@ -239,7 +239,7 @@ impl BlockStore for IndexerStore {
             .and_then(|state_hash| self.get_block_global_slot(&state_hash).ok().flatten()))
     }
 
-    fn get_best_block_genesis_hash(&self) -> anyhow::Result<Option<BlockHash>> {
+    fn get_best_block_genesis_hash(&self) -> anyhow::Result<Option<StateHash>> {
         Ok(self.get_best_block_hash()?.and_then(|state_hash| {
             self.get_block_genesis_state_hash(&state_hash)
                 .ok()
@@ -247,7 +247,7 @@ impl BlockStore for IndexerStore {
         }))
     }
 
-    fn set_best_block(&self, state_hash: &BlockHash) -> anyhow::Result<()> {
+    fn set_best_block(&self, state_hash: &StateHash) -> anyhow::Result<()> {
         trace!("Setting best block {state_hash}");
         if let Some(old) = self.get_best_block_hash()? {
             if old == *state_hash {
@@ -285,8 +285,8 @@ impl BlockStore for IndexerStore {
 
     fn reorg_blocks(
         &self,
-        old_best_tip: &BlockHash,
-        new_best_tip: &BlockHash,
+        old_best_tip: &StateHash,
+        new_best_tip: &StateHash,
     ) -> anyhow::Result<DbBlockUpdate> {
         trace!(
             "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
@@ -364,7 +364,7 @@ impl BlockStore for IndexerStore {
 
     fn get_block_account_diffs(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
         trace!("Getting block account diffs for {state_hash}");
         Ok(self
@@ -372,7 +372,7 @@ impl BlockStore for IndexerStore {
             .map(|diff| diff.account_diffs.into_iter().flatten().collect::<Vec<_>>()))
     }
 
-    fn get_block_ledger_diff(&self, state_hash: &BlockHash) -> anyhow::Result<Option<LedgerDiff>> {
+    fn get_block_ledger_diff(&self, state_hash: &StateHash) -> anyhow::Result<Option<LedgerDiff>> {
         trace!("Getting block ledger diff {state_hash}");
         Ok(self
             .database
@@ -380,18 +380,18 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn get_block_parent_hash(&self, state_hash: &BlockHash) -> anyhow::Result<Option<BlockHash>> {
+    fn get_block_parent_hash(&self, state_hash: &StateHash) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting block's parent hash {state_hash}");
         Ok(self
             .database
             .get_cf(self.block_parent_hash_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
     fn set_block_parent_hash_batch(
         &self,
-        state_hash: &BlockHash,
-        previous_state_hash: &BlockHash,
+        state_hash: &StateHash,
+        previous_state_hash: &StateHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block parent hash {state_hash}: {previous_state_hash}");
@@ -403,7 +403,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_date_time(&self, state_hash: &BlockHash) -> anyhow::Result<Option<i64>> {
+    fn get_block_date_time(&self, state_hash: &StateHash) -> anyhow::Result<Option<i64>> {
         trace!("Getting block date time {state_hash}");
         Ok(self
             .database
@@ -413,7 +413,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_date_time_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         date_time: i64,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -426,7 +426,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_height(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_height(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block height {state_hash}");
         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
             return Ok(Some(0));
@@ -439,7 +439,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_height_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         blockchain_length: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -452,7 +452,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_global_slot(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_global_slot(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block global slot {state_hash}");
         Ok(self
             .database
@@ -462,7 +462,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_global_slot_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         global_slot: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -475,7 +475,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_creator(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
+    fn get_block_creator(&self, state_hash: &StateHash) -> anyhow::Result<Option<PublicKey>> {
         trace!("Getting block creator {state_hash}");
         Ok(self
             .database
@@ -519,7 +519,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_coinbase_receiver(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PublicKey>> {
+    fn get_coinbase_receiver(&self, state_hash: &StateHash) -> anyhow::Result<Option<PublicKey>> {
         trace!("Getting coinbase receiver for {state_hash}");
         Ok(self
             .database
@@ -573,7 +573,7 @@ impl BlockStore for IndexerStore {
 
     fn add_block_at_height_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         blockchain_length: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -596,7 +596,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<StateHash>> {
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
         let mut blocks = vec![];
 
@@ -606,7 +606,7 @@ impl BlockStore for IndexerStore {
                 block_num_key(blockchain_length, n),
             )? {
                 None => break,
-                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
+                Some(bytes) => blocks.push(StateHash::from_bytes(&bytes)?),
             }
         }
         blocks.sort_by(|a, b| block_cmp(self, a, b));
@@ -623,7 +623,7 @@ impl BlockStore for IndexerStore {
 
     fn add_block_at_slot_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         slot: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -646,7 +646,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<StateHash>> {
         trace!("Getting blocks at slot {slot}");
         let mut blocks = vec![];
 
@@ -656,7 +656,7 @@ impl BlockStore for IndexerStore {
                 .get_cf(self.blocks_at_global_slot_cf(), block_num_key(slot, n))?
             {
                 None => break,
-                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
+                Some(bytes) => blocks.push(StateHash::from_bytes(&bytes)?),
             }
         }
 
@@ -675,7 +675,7 @@ impl BlockStore for IndexerStore {
     fn add_block_at_public_key_batch(
         &self,
         pk: &PublicKey,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Adding block {state_hash} at public key {pk}");
@@ -697,7 +697,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<StateHash>> {
         trace!("Getting blocks at public key {pk}");
         let mut blocks = vec![];
 
@@ -707,7 +707,7 @@ impl BlockStore for IndexerStore {
                 .get_cf(self.blocks_cf(), pk_index_key(pk, n))?
             {
                 None => break,
-                Some(bytes) => blocks.push(BlockHash::from_bytes(&bytes)?),
+                Some(bytes) => blocks.push(StateHash::from_bytes(&bytes)?),
             }
         }
 
@@ -715,11 +715,11 @@ impl BlockStore for IndexerStore {
         Ok(blocks)
     }
 
-    fn get_block_children(&self, state_hash: &BlockHash) -> anyhow::Result<Vec<BlockHash>> {
+    fn get_block_children(&self, state_hash: &StateHash) -> anyhow::Result<Vec<StateHash>> {
         trace!("Getting children of block {state_hash}");
         if let Some(height) = self.get_block_height(state_hash)? {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
-            let mut children: Vec<BlockHash> = blocks_at_next_height
+            let mut children: Vec<StateHash> = blocks_at_next_height
                 .into_iter()
                 .filter(|b| {
                     self.get_block_parent_hash(b).ok().flatten() == Some(state_hash.clone())
@@ -731,7 +731,7 @@ impl BlockStore for IndexerStore {
         bail!("Block missing from store {state_hash}")
     }
 
-    fn get_block_version(&self, state_hash: &BlockHash) -> anyhow::Result<Option<PcbVersion>> {
+    fn get_block_version(&self, state_hash: &StateHash) -> anyhow::Result<Option<PcbVersion>> {
         trace!("Getting block version {state_hash}");
         let key = state_hash.0.as_bytes();
         Ok(self
@@ -742,7 +742,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_version_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         version: PcbVersion,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -823,7 +823,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_epoch_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         epoch: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -836,7 +836,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_epoch(&self, state_hash: &BlockHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_epoch(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block epoch {state_hash}");
         Ok(self
             .database
@@ -846,8 +846,8 @@ impl BlockStore for IndexerStore {
 
     fn set_block_genesis_state_hash_batch(
         &self,
-        state_hash: &BlockHash,
-        genesis_state_hash: &BlockHash,
+        state_hash: &StateHash,
+        genesis_state_hash: &StateHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
@@ -861,13 +861,13 @@ impl BlockStore for IndexerStore {
 
     fn get_block_genesis_state_hash(
         &self,
-        state_hash: &BlockHash,
-    ) -> anyhow::Result<Option<BlockHash>> {
+        state_hash: &StateHash,
+    ) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting block genesis state hash {state_hash}");
         Ok(self
             .database
             .get_cf(self.block_genesis_state_hash_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok()))
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
     fn add_epoch_slots_produced(
@@ -1104,7 +1104,7 @@ impl BlockStore for IndexerStore {
 
     fn increment_block_production_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         creator: &PublicKey,
         supercharged: bool,
     ) -> anyhow::Result<()> {
@@ -1177,7 +1177,7 @@ impl BlockStore for IndexerStore {
 
     fn increment_block_canonical_production_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         trace!("Incrementing canonical block production count {state_hash}");
         let creator = self.get_block_creator(state_hash)?.expect("block creator");
@@ -1234,7 +1234,7 @@ impl BlockStore for IndexerStore {
 
     fn decrement_block_canonical_production_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         trace!("Decrementing canonical block production count {state_hash}");
         let creator = self.get_block_creator(state_hash)?.expect("block creator");
@@ -1465,7 +1465,7 @@ impl BlockStore for IndexerStore {
 
     fn set_block_comparison_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         comparison: &BlockComparison,
     ) -> anyhow::Result<()> {
         trace!("Setting block comparison {state_hash}");
@@ -1478,7 +1478,7 @@ impl BlockStore for IndexerStore {
 
     fn get_block_comparison(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<BlockComparison>> {
         trace!("Getting block comparison {state_hash}");
         Ok(self
@@ -1489,8 +1489,8 @@ impl BlockStore for IndexerStore {
 
     fn block_cmp(
         &self,
-        block: &BlockHash,
-        other: &BlockHash,
+        block: &StateHash,
+        other: &StateHash,
     ) -> anyhow::Result<Option<std::cmp::Ordering>> {
         // get stored block comparisons
         let res1 = self
@@ -1579,7 +1579,7 @@ impl BlockStore for IndexerStore {
     }
 }
 
-fn block_cmp(db: &IndexerStore, a: &BlockHash, b: &BlockHash) -> std::cmp::Ordering {
+fn block_cmp(db: &IndexerStore, a: &StateHash, b: &StateHash) -> std::cmp::Ordering {
     use std::cmp::Ordering;
     let a_canonicity = db.get_block_canonicity(a).ok().flatten();
     let b_canonicity = db.get_block_canonicity(b).ok().flatten();

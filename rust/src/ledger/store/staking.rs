@@ -1,9 +1,8 @@
 //! Store of staking ledgers and delegations
 
 use crate::{
-    block::BlockHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     ledger::{
-        public_key::PublicKey,
         staking::{
             AggregatedEpochStakeDelegations, EpochStakeDelegation, StakingAccount, StakingLedger,
         },
@@ -18,7 +17,7 @@ pub trait StakingLedgerStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingAccount>>;
 
     /// Set `pk`'s staking ledger account
@@ -27,7 +26,7 @@ pub trait StakingLedgerStore {
         pk: &PublicKey,
         epoch: u32,
         ledger_hash: &LedgerHash,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
         staking_account_with_delegation: StakingAccountWithEpochDelegation,
     ) -> anyhow::Result<()>;
 
@@ -35,7 +34,7 @@ pub trait StakingLedgerStore {
     fn add_staking_ledger(
         &self,
         staking_ledger: StakingLedger,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()>;
 
     /// Get the staking ledger with the given hash & epoch
@@ -43,7 +42,7 @@ pub trait StakingLedgerStore {
         &self,
         ledger_hash: &LedgerHash,
         epoch: Option<u32>,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingLedger>>;
 
     /// Get the aggregated staking delegations for the given epoch
@@ -53,7 +52,7 @@ pub trait StakingLedgerStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<EpochStakeDelegation>>;
 
     /// Set the epoch number corresponding to the given staking ledger hash
@@ -61,7 +60,7 @@ pub trait StakingLedgerStore {
         &self,
         ledger_hash: &LedgerHash,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<()>;
 
     /// Set the genesis state hash corresponding to the given staking ledger
@@ -69,7 +68,7 @@ pub trait StakingLedgerStore {
     fn set_staking_ledger_hash_genesis_pair(
         &self,
         ledger_hash: &LedgerHash,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()>;
 
     /// Get the epoch number corresponding to the given staking ledger hash
@@ -79,12 +78,12 @@ pub trait StakingLedgerStore {
     fn get_staking_ledger_hash_by_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<LedgerHash>>;
 
     /// Get the genesis state hash corresponding to the given staking ledger
     fn get_genesis_state_hash(&self, ledger_hash: &LedgerHash)
-        -> anyhow::Result<Option<BlockHash>>;
+        -> anyhow::Result<Option<StateHash>>;
 
     /// Set a staking ledger's total currency
     fn set_total_currency(
@@ -100,14 +99,14 @@ pub trait StakingLedgerStore {
     fn get_staking_ledger_accounts_count_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
     ) -> anyhow::Result<u32>;
 
     /// Set the total number of accounts per staking ledger
     fn set_staking_ledger_accounts_count_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: &BlockHash,
+        genesis_state_hash: &StateHash,
         count: u32,
     ) -> anyhow::Result<()>;
 
@@ -115,14 +114,14 @@ pub trait StakingLedgerStore {
     fn build_staking_ledger(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingLedger>>;
 
     // Build the aggregated staking delegations from the CF representation
     fn build_aggregated_delegations(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&BlockHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>>;
 
     ///////////////

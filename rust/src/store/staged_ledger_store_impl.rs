@@ -1,13 +1,13 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
-    block::{store::BlockStore, BlockHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::store::BlockStore,
     canonicity::store::CanonicityStore,
     constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
         account::Account,
         diff::LedgerDiff,
-        public_key::PublicKey,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
         token::TokenAddress,
         Ledger, LedgerHash,
@@ -23,7 +23,7 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Account>> {
         trace!("Getting {pk} staged ledger {state_hash} account");
 
@@ -84,7 +84,7 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Account>> {
         trace!("Display {pk} staged ledger {state_hash} account");
         if let Some(staged_acct) = self.get_staged_account(pk, token, state_hash)? {
@@ -114,7 +114,7 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         block_height: u32,
         account: &Account,
     ) -> anyhow::Result<()> {
@@ -133,7 +133,7 @@ impl StagedLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         balance: u64,
         block_height: u32,
         account_serde_bytes: &[u8],
@@ -187,7 +187,7 @@ impl StagedLedgerStore for IndexerStore {
     fn add_staged_ledger_hashes(
         &self,
         ledger_hash: &LedgerHash,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<bool> {
         trace!("Adding staged ledger hash\nstate_hash: {state_hash}\nledger_hash: {ledger_hash}");
         let is_new = self
@@ -206,7 +206,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn add_staged_ledger_at_state_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         ledger: Ledger,
         block_height: u32,
     ) -> anyhow::Result<()> {
@@ -289,7 +289,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn add_genesis_ledger(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         genesis_ledger: Ledger,
         height: u32,
     ) -> anyhow::Result<()> {
@@ -317,7 +317,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn get_staged_ledger_at_state_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>> {
         trace!("Getting staged ledger state hash {state_hash}");
@@ -391,7 +391,7 @@ impl StagedLedgerStore for IndexerStore {
         if let Some(state_hash) = self
             .database
             .get_cf(self.staged_ledger_hash_to_block_cf(), key)?
-            .and_then(|bytes| BlockHash::from_bytes(&bytes).ok())
+            .and_then(|bytes| StateHash::from_bytes(&bytes).ok())
         {
             if let Some(ledger) = self.get_staged_ledger_at_state_hash(&state_hash, memoize)? {
                 return Ok(Some(ledger));
@@ -414,7 +414,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn set_block_ledger_diff_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         ledger_diff: &LedgerDiff,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -429,7 +429,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn set_block_staged_ledger_hash_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         staged_ledger_hash: &LedgerHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
@@ -449,7 +449,7 @@ impl StagedLedgerStore for IndexerStore {
 
     fn get_block_staged_ledger_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<LedgerHash>> {
         trace!("Getting block staged ledger hash {state_hash}");
         Ok(self
@@ -461,7 +461,7 @@ impl StagedLedgerStore for IndexerStore {
     fn get_staged_ledger_block_state_hash(
         &self,
         ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<Option<BlockHash>> {
+    ) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting staged ledger {ledger_hash} block state hash");
         Ok(self
             .database
@@ -469,10 +469,10 @@ impl StagedLedgerStore for IndexerStore {
                 self.staged_ledger_hash_to_block_cf(),
                 ledger_hash.0.as_bytes(),
             )?
-            .map(BlockHash::from_bytes_or_panic))
+            .map(StateHash::from_bytes_or_panic))
     }
 
-    fn build_staged_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>> {
+    fn build_staged_ledger(&self, state_hash: &StateHash) -> anyhow::Result<Option<Ledger>> {
         trace!("Building staged ledger {state_hash}");
         let mut ledger = Ledger::new();
 
@@ -503,20 +503,20 @@ impl StagedLedgerStore for IndexerStore {
 
     fn staged_ledger_account_balance_iterator(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let mut start = [0; BlockHash::LEN + TokenAddress::LEN + 1];
+        let mut start = [0; StateHash::LEN + TokenAddress::LEN + 1];
         let mode = IteratorMode::From(
             match direction {
                 Direction::Forward => state_hash.0.as_bytes(),
                 Direction::Reverse => {
                     // need to "overshoot" all {state_hash}{token}{pk} keys for this staged ledger
                     // without going into the "next" staged ledger's data
-                    start[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-                    start[BlockHash::LEN..][..TokenAddress::LEN]
+                    start[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+                    start[StateHash::LEN..][..TokenAddress::LEN]
                         .copy_from_slice(&TokenAddress::upper_bound());
-                    start[BlockHash::LEN..][TokenAddress::LEN..].copy_from_slice(b"C");
+                    start[StateHash::LEN..][TokenAddress::LEN..].copy_from_slice(b"C");
                     start.as_slice()
                 }
             },

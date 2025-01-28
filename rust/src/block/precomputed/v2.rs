@@ -1,11 +1,12 @@
 //! Indexer internal V2 precomputed block representation
 
 use crate::{
-    block::BlockHash,
+    base::{
+        blockchain_length::BlockchainLength, scheduled_time::ScheduledTime, state_hash::StateHash,
+    },
     canonicity::Canonicity,
     chain::Network,
-    constants::berkeley::*,
-    mina_blocks::{common::from_str, v2},
+    mina_blocks::v2,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,9 +18,8 @@ pub struct BlockFileV2 {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockFileDataV2 {
-    #[serde(default = "berkeley_genesis_timestamp")]
-    #[serde(deserialize_with = "from_str")]
-    pub scheduled_time: u64,
+    #[serde(default = "ScheduledTime::hardfork_genesis_timestamp")]
+    pub scheduled_time: ScheduledTime,
 
     pub protocol_state: v2::protocol_state::ProtocolState,
     pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
@@ -30,18 +30,14 @@ pub struct BlockFileDataV2 {
     pub accounts_created: Vec<v2::AccountCreated>,
 }
 
-fn berkeley_genesis_timestamp() -> u64 {
-    BERKELEY_GENESIS_TIMESTAMP
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV2 {
     // metadata
     pub network: Network,
-    pub state_hash: BlockHash,
-    pub blockchain_length: u32,
+    pub state_hash: StateHash,
+    pub blockchain_length: BlockchainLength,
     // from PCB
-    pub scheduled_time: u64,
+    pub scheduled_time: ScheduledTime,
     pub protocol_state: v2::protocol_state::ProtocolState,
     pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
     // new post-hardfork data
@@ -54,9 +50,9 @@ pub struct PrecomputedBlockV2 {
 pub struct PrecomputedBlockWithCanonicityV2 {
     pub canonicity: Option<Canonicity>,
     pub network: Network,
-    pub state_hash: BlockHash,
-    pub scheduled_time: u64,
-    pub blockchain_length: u32,
+    pub state_hash: StateHash,
+    pub scheduled_time: ScheduledTime,
+    pub blockchain_length: BlockchainLength,
     pub protocol_state: v2::protocol_state::ProtocolState,
     pub staged_ledger_diff: v2::staged_ledger_diff::StagedLedgerDiff,
 }

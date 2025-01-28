@@ -1,5 +1,6 @@
 use crate::{
-    block::{store::BlockStore, BlockHash},
+    base::state_hash::StateHash,
+    block::store::BlockStore,
     store::IndexerStore,
     web::graphql::{
         blocks::{get_counts, Block},
@@ -96,7 +97,7 @@ pub async fn get_block_by_state_hash(
 ) -> HttpResponse {
     let db = store.as_ref();
 
-    if BlockHash::is_valid(&state_hash) {
+    if StateHash::is_valid(&state_hash) {
         if let Ok(Some((ref block, _))) = db.get_block(&state_hash.clone().into()) {
             let block = Block::from_precomputed(db, block, get_counts(db).await.expect("counts"));
             return HttpResponse::Ok()

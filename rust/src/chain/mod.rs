@@ -1,9 +1,6 @@
 pub mod store;
 
-use crate::{
-    block::{precomputed::PcbVersion, BlockHash},
-    constants::*,
-};
+use crate::{base::state_hash::StateHash, block::precomputed::PcbVersion, constants::*};
 use bincode::{Decode, Encode};
 use clap::builder::OsStr;
 use hex::ToHex;
@@ -14,7 +11,7 @@ use std::collections::HashMap;
 pub struct ChainId(pub String);
 
 #[derive(Debug)]
-pub struct ChainData(pub HashMap<BlockHash, (PcbVersion, ChainId)>);
+pub struct ChainData(pub HashMap<StateHash, (PcbVersion, ChainId)>);
 
 impl ChainId {
     pub const LEN: u32 = 64;
@@ -48,7 +45,7 @@ impl std::fmt::Display for ChainId {
 
 impl std::default::Default for ChainData {
     fn default() -> Self {
-        let v1_genesis_state_hash: BlockHash = MAINNET_GENESIS_HASH.into();
+        let v1_genesis_state_hash: StateHash = MAINNET_GENESIS_HASH.into();
         let v1_chain_id = chain_id(
             &v1_genesis_state_hash.0,
             MAINNET_PROTOCOL_CONSTANTS,
@@ -57,7 +54,7 @@ impl std::default::Default for ChainData {
             None,
             None,
         );
-        let v2_genesis_state_hash: BlockHash = HARDFORK_GENESIS_HASH.into();
+        let v2_genesis_state_hash: StateHash = HARDFORK_GENESIS_HASH.into();
         let v2_chain_id = chain_id(
             &v2_genesis_state_hash.0,
             MAINNET_PROTOCOL_CONSTANTS,

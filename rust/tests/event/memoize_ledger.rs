@@ -1,6 +1,7 @@
 use crate::helpers::{state::*, store::*};
 use mina_indexer::{
-    block::{parser::BlockParser, BlockHash},
+    base::state_hash::StateHash,
+    block::parser::BlockParser,
     event::{
         db::{DbEvent, DbLedgerEvent},
         store::EventStore,
@@ -26,7 +27,7 @@ async fn test() -> anyhow::Result<()> {
     // memoize via state hash query
     // mainnet-7-3NLGcwFVQF1p1PrZpusw2fZwBe5HKXGtrGy1Vc4aPkeBtT8nMNUc.json
     let blockchain_length = 7;
-    let state_hash = BlockHash("3NLGcwFVQF1p1PrZpusw2fZwBe5HKXGtrGy1Vc4aPkeBtT8nMNUc".into());
+    let state_hash = StateHash("3NLGcwFVQF1p1PrZpusw2fZwBe5HKXGtrGy1Vc4aPkeBtT8nMNUc".into());
     let ledger_hash =
         LedgerHash::new_or_panic("jwFtwfnhd2PDb15c23uVgNqjS3PNVWP4HpZzYSVGQAv64Y2bdV5".into());
     assert!(store
@@ -36,7 +37,7 @@ async fn test() -> anyhow::Result<()> {
     // don't memoize via state hash query
     // mainnet-6-3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v.json
     let blockchain_length_no = 6;
-    let state_hash_no = BlockHash("3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v".into());
+    let state_hash_no = StateHash("3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v".into());
     let ledger_hash_no =
         LedgerHash::new_or_panic("jxqrHaBcJzZAPW2rSa84chAxEHW7ot2GbqmRsWuNhwctZ8TFA2K".into());
     assert!(store
@@ -64,7 +65,7 @@ async fn test() -> anyhow::Result<()> {
     // memoize via height query
     // mainnet-4-3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG.json
     let blockchain_length = 4;
-    let state_hash = BlockHash("3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG".into());
+    let state_hash = StateHash("3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG".into());
     let ledger_hash =
         LedgerHash::new_or_panic("jxw3wNhAUhyVT4AK4dGxtn4Kpx6pvk3AXVoi2A6BAEQweyV8Uwe".into());
     assert!(store
@@ -74,7 +75,7 @@ async fn test() -> anyhow::Result<()> {
     // don't memoize via height query
     // mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json
     let blockchain_length_no = 11;
-    let state_hash_no = BlockHash("3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into());
+    let state_hash_no = StateHash("3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA".into());
     let ledger_hash_no =
         LedgerHash::new_or_panic("jxZVWjsyuQkPVSj7ZbqC8PPx8FXzHQjxUYA3bhvdnQQZ15jn7mR".into());
     assert!(store

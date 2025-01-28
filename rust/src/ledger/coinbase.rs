@@ -34,7 +34,7 @@ impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
             v2::staged_ledger_diff::Coinbase::One(_, one) => {
                 Self::One(one.map(|o| CoinbaseFeeTransfer {
                     receiver_pk: o.receiver_pk,
-                    fee: o.fee,
+                    fee: o.fee.0,
                 }))
             }
             v2::staged_ledger_diff::Coinbase::Two(_, two) => match two {
@@ -42,11 +42,11 @@ impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
                 Some((fst, snd)) => Self::Two(
                     Some(CoinbaseFeeTransfer {
                         receiver_pk: fst.receiver_pk,
-                        fee: fst.fee,
+                        fee: fst.fee.0,
                     }),
                     snd.map(|s| CoinbaseFeeTransfer {
                         receiver_pk: s.receiver_pk,
-                        fee: s.fee,
+                        fee: s.fee.0,
                     }),
                 ),
             },

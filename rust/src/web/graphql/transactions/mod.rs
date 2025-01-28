@@ -1,5 +1,6 @@
 use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
+    base::public_key::PublicKey,
     block::store::BlockStore,
     command::{
         signed::{SignedCommandWithData, TxnHash},
@@ -7,7 +8,6 @@ use crate::{
         CommandStatusData,
     },
     constants::millis_to_global_slot,
-    ledger::public_key::PublicKey,
     store::IndexerStore,
     utility::store::{
         command::user::{

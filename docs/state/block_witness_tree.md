@@ -1,4 +1,4 @@
-# [Mina Indexer / State] Block Witness Tree
+# \[Mina Indexer / State\] Block Witness Tree
 
 Each block in Mina can only have a single parent. Several blocks can
 be produced in each slot. The overall structure is a **tree**.
@@ -17,11 +17,11 @@ chain. It's what is called *Rooted* in the image below.
 
 ## Branch, Paths, Root, Leaves, and Head
 
-- **root** is a `BlockHash` representing the latest block we are
+- **root** is a `StateHash` representing the latest block we are
   effectively certain about
 - **branch** is a *rooted union* of *paths*, i.e. they all start at
   the same *root*
-- **path** is a `Vec<BlockHash>` representing a valid trace of state
+- **path** is a `Vec<StateHash>` representing a valid trace of state
   updates
   - begins at the root and ends at a unique leaf
   - the corresponding blocks are stored in separate hash-keyed data

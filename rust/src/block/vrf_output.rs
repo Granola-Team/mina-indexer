@@ -9,7 +9,7 @@ use blake2::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VrfOutput(Vec<u8>);
 
 impl VrfOutput {
@@ -36,6 +36,28 @@ impl VrfOutput {
     }
 }
 
+///////////
+// serde //
+///////////
+
+impl Serialize for VrfOutput {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        crate::utility::serde::to_str(self, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for VrfOutput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::utility::serde::from_str(deserializer)
+    }
+}
+
 /////////////////
 // conversions //
 /////////////////
@@ -45,6 +67,16 @@ impl std::str::FromStr for VrfOutput {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::base64_decode(s)
+    }
+}
+
+/////////////
+// default //
+/////////////
+
+impl Default for VrfOutput {
+    fn default() -> Self {
+        Self([0; 32].to_vec())
     }
 }
 
@@ -61,6 +93,26 @@ impl Display for VrfOutput {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn roundtrip() -> anyhow::Result<()> {
+        let vrf = VrfOutput::default();
+        let vrf_str = vrf.to_string();
+
+        // serialize
+        let ser = serde_json::to_vec(&vrf)?;
+
+        // deserialize
+        let res: VrfOutput = serde_json::from_slice(&ser)?;
+
+        // roundtrip
+        assert_eq!(vrf, res);
+
+        // same serialization as string
+        assert_eq!(ser, serde_json::to_vec(&vrf_str)?);
+
+        Ok(())
+    }
 
     #[test]
     fn last_pre_hardfork_vrf_output() -> anyhow::Result<()> {

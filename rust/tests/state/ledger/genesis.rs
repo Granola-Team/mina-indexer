@@ -1,10 +1,10 @@
 use mina_indexer::{
+    base::public_key::PublicKey,
     block::genesis::GenesisBlock,
     chain::Network,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         genesis::{GenesisLedger, GenesisRoot},
-        public_key::PublicKey,
         token::TokenAddress,
         Ledger,
     },

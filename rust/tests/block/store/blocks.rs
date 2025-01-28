@@ -1,10 +1,10 @@
 use crate::helpers::store::*;
 use mina_indexer::{
+    base::state_hash::StateHash,
     block::{
         parser::BlockParser,
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
-        BlockHash,
     },
     constants::*,
     store::IndexerStore,
@@ -73,7 +73,7 @@ async fn get_invalid() -> anyhow::Result<()> {
         db.add_block(&block, block_bytes)?;
     }
 
-    db.get_block(&BlockHash(
+    db.get_block(&StateHash(
         "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy".into(),
     ))?;
 

@@ -1,7 +1,8 @@
 use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
-    block::{parser::BlockParser, precomputed::PcbVersion, BlockHash},
+    base::state_hash::StateHash,
+    block::{parser::BlockParser, precomputed::PcbVersion},
     constants::*,
     ledger::store::{best::BestLedgerStore, staged::StagedLedgerStore},
 };
@@ -22,7 +23,7 @@ async fn check_staged_accounts() -> anyhow::Result<()> {
         BLOCK_REPORTING_FREQ_NUM,
     )
     .await?;
-    let state_hash = BlockHash::from("3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ");
+    let state_hash = StateHash::from("3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ");
 
     // ingest the blocks
     state.add_blocks(&mut bp).await?;

@@ -1,25 +1,20 @@
 pub mod account;
-pub mod amount;
 pub mod coinbase;
 pub mod diff;
 pub mod genesis;
 pub mod hash;
-pub mod nonce;
-pub mod public_key;
 pub mod staking;
 pub mod store;
 pub mod token;
 pub mod username;
 
 use crate::{
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey},
     block::precomputed::PrecomputedBlock,
     constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         account::Account,
-        amount::Amount,
         diff::{account::AccountDiff, LedgerDiff},
-        nonce::Nonce,
-        public_key::PublicKey,
         token::TokenAddress,
     },
 };
@@ -475,13 +470,12 @@ mod tests {
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
-        public_key::PublicKey,
         Amount, LedgerHash,
     };
     use crate::{
-        block::BlockHash,
+        base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
         constants::MINA_SCALE,
-        ledger::{nonce::Nonce, token::TokenAddress, TokenLedger},
+        ledger::{token::TokenAddress, TokenLedger},
     };
     use std::collections::{BTreeMap, HashMap};
 
@@ -510,7 +504,7 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
-            state_hash: BlockHash::default(),
+            state_hash: StateHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),
@@ -553,7 +547,7 @@ mod tests {
 
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
-            state_hash: BlockHash::default(),
+            state_hash: StateHash::default(),
             new_pk_balances: BTreeMap::new(),
             new_coinbase_receiver: None,
             staged_ledger_hash: LedgerHash::default(),

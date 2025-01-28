@@ -1,15 +1,14 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, DbBlockUpdate},
-        BlockHash,
     },
     command::internal::{
         store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData,
     },
     constants::millis_to_iso_date_string,
-    ledger::public_key::PublicKey,
     utility::store::{
         command::internal::*,
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key, U32_LEN},
@@ -127,7 +126,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_block_internal_command(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         trace!("Getting internal command block {state_hash} index {index}");
@@ -176,7 +175,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_internal_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands in block {state_hash}");
         let mut res = vec![];
@@ -422,7 +421,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn get_block_internal_commands_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<u32>> {
         trace!("Getting block internal command count");
         Ok(self
@@ -436,7 +435,7 @@ impl InternalCommandStore for IndexerStore {
 
     fn set_block_internal_commands_count_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {

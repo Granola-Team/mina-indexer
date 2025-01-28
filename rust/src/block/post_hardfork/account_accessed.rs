@@ -23,8 +23,8 @@ impl From<(u64, v2::AccountAccessed)> for AccountAccessed {
 
         let account = Account {
             public_key: public_key.to_owned(),
-            balance: value.1.balance.into(),
-            nonce: Some(value.1.nonce.into()),
+            balance: value.1.balance.0.into(),
+            nonce: Some(value.1.nonce),
             delegate: value.1.delegate.unwrap_or(public_key),
             genesis_account: false,
             token: Some(value.1.token_id),

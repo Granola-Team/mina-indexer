@@ -1,5 +1,8 @@
+//! Zkapp action store impl
+
 use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::public_key::PublicKey,
+    ledger::token::TokenAddress,
     mina_blocks::v2::ActionState,
     store::{
         column_families::ColumnFamilyHelpers, zkapp::actions::ZkappActionStore, IndexerStore,

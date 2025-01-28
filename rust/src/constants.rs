@@ -1,4 +1,4 @@
-use crate::ledger::amount::Amount;
+use crate::base::amount::Amount;
 use chrono::{DateTime, SecondsFormat, Utc};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;

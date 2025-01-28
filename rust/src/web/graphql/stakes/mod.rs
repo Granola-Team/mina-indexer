@@ -493,11 +493,11 @@ impl StakesLedgerAccountWithMeta {
 
         let total_delegated = decimal.to_f64().unwrap_or_default();
         let timing = account.timing.as_ref().map(|timing| Timing {
-            cliff_amount: Some(timing.cliff_amount),
-            cliff_time: Some(timing.cliff_time),
-            initial_minimum_balance: Some(timing.initial_minimum_balance),
-            vesting_increment: Some(timing.vesting_increment),
-            vesting_period: Some(timing.vesting_period),
+            cliff_amount: Some(timing.cliff_amount.0),
+            cliff_time: Some(timing.cliff_time.0),
+            initial_minimum_balance: Some(timing.initial_minimum_balance.0),
+            vesting_increment: Some(timing.vesting_increment.0),
+            vesting_period: Some(timing.vesting_period.0),
         });
         let chain_id = db.get_chain_id().expect("chain id").0;
 

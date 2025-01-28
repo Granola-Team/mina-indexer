@@ -1,4 +1,4 @@
-use super::BlockHash;
+use super::StateHash;
 use anyhow::bail;
 use std::{
     fs::File,
@@ -6,10 +6,10 @@ use std::{
     path::Path,
 };
 
-pub struct GenesisStateHash(BlockHash);
+pub struct GenesisStateHash(StateHash);
 
 impl GenesisStateHash {
-    pub fn from_path(path: &Path) -> anyhow::Result<BlockHash> {
+    pub fn from_path(path: &Path) -> anyhow::Result<StateHash> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
         let mut buffer = String::with_capacity(400);
@@ -25,8 +25,8 @@ impl GenesisStateHash {
             // Find the first quote after the colon
             if let Some(quote_start) = buffer[hash_start..].find('"') {
                 let start = hash_start + quote_start + 1;
-                if start + BlockHash::LEN <= buffer.len() {
-                    let genesis_state_hash = &buffer[start..][..BlockHash::LEN];
+                if start + StateHash::LEN <= buffer.len() {
+                    let genesis_state_hash = &buffer[start..][..StateHash::LEN];
                     return Ok(genesis_state_hash.into());
                 }
             }
@@ -35,7 +35,7 @@ impl GenesisStateHash {
     }
 }
 
-impl From<GenesisStateHash> for BlockHash {
+impl From<GenesisStateHash> for StateHash {
     fn from(value: GenesisStateHash) -> Self {
         value.0
     }
@@ -87,7 +87,7 @@ mod test {
                 "{}/{}-{i}-{}.json",
                 dir.path().display(),
                 Network::default(),
-                BlockHash::default()
+                StateHash::default()
             );
             write(&test_path, json_content)?;
 

@@ -1,7 +1,4 @@
-use crate::{
-    ledger::{public_key::PublicKey, token::TokenAddress},
-    mina_blocks::v2,
-};
+use crate::{base::public_key::PublicKey, ledger::token::TokenAddress, mina_blocks::v2};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

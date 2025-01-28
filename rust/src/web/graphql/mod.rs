@@ -12,7 +12,8 @@ pub mod version;
 
 use super::ENDPOINT_GRAPHQL;
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
     store::IndexerStore,
 };
@@ -122,14 +123,14 @@ pub(crate) fn date_time_to_scalar(millis: i64) -> DateTime {
 }
 
 /// Convenience function for obtaining a block's canonicity
-pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> bool {
+pub(crate) fn get_block_canonicity(db: &Arc<IndexerStore>, state_hash: &StateHash) -> bool {
     use crate::canonicity::{store::CanonicityStore, Canonicity};
     db.get_block_canonicity(state_hash)
         .map(|status| matches!(status, Some(Canonicity::Canonical)))
         .unwrap_or(false)
 }
 
-pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &BlockHash) -> PrecomputedBlock {
+pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &StateHash) -> PrecomputedBlock {
     db.get_block(state_hash)
         .with_context(|| format!("block missing from store {state_hash}"))
         .unwrap()

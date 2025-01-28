@@ -1,8 +1,8 @@
 //! Store for internal commands
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate, BlockHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},
     command::internal::DbInternalCommandWithData,
-    ledger::public_key::PublicKey,
 };
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;
@@ -34,13 +34,13 @@ pub trait InternalCommandStore {
     /// Get indexed internal commands from the given block
     fn get_internal_commands(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Vec<DbInternalCommandWithData>>;
 
     /// Get indexed internal command from block
     fn get_block_internal_command(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>>;
 
@@ -132,7 +132,7 @@ pub trait InternalCommandStore {
     /// Set internal command count for a block
     fn set_block_internal_commands_count_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
@@ -140,7 +140,7 @@ pub trait InternalCommandStore {
     /// Get num internal commands in block
     fn get_block_internal_commands_count(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<u32>>;
 
     /// Increment internal commands counts given `internal_command` in `epoch`

@@ -1,13 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
-    block::{
-        store::{BlockStore, BlockUpdate, DbBlockUpdate},
-        BlockHash,
-    },
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::store::{BlockStore, BlockUpdate, DbBlockUpdate},
     ledger::{
         account::Account,
         diff::account::AccountDiff,
-        public_key::PublicKey,
         store::{
             best::{BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
@@ -126,7 +123,7 @@ impl BestLedgerStore for IndexerStore {
 
     fn update_block_best_accounts(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         blocks: &DbBlockUpdate,
     ) -> anyhow::Result<()> {
         let account_updates = DbUpdate {
@@ -162,7 +159,7 @@ impl BestLedgerStore for IndexerStore {
 
     fn update_best_accounts(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         updates: DbAccountUpdate,
     ) -> anyhow::Result<()> {
         use AccountDiff::*;

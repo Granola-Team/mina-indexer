@@ -1,9 +1,8 @@
 use mina_indexer::{
+    base::amount::Amount,
     block::{parser::BlockParser, precomputed::PrecomputedBlock},
     constants::MINA_SCALE,
-    ledger::{
-        account::Account, amount::Amount, genesis::GenesisLedger, token::TokenAddress, Ledger,
-    },
+    ledger::{account::Account, genesis::GenesisLedger, token::TokenAddress, Ledger},
     state::IndexerState,
 };
 use std::path::PathBuf;

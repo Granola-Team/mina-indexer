@@ -42,7 +42,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: b""
     /// where
     /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [BlockHash::LEN] bytes
+    /// - state_hash:  [StateHash::LEN] bytes
     fn blocks_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-global-slot-sort")
@@ -55,7 +55,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: b""
     /// where
     /// - block_height: [u32] BE bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     fn blocks_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-height-sort")
@@ -268,7 +268,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - height:     [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     fn user_commands_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-height-sort")
@@ -282,7 +282,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - slot:       [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     fn user_commands_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-slot-sort")
@@ -323,7 +323,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - sender:      [PublicKey::LEN] bytes
     /// - global_slot: [u32] BE bytes
     /// - txn_hash:    [TxnHash::V1_LEN] bytes
-    /// - state_hash:  [BlockHash::LEN] bytes
+    /// - state_hash:  [StateHash::LEN] bytes
     /// - amount:      [u64] BE bytes
     fn txn_from_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -340,7 +340,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - block_height: [u32] BE bytes
     /// - nonce:        [u32] BE bytes
     /// - txn_hash:     [TxnHash::V1_LEN] bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     /// - amount:       [u64] BE bytes
     fn txn_from_height_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -356,7 +356,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - receiver:    [PublicKey::LEN] bytes
     /// - global_slot: [u32] BE bytes
     /// - txn_hash:    [TxnHash::V1_LEN] bytes
-    /// - state_hash:  [BlockHash::LEN] bytes
+    /// - state_hash:  [StateHash::LEN] bytes
     /// - amount:      [u64] BE bytes
     fn txn_to_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -372,7 +372,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - receiver:     [PublicKey::LEN] bytes
     /// - block_height: [u32] BE bytes
     /// - txn_hash:     [TxnHash::V1_LEN] bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     /// - amount:       [u64] BE bytes
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -447,7 +447,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - key: {state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     /// - index:      [u32] BE bytes
     fn internal_commands_cf(&self) -> &ColumnFamily {
         self.database
@@ -457,7 +457,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: [BlockHash::LEN] bytes
+    /// - key: [StateHash::LEN] bytes
     /// - val: [u32] BE bytes
     fn internal_commands_block_num_cf(&self) -> &ColumnFamily {
         self.database
@@ -494,7 +494,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: [InternalCommandWithData] serde bytes
     /// where
     /// - block_height: [u32] BE bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     /// - index:        [u32] BE bytes
     /// - kind:         0, 1, or 2
     fn internal_commands_block_height_sort_cf(&self) -> &ColumnFamily {
@@ -509,7 +509,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - val: [InternalCommandWithData] serde bytes
     /// where
     /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [BlockHash::LEN] bytes
+    /// - state_hash:  [StateHash::LEN] bytes
     /// - index:       [u32] BE bytes
     /// - kind:        0, 1, or 2
     fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily {
@@ -525,7 +525,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - receiver:     [PublicKey::LEN] bytes
     /// - block_height: [u32] BE bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     /// - index:        [u32] BE bytes
     fn internal_commands_pk_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -540,7 +540,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - receiver:     [PublicKey::LEN] bytes
     /// - global_slot: [u32] BE bytes
-    /// - state_hash:   [BlockHash::LEN] bytes
+    /// - state_hash:   [StateHash::LEN] bytes
     /// - index:        [u32] BE bytes
     fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -623,7 +623,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {state_hash}{token}{pk} -> account
     /// where
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     /// - token:      [TokenAddress::LEN] bytes
     /// - pk:         [PublicKey::LEN] bytes
     /// - account:    serde bytes
@@ -637,7 +637,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {state_hash}{token}{balance}{pk} -> _
     /// where
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     /// - token:      [TokenAddress::LEN] bytes
     /// - balance:    [u64] BE bytes
     /// - pk:         [PublicKey::LEN] bytes
@@ -651,7 +651,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {state_hash}{pk} -> num
     /// where
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     /// - pk:         [PublicKey::LEN] bytes
     /// - num:        [u32] BE bytes
     fn staged_ledger_account_num_delegations_cf(&self) -> &ColumnFamily {
@@ -664,7 +664,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {state_hash}{pk}{num} -> delegate
     /// where
-    /// - state_hash: [BlockHash::LEN] bytes
+    /// - state_hash: [StateHash::LEN] bytes
     /// - pk:         [PublicKey::LEN] bytes
     /// - num:        [u32] BE bytes
     /// - delegate:   serde bytes
@@ -824,7 +824,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {hash}{index}
     /// val: snark
     /// where
-    /// - hash:  [BlockHash] bytes
+    /// - hash:  [StateHash] bytes
     /// - index: u32 BE bytes
     /// - snark: [SnarkWorkSummary] serde bytes
     fn snarks_cf(&self) -> &ColumnFamily {
@@ -1080,7 +1080,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// fee:   u6[u32] BE bytes
     /// sort:  u32 BE bytes
     /// pk:    [PublicKey] bytes
-    /// hash:  [BlockHash] bytes
+    /// hash:  [StateHash] bytes
     /// index: u32 BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
@@ -1097,7 +1097,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// fee:   u6[u32] BE bytes
     /// sort:  u32 BE bytes
     /// pk:    [PublicKey] bytes
-    /// hash:  [BlockHash] bytes
+    /// hash:  [StateHash] bytes
     /// index: u32 BE bytes
     /// ```
     /// Use [snark_fee_sort_key]

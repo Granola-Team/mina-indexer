@@ -3,7 +3,8 @@ pub mod account;
 use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
 use super::{coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
 use crate::{
-    block::{precomputed::PrecomputedBlock, AccountCreated, BlockHash},
+    base::state_hash::StateHash,
+    block::{precomputed::PrecomputedBlock, AccountCreated},
     command::UserCommandWithStatusT,
 };
 use account::ZkappAccountCreationFee;
@@ -16,7 +17,7 @@ pub struct LedgerDiff {
     pub blockchain_length: u32,
 
     /// State hash of the block
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
 
     /// Staged ledger hash of the resulting ledger
     pub staged_ledger_hash: LedgerHash,
@@ -192,11 +193,9 @@ impl LedgerDiff {
 #[cfg(test)]
 mod tests {
     use crate::{
+        base::nonce::Nonce,
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        ledger::{
-            diff::{account::AccountDiffType::*, LedgerDiff},
-            nonce::Nonce,
-        },
+        ledger::diff::{account::AccountDiffType::*, LedgerDiff},
     };
     use std::path::PathBuf;
 

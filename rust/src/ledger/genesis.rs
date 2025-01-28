@@ -1,14 +1,12 @@
 use super::{
     account::{Account, ReceiptChainHash, Timing},
-    amount::Amount,
-    public_key::PublicKey,
-    token::TokenAddress,
+    token::{TokenAddress, TokenId},
     Ledger, TokenLedger,
 };
 use crate::{
-    block::{genesis::GenesisBlock, BlockHash},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    block::genesis::GenesisBlock,
     constants::*,
-    mina_blocks::common::from_str_opt,
     utility::compression::decompress_gzip,
 };
 use anyhow::{anyhow, Ok};
@@ -39,7 +37,7 @@ pub struct GenesisProof {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenesisForkProof {
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
 }
@@ -58,17 +56,15 @@ pub struct GenesisAccount {
     pub delegate: Option<String>,
     pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<BlockHash>,
+    pub voting_for: Option<StateHash>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "from_str_opt")]
-    pub nonce: Option<u32>,
+    pub nonce: Option<Nonce>,
 
     #[serde(default)]
-    #[serde(deserialize_with = "from_str_opt")]
-    pub token: Option<u64>,
+    pub token: Option<TokenId>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -295,19 +291,22 @@ impl From<GenesisAccountTiming> for Timing {
                 .initial_minimum_balance
                 .parse::<Amount>()
                 .unwrap_or_else(|_| panic!("Unable to parse genesis initial minimum balance"))
-                .0,
+                .0
+                .into(),
             cliff_time: value.cliff_time.parse().expect("cliff time is u64"),
             cliff_amount: value
                 .cliff_amount
                 .parse::<Amount>()
                 .unwrap_or_else(|_| panic!("Unable to parse genesis cliff amount"))
-                .0,
+                .0
+                .into(),
             vesting_period: value.vesting_period.parse().expect("vesting period is u64"),
             vesting_increment: value
                 .vesting_increment
                 .parse::<Amount>()
                 .unwrap_or_else(|_| panic!("Unable to parse genesis vesting increment"))
-                .0,
+                .0
+                .into(),
         }
     }
 }

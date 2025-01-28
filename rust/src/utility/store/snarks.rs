@@ -1,6 +1,5 @@
 use crate::{
-    block::BlockHash,
-    ledger::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
     utility::store::common::{U32_LEN, U64_LEN},
 };
 
@@ -24,22 +23,22 @@ pub fn snark_epoch_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::
 /// fee:   [u64] BE bytes
 /// sort:  [u32] BE bytes
 /// pk:    [PublicKey] bytes
-/// hash:  [BlockHash] bytes
+/// hash:  [StateHash] bytes
 /// index: [u32] BE bytes
 pub fn snark_fee_sort_key(
     fee: u64,
     u32_sort: u32,
     pk: &PublicKey,
-    state_hash: &BlockHash,
+    state_hash: &StateHash,
     index: u32,
-) -> [u8; U64_LEN + U32_LEN + PublicKey::LEN + BlockHash::LEN + U32_LEN] {
-    let mut key = [0; U64_LEN + U32_LEN + PublicKey::LEN + BlockHash::LEN + U32_LEN];
+) -> [u8; U64_LEN + U32_LEN + PublicKey::LEN + StateHash::LEN + U32_LEN] {
+    let mut key = [0; U64_LEN + U32_LEN + PublicKey::LEN + StateHash::LEN + U32_LEN];
     key[..U64_LEN].copy_from_slice(&fee.to_be_bytes());
     key[U64_LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[U64_LEN..][U32_LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
-    key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..BlockHash::LEN]
+    key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..StateHash::LEN]
         .copy_from_slice(state_hash.0.as_bytes());
-    key[U64_LEN..][U32_LEN..][PublicKey::LEN..][BlockHash::LEN..]
+    key[U64_LEN..][U32_LEN..][PublicKey::LEN..][StateHash::LEN..]
         .copy_from_slice(&index.to_be_bytes());
     key
 }
@@ -92,7 +91,7 @@ mod tests {
         let index = 25;
         let block_height = 50;
         let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
+        let state_hash = StateHash::default();
         let key = snark_fee_sort_key(fee, block_height, &pk, &state_hash, index);
 
         assert_eq!(&key[..U64_LEN], &fee.to_be_bytes());
@@ -102,11 +101,11 @@ mod tests {
             pk.0.as_bytes()
         );
         assert_eq!(
-            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..BlockHash::LEN],
+            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..StateHash::LEN],
             state_hash.0.as_bytes()
         );
         assert_eq!(
-            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][BlockHash::LEN..],
+            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][StateHash::LEN..],
             &index.to_be_bytes()
         );
     }

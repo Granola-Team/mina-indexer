@@ -9,9 +9,10 @@ use super::{
     post_hardfork::{
         account_accessed::AccountAccessed, account_created::AccountCreated, token_used::TokenUsed,
     },
-    Block, BlockHash, VrfOutput,
+    Block, StateHash, VrfOutput,
 };
 use crate::{
+    base::{blockchain_length::BlockchainLength, public_key::PublicKey},
     canonicity::Canonicity,
     chain::Network,
     command::{
@@ -21,7 +22,6 @@ use crate::{
     constants::*,
     ledger::{
         coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
-        public_key::PublicKey,
         token::TokenAddress,
         username::Username,
         LedgerHash,
@@ -40,8 +40,8 @@ use v2::{BlockFileDataV2, BlockFileV2, PrecomputedBlockV2, PrecomputedBlockWithC
 
 pub struct BlockFileContents {
     pub(crate) network: Network,
-    pub(crate) state_hash: BlockHash,
-    pub(crate) blockchain_length: u32,
+    pub(crate) state_hash: StateHash,
+    pub(crate) blockchain_length: BlockchainLength,
     pub(crate) contents: Vec<u8>,
 }
 
@@ -128,9 +128,9 @@ impl PrecomputedBlock {
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
-                blockchain_length,
                 network: network.into(),
                 state_hash: state_hash.into(),
+                blockchain_length: blockchain_length.into(),
             },
             version,
         )?;
@@ -144,9 +144,9 @@ impl PrecomputedBlock {
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
-                blockchain_length,
                 network,
                 state_hash,
+                blockchain_length: blockchain_length.into(),
             },
             version,
         )?;
@@ -160,10 +160,10 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn previous_state_hash(&self) -> BlockHash {
+    pub fn previous_state_hash(&self) -> StateHash {
         match self {
             Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
+                StateHash::from_hashv1(v1.protocol_state.previous_state_hash.to_owned())
             }
             Self::V2(v2) => v2.protocol_state.previous_state_hash.to_owned(),
         }
@@ -289,7 +289,7 @@ impl PrecomputedBlock {
     pub fn snark_fees(&self) -> u64 {
         self.completed_works()
             .into_iter()
-            .map(|work| work.fee)
+            .map(|work| work.fee.0)
             .sum()
     }
 
@@ -383,7 +383,7 @@ impl PrecomputedBlock {
                     .t
                     .t
             }
-            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp,
+            Self::V2(v2) => v2.protocol_state.body.blockchain_state.timestamp.0,
         }
     }
 
@@ -677,10 +677,10 @@ impl PrecomputedBlock {
         public_keys
     }
 
-    pub fn genesis_state_hash(&self) -> BlockHash {
+    pub fn genesis_state_hash(&self) -> StateHash {
         match self {
             Self::V1(v1) => {
-                BlockHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
+                StateHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
             }
             Self::V2(v2) => v2.protocol_state.body.genesis_state_hash.to_owned(),
         }
@@ -704,7 +704,7 @@ impl PrecomputedBlock {
                     .t
                     .t
             }
-            Self::V2(v2) => v2.protocol_state.body.consensus_state.total_currency,
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.total_currency.0,
         }
     }
 
@@ -830,6 +830,7 @@ impl PrecomputedBlock {
                     .body
                     .consensus_state
                     .global_slot_since_genesis
+                    .0
             }
         }
     }
@@ -848,7 +849,7 @@ impl PrecomputedBlock {
                     .t
                     .t
             }
-            Self::V2(v2) => v2.protocol_state.body.consensus_state.min_window_density,
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.min_window_density.0,
         }
     }
 
@@ -933,6 +934,7 @@ impl PrecomputedBlock {
                     .consensus_state
                     .next_epoch_data
                     .epoch_length
+                    .0
             }
         }
     }
@@ -964,13 +966,14 @@ impl PrecomputedBlock {
                     .next_epoch_data
                     .ledger
                     .total_currency
+                    .0
             }
         }
     }
 
-    pub fn next_epoch_start_checkpoint(&self) -> BlockHash {
+    pub fn next_epoch_start_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -994,9 +997,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn next_epoch_lock_checkpoint(&self) -> BlockHash {
+    pub fn next_epoch_lock_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1045,6 +1048,7 @@ impl PrecomputedBlock {
                     .consensus_state
                     .next_epoch_data
                     .epoch_length
+                    .0
             }
         }
     }
@@ -1132,13 +1136,14 @@ impl PrecomputedBlock {
                     .staking_epoch_data
                     .ledger
                     .total_currency
+                    .0
             }
         }
     }
 
-    pub fn staking_epoch_start_checkpoint(&self) -> BlockHash {
+    pub fn staking_epoch_start_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1162,9 +1167,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn staking_epoch_lock_checkpoint(&self) -> BlockHash {
+    pub fn staking_epoch_lock_checkpoint(&self) -> StateHash {
         match self {
-            Self::V1(v1) => BlockHash::from_hashv1(
+            Self::V1(v1) => StateHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -1202,7 +1207,7 @@ impl PrecomputedBlock {
                     .t
                     .t
             }
-            Self::V2(v2) => v2.protocol_state.body.consensus_state.epoch_count,
+            Self::V2(v2) => v2.protocol_state.body.consensus_state.epoch_count.0,
         }
     }
 
@@ -1293,8 +1298,8 @@ impl PrecomputedBlock {
                     canonicity: Some(canonicity),
                     network: v1.network.to_owned(),
                     state_hash: v1.state_hash.to_owned(),
-                    blockchain_length: v1.blockchain_length,
-                    scheduled_time: v1.scheduled_time,
+                    blockchain_length: v1.blockchain_length.to_owned(),
+                    scheduled_time: v1.scheduled_time.to_owned(),
                     protocol_state: v1.protocol_state.to_owned(),
                     staged_ledger_diff: v1.staged_ledger_diff.to_owned(),
                 }))
@@ -1322,7 +1327,7 @@ impl PrecomputedBlock {
         )
     }
 
-    pub fn state_hash(&self) -> BlockHash {
+    pub fn state_hash(&self) -> StateHash {
         match self {
             PrecomputedBlock::V1(v1) => v1.state_hash.to_owned(),
             PrecomputedBlock::V2(v2) => v2.state_hash.to_owned(),
@@ -1331,8 +1336,8 @@ impl PrecomputedBlock {
 
     pub fn blockchain_length(&self) -> u32 {
         match self {
-            PrecomputedBlock::V1(v1) => v1.blockchain_length,
-            PrecomputedBlock::V2(v2) => v2.blockchain_length,
+            PrecomputedBlock::V1(v1) => v1.blockchain_length.0,
+            PrecomputedBlock::V2(v2) => v2.blockchain_length.0,
         }
     }
 

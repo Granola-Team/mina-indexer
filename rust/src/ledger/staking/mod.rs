@@ -2,13 +2,12 @@ pub mod parser;
 pub mod permissions;
 
 use crate::{
-    block::{extract_height_and_hash, extract_network, BlockHash},
+    base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    block::{extract_height_and_hash, extract_network},
     chain::Network,
     constants::MINA_SCALE_DEC,
     ledger::{
         account::{ReceiptChainHash, Timing},
-        nonce::Nonce,
-        public_key::PublicKey,
         LedgerHash,
     },
     mina_blocks::v2::ZkappAccount,
@@ -29,7 +28,7 @@ pub struct StakingLedger {
     pub network: Network,
     pub ledger_hash: LedgerHash,
     pub total_currency: u64,
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
@@ -42,7 +41,7 @@ pub struct StakingAccount {
     pub token: Option<u64>,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
-    pub voting_for: BlockHash,
+    pub voting_for: StateHash,
     pub nonce: Option<Nonce>,
     pub timing: Option<Timing>,
     pub zkapp: Option<ZkappAccount>,
@@ -57,7 +56,7 @@ pub struct StakingAccountJson {
     pub token: String,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
-    pub voting_for: BlockHash,
+    pub voting_for: StateHash,
     pub nonce: Option<String>,
     pub timing: Option<TimingJson>,
 }
@@ -76,7 +75,7 @@ pub struct AggregatedEpochStakeDelegations {
     pub epoch: u32,
     pub network: Network,
     pub ledger_hash: LedgerHash,
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub delegations: HashMap<PublicKey, EpochStakeDelegation>,
     pub total_delegations: u64,
 }
@@ -103,7 +102,7 @@ pub struct AggregatedEpochStakeDelegation {
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
         let token = Some(value.token.parse().expect("token is u32"));
-        let nonce = value.nonce.map(|nonce| nonce.into());
+        let nonce = value.nonce.map(Into::into);
         let balance = match value.balance.parse::<Decimal>() {
             Ok(amt) => (amt * MINA_SCALE_DEC)
                 .to_u64()
@@ -117,15 +116,15 @@ impl From<StakingAccountJson> for StakingAccount {
                 .parse()
                 .expect("vesting_period is u64"),
             initial_minimum_balance: match timing.initial_minimum_balance.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
                 Err(e) => panic!("Unable to parse initial_minimum_balance: {e}"),
             },
             cliff_amount: match timing.cliff_amount.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
                 Err(e) => panic!("Unable to parse cliff_amount: {e}"),
             },
             vesting_increment: match timing.vesting_increment.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap(),
+                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
                 Err(e) => panic!("Unable to parse vesting_increment: {e}"),
             },
         });
@@ -158,7 +157,7 @@ pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
 impl StakingLedger {
     pub async fn parse_file(
         path: &Path,
-        genesis_state_hash: BlockHash,
+        genesis_state_hash: StateHash,
     ) -> anyhow::Result<StakingLedger> {
         trace!(
             "Parsing staking ledger {:?}",
@@ -298,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn calculate_delegations() -> anyhow::Result<()> {
-        use crate::ledger::public_key::PublicKey;
+        use crate::base::public_key::PublicKey;
 
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into()).await?;

@@ -1,12 +1,16 @@
-pub mod command;
+//! V2 staged ledger diff
+
 pub mod completed_work;
 
 use super::{protocol_state::SupplyAdjustment, AppState, Permissions, Timing, VerificationKey};
 use crate::{
+    base::{
+        amount::Amount, nonce::Nonce, numeric::Numeric, public_key::PublicKey,
+        scheduled_time::ScheduledTime, Balance,
+    },
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
-    ledger::{public_key::PublicKey, token::TokenAddress},
-    mina_blocks::common::*,
+    ledger::token::TokenAddress,
     protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
     utility::functions::nanomina_to_mina,
 };
@@ -50,10 +54,7 @@ pub enum CoinbaseKind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CoinbasePayload {
     pub receiver_pk: PublicKey,
-
-    #[serde(serialize_with = "to_nanomina_str")]
-    #[serde(deserialize_with = "from_nanomina_str")]
-    pub fee: u64,
+    pub fee: Amount,
 }
 
 /// User command
@@ -98,7 +99,6 @@ impl std::cmp::Eq for UserCommandData {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignedCommandData {
     pub signer: PublicKey,
-
     pub payload: SignedCommandPayload,
     pub signature: String,
 }
@@ -135,10 +135,7 @@ pub enum SetDelegate {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PaymentPayload {
     pub receiver_pk: PublicKey,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub amount: u64,
+    pub amount: Balance,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -150,11 +147,10 @@ pub struct StakeDelegationPayload {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ZkappCommandData {
-    pub fee_payer: FeePayer,
-    pub account_updates: Vec<AccountUpdates>,
-
     // base58 encoded memo
     pub memo: String,
+    pub fee_payer: FeePayer,
+    pub account_updates: Vec<AccountUpdates>,
 }
 
 impl Eq for ZkappCommandData {}
@@ -168,18 +164,9 @@ pub struct FeePayer {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct FeePayerBody {
     pub public_key: PublicKey,
-
-    #[serde(serialize_with = "to_nanomina_str")]
-    #[serde(deserialize_with = "from_nanomina_str")]
-    pub fee: u64,
-
-    #[serde(serialize_with = "to_str_opt")]
-    #[serde(deserialize_with = "from_str_opt")]
-    pub valid_until: Option<u64>,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub nonce: u32,
+    pub fee: Amount,
+    pub valid_until: Option<ScheduledTime>,
+    pub nonce: Nonce,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -214,10 +201,12 @@ pub enum Authorization {
     #[serde(rename = "None_given")]
     NoneGiven((String,)),
     Either((String,)),
-    Proof((String,)),
+    #[serde(rename = "Proof")]
     Proof_((ProofOrSignature, String)),
-    Signature((String,)),
+    Proof((String,)),
+    #[serde(rename = "Signature")]
     Signature_((ProofOrSignature, String)),
+    Signature((String,)),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -347,13 +336,8 @@ pub enum Precondition<T> {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NumericBounds {
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    lower: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    upper: u32,
+    lower: Numeric<u32>,
+    upper: Numeric<u32>,
 }
 
 impl std::str::FromStr for NumericBounds {
@@ -372,22 +356,12 @@ pub struct Call {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignedCommandPayloadCommon {
-    #[serde(serialize_with = "to_nanomina_str")]
-    #[serde(deserialize_with = "from_nanomina_str")]
-    pub fee: u64,
-
-    pub fee_payer_pk: PublicKey,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub nonce: u32,
-
-    #[serde(serialize_with = "to_str")]
-    #[serde(deserialize_with = "from_str")]
-    pub valid_until: u64,
-
     // Base58 encoded string
     pub memo: String,
+    pub fee: Amount,
+    pub fee_payer_pk: PublicKey,
+    pub nonce: Nonce,
+    pub valid_until: ScheduledTime,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -431,7 +405,9 @@ fn convert_object(key: &str, value: &mut serde_json::Value) {
     }
 }
 
-// conversions
+/////////////////
+// conversions //
+/////////////////
 
 impl<T> From<UpdateKind> for Option<T>
 where

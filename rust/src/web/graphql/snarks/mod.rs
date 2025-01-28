@@ -1,8 +1,8 @@
 use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity};
 use crate::{
-    block::{precomputed::PrecomputedBlock, store::BlockStore, BlockHash},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
-    ledger::public_key::PublicKey,
     snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
     store::IndexerStore,
     utility::store::common::{from_be_bytes, state_hash_suffix, U32_LEN},
@@ -121,7 +121,7 @@ impl SnarkQueryRoot {
                         SnarkWorkSummaryWithStateHash {
                             fee: snark.fee,
                             prover: snark.prover,
-                            state_hash: state_hash.clone(),
+                            state_hash: state_hash.clone().into(),
                         },
                     )
                     .ok()
@@ -407,10 +407,9 @@ fn snark_summary_matches_query(
     query: &Option<SnarkQueryInput>,
     snark: SnarkWorkSummaryWithStateHash,
 ) -> anyhow::Result<Option<SnarkWithCanonicity>> {
-    let state_hash = BlockHash::from(snark.state_hash.clone());
-    let canonical = get_block_canonicity(db, &state_hash);
+    let canonical = get_block_canonicity(db, &snark.state_hash);
     let snark_with_canonicity = SnarkWithCanonicity {
-        pcb: get_block(db, &state_hash),
+        pcb: get_block(db, &snark.state_hash),
         canonical,
         snark: (
             snark,
@@ -430,10 +429,10 @@ fn snark_summary_matches_query(
     }
 }
 
-impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
-    fn from(snark: (SnarkWorkSummary, BlockHash, u32, u32)) -> Self {
+impl From<(SnarkWorkSummary, StateHash, u32, u32)> for Snark {
+    fn from(snark: (SnarkWorkSummary, StateHash, u32, u32)) -> Self {
         Snark {
-            fee: snark.0.fee,
+            fee: snark.0.fee.0,
             prover: snark.0.prover.0,
             block: SnarkBlock {
                 state_hash: snark.1 .0,
@@ -447,10 +446,10 @@ impl From<(SnarkWorkSummary, BlockHash, u32, u32)> for Snark {
 impl From<(SnarkWorkSummaryWithStateHash, u32, u32)> for Snark {
     fn from(snark: (SnarkWorkSummaryWithStateHash, u32, u32)) -> Self {
         Snark {
-            fee: snark.0.fee,
+            fee: snark.0.fee.0,
             prover: snark.0.prover.0,
             block: SnarkBlock {
-                state_hash: snark.0.state_hash.clone(),
+                state_hash: snark.0.state_hash.0,
             },
             epoch_num_snarks: snark.1,
             total_num_snarks: snark.2,

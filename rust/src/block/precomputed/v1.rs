@@ -1,11 +1,11 @@
 //! Indexer internal V1 precomputed block representation
 
-use super::MAINNET_GENESIS_TIMESTAMP;
 use crate::{
-    block::BlockHash,
+    base::{
+        blockchain_length::BlockchainLength, scheduled_time::ScheduledTime, state_hash::StateHash,
+    },
     canonicity::Canonicity,
     chain::Network,
-    mina_blocks::common::*,
     protocol::serialization_types::{
         protocol_state::{ProtocolState, ProtocolStateJson},
         staged_ledger_diff as mina_rs,
@@ -15,26 +15,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct BlockFileV1 {
-    #[serde(default = "mainnet_genesis_timestamp")]
-    #[serde(deserialize_with = "from_str")]
-    pub scheduled_time: u64,
+    #[serde(default = "ScheduledTime::mainnet_genesis_timestamp")]
+    pub scheduled_time: ScheduledTime,
 
     pub protocol_state: ProtocolStateJson,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiffJson,
-}
-
-fn mainnet_genesis_timestamp() -> u64 {
-    MAINNET_GENESIS_TIMESTAMP
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PrecomputedBlockV1 {
     // metadata
     pub network: Network,
-    pub state_hash: BlockHash,
-    pub blockchain_length: u32,
+    pub state_hash: StateHash,
+    pub blockchain_length: BlockchainLength,
     // from PCB
-    pub scheduled_time: u64,
+    pub scheduled_time: ScheduledTime,
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
 }
@@ -43,9 +38,9 @@ pub struct PrecomputedBlockV1 {
 pub struct PrecomputedBlockWithCanonicityV1 {
     pub canonicity: Option<Canonicity>,
     pub network: Network,
-    pub state_hash: BlockHash,
-    pub scheduled_time: u64,
-    pub blockchain_length: u32,
+    pub state_hash: StateHash,
+    pub scheduled_time: ScheduledTime,
+    pub blockchain_length: BlockchainLength,
     pub protocol_state: ProtocolState,
     pub staged_ledger_diff: mina_rs::StagedLedgerDiff,
 }

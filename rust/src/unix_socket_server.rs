@@ -1,8 +1,6 @@
 use crate::{
-    block::{
-        precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockHash,
-        BlockWithoutHeight,
-    },
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::{precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockWithoutHeight},
     canonicity::store::CanonicityStore,
     client::*,
     command::{
@@ -12,7 +10,6 @@ use crate::{
         Command,
     },
     ledger::{
-        public_key::PublicKey,
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::TokenAddress,
@@ -149,7 +146,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received block-state-hash command");
-                    if !BlockHash::is_valid(&state_hash) {
+                    if !StateHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else if let Ok(Some((ref block, _))) =
                         db.get_block(&state_hash.clone().into())
@@ -463,14 +460,14 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received best-chain command");
-                    let start_state_hash: BlockHash = start_state_hash.into();
+                    let start_state_hash: StateHash = start_state_hash.into();
                     if let Some(best_tip) = db.get_best_block()? {
                         let end_state_hash: String = {
                             if end_state_hash.is_none() {
                                 best_tip.state_hash().0
                             } else {
                                 let end_state_hash = &end_state_hash.unwrap();
-                                if !BlockHash::is_valid(end_state_hash) {
+                                if !StateHash::is_valid(end_state_hash) {
                                     best_tip.state_hash().0
                                 } else {
                                     end_state_hash.into()
@@ -478,7 +475,7 @@ pub async fn handle_connection(
                             }
                         };
 
-                        if !BlockHash::is_valid(&start_state_hash.0) {
+                        if !StateHash::is_valid(&start_state_hash.0) {
                             invalid_state_hash(&start_state_hash.0)
                         } else if let (Some((end_block, _)), Some((start_block, _))) = (
                             db.get_block(&end_state_hash.into())?,
@@ -492,7 +489,7 @@ pub async fn handle_connection(
                             // constrain by num and state hash bound
                             for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
                                 if let Some((parent_pcb, _)) = db.get_block(&parent_hash)? {
-                                    let curr_hash: BlockHash = parent_pcb.state_hash();
+                                    let curr_hash: StateHash = parent_pcb.state_hash();
                                     parent_hash = parent_pcb.previous_state_hash();
                                     best_chain.push(parent_pcb);
 
@@ -619,7 +616,7 @@ pub async fn handle_connection(
                     }
 
                     // check if ledger or state hash and use appropriate getter
-                    if BlockHash::is_valid(&hash) {
+                    if StateHash::is_valid(&hash) {
                         trace!("{hash} is a state hash");
                         if let Some(ledger) =
                             db.get_staged_ledger_at_state_hash(&hash.clone().into(), memoize)?
@@ -719,7 +716,7 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received staking-ledgers-epoch {epoch} command");
-                    if !BlockHash::is_valid(&genesis_state_hash) {
+                    if !StateHash::is_valid(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if let Some(staking_ledger) =
                         db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
@@ -753,7 +750,7 @@ pub async fn handle_connection(
                     public_key: pk,
                 } => {
                     info!("Received staking ledger account command for pk {pk} epoch {epoch}");
-                    if !BlockHash::is_valid(&genesis_state_hash) {
+                    if !StateHash::is_valid(&genesis_state_hash) {
                         invalid_state_hash(&genesis_state_hash)
                     } else if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
@@ -865,7 +862,7 @@ pub async fn handle_connection(
                 Snarks::StateHash { state_hash, path } => {
                     info!("Received SNARK work command for state hash {state_hash}");
 
-                    if !BlockHash::is_valid(&state_hash) {
+                    if !StateHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
                         db.get_block_snark_work(&state_hash.clone().into())?
@@ -944,8 +941,8 @@ pub async fn handle_connection(
                     path,
                     csv,
                 } => {
-                    let start_state_hash: BlockHash = start_state_hash.into();
-                    let end_state_hash: BlockHash = {
+                    let start_state_hash: StateHash = start_state_hash.into();
+                    let end_state_hash: StateHash = {
                         let raw = end_state_hash.unwrap_or("x".to_string());
                         if &raw == "x" {
                             // dummy value replaced with best block state hash
@@ -962,9 +959,9 @@ pub async fn handle_connection(
 
                     if !PublicKey::is_valid(&pk) {
                         invalid_public_key(&pk)
-                    } else if !BlockHash::is_valid(&start_state_hash.0) {
+                    } else if !StateHash::is_valid(&start_state_hash.0) {
                         invalid_state_hash(&start_state_hash.0)
-                    } else if !BlockHash::is_valid(&end_state_hash.0) {
+                    } else if !StateHash::is_valid(&end_state_hash.0) {
                         invalid_state_hash(&end_state_hash.0)
                     } else if csv {
                         match db.write_user_commands_csv(&pk.clone().into(), path) {
@@ -1020,10 +1017,10 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received tx-state-hash command for {state_hash}");
-                    if !BlockHash::is_valid(&state_hash) {
+                    if !StateHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
-                        let block_hash = BlockHash(state_hash.to_owned());
+                        let block_hash = StateHash(state_hash.to_owned());
                         db.get_block_user_commands(&block_hash)
                             .unwrap_or_default()
                             .map(|cmds| {
@@ -1091,10 +1088,10 @@ pub async fn handle_connection(
                 }
                 InternalCommands::StateHash { path, state_hash } => {
                     info!("Received internal-state-hash command for {}", state_hash);
-                    if !BlockHash::is_valid(&state_hash) {
+                    if !StateHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
                     } else {
-                        let state_hash = BlockHash(state_hash);
+                        let state_hash = StateHash(state_hash);
                         let internal_cmds_str =
                             serde_json::to_string_pretty(&db.get_internal_commands(&state_hash)?)?;
 

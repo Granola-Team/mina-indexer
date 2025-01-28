@@ -1,14 +1,12 @@
 use mina_indexer::{
+    base::public_key::PublicKey,
     block::parser::BlockParser,
-    ledger::{
-        diff::{
-            account::{
-                AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, PaymentDiff,
-                UpdateType,
-            },
-            LedgerDiff,
+    ledger::diff::{
+        account::{
+            AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, PaymentDiff,
+            UpdateType,
         },
-        public_key::PublicKey,
+        LedgerDiff,
     },
 };
 use std::{collections::HashMap, path::PathBuf};

@@ -1,20 +1,20 @@
 use crate::{
-    block::{precomputed::PrecomputedBlock, BlockHash},
-    ledger::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    block::precomputed::PrecomputedBlock,
     utility::store::common::U32_LEN,
 };
 
 /// `{block height BE}{state hash}`
-pub fn block_height_key(block: &PrecomputedBlock) -> [u8; U32_LEN + BlockHash::LEN] {
-    let mut key = [0; U32_LEN + BlockHash::LEN];
+pub fn block_height_key(block: &PrecomputedBlock) -> [u8; U32_LEN + StateHash::LEN] {
+    let mut key = [0; U32_LEN + StateHash::LEN];
     key[..U32_LEN].copy_from_slice(&block.blockchain_length().to_be_bytes());
     key[U32_LEN..].copy_from_slice(block.state_hash().0.as_bytes());
     key
 }
 
 /// `{global slot BE}{state hash}`
-pub fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; U32_LEN + BlockHash::LEN] {
-    let mut key = [0; U32_LEN + BlockHash::LEN];
+pub fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; U32_LEN + StateHash::LEN] {
+    let mut key = [0; U32_LEN + StateHash::LEN];
     key[..U32_LEN].copy_from_slice(&block.global_slot_since_genesis().to_be_bytes());
     key[U32_LEN..].copy_from_slice(block.state_hash().0.as_bytes());
     key
@@ -26,16 +26,16 @@ pub fn block_global_slot_key(block: &PrecomputedBlock) -> [u8; U32_LEN + BlockHa
 /// where
 /// - pk:         [PublicKey] bytes
 /// - sort_value: u32 BE bytes
-/// - state_hash: [BlockHash] bytes
+/// - state_hash: [StateHash] bytes
 pub fn pk_block_sort_key(
     pk: &PublicKey,
     sort_value: u32,
-    state_hash: &BlockHash,
-) -> [u8; PublicKey::LEN + U32_LEN + BlockHash::LEN] {
-    let mut key = [0; PublicKey::LEN + U32_LEN + BlockHash::LEN];
+    state_hash: &StateHash,
+) -> [u8; PublicKey::LEN + U32_LEN + StateHash::LEN] {
+    let mut key = [0; PublicKey::LEN + U32_LEN + StateHash::LEN];
     key[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort_value.to_be_bytes());
-    key[PublicKey::LEN..][U32_LEN..][..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    key[PublicKey::LEN..][U32_LEN..][..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
     key
 }
 
@@ -142,7 +142,7 @@ mod block_store_impl_tests {
     fn test_pk_block_sort_key() {
         let sort_value = 500;
         let pk = PublicKey::default();
-        let state_hash = BlockHash::default();
+        let state_hash = StateHash::default();
         let key = pk_block_sort_key(&pk, sort_value, &state_hash);
 
         assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());

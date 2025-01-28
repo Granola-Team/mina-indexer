@@ -1,7 +1,8 @@
 use super::db;
 use crate::{
+    base::public_key::PublicKey,
     block::store::BlockStore,
-    ledger::{account, public_key::PublicKey, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     store::username::UsernameStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };

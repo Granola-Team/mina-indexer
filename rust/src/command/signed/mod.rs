@@ -35,14 +35,14 @@ pub struct SignedCommandWithCreationData {
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithStateHash {
     pub command: SignedCommand,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub is_new_receiver_account: bool,
 }
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct SignedCommandWithData {
     pub command: SignedCommand,
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub status: CommandStatusData,
     pub tx_hash: TxnHash,
     pub blockchain_length: u32,
@@ -60,8 +60,8 @@ impl SignedCommand {
         match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.fee.t.t,
             Self::V2(v2) => match &v2 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.fee,
-                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee,
+                UserCommandData::SignedCommandData(data) => data.payload.common.fee.0,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee.0,
             },
         }
     }
@@ -96,8 +96,8 @@ impl SignedCommand {
         let nonce = match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32,
             Self::V2(v2) => match &v2 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.nonce,
-                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce,
+                UserCommandData::SignedCommandData(data) => data.payload.common.nonce.0,
+                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce.0,
             },
         };
         Nonce(nonce)
@@ -107,9 +107,15 @@ impl SignedCommand {
         match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.valid_until.t.t,
             Self::V2(v2) => match &v2 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.valid_until as i32,
+                UserCommandData::SignedCommandData(data) => {
+                    data.payload.common.valid_until.0 as i32
+                }
                 UserCommandData::ZkappCommandData(data) => {
-                    data.fee_payer.body.valid_until.unwrap_or(u64::MAX) as i32
+                    data.fee_payer
+                        .body
+                        .valid_until
+                        .as_ref()
+                        .map_or(u64::MAX, |t| t.0) as i32
                 }
             },
         }
@@ -151,7 +157,7 @@ impl SignedCommand {
                 use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
                 match data {
                     UserCommandData::SignedCommandData(data) => match &data.payload.body.1 {
-                        Payment(PaymentPayload { amount, .. }) => *amount,
+                        Payment(PaymentPayload { amount, .. }) => amount.0,
                         StakeDelegation(_) => 0,
                     },
                     UserCommandData::ZkappCommandData(_data) => 0,
@@ -791,16 +797,13 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
         memo,
     } = &payload.common;
 
-    common.insert("fee".into(), Value::Number(Number::from(*fee)));
+    common.insert("fee".into(), Value::Number(fee.0.into()));
     common.insert(
         "fee_payer_pk".into(),
         Value::String(fee_payer_pk.to_owned().to_address()),
     );
-    common.insert("nonce".into(), Value::Number(Number::from(*nonce)));
-    common.insert(
-        "valid_until".into(),
-        Value::Number(Number::from(*valid_until as u32)),
-    );
+    common.insert("nonce".into(), Value::Number(nonce.0.into()));
+    common.insert("valid_until".into(), Value::Number(valid_until.0.into()));
     common.insert("memo".into(), Value::String(memo.to_owned()));
 
     use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
@@ -815,7 +818,7 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
                 "receiver_pk".into(),
                 Value::String(receiver_pk.to_owned().to_address()),
             );
-            body_obj.insert("amount".into(), Value::Number(Number::from(*amount)));
+            body_obj.insert("amount".into(), Value::Number(amount.0.into()));
             body_obj.insert("kind".into(), Value::String("Payment".into()));
 
             Value::Object(body_obj)

@@ -1,11 +1,8 @@
 //! Store of staged ledgers
 
 use crate::{
-    block::BlockHash,
-    ledger::{
-        account::Account, diff::LedgerDiff, public_key::PublicKey, token::TokenAddress, Ledger,
-        LedgerHash,
-    },
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::{account::Account, diff::LedgerDiff, token::TokenAddress, Ledger, LedgerHash},
 };
 use speedb::{DBIterator, Direction, WriteBatch};
 
@@ -15,7 +12,7 @@ pub trait StagedLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Account>>;
 
     // Get the display view of `pk`'s `state_hash` staged ledger account
@@ -26,7 +23,7 @@ pub trait StagedLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<Account>>;
 
     // Get `pk`'s `block_height` (canonical) staged ledger account
@@ -47,7 +44,7 @@ pub trait StagedLedgerStore {
     /// Get a ledger associated with an arbitrary block
     fn get_staged_ledger_at_state_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         memoize: bool,
     ) -> anyhow::Result<Option<Ledger>>;
 
@@ -64,7 +61,7 @@ pub trait StagedLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         block_height: u32,
         account: &Account,
     ) -> anyhow::Result<()>;
@@ -74,7 +71,7 @@ pub trait StagedLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         balance: u64,
         block_height: u32,
         account_serde_bytes: &[u8],
@@ -95,13 +92,13 @@ pub trait StagedLedgerStore {
     fn add_staged_ledger_hashes(
         &self,
         ledger_hash: &LedgerHash,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<bool>;
 
     /// Add a ledger associated with a canonical block
     fn add_staged_ledger_at_state_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         ledger: Ledger,
         block_height: u32,
     ) -> anyhow::Result<()>;
@@ -109,7 +106,7 @@ pub trait StagedLedgerStore {
     /// Add a new genesis ledger
     fn add_genesis_ledger(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         genesis_ledger: Ledger,
         block_height: u32,
     ) -> anyhow::Result<()>;
@@ -117,7 +114,7 @@ pub trait StagedLedgerStore {
     /// Index the block's ledger diff
     fn set_block_ledger_diff_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         ledger_diff: &LedgerDiff,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
@@ -125,7 +122,7 @@ pub trait StagedLedgerStore {
     /// Index the block's ledger diff
     fn set_block_staged_ledger_hash_batch(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         staged_ledger_hash: &LedgerHash,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()>;
@@ -133,17 +130,17 @@ pub trait StagedLedgerStore {
     /// Get the block's corresponding staged ledger hash
     fn get_block_staged_ledger_hash(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
     ) -> anyhow::Result<Option<LedgerHash>>;
 
     /// Get the staged ledger's corresponding block state hash
     fn get_staged_ledger_block_state_hash(
         &self,
         ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<Option<BlockHash>>;
+    ) -> anyhow::Result<Option<StateHash>>;
 
     /// Build the `state_hash` staged ledger from the CF representation
-    fn build_staged_ledger(&self, state_hash: &BlockHash) -> anyhow::Result<Option<Ledger>>;
+    fn build_staged_ledger(&self, state_hash: &StateHash) -> anyhow::Result<Option<Ledger>>;
 
     ///////////////
     // Iterators //
@@ -153,7 +150,7 @@ pub trait StagedLedgerStore {
     /// (key: [staged_account_balance_sort_key])
     fn staged_ledger_account_balance_iterator(
         &self,
-        state_hash: &BlockHash,
+        state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_>;
 }

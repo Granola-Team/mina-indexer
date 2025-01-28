@@ -1,6 +1,6 @@
 use crate::{
-    block::BlockHash,
-    ledger::{public_key::PublicKey, token::TokenAddress},
+    base::{public_key::PublicKey, state_hash::StateHash},
+    ledger::token::TokenAddress,
 };
 use anyhow::bail;
 use std::mem::size_of;
@@ -82,12 +82,12 @@ pub fn token_pk_index_key(
 /// ```
 /// {hash}{index}
 /// where
-/// - hash:  [BlockHash] bytes
+/// - hash:  [StateHash] bytes
 /// - index: u32 BE bytes
-pub fn block_index_key(state_hash: &BlockHash, index: u32) -> [u8; BlockHash::LEN + U32_LEN] {
-    let mut key = [0; BlockHash::LEN + U32_LEN];
-    key[..BlockHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-    key[BlockHash::LEN..].copy_from_slice(&index.to_be_bytes());
+pub fn block_index_key(state_hash: &StateHash, index: u32) -> [u8; StateHash::LEN + U32_LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN];
+    key[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    key[StateHash::LEN..].copy_from_slice(&index.to_be_bytes());
     key
 }
 
@@ -106,8 +106,8 @@ pub fn pk_index_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + U32_LEN
 
 /// Extracts state hash suffix from the iterator key.
 /// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
-pub fn state_hash_suffix(key: &[u8]) -> anyhow::Result<BlockHash> {
-    BlockHash::from_bytes(&key[key.len() - BlockHash::LEN..])
+pub fn state_hash_suffix(key: &[u8]) -> anyhow::Result<StateHash> {
+    StateHash::from_bytes(&key[key.len() - StateHash::LEN..])
 }
 
 /// Extracts u32 BE prefix from the iterator key.

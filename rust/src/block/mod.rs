@@ -14,16 +14,9 @@ mod post_hardfork;
 
 use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
-    canonicity::Canonicity,
-    chain::Network,
-    constants::*,
-    protocol::serialization_types::{
-        common::{Base58EncodableVersionedType, HashV1},
-        version_bytes,
-    },
+    base::state_hash::StateHash, canonicity::Canonicity, chain::Network, constants::*,
     utility::functions::is_valid_file_name,
 };
-use anyhow::bail;
 use precomputed::PcbVersion;
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, path::Path};
@@ -33,11 +26,11 @@ pub type AccountCreated = post_hardfork::account_created::AccountCreated;
 
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Block {
-    pub parent_hash: BlockHash,
-    pub state_hash: BlockHash,
+    pub parent_hash: StateHash,
+    pub state_hash: StateHash,
     pub height: u32,
     pub blockchain_length: u32,
-    pub genesis_state_hash: BlockHash,
+    pub genesis_state_hash: StateHash,
     pub global_slot_since_genesis: u32,
     pub hash_last_vrf_output: VrfOutput,
 }
@@ -45,47 +38,10 @@ pub struct Block {
 #[derive(Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct BlockWithoutHeight {
     pub canonicity: Option<Canonicity>,
-    pub parent_hash: BlockHash,
-    pub state_hash: BlockHash,
+    pub parent_hash: StateHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
-}
-
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
-pub struct BlockHash(pub String);
-
-impl BlockHash {
-    pub const LEN: usize = 52;
-    pub const PREFIX: &'static str = "3N";
-
-    pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
-        let res = String::from_utf8(bytes.to_vec())?;
-        if Self::is_valid(&res) {
-            return Ok(Self(res));
-        }
-        bail!("Invalid state hash from bytes")
-    }
-
-    pub fn from_bytes_or_panic(bytes: Vec<u8>) -> Self {
-        Self::from_bytes(&bytes).expect("block state hash bytes")
-    }
-
-    pub fn from_hashv1(hashv1: HashV1) -> Self {
-        let versioned: Base58EncodableVersionedType<{ version_bytes::STATE_HASH }, _> =
-            hashv1.into();
-        Self(versioned.to_base58_string().expect("block state hash"))
-    }
-
-    pub fn to_bytes(self) -> [u8; BlockHash::LEN] {
-        let mut res = [0u8; BlockHash::LEN];
-
-        res.copy_from_slice(self.0.as_bytes());
-        res
-    }
-
-    pub fn is_valid(input: &str) -> bool {
-        input.starts_with(BlockHash::PREFIX) && input.len() == BlockHash::LEN
-    }
 }
 
 impl Block {
@@ -147,23 +103,10 @@ impl BlockWithoutHeight {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockComparison {
-    pub state_hash: BlockHash,
+    pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub hash_last_vrf_output: VrfOutput,
     pub version: PcbVersion,
-}
-
-///////////
-// serde //
-///////////
-
-impl<'de> Deserialize<'de> for BlockHash {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        crate::mina_blocks::common::from_str(deserializer)
-    }
 }
 
 /////////////////
@@ -218,27 +161,6 @@ impl From<&PrecomputedBlock> for BlockComparison {
             hash_last_vrf_output: value.hash_last_vrf_output(),
             version: value.version(),
         }
-    }
-}
-
-impl std::str::FromStr for BlockHash {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if Self::is_valid(s) {
-            Ok(Self(s.to_string()))
-        } else {
-            bail!("Invalid state hash: {s}")
-        }
-    }
-}
-
-impl<T> From<T> for BlockHash
-where
-    T: Into<String>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
     }
 }
 
@@ -303,7 +225,7 @@ impl std::cmp::Ord for Block {
     }
 }
 
-impl std::default::Default for BlockHash {
+impl std::default::Default for StateHash {
     fn default() -> Self {
         Self("3NLDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into())
     }
@@ -351,13 +273,13 @@ impl std::fmt::Display for BlockWithoutHeight {
     }
 }
 
-impl std::fmt::Debug for BlockHash {
+impl std::fmt::Debug for StateHash {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "BlockHash {{ {:?} }}", self.0)
+        write!(f, "StateHash {{ {:?} }}", self.0)
     }
 }
 
-impl std::fmt::Display for BlockHash {
+impl std::fmt::Display for StateHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -371,7 +293,7 @@ pub fn is_valid_block_file<P>(path: P) -> bool
 where
     P: AsRef<Path>,
 {
-    is_valid_file_name(path, &BlockHash::is_valid)
+    is_valid_file_name(path, &StateHash::is_valid)
 }
 
 pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf]) {
@@ -426,7 +348,7 @@ pub fn extract_network(path: &Path) -> Network {
 /// Extracts all three values from file name
 ///
 /// Valid block file names have the form: {network}-{block height}-{state hash}
-pub fn extract_network_height_hash(path: &Path) -> (Network, u32, BlockHash) {
+pub fn extract_network_height_hash(path: &Path) -> (Network, u32, StateHash) {
     let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
     let network_end = name.find('-').expect("valid block file has network");
     let height_end = name[network_end + 1..]
@@ -451,7 +373,7 @@ mod block_tests {
 
     #[test]
     fn default_block_hash_is_valid_public_key() {
-        assert!(BlockHash::is_valid(&BlockHash::default().0))
+        assert!(StateHash::is_valid(&StateHash::default().0))
     }
 
     #[test]
@@ -496,7 +418,7 @@ mod block_tests {
             (
                 Network::Mainnet,
                 2,
-                BlockHash::from("3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH")
+                StateHash::from("3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH")
             ),
             extract_network_height_hash(path0)
         );
@@ -504,7 +426,7 @@ mod block_tests {
             (
                 Network::Devnet,
                 3,
-                BlockHash::from("3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R")
+                StateHash::from("3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R")
             ),
             extract_network_height_hash(path1)
         );
@@ -534,11 +456,11 @@ mod block_tests {
 
     #[test]
     fn block_hash_roundtrip() -> anyhow::Result<()> {
-        let input = BlockHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
+        let input = StateHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
         let bytes = input.0.as_bytes();
 
         assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
-        assert_eq!(input, BlockHash::from_bytes(bytes)?, "from_bytes");
+        assert_eq!(input, StateHash::from_bytes(bytes)?, "from_bytes");
         Ok(())
     }
 
