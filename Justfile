@@ -83,7 +83,7 @@ lint:
   # standardrb --no-fix ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Nix configs"
-  alejandra --check flake.nix
+  alejandra --check flake.nix ops/mina/mina_txn_hasher.nix
   @echo "--- Linting Rust code"
   cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features \
@@ -109,7 +109,7 @@ format:
   cd rust && cargo {{nightly_if_required}} fmt --all
   # standardrb --fix ops/*.rb
   shfmt --write ops/*.sh
-  alejandra flake.nix
+  alejandra flake.nix ops/mina/mina_txn_hasher.nix
 
 # Perform a fast verification of whether the source compiles.
 check:
