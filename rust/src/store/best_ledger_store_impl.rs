@@ -12,7 +12,10 @@ use crate::{
         token::TokenAddress,
         Ledger, TokenLedger,
     },
-    store::zkapp::{actions::ZkappActionStore, events::ZkappEventStore},
+    store::{
+        zkapp::{actions::ZkappActionStore, events::ZkappEventStore},
+        Result,
+    },
     utility::store::{
         common::{from_be_bytes, pk_index_key},
         ledger::best::*,
@@ -23,11 +26,7 @@ use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 impl BestLedgerStore for IndexerStore {
-    fn get_best_account(
-        &self,
-        pk: &PublicKey,
-        token: &TokenAddress,
-    ) -> anyhow::Result<Option<Account>> {
+    fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>> {
         trace!("Getting best ledger account {pk}");
         Ok(self
             .database
@@ -42,7 +41,7 @@ impl BestLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-    ) -> anyhow::Result<Option<Account>> {
+    ) -> Result<Option<Account>> {
         trace!("Display best ledger account {pk}");
         if let Some(best_acct) = self.get_best_account(pk, token)? {
             return Ok(Some(best_acct.display()));
@@ -50,7 +49,7 @@ impl BestLedgerStore for IndexerStore {
         Ok(None)
     }
 
-    fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>> {
+    fn get_best_ledger(&self, memoize: bool) -> Result<Option<Ledger>> {
         Ok(self.build_best_ledger()?.inspect(|best_ledger| {
             if let (Ok(Some(state_hash)), Ok(Some(block_height))) =
                 (self.get_best_block_hash(), self.get_best_block_height())
@@ -72,19 +71,32 @@ impl BestLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        before_balance: Option<u64>,
+        before: Option<(bool, u64)>,
         after: Option<Account>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         // remove account
         if after.is_none() {
-            if let Some(before_balance) = before_balance {
+            if let Some(before) = before {
+                // generic token account
+                let account_key = best_account_key(token, pk);
+                let sort_key = best_account_sort_key(token, before.1, pk);
+
                 self.database
-                    .delete_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?;
-                self.database.delete_cf(
-                    self.best_ledger_accounts_balance_sort_cf(),
-                    best_account_sort_key(token, before_balance, pk),
-                )?;
+                    .delete_cf(self.best_ledger_accounts_cf(), account_key)?;
+
+                self.database
+                    .delete_cf(self.best_ledger_accounts_balance_sort_cf(), sort_key)?;
+
+                // zkapp account
+                if before.0 {
+                    self.database
+                        .delete_cf(self.zkapp_best_ledger_accounts_cf(), account_key)?;
+
+                    self.database
+                        .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
+                }
             }
+
             return Ok(());
         }
 
@@ -92,30 +104,54 @@ impl BestLedgerStore for IndexerStore {
         let after = after.unwrap();
         let balance = after.balance.0;
 
-        if let Some(before_balance) = before_balance {
-            // delete stale balance sorting data
-            self.database.delete_cf(
-                self.best_ledger_accounts_balance_sort_cf(),
-                best_account_sort_key(token, before_balance, pk),
-            )?;
+        // delete stale balance sorting data
+        if let Some(before) = before {
+            let sort_key = best_account_sort_key(token, before.1, pk);
+
+            // general account
+            self.database
+                .delete_cf(self.best_ledger_accounts_balance_sort_cf(), sort_key)?;
+
+            // zkapp account
+            if before.0 {
+                self.database
+                    .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
+            }
         }
 
-        // write new account
+        let account_key = best_account_key(token, pk);
+        let sort_key = best_account_sort_key(token, balance, pk);
+
+        // store the new account
         self.database.put_cf(
             self.best_ledger_accounts_cf(),
-            best_account_key(token, pk),
+            account_key,
             serde_json::to_vec(&after)?,
         )?;
 
-        if let Some(_zkapp) = after.zkapp {
-            // populate index for best_ledger_zkapps_balance_sort_cf
-            // populate index for best_ledger_tokens_balance_sort_cf
-        } else {
+        // balance-sort the new account
+        self.database.put_cf(
+            self.best_ledger_accounts_balance_sort_cf(),
+            sort_key,
+            serde_json::to_vec(&after)?,
+        )?;
+
+        if after.is_zkapp_account() {
+            // store
             self.database.put_cf(
-                self.best_ledger_accounts_balance_sort_cf(),
-                best_account_sort_key(token, balance, pk),
+                self.zkapp_best_ledger_accounts_cf(),
+                account_key,
                 serde_json::to_vec(&after)?,
             )?;
+
+            // balance-sort
+            self.database.put_cf(
+                self.zkapp_best_ledger_accounts_balance_sort_cf(),
+                sort_key,
+                serde_json::to_vec(&after)?,
+            )?;
+
+            // populate index for best_ledger_tokens_balance_sort_cf
         }
 
         Ok(())
@@ -125,7 +161,7 @@ impl BestLedgerStore for IndexerStore {
         &self,
         state_hash: &StateHash,
         blocks: &DbBlockUpdate,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let account_updates = DbUpdate {
             apply: blocks
                 .apply
@@ -157,11 +193,7 @@ impl BestLedgerStore for IndexerStore {
         self.update_best_accounts(state_hash, account_updates)
     }
 
-    fn update_best_accounts(
-        &self,
-        state_hash: &StateHash,
-        updates: DbAccountUpdate,
-    ) -> anyhow::Result<()> {
+    fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()> {
         use AccountDiff::*;
         trace!("Updating best ledger accounts for block {state_hash}");
 
@@ -183,12 +215,11 @@ impl BestLedgerStore for IndexerStore {
 
             for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
-                let (before_balance, before) = (
-                    before.as_ref().map(|a| a.balance.0),
+                let (before_values, mut after) = (
+                    before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
                     before.unwrap_or(Account::empty(pk.clone(), token.clone())),
                 );
 
-                let mut after = before.clone();
                 for diff in diffs.iter() {
                     after = match diff {
                         Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
@@ -225,7 +256,7 @@ impl BestLedgerStore for IndexerStore {
                     };
                 }
 
-                self.update_best_account(&pk, &token, before_balance, Some(after))?;
+                self.update_best_account(&pk, &token, before_values, Some(after))?;
             }
 
             // remove accounts
@@ -240,12 +271,11 @@ impl BestLedgerStore for IndexerStore {
 
             for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
-                let (before_balance, before) = (
-                    before.as_ref().map(|a| a.balance.0),
+                let (before_values, mut after) = (
+                    before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
                     before.unwrap_or(Account::empty(pk.clone(), token.clone())),
                 );
 
-                let mut after = before.clone();
                 for diff in diffs.iter() {
                     after = match diff {
                         Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
@@ -277,13 +307,13 @@ impl BestLedgerStore for IndexerStore {
                     };
                 }
 
-                self.update_best_account(&pk, &token, before_balance, Some(after))?;
+                self.update_best_account(&pk, &token, before_values, Some(after))?;
             }
         }
         Ok(())
     }
 
-    fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> anyhow::Result<()> {
+    fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> Result<()> {
         trace!("Adding pk {pk} delegate {delegate}");
         let num = self.get_num_pk_delegations(pk)?;
 
@@ -303,7 +333,7 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn get_num_pk_delegations(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_num_pk_delegations(&self, pk: &PublicKey) -> Result<u32> {
         Ok(self
             .database
             .get_cf(
@@ -313,7 +343,7 @@ impl BestLedgerStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>> {
+    fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> Result<Option<PublicKey>> {
         trace!("Getting pk {pk} delegation index {idx}");
         Ok(self
             .database
@@ -324,7 +354,7 @@ impl BestLedgerStore for IndexerStore {
             .and_then(|bytes| PublicKey::from_bytes(&bytes).ok()))
     }
 
-    fn remove_pk_delegate(&self, pk: PublicKey) -> anyhow::Result<()> {
+    fn remove_pk_delegate(&self, pk: PublicKey) -> Result<()> {
         trace!("Removing pk {pk} delegate");
         let idx = self.get_num_pk_delegations(&pk)?;
         if idx > 0 {
@@ -344,7 +374,7 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn update_num_accounts(&self, adjust: i32) -> anyhow::Result<()> {
+    fn update_num_accounts(&self, adjust: i32) -> Result<()> {
         use std::cmp::Ordering::*;
         match adjust.cmp(&0) {
             Equal => (),
@@ -366,14 +396,14 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn get_num_accounts(&self) -> anyhow::Result<Option<u32>> {
+    fn get_num_accounts(&self) -> Result<Option<u32>> {
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
             .map(from_be_bytes))
     }
 
-    fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>> {
+    fn build_best_ledger(&self) -> Result<Option<Ledger>> {
         trace!("Building best ledger");
         if let (Some(best_block_height), Some(best_block_hash)) =
             (self.get_best_block_height()?, self.get_best_block_hash()?)
@@ -401,6 +431,11 @@ impl BestLedgerStore for IndexerStore {
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.best_ledger_accounts_balance_sort_cf(), mode)
+    }
+
+    fn zkapp_best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), mode)
     }
 }
 

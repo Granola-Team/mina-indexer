@@ -4,20 +4,16 @@ use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::store::DbBlockUpdate,
     ledger::{account::Account, diff::account::AccountDiff, token::TokenAddress, Ledger},
-    store::DbUpdate,
+    store::{DbUpdate, Result},
 };
 use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 pub trait BestLedgerStore {
-    /// Get pk's best ledger account
-    fn get_best_account(
-        &self,
-        pk: &PublicKey,
-        token: &TokenAddress,
-    ) -> anyhow::Result<Option<Account>>;
+    /// Get the token account from the best ledger
+    fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>>;
 
-    /// Get the display view of pk's account
+    /// Get the display view of the token account
     /// ****************************************************************
     /// This is `pk`'s balance accounting for any potential creation fee
     /// ****************************************************************
@@ -25,53 +21,50 @@ pub trait BestLedgerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-    ) -> anyhow::Result<Option<Account>>;
+    ) -> Result<Option<Account>>;
 
-    /// Get the best ledger
-    fn get_best_ledger(&self, memoize: bool) -> anyhow::Result<Option<Ledger>>;
-
-    /// Update pk's best ledger account
+    /// Update the best ledger token account
     fn update_best_account(
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        before_balance: Option<u64>,
+        before: Option<(bool, u64)>,
         after: Option<Account>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 
-    /// Updates best ledger accounts
-    fn update_best_accounts(
-        &self,
-        state_hash: &StateHash,
-        updates: DbAccountUpdate,
-    ) -> anyhow::Result<()>;
+    /// Update the best ledger token accounts
+    fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()>;
 
+    /// Update the best ledger token accounts due to block updates
     fn update_block_best_accounts(
         &self,
         state_hash: &StateHash,
         blocks: &DbBlockUpdate,
-    ) -> anyhow::Result<()>;
+    ) -> Result<()>;
 
-    /// Remove pk delegation
-    fn remove_pk_delegate(&self, pk: PublicKey) -> anyhow::Result<()>;
+    /// Remove a delegation
+    fn remove_pk_delegate(&self, pk: PublicKey) -> Result<()>;
 
-    /// Add pk delegation
-    fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> anyhow::Result<()>;
+    /// Add a delegation
+    fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> Result<()>;
 
-    /// Get pk's number of delegations
-    fn get_num_pk_delegations(&self, pk: &PublicKey) -> anyhow::Result<u32>;
+    /// Get the number of delegations
+    fn get_num_pk_delegations(&self, pk: &PublicKey) -> Result<u32>;
 
-    /// Get `pk`'s `idx`-th delegation
-    fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> anyhow::Result<Option<PublicKey>>;
+    /// Get the `idx`-th delegation
+    fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> Result<Option<PublicKey>>;
 
-    /// Update best ledger accounts count
-    fn update_num_accounts(&self, adjust: i32) -> anyhow::Result<()>;
+    /// Update the count of best ledger accounts
+    fn update_num_accounts(&self, adjust: i32) -> Result<()>;
 
-    /// Get best ledger accounts count
-    fn get_num_accounts(&self) -> anyhow::Result<Option<u32>>;
+    /// Get the count of best ledger accounts
+    fn get_num_accounts(&self) -> Result<Option<u32>>;
 
     /// Build the best ledger from the CF representation
-    fn build_best_ledger(&self) -> anyhow::Result<Option<Ledger>>;
+    fn build_best_ledger(&self) -> Result<Option<Ledger>>;
+
+    /// Get the best ledger
+    fn get_best_ledger(&self, memoize: bool) -> Result<Option<Ledger>>;
 
     ///////////////
     // Iterators //
@@ -81,10 +74,19 @@ pub trait BestLedgerStore {
     /// ```
     /// {token}{balance}{pk} -> _
     /// where
-    /// - token:   [TokenAddress::LEN] bytes
+    /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes
-    /// - pk:      [PublicKey::LEN] bytes
+    /// - pk:      [PublicKey] bytes
     fn best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator for balance-sorted best ledger zkapp accounts
+    /// ```
+    /// {token}{balance}{pk} -> _
+    /// where
+    /// - token:   [TokenAddress] bytes
+    /// - balance: [u64] BE bytes
+    /// - pk:      [PublicKey] bytes
+    fn zkapp_best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
 /// Applied & unapplied block account diffs & new block accounts
