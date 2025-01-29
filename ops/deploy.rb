@@ -181,7 +181,7 @@ if DEPLOY_TYPE == "test"
   # normalize indexer best ledger
   unless system(
     IDXR_NORM_EXE,
-    "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json",
+    IDXR_NORM_LEDGER,
     out: IDXR_NORM_LEDGER
   )
     warn("Normalizing Indexer Ledger at height #{BLOCKS_COUNT} failed.")
