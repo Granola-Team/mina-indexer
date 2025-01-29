@@ -83,7 +83,16 @@ pub enum Permission {
     Impossible,
 }
 
+//////////
+// impl //
+//////////
+
 impl Account {
+    /// Checks whether account is a zkapp account
+    pub fn is_zkapp_account(&self) -> bool {
+        self.zkapp.is_some()
+    }
+
     /// Display view of account, removes non-genesis account creation fee
     pub fn display(self) -> Self {
         Self {
@@ -562,20 +571,6 @@ impl Account {
     }
 }
 
-impl From<GenesisBlock> for Account {
-    fn from(value: GenesisBlock) -> Self {
-        // magic mina
-        let block_creator = value.0.block_creator();
-        Self {
-            public_key: block_creator.clone(),
-            balance: Amount(1000_u64),
-            delegate: block_creator,
-            genesis_account: true,
-            ..Default::default()
-        }
-    }
-}
-
 impl PartialOrd for Account {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
@@ -592,6 +587,28 @@ impl Ord for Account {
         }
     }
 }
+
+/////////////////
+// conversions //
+/////////////////
+
+impl From<GenesisBlock> for Account {
+    fn from(value: GenesisBlock) -> Self {
+        // magic mina
+        let block_creator = value.0.block_creator();
+        Self {
+            public_key: block_creator.clone(),
+            balance: Amount(1000_u64),
+            delegate: block_creator,
+            genesis_account: true,
+            ..Default::default()
+        }
+    }
+}
+
+///////////////////
+// debug/display //
+///////////////////
 
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
