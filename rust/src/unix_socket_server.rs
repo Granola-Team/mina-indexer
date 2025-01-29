@@ -4,10 +4,7 @@ use crate::{
     canonicity::store::CanonicityStore,
     client::*,
     command::{
-        internal::store::InternalCommandStore,
-        signed::{hash_signed_command_v2, TxnHash},
-        store::UserCommandStore,
-        Command,
+        internal::store::InternalCommandStore, signed::TxnHash, store::UserCommandStore, Command,
     },
     ledger::{
         staking::AggregatedEpochStakeDelegation,
@@ -555,9 +552,6 @@ pub async fn handle_connection(
                     }
                 }
             },
-            ClientCli::Hash(HashTxn::Txn { json }) => {
-                hash_signed_command_v2(json).map(|res| res.to_string()).ok()
-            }
             ClientCli::CreateSnapshot { output_path } => {
                 info!("Received create-snapshot command");
                 match db.create_snapshot(&output_path) {

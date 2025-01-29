@@ -1,4 +1,5 @@
-/// Indexer store column family helper trait
+//! Indexer store column family helper trait
+
 use speedb::ColumnFamily;
 
 pub trait ColumnFamilyHelpers {
@@ -198,6 +199,12 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for sorting best ledger accounts by balance
     fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp best ledger accounts
+    fn zkapp_best_ledger_accounts_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting zkapp best ledger accounts by balance
+    fn zkapp_best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for storing number of best ledger delegations
     fn best_ledger_accounts_num_delegations_cf(&self) -> &ColumnFamily;

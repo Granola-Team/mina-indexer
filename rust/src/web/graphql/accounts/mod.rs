@@ -18,6 +18,7 @@ pub struct AccountQueryInput {
     username: Option<String>,
     balance: Option<u64>,
     token: Option<String>,
+    zkapp: Option<bool>,
 
     #[graphql(name = "balance_gt")]
     balance_gt: Option<u64>,
@@ -141,19 +142,30 @@ impl AccountQueryRoot {
         }
 
         // default query handler use balance-sorted accounts
-        let mut accounts = Vec::new();
+        let mut accounts = Vec::with_capacity(limit);
         let mode = match sort_by {
             Some(BalanceAsc) => IteratorMode::Start,
             Some(BalanceDesc) | None => IteratorMode::End,
         };
+        let iter = match query.as_ref().and_then(|q| q.zkapp) {
+            // all account types
+            None => db.best_ledger_account_balance_iterator(mode).flatten(),
+            // zkapp accounts only
+            Some(true) => db
+                .zkapp_best_ledger_account_balance_iterator(mode)
+                .flatten(),
+            // non-zkapp account only
+            Some(false) => todo!("non-zkapp account"),
+        };
 
-        for (_, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
+        for (_, value) in iter {
             let account = serde_json::from_slice::<account::Account>(&value)?.display();
             let pk = account.public_key.clone();
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,
                 Ok(Some(username)) => Some(username.0),
             };
+
             if query
                 .as_ref()
                 .map_or(true, |q| q.matches(&account, username.as_ref()))
@@ -185,6 +197,7 @@ impl AccountQueryRoot {
                 }
             }
         }
+
         Ok(accounts)
     }
 }
@@ -202,17 +215,21 @@ impl AccountQueryInput {
             balance_lte,
             balance_ne,
             token,
+            zkapp,
         } = self;
+
         if let Some(public_key) = public_key {
             if *public_key != account.public_key.0 {
                 return false;
             }
         }
+
         if let Some(delegate) = delegate {
             if *delegate != account.delegate.0 {
                 return false;
             }
         }
+
         if let Some(username_prefix) = query_username_prefix {
             if username.map_or(true, |u| {
                 !u.to_lowercase()
@@ -221,41 +238,55 @@ impl AccountQueryInput {
                 return false;
             }
         }
+
         if let Some(balance) = balance {
             if account.balance.0 != *balance {
                 return false;
             }
         }
+
         if let Some(balance_gt) = balance_gt {
             if account.balance.0 <= *balance_gt {
                 return false;
             }
         }
+
         if let Some(balance_gte) = balance_gte {
             if account.balance.0 < *balance_gte {
                 return false;
             }
         }
+
         if let Some(balance_lt) = balance_lt {
             if account.balance.0 >= *balance_lt {
                 return false;
             }
         }
+
         if let Some(balance_lte) = balance_lte {
             if account.balance.0 > *balance_lte {
                 return false;
             }
         }
+
         if let Some(balance_ne) = balance_ne {
             if account.balance.0 == *balance_ne {
                 return false;
             }
         }
+
         if let Some(token) = token.as_ref() {
             if account.token != Some(TokenAddress::new(token).expect("valid token address")) {
                 return false;
             }
         }
+
+        if let Some(zkapp) = zkapp {
+            if account.is_zkapp_account() != *zkapp {
+                return false;
+            }
+        }
+
         true
     }
 }

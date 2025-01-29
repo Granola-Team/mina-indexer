@@ -36,7 +36,7 @@ use std::{
 };
 use version::{IndexerStoreVersion, VersionStore};
 
-type Result<T> = anyhow::Result<T>;
+pub(crate) type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub struct IndexerStore {
@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 127] = [
+    const COLUMN_FAMILIES: [&'static str; 129] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -159,6 +159,8 @@ impl IndexerStore {
         "best-ledger-account-balance-sort",
         "best-ledger-account-num-delegations",
         "best-ledger-account-delegations",
+        "zkapp-best-ledger-accounts",
+        "zkapp-best-ledger-account-balance-sort",
         /////////////////////////////
         // Staged ledger store CFs //
         /////////////////////////////
