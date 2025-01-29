@@ -30,4 +30,4 @@ X="$(expr $1 + 1)"
 	"$2" \
 	cloudflare:mina-blocks \
 	--exclude '*mainnet-{{\d{'"$X"',}}}-*' \
-RESULT='Blocks uploaded.'
+	RESULT='Blocks uploaded.'
