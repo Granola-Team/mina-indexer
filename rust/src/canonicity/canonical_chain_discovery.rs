@@ -140,7 +140,7 @@ fn canonical_branch_from_best_tip<'a>(
         }
     }
     info!(
-        "Found canonical branch in {}",
+        "Found canonical chain in {}",
         pretty_print_duration(time.elapsed())
     );
     canonical_branch.reverse(); // Reverse to maintain order
