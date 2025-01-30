@@ -66,6 +66,7 @@ async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli> {
 }
 
 #[allow(clippy::just_underscores_and_digits)]
+#[allow(clippy::too_many_lines)]
 pub async fn handle_connection(
     listener: UnixListener,
     state: Arc<RwLock<IndexerState>>,

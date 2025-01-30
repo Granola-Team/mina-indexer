@@ -248,6 +248,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn fees_from_precomputed_320081() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/non_sequential_blocks/mainnet-320081-3NK3bLM3eMyCum34ovAGCUw2GWUqDxkNwiti8XtKBYrocinp8oZM.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
