@@ -4,7 +4,7 @@
 
 require "fileutils"
 
-# Usage: ./move_and_update_blocks.rb <source_folder> <dest_folder> <blocks_list_file> <min_number> <max_number>
+# Usage: ./recycle-pcbs.rb <source_folder> <dest_folder> <blocks_list_file> <min_number> <max_number>
 
 # Check if the correct number of arguments is passed
 if ARGV.length != 5
