@@ -107,7 +107,6 @@ impl TransactionsQueryRoot {
         Ok(None)
     }
 
-    #[allow(clippy::too_many_lines)]
     pub async fn transactions(
         &self,
         ctx: &Context<'_>,
@@ -716,7 +715,6 @@ impl TransactionWithoutBlock {
 }
 
 impl TransactionQueryInput {
-    #[allow(clippy::too_many_lines)]
     fn matches(&self, transaction: &Transaction) -> bool {
         let TransactionQueryInput {
             hash,

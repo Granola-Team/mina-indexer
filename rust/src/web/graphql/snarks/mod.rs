@@ -93,7 +93,6 @@ pub struct SnarkQueryRoot;
 
 #[Object]
 impl SnarkQueryRoot {
-    #[allow(clippy::too_many_lines)]
     async fn snarks<'ctx>(
         &self,
         ctx: &Context<'ctx>,

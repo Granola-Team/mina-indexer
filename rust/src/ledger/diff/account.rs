@@ -1475,7 +1475,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::too_many_lines)]
     fn zkapp_account_diff() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-359630-3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;

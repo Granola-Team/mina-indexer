@@ -80,7 +80,6 @@ impl BlocksQueryRoot {
         Ok(None)
     }
 
-    #[allow(clippy::too_many_lines)]
     async fn blocks<'ctx>(
         &self,
         ctx: &async_graphql::Context<'ctx>,
