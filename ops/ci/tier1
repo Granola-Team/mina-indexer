@@ -1,4 +1,5 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-1 testing.
 
+git lfs pull
 nix develop --command just tier1
