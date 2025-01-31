@@ -21,6 +21,7 @@ use crate::{
     ledger::diff::account::PaymentDiff,
     mina_blocks::v2::{self, ZkappAccount},
 };
+use log::error;
 use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
 
@@ -549,24 +550,41 @@ impl Account {
     pub fn apply_ledger_diff(self, diff: &LedgerDiff) -> Self {
         let pk = self.public_key.clone();
         let mut acct = self;
+
         for acct_diff in diff.account_diffs.iter().flatten() {
             if acct_diff.public_key() == pk {
                 acct = acct.apply_account_diff(acct_diff);
             }
         }
+
         acct
     }
 
     /// Checks application to the expected token account
-    fn checks(&self, public_key: &PublicKey, token: &TokenAddress) {
-        assert_eq!(*public_key, self.public_key);
+    fn checks(&self, pk: &PublicKey, token: &TokenAddress) {
+        self.check_pk(pk);
         self.check_token(token);
     }
 
+    fn check_pk(&self, pk: &PublicKey) {
+        if self.public_key != *pk {
+            error!(
+                "Public key mismatch in zkapp account diff: {} /= {}",
+                self.public_key, pk
+            );
+        }
+    }
+
     fn check_token(&self, token: &TokenAddress) {
+        fn check(t0: &TokenAddress, t1: &TokenAddress) {
+            if t0 != t1 {
+                error!("Token mismatch in zkapp account diff: {t0} /= {t1}");
+            }
+        }
+
         match self.token.as_ref() {
-            None => assert_eq!(*token, TokenAddress::default()),
-            Some(account_token) => assert_eq!(account_token, token),
+            None => check(&TokenAddress::default(), token),
+            Some(account_token) => check(account_token, token),
         }
     }
 }
