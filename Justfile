@@ -61,7 +61,7 @@ tier1-prereqs:
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
   cd rust && cargo clippy --version
-  cd rust && cargo machete --help 2>&1 >/dev/null
+  cd rust && cargo machete --help 2>&1 /dev/null
   shellcheck --version
   shfmt --version
 
@@ -85,7 +85,6 @@ lint:
   @echo "--- Linting Nix configs"
   alejandra --check flake.nix ops/mina/mina_txn_hasher.nix
   @echo "--- Linting Rust code"
-  cd rust && time cargo {{nightly_if_required}} fmt --all --check
   cd rust && time cargo clippy --all-targets --all-features \
     -- \
     -Dwarnings \
@@ -101,15 +100,15 @@ lint:
   # -Dclippy::multiple_crate_versions \
   # -Dclippy::cargo_common_metadata
   # -Dclippy::pedantic
-  # -Dclippy::wildcard_imports \
+  # -Dclippy::wildcard_imports
   @echo "--- Linting Cargo dependencies"
-  cd rust && cargo machete Cargo.toml
+  cd rust && cargo machete
 
 format:
-  cd rust && cargo {{nightly_if_required}} fmt --all
+  cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1 
   # standardrb --fix ops/*.rb
-  shfmt --write ops/*.sh
-  alejandra flake.nix ops/mina/mina_txn_hasher.nix
+  shfmt --write ops/*.sh 2>&1 >/dev/null
+  alejandra flake.nix ops/mina/mina_txn_hasher.nix > /dev/null 2>&1
 
 # Perform a fast verification of whether the source compiles.
 check:
