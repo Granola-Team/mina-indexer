@@ -1,5 +1,8 @@
 use super::precomputed::PcbVersion;
-use crate::block::precomputed::PrecomputedBlock;
+use crate::{
+    block::precomputed::PrecomputedBlock,
+    constants::{HARDFORK_GENESIS_BLOCKCHAIN_LENGTH, HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
+};
 
 #[derive(Debug)]
 pub struct GenesisBlock(pub PrecomputedBlock, pub u64);
@@ -19,7 +22,7 @@ impl GenesisBlock {
         let size = contents.len() as u64;
         let network = "mainnet";
         let blockchain_length: u32 = 1;
-        let state_hash = "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ";
+        let state_hash = MAINNET_GENESIS_HASH;
 
         Ok(Self(
             PrecomputedBlock::new(
@@ -38,8 +41,8 @@ impl GenesisBlock {
         let contents = GENESIS_HARDFORK_BLOCK_CONTENTS.as_bytes().to_vec();
         let size = contents.len() as u64;
         let network = "mainnet";
-        let blockchain_length: u32 = 359605;
-        let state_hash = "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP";
+        let blockchain_length = HARDFORK_GENESIS_BLOCKCHAIN_LENGTH;
+        let state_hash = HARDFORK_GENESIS_HASH;
 
         Ok(Self(
             PrecomputedBlock::new(
@@ -67,20 +70,14 @@ mod test {
     #[test]
     fn parse_genesis_block_v1() -> anyhow::Result<()> {
         let block = GenesisBlock::new_v1()?;
-        assert_eq!(
-            block.0.state_hash().0,
-            "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ",
-        );
+        assert_eq!(block.0.state_hash().0, MAINNET_GENESIS_HASH,);
         Ok(())
     }
 
     #[test]
     fn parse_genesis_block_v2() -> anyhow::Result<()> {
         let block = GenesisBlock::new_v2()?;
-        assert_eq!(
-            block.0.state_hash().0,
-            "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP",
-        );
+        assert_eq!(block.0.state_hash().0, HARDFORK_GENESIS_HASH,);
         Ok(())
     }
 }
