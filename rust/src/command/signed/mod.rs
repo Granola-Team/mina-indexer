@@ -278,9 +278,7 @@ impl SignedCommand {
                     StakeDelegation => CommandType::Delegation,
                 }
             }
-            Self::V2(UserCommandData::ZkappCommandData(_)) => {
-                unreachable!("zkapp commands are not signed commands")
-            }
+            Self::V2(UserCommandData::ZkappCommandData(_)) => CommandType::Zkapp,
         }
     }
 

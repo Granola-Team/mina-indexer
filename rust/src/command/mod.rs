@@ -34,7 +34,7 @@ pub enum UserCommand {
 pub enum CommandType {
     Payment,
     Delegation,
-    // Zkapp,
+    Zkapp,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Clone, Serialize, Deserialize)]
@@ -718,11 +718,15 @@ impl std::fmt::Debug for CommandType {
 
 impl std::fmt::Display for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let result: String = match self {
-            Self::Payment => "PAYMENT".into(),
-            Self::Delegation => "STAKE_DELEGATION".into(),
-        };
-        write!(f, "{result}")
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Payment => "PAYMENT".to_string(),
+                Self::Delegation => "STAKE_DELEGATION".to_string(),
+                Self::Zkapp => "ZKAPP".to_string(),
+            }
+        )
     }
 }
 
