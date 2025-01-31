@@ -156,51 +156,48 @@ if DEPLOY_TYPE == "test"
   ) || abort("Snapshot creation failed. Aborting.")
   puts "Snapshot complete."
 
-  # TODO include ledger diff test after we get a more recent ledger
-  # https://github.com/Granola-Team/mina-indexer/issues/1735
+  IDXR_LEDGER = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
 
-  # IDXR_LEDGER = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}-#{REV}.json"
+  # Compare the indexer best ledger with the Mina pre-hardfork ledger
+  #
+  puts "Attempting ledger extraction..."
+  unless system(
+    EXE,
+    "--socket", SOCKET,
+    "ledgers",
+    "height",
+    "--height", BLOCKS_COUNT.to_s,
+    "--path", IDXR_LEDGER
+  )
+    warn("Ledger extraction failed.")
+    success = false
+  end
+  puts "Ledger extraction complete."
 
-  # # Compare the indexer best ledger with the Mina pre-hardfork ledger
-  # #
-  # puts "Attempting ledger extraction..."
-  # unless system(
-  #   EXE,
-  #   "--socket", SOCKET,
-  #   "ledgers",
-  #   "height",
-  #   "--height", BLOCKS_COUNT.to_s,
-  #   "--path", IDXR_LEDGER
-  # )
-  #   warn("Ledger extraction failed.")
-  #   success = false
-  # end
-  # puts "Ledger extraction complete."
+  puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
+  IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
+  IDXR_NORM_LEDGER = "#{IDXR_LEDGER}.norm.json"
+  MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledger-359604/mina_ledger.json"
+  IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.diff"
 
-  # puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
-  # IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
-  # IDXR_NORM_LEDGER = "#{IDXR_LEDGER}.norm.json"
-  # MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledger-359604/mina_ledger.json"
-  # IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.diff"
+  # normalize indexer best ledger
+  unless system(
+    IDXR_NORM_EXE,
+    IDXR_LEDGER,
+    out: IDXR_NORM_LEDGER
+  )
+    warn("Normalizing Indexer Ledger at height #{BLOCKS_COUNT} failed.")
+    success = false
+  end
 
-  # # normalize indexer best ledger
-  # unless system(
-  #   IDXR_NORM_EXE,
-  #   IDXR_LEDGER,
-  #   out: IDXR_NORM_LEDGER
-  # )
-  #   warn("Normalizing Indexer Ledger at height #{BLOCKS_COUNT} failed.")
-  #   success = false
-  # end
-
-  # # check ledgers match
-  # unless system(
-  #   "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
-  #   out: IDXR_LEDGER_DIFF
-  # ) && `cat #{IDXR_LEDGER_DIFF}`.empty?
-  #   warn("Regression introduced to ledger calculations. Inspect diff file: #{IDXR_LEDGER_DIFF}")
-  #   success = false
-  # end
+  # check ledgers match
+  unless system(
+    "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
+    out: IDXR_LEDGER_DIFF
+  ) && `cat #{IDXR_LEDGER_DIFF}`.empty?
+    warn("Regression introduced to ledger calculations. Inspect diff file: #{IDXR_LEDGER_DIFF}")
+    success = false
+  end
 
   # Restore database from the snapshot made earlier
   #
