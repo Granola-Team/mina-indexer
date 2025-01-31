@@ -4,6 +4,3 @@
 ulimit -Sn
 ulimit -Hn
 nix develop --command just deploy-local-prod 422056
-
-# The argument to `deploy-local-prod` is the block height to retrieve up to.
-# Be sure to remove `blocks.list` if it exists so that it refetches all blocks.
