@@ -61,7 +61,7 @@ tier1-prereqs:
   cd rust && cargo nextest --version
   cd rust && cargo audit --version
   cd rust && cargo clippy --version
-  cd rust && cargo machete --help 2>&1 /dev/null
+  cd rust && cargo machete --help 2>&1 > /dev/null
   shellcheck --version
   shfmt --version
 
