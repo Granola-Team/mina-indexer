@@ -1,4 +1,4 @@
-use crate::constants::MAINNET_GENESIS_HASH;
+use crate::{constants::MAINNET_GENESIS_HASH, unix_socket_server::ServerCliResponse};
 use bincode::{config, Decode, Encode};
 use clap::{Parser, Subcommand};
 use std::{path::PathBuf, process};
@@ -454,9 +454,18 @@ impl ClientCli {
         writer.write_all(&encoded).await?;
         reader.read_to_end(&mut buffer).await?;
 
-        let msg = String::from_utf8(buffer)?;
-        let msg = msg.trim_end();
-        println!("{msg}");
-        Ok(())
+        let (response, _): (ServerCliResponse, usize) =
+            bincode::decode_from_slice(&buffer, BIN_CODE_CONFIG)?;
+
+        match response {
+            ServerCliResponse::Success(msg) => {
+                println!("{msg}");
+                Ok(())
+            }
+            ServerCliResponse::Error(err) => {
+                eprintln!("{err}");
+                process::exit(1);
+            }
+        }
     }
 }
