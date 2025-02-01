@@ -43,7 +43,7 @@ impl Branch {
         root_prev_hash: StateHash,
         blockchain_length: u32,
         global_slot_since_genesis: u32,
-        genesis_last_vrf_output: &str,
+        genesis_last_vrf_output: VrfOutput,
     ) -> anyhow::Result<Self> {
         let genesis_block = Block {
             state_hash: root_hash.clone(),
@@ -52,9 +52,7 @@ impl Branch {
             height: 0,
             blockchain_length,
             global_slot_since_genesis,
-            hash_last_vrf_output: VrfOutput::new(
-                VrfOutput::base64_decode(genesis_last_vrf_output)?.hex_digest(),
-            ),
+            hash_last_vrf_output: genesis_last_vrf_output,
         };
 
         Self::new_genesis_block(genesis_block)
