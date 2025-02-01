@@ -184,23 +184,28 @@ impl StagedLedgerStore for IndexerStore {
         )?)
     }
 
-    fn add_staged_ledger_hashes(
+    fn add_staged_ledger_hash(
         &self,
         ledger_hash: &LedgerHash,
         state_hash: &StateHash,
     ) -> anyhow::Result<bool> {
-        trace!("Adding staged ledger hash\nstate_hash: {state_hash}\nledger_hash: {ledger_hash}");
+        trace!(
+            "Adding staged ledger hash\n  state_hash:  {state_hash}\n  ledger_hash: {ledger_hash}"
+        );
         let is_new = self
             .database
             .get_cf(self.staged_ledgers_persisted_cf(), state_hash.0.as_bytes())?
             .is_none();
 
         // record persistence
-        self.database.put_cf(
-            self.staged_ledgers_persisted_cf(),
-            state_hash.0.as_bytes(),
-            b"",
-        )?;
+        if is_new {
+            self.database.put_cf(
+                self.staged_ledgers_persisted_cf(),
+                state_hash.0.as_bytes(),
+                b"",
+            )?;
+        }
+
         Ok(is_new)
     }
 
@@ -222,7 +227,7 @@ impl StagedLedgerStore for IndexerStore {
         // index on state hash & add new ledger event
         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH
             && self
-                .add_staged_ledger_hashes(
+                .add_staged_ledger_hash(
                     &LedgerHash::new_or_panic(MAINNET_GENESIS_LEDGER_HASH.into()),
                     state_hash,
                 )
@@ -237,7 +242,7 @@ impl StagedLedgerStore for IndexerStore {
             )))?;
         } else if state_hash.0 == HARDFORK_GENESIS_PREV_STATE_HASH
             && self
-                .add_staged_ledger_hashes(
+                .add_staged_ledger_hash(
                     &LedgerHash::new_or_panic(HARDFORK_GENESIS_LEDGER_HASH.into()),
                     state_hash,
                 )
@@ -254,7 +259,7 @@ impl StagedLedgerStore for IndexerStore {
             match self.get_block_staged_ledger_hash(state_hash)? {
                 Some(ledger_hash) => {
                     if self
-                        .add_staged_ledger_hashes(&ledger_hash, state_hash)
+                        .add_staged_ledger_hash(&ledger_hash, state_hash)
                         .unwrap_or(false)
                     {
                         self.add_event(&IndexerEvent::Db(DbEvent::Ledger(
@@ -270,9 +275,9 @@ impl StagedLedgerStore for IndexerStore {
                 }
                 None => {
                     if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH
-                        || state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
+                        && state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
                     {
-                        bail!("Block missing from store: {state_hash}")
+                        bail!("Staged ledger hash block missing from store: {state_hash}")
                     }
                 }
             }
@@ -284,6 +289,7 @@ impl StagedLedgerStore for IndexerStore {
             state_hash.0.as_bytes(),
             b"",
         )?;
+
         Ok(())
     }
 
@@ -293,6 +299,8 @@ impl StagedLedgerStore for IndexerStore {
         genesis_ledger: Ledger,
         height: u32,
     ) -> anyhow::Result<()> {
+        trace!("Adding genesis ledger to the store");
+
         // add prev genesis state hash
         let mut known_prev = self.get_known_genesis_prev_state_hashes()?;
 
@@ -455,7 +463,7 @@ impl StagedLedgerStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.block_staged_ledger_hash_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| LedgerHash::from_bytes(bytes).ok()))
+            .map(|bytes| LedgerHash::from_bytes(bytes).expect("ledger hash")))
     }
 
     fn get_staged_ledger_block_state_hash(

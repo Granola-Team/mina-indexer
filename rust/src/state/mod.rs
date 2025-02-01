@@ -154,6 +154,7 @@ pub enum ExtensionDirection {
     Reverse,
 }
 
+#[derive(Debug)]
 pub struct IndexerStateConfig {
     pub genesis_ledger: GenesisLedger,
     pub version: IndexerVersion,
@@ -176,7 +177,7 @@ impl IndexerStateConfig {
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
     ) -> Self {
-        IndexerStateConfig {
+        Self {
             version,
             genesis_ledger,
             indexer_store,
@@ -299,7 +300,10 @@ impl IndexerState {
         config
             .indexer_store
             .add_block(&genesis_block, genesis_bytes)?;
-        info!("Genesis block added to indexer store");
+        info!(
+            "Genesis block added to indexer store {}",
+            genesis_block.summary()
+        );
 
         // update genesis canonicity
         config.indexer_store.add_canonical_block(
@@ -364,7 +368,7 @@ impl IndexerState {
             config.version.genesis.prev_hash.to_owned(),
             config.version.genesis.blockchain_lenth,
             config.version.genesis.global_slot,
-            &config.version.genesis.last_vrf_output,
+            config.version.genesis.last_vrf_output.to_owned(),
         )?;
         let tip = Tip {
             state_hash: root_branch.root_block().state_hash.clone(),
@@ -1455,8 +1459,7 @@ impl IndexerState {
     }
 
     fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> anyhow::Result<()> {
-        let ledger_summary = format!("(epoch {epoch}): {ledger_hash}");
-        info!("Replaying staking ledger {ledger_summary}");
+        info!("Replaying staking ledger (epoch {epoch}): {ledger_hash}");
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
@@ -1482,8 +1485,10 @@ impl IndexerState {
                 assert_eq!(staking_ledger_epoch, staking_ledger_hash);
                 return Ok(());
             }
+
             panic!("Fatal: no staking ledger at epoch {epoch} in store");
         }
+
         panic!("Fatal: no staking ledger with hash {ledger_hash} in store");
     }
 
