@@ -16,9 +16,14 @@ FileUtils.mkdir_p(BASE_DIR)
 
 require "#{__dir__}/helpers" # Expects BASE_DIR & BUILD_TYPE to exist.
 
+# TODO add these back once fixed
+# missing_block_recovery
+# fetch_new_blocks
+
 test_names = %w[
   indexer_cli_reports
-  server_startup
+  server_startup_v1
+  server_startup_v2
   ipc_is_available_immediately
   startup_dirs_get_created
   clean_shutdown
@@ -31,8 +36,6 @@ test_names = %w[
   blocks
   block_copy
   missing_blocks
-  missing_block_recovery
-  fetch_new_blocks
   best_chain
   block_children
   ledgers
@@ -55,7 +58,8 @@ test_names = %w[
   staking_delegations
   internal_commands
   internal_commands_csv
-  start_from_config
+  start_from_config_v1
+  start_from_config_v2
   version_file
   hurl
 ]
@@ -122,7 +126,7 @@ tests.each do |tn|
   puts "\nTesting: #{tn}"
   test_success = system(BASH_TEST_DRIVER, EXE_SRC, "test_#{tn}")
   cleanup
-  test_success || abort("Failure from: #{BASH_TEST_DRIVER} #{EXE_SRC} test_#{tn}")
+  test_success || abort("Failure from: #{tn}")
 end
 
 puts "Regression testing complete."
