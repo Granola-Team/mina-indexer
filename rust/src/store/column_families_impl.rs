@@ -8,7 +8,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing blocks
     /// ```
-    /// key: state_hash
+    /// key: [StateHash] bytes
     /// val: {num block bytes BE u64 bytes}{serde_json block bytes}
     fn blocks_cf(&self) -> &ColumnFamily {
         self.database
@@ -18,7 +18,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing block state hashes
     /// ```
-    /// key: state_hash
+    /// key: [StateHash] bytes
     /// val: {num block bytes BE u64 bytes}{serde_json block bytes}
     fn blocks_state_hash_cf(&self) -> &ColumnFamily {
         self.database
@@ -28,8 +28,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing PCB versions
     /// ```
-    /// key: state hash bytes
-    /// val: pcb version serde bytes
+    /// key: [StateHash] bytes
+    /// val: [PcbVersion] serde bytes
     fn block_version_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-version")
@@ -177,8 +177,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{slot}
     /// val: b""
     /// where
-    /// - epoch: u32 BE bytes
-    /// - slot:  u32 BE bytes
+    /// - epoch: [u32] BE bytes
+    /// - slot:  [u32] BE bytes
     fn block_epoch_slots_produced_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-epoch-slots-produced")
@@ -190,9 +190,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{pk}{slot}
     /// val: b""
     /// where
-    /// - epoch: u32 BE bytes
+    /// - epoch: [u32] BE bytes
     /// - pk:    [PublicKey] bytes
-    /// - slot:  u32 BE bytes
+    /// - slot:  [u32] BE bytes
     /// ```
     /// Use [epoch_pk_num_key]
     fn block_pk_epoch_slots_produced_cf(&self) -> &ColumnFamily {
@@ -208,7 +208,6 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - pk:    [PublicKey] bytes
     /// - count: [u32] BE bytes
-    /// ```
     fn blocks_pk_count_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-pk-count")
@@ -470,8 +469,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - key: {receiver}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - receiver:     [PublicKey] bytes
-    /// - index:        [u32] BE bytes
+    /// - receiver: [PublicKey] bytes
+    /// - index:    [u32] BE bytes
     fn internal_commands_pk_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk")
@@ -538,10 +537,10 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - key: {receiver}{global_slot}{state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - receiver:     [PublicKey] bytes
+    /// - receiver:    [PublicKey] bytes
     /// - global_slot: [u32] BE bytes
-    /// - state_hash:   [StateHash] bytes
-    /// - index:        [u32] BE bytes
+    /// - state_hash:  [StateHash] bytes
+    /// - index:       [u32] BE bytes
     fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-global-slot-sort")
@@ -571,7 +570,10 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for storing best ledger accounts
     /// ```
     /// key: {token}{pk}
-    /// val: account serde bytes
+    /// val: [Account] serde bytes
+    /// where
+    /// - token:   [TokenAddress] bytes
+    /// - pk:      [PublicKey] bytes
     fn best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("best-ledger-accounts")
@@ -583,6 +585,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {token}{balance}{pk}
     /// val: b""
     /// where
+    /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey] bytes
     fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily {
@@ -594,7 +597,10 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for storing zkapp best ledger accounts
     /// ```
     /// key: {token}{pk}
-    /// val: account serde bytes
+    /// val: [Account] serde bytes
+    /// where
+    /// - token:   [TokenAddress] bytes
+    /// - pk:      [PublicKey] bytes
     fn zkapp_best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-best-ledger-accounts")
@@ -606,6 +612,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {token}{balance}{pk}
     /// val: b""
     /// where
+    /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey] bytes
     fn zkapp_best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily {
@@ -649,7 +656,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - state_hash: [StateHash] bytes
     /// - token:      [TokenAddress] bytes
     /// - pk:         [PublicKey] bytes
-    /// - account:    serde bytes
+    /// - account:    [Account] serde bytes
     fn staged_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staged-ledger-accounts")
@@ -690,7 +697,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - state_hash: [StateHash] bytes
     /// - pk:         [PublicKey] bytes
     /// - num:        [u32] BE bytes
-    /// - delegate:   serde bytes
+    /// - delegate:   [PublicKey] bytes
     fn staged_ledger_account_delegations_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staged-ledger-account-delegations")
@@ -720,8 +727,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing block ledger diffs
     /// ```
-    /// key: state hash bytes
-    /// val: ledger diff serde bytes
+    /// key: [StateHash] bytes
+    /// val: [LedgerDiff] serde bytes
     fn block_ledger_diff_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-ledger-diff")
@@ -741,7 +748,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for storing staking ledger accounts
     /// ```
     /// - key: [staking_ledger_account_key]
-    /// - val: account serde bytes
+    /// - val: [Account] serde bytes
     fn staking_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-accounts")
@@ -771,7 +778,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for storing staking ledger hashes
     /// ```
     /// - key: [staking_ledger_epoch_key_prefix]
-    /// - val: ledger hash bytes
+    /// - val: [LedgerHash] bytes
     fn staking_ledger_epoch_to_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-epoch-to-hash")
@@ -780,8 +787,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger epochs
     /// ```
-    /// - key: ledger hash bytes
-    /// - val: epoch BE bytes
+    /// - key: [LedgerHash] bytes
+    /// - val: epoch ([u32] BE bytes)
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-hash-to-epoch")
@@ -790,8 +797,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger genesis state hashes
     /// ```
-    /// - key: ledger hash bytes
-    /// - val: genesis state hash bytes
+    /// - key: [LedgerHash] bytes
+    /// - val: [StateHash] bytes
     fn staking_ledger_genesis_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-genesis-hash")
@@ -800,8 +807,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger total currencies
     /// ```
-    /// - key: ledger hash bytes
-    /// - val: total currency BE bytes
+    /// - key: [LedgerHash] bytes
+    /// - val: [u64] BE bytes
     fn staking_ledger_total_currency_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-total-currency")
@@ -830,7 +837,7 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch total number of staking ledger accounts
     /// ```
-    /// - key: epoch
+    /// - key: epoch ([u32] BE bytes)
     /// - value: number of staking ledger accounts in epoch ([u32] BE bytes)
     fn staking_ledger_accounts_count_epoch_cf(&self) -> &ColumnFamily {
         self.database
@@ -848,7 +855,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: snark
     /// where
     /// - hash:  [StateHash] bytes
-    /// - index: u32 BE bytes
+    /// - index: [u32] BE bytes
     /// - snark: [SnarkWorkSummary] serde bytes
     fn snarks_cf(&self) -> &ColumnFamily {
         self.database
@@ -862,7 +869,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: snark
     /// where
     /// - prover: [PublicKey] bytes
-    /// - index:  u32 BE bytes
+    /// - index:  [u32] BE bytes
     /// - snark:  [SnarkWorkSummaryWithStateHash] serde bytes
     fn snarks_prover_cf(&self) -> &ColumnFamily {
         self.database
@@ -876,7 +883,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: fees
     /// where
     /// - prover: [PublicKey] bytes
-    /// - fees:   u6[u32] BE bytes
+    /// - fees:   [u64] BE bytes
     fn snark_prover_fees_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees")
@@ -888,9 +895,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{prover}
     /// val: fees
     /// where
-    /// - epoch:  u32 BE bytes
+    /// - epoch:  [u32] BE bytes
     /// - prover: [PublicKey] bytes
-    /// - fees:   u6[u32] BE bytes
+    /// - fees:   [u64] BE bytes
     fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-epoch")
@@ -903,7 +910,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: [SnarkAllTimeFees] serde bytes
     /// where
     /// - prover: [PublicKey] bytes
-    /// - height: u32 BE bytes
+    /// - height: [u32] BE bytes
     fn snark_prover_fees_historical_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-historical")
@@ -916,7 +923,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: [SnarkEpochFees] serde bytes
     /// where
     /// - prover: [PublicKey] bytes
-    /// - height: u32 BE bytes
+    /// - height: [u32] BE bytes
     fn snark_prover_fees_epoch_historical_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-epoch-historical")
@@ -928,7 +935,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {fees}{prover}
     /// val: b""
     /// where
-    /// - fees:   u6[u32] BE bytes
+    /// - fees:   [u64] BE bytes
     /// - prover: [PublicKey] bytes
     fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -941,8 +948,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{fees}{prover}
     /// val: b""
     /// where
-    /// - epoch:  u32 BE bytes
-    /// - fees:   u6[u32] BE bytes
+    /// - epoch:  [u32] BE bytes
+    /// - fees:   [u64] BE bytes
     /// - prover: [PublicKey] bytes
     fn snark_prover_total_fees_epoch_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -956,7 +963,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: fee
     /// where
     /// - prover: [PublicKey] bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     fn snark_prover_max_fee_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-max-fee")
@@ -968,9 +975,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{prover}
     /// val: fee
     /// where
-    /// - epoch:  u32 BE bytes
+    /// - epoch:  [u32] BE bytes
     /// - prover: [PublicKey] bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     fn snark_prover_max_fee_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-max-fee-epoch")
@@ -982,7 +989,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {fee}{prover}
     /// val: b""
     /// where
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
     /// Use [snark_fee_sort_key]
@@ -997,8 +1004,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key:{epoch}{fee}{prover}
     /// val: b""
     /// where
-    /// - epoch:  u32 BE bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - epoch:  [u32] BE bytes
+    /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
     /// Use [snark_fee_epoch_sort_key]
@@ -1014,7 +1021,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: fee
     /// where
     /// - prover: [PublicKey] bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     fn snark_prover_min_fee_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-min-fee")
@@ -1026,9 +1033,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{prover}
     /// val: fee
     /// where
-    /// - epoch:  u32 BE bytes
+    /// - epoch:  [u32] BE bytes
     /// - prover: [PublicKey] bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     fn snark_prover_min_fee_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-min-fee-epoch")
@@ -1040,7 +1047,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {fee}{prover}
     /// val: b""
     /// where
-    /// - fee:    u6[u32] BE bytes
+    /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
     /// Use [snark_fee_sort_key]
@@ -1055,8 +1062,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{fee}{prover}
     /// val: b""
     /// where
-    /// - epoch:  u32 BE bytes
-    /// - fee:    u6[u32] BE bytes
+    /// - epoch:  [u32] BE bytes
+    /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
     /// Use [snark_fee_epoch_sort_key]
@@ -1072,8 +1079,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: snark
     /// where
     /// - prover:       [PublicKey] bytes
-    /// - block height: u32 BE bytes
-    /// - index:        u32 BE bytes
+    /// - block height: [u32] BE bytes
+    /// - index:        [u32] BE bytes
     /// - snark:        [SnarkWorkSummary] serde bytes
     fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -1087,8 +1094,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// val: snark
     /// where
     /// - prover:      [PublicKey] bytes
-    /// - global_slot: u32 BE bytes
-    /// - index:       u32 BE bytes
+    /// - global_slot: [u32] BE bytes
+    /// - index:       [u32] BE bytes
     /// - snark:       [SnarkWorkSummary] serde bytes
     fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
@@ -1100,11 +1107,11 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {fee}{sort}{pk}{hash}{index}
     /// where
-    /// fee:   u6[u32] BE bytes
-    /// sort:  u32 BE bytes
+    /// fee:   [u64] BE bytes
+    /// sort:  [u32] BE bytes
     /// pk:    [PublicKey] bytes
     /// hash:  [StateHash] bytes
-    /// index: u32 BE bytes
+    /// index: [u32] BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
     fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily {
@@ -1117,11 +1124,11 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// {fee}{sort}{pk}{hash}{index}
     /// where
-    /// fee:   u6[u32] BE bytes
-    /// sort:  u32 BE bytes
+    /// fee:   [u64] BE bytes
+    /// sort:  [u32] BE bytes
     /// pk:    [PublicKey] bytes
     /// hash:  [StateHash] bytes
-    /// index: u32 BE bytes
+    /// index: [u32] BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
     fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily {
@@ -1310,8 +1317,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch slots produced counts
     /// ```
-    /// key: epoch (u32 BE bytes)
-    /// val: number of slots produced in epoch (u32 BE bytes)
+    /// key: epoch ([u32] BE bytes)
+    /// val: number of slots produced in epoch ([u32] BE bytes)
     fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-epoch-slots-produced-count")
@@ -1323,9 +1330,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// key: {epoch}{pk}
     /// val: count
     /// where
-    /// - epoch: u32 BE bytes
+    /// - epoch: [u32] BE bytes
     /// - pk:    [PublicKey] bytes
-    /// - count: u32 BE bytes
+    /// - count: [u32] BE bytes
     /// ```
     /// Use [epoch_pk_key]
     fn block_pk_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
@@ -1338,8 +1345,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// key: {epoch}{count}{pk}
     /// val: b""
-    /// - epoch: u32 BE bytes
-    /// - count: u32 BE bytes
+    /// - epoch: [u32] BE bytes
+    /// - count: [u32] BE bytes
     /// - pk:    [PublicKey] bytes
     /// ```
     /// Use [epoch_block_num_key]
