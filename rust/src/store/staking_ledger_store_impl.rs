@@ -28,8 +28,6 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingAccount>> {
-        trace!("Getting staking account {pk}");
-
         if let Some(ledger_hash) =
             self.get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
         {
@@ -38,7 +36,6 @@ impl StakingLedgerStore for IndexerStore {
                 .or(best_block_genesis_hash.as_ref())
                 .unwrap();
             let key = staking_ledger_account_key(genesis_state_hash, epoch, &ledger_hash, pk);
-
             return Ok(self
                 .database
                 .get_cf(self.staking_ledger_accounts_cf(), key)?
@@ -57,7 +54,7 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: &StateHash,
         staking_account_with_delegation: StakingAccountWithEpochDelegation,
     ) -> anyhow::Result<()> {
-        trace!("Setting staking account {pk} (epoch {epoch}): {ledger_hash}");
+        trace!("Setting staking account {pk}");
 
         // add staking account
         self.database.put_cf(
@@ -80,7 +77,6 @@ impl StakingLedgerStore for IndexerStore {
             staking_ledger_sort_key(epoch, staking_account_with_delegation.account.balance, pk),
             &account_serde_bytes,
         )?;
-
         self.database.put_cf(
             self.staking_ledger_stake_sort_cf(),
             staking_ledger_sort_key(
@@ -93,7 +89,6 @@ impl StakingLedgerStore for IndexerStore {
             ),
             &account_serde_bytes,
         )?;
-
         Ok(())
     }
 
@@ -103,21 +98,16 @@ impl StakingLedgerStore for IndexerStore {
         epoch: Option<u32>,
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingLedger>> {
-        trace!("Getting staking ledger {ledger_hash}");
-
         match epoch {
             None => {
                 trace!("Getting staking ledger by hash {ledger_hash}");
-
                 if let Some(epoch) = self.get_epoch(ledger_hash)? {
                     return self.build_staking_ledger(epoch, genesis_state_hash);
                 }
-
                 Ok(None)
             }
             Some(epoch) => {
                 trace!("Getting staking ledger by epoch {epoch}");
-
                 if let Ok(Some(staking_ledger)) =
                     self.build_staking_ledger(epoch, genesis_state_hash)
                 {
@@ -127,7 +117,6 @@ impl StakingLedgerStore for IndexerStore {
                         error!("Invalid ledger hash {ledger_hash} for epoch {epoch}")
                     }
                 }
-
                 Ok(None)
             }
         }
@@ -139,7 +128,6 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         trace!("Adding staking ledger {}", staking_ledger.summary());
-
         let epoch = staking_ledger.epoch;
         let key = staking_ledger_epoch_key(
             genesis_state_hash,
@@ -205,7 +193,6 @@ impl StakingLedgerStore for IndexerStore {
                 },
             )))?;
         }
-
         Ok(())
     }
 
@@ -216,17 +203,15 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<EpochStakeDelegation>> {
         trace!("Getting epoch {epoch} aggregated delegations for {pk}");
-
+        let ledger_hash = self
+            .get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
+            .expect("staking ledger hash");
         let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
             best_block_genesis_hash
                 .as_ref()
                 .expect("best block genesis hash")
         });
-        let ledger_hash = self
-            .get_staking_ledger_hash_by_epoch(epoch, Some(genesis_state_hash))?
-            .expect("staking ledger hash");
-
         Ok(self
             .database
             .get_cf(
@@ -253,12 +238,10 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<LedgerHash>> {
         trace!("Getting staking ledger hash for epoch {epoch}");
-
         let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
         let genesis_state_hash = genesis_state_hash
             .or(best_block_genesis_hash.as_ref())
             .unwrap();
-
         Ok(self
             .database
             .get_cf(
@@ -274,21 +257,16 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<()> {
+        trace!("Setting epoch {epoch} for staking ledger {ledger_hash}");
         let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
         let genesis_state_hash = genesis_state_hash
             .or(best_block_genesis_hash.as_ref())
             .unwrap();
-
-        trace!(
-            "Setting epoch {epoch} for staking ledger {ledger_hash} genesis {genesis_state_hash}"
-        );
-
         self.database.put_cf(
             self.staking_ledger_epoch_to_hash_cf(),
             staking_ledger_epoch_key_prefix(genesis_state_hash, epoch),
             ledger_hash.0.as_bytes(),
         )?;
-
         Ok(self.database.put_cf(
             self.staking_ledger_hash_to_epoch_cf(),
             ledger_hash.0.as_bytes(),
@@ -382,7 +360,6 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<StakingLedger>> {
         trace!("Building staking ledger epoch {epoch}");
-
         if let Some(ledger_hash) =
             self.get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
         {
@@ -414,7 +391,6 @@ impl StakingLedgerStore for IndexerStore {
                     assert_eq!(account.balance, balance);
                     staking_ledger.insert(pk, account);
                 }
-
                 return Ok(Some(StakingLedger {
                     epoch,
                     network,
@@ -425,7 +401,6 @@ impl StakingLedgerStore for IndexerStore {
                 }));
             }
         }
-
         Ok(None)
     }
 
