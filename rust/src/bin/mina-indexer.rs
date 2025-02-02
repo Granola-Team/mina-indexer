@@ -10,7 +10,10 @@ use mina_indexer::{
     client,
     constants::*,
     ledger::genesis::GenesisLedger,
-    server::{GenesisVersion, IndexerConfiguration, IndexerVersion, InitializationMode},
+    server::{
+        initialize_indexer_database, start_indexer, GenesisVersion, IndexerConfiguration,
+        InitializationMode,
+    },
     store::{restore_snapshot, version::IndexerStoreVersion, IndexerStore},
     unix_socket_server::remove_unix_socket,
     web::start_web_server,
@@ -172,22 +175,19 @@ impl ServerCommand {
 
         check_or_write_pid_file(&database_dir);
 
-        debug!("Reading mina indexer config from store");
+        debug!("Building mina indexer configuration");
+        let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
         let db = Arc::new(IndexerStore::new(&database_dir)?);
-        let mut config = IndexerConfiguration::read_indexer_config(&db)?;
-        config.initialization_mode = mode;
 
         info!("Starting the mina indexer filesystem watchers & UDS server");
         let store = db.clone();
-
         subsys.start(SubsystemBuilder::new("Indexer", move |s| {
-            config.start_indexer(s, store)
+            start_indexer(s, config, store)
         }));
 
         info!("Starting the web server listening on {web_hostname}:{web_port}");
         let store = db.clone();
         let host = web_hostname.clone();
-
         subsys.start(SubsystemBuilder::new("Web Server", move |s| {
             start_web_server(s, store, (host, web_port))
         }));
@@ -264,28 +264,19 @@ impl DatabaseCommand {
             Self::Create(args) => {
                 let database_dir = args.database_dir.clone();
                 debug!("Ensuring mina indexer database exists in {database_dir:#?}");
-
                 if let Err(e) = fs::create_dir_all(&database_dir) {
                     error!("Failed to create database directory: {e}");
                     process::exit(1);
                 }
-
                 debug!("Building mina indexer configuration");
                 let mut mode = InitializationMode::BuildDB;
-
                 if let Ok(dir) = std::fs::read_dir(database_dir.clone()) {
                     if dir.count() > 0 {
                         mode = InitializationMode::Sync;
                     }
                 };
-
-                let config = if let Some(config_path) = args.config {
-                    let contents = std::fs::read(config_path)?;
-                    let args: ServerArgsJson = serde_json::from_slice(&contents)?;
-                    IndexerConfiguration::from((args, domain_socket_path))
-                } else {
-                    process_indexer_configuration((*args).into(), mode, domain_socket_path)?
-                };
+                let config =
+                    process_indexer_configuration((*args).into(), mode, domain_socket_path)?;
                 let db = Arc::new(IndexerStore::new(&database_dir)?);
                 let store = db.clone();
 
@@ -297,7 +288,7 @@ impl DatabaseCommand {
                     }
 
                     // build the database
-                    res = config.initialize_indexer_database(&store) => {
+                    res = initialize_indexer_database(config, &store) => {
                         if let Err(e) = res {
                             error!("Failed to initialize indexer database: {e}");
                         };
@@ -350,44 +341,32 @@ fn process_indexer_configuration(
     }
 
     // pick up protocol constants from the given file or use defaults
-    // let genesis_constants = args.db.genesis_constants;
-    // let constraint_system_digests = args.db.constraint_system_digests;
-    // let protocol_txn_version_digest = args.db.protocol_txn_version_digest;
-    // let protocol_network_version_digest =
-    // args.db.protocol_network_version_digest; let genesis_constants =
-    // protocol_constants(genesis_constants)?; let constraint_system_digests =
-    // constraint_system_digests.unwrap_or(
-    //     MAINNET_CONSTRAINT_SYSTEM_DIGESTS
-    //         .iter()
-    //         .map(|x| x.to_string())
-    //         .collect(),
-    // );
-
-    // indexer version
-    let network = args.db.network;
-    let (version, chain_id, genesis) = if genesis_hash == HARDFORK_GENESIS_HASH {
-        (PcbVersion::V2, ChainId::v2(), GenesisVersion::v2())
-    } else {
-        (PcbVersion::V1, ChainId::v1(), GenesisVersion::v1())
-    };
-
-    let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger, &version)?;
-    let version = IndexerVersion {
-        network,
-        version,
-        chain_id,
-        genesis,
-    };
-
+    let genesis_constants = protocol_constants(genesis_constants)?;
+    let constraint_system_digests = constraint_system_digests.unwrap_or(
+        MAINNET_CONSTRAINT_SYSTEM_DIGESTS
+            .iter()
+            .map(|x| x.to_string())
+            .collect(),
+    );
+    let genesis_ledger = parse_genesis_ledger(args.db.genesis_ledger)?;
     Ok(IndexerConfiguration {
+        genesis_version: if genesis_hash == HARDFORK_GENESIS_HASH {
+            GenesisVersion::v2()
+        } else {
+            GenesisVersion::v1()
+        },
         genesis_ledger,
-        version,
+        genesis_constants,
+        constraint_system_digests,
+        protocol_txn_version_digest,
+        protocol_network_version_digest,
+        version: PcbVersion::default(),
         blocks_dir,
         staking_ledgers_dir,
         prune_interval,
         canonical_threshold,
         canonical_update_threshold,
-        initialization_mode,
+        initialization_mode: mode,
         ledger_cadence,
         reporting_freq,
         domain_socket_path,
@@ -400,10 +379,7 @@ fn process_indexer_configuration(
     })
 }
 
-fn parse_genesis_ledger(
-    path: Option<PathBuf>,
-    version: &PcbVersion,
-) -> anyhow::Result<GenesisLedger> {
+fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> {
     let genesis_ledger = if let Some(path) = path {
         assert!(path.is_file(), "Ledger file does not exist at {path:#?}");
         info!("Parsing ledger file at {path:#?}");
@@ -419,11 +395,8 @@ fn parse_genesis_ledger(
             }
         }
     } else {
-        info!("Using default {} genesis ledger", version);
-        match version {
-            PcbVersion::V1 => GenesisLedger::new_v1()?,
-            PcbVersion::V2 => GenesisLedger::new_v2()?,
-        }
+        info!("Using default genesis ledger");
+        GenesisLedger::new_v1()?
     };
 
     Ok(genesis_ledger)
