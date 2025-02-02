@@ -541,6 +541,28 @@ fn parse_genesis_ledger(path: Option<PathBuf>) -> anyhow::Result<GenesisLedger> 
     Ok(genesis_ledger)
 }
 
+fn protocol_constants(path: Option<PathBuf>) -> anyhow::Result<GenesisConstants> {
+    let mut constants = GenesisConstants::default();
+    if let Some(path) = path {
+        if let Ok(ref contents) = std::fs::read(path) {
+            if let Ok(override_constants) = serde_json::from_slice::<GenesisConstants>(contents) {
+                constants.override_with(override_constants);
+            } else {
+                error!(
+                    "Error parsing supplied protocol constants. Using default:\n{}",
+                    serde_json::to_string_pretty(&constants)?
+                )
+            }
+        } else {
+            error!(
+                "Error reading protocol constants file. Using default:\n{}",
+                serde_json::to_string_pretty(&constants)?
+            )
+        }
+    }
+    Ok(constants)
+}
+
 /// Read the pid from a file
 fn read_pid_from_file<P: AsRef<Path>>(pid_path: P) -> anyhow::Result<i32> {
     let content = fs::read_to_string(pid_path)?;

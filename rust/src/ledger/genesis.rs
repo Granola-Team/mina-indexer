@@ -9,8 +9,7 @@ use crate::{
     constants::*,
     utility::compression::decompress_gzip,
 };
-use anyhow::anyhow;
-use log::error;
+use anyhow::{anyhow, Ok};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::Path, str::FromStr};
 
@@ -98,7 +97,7 @@ pub struct GenesisAccountTiming {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProtocolConstants {
+pub struct GenesisConstants {
     pub k: Option<u32>,
     pub slots_per_epoch: Option<u32>,
     pub slots_per_sub_window: Option<u32>,
@@ -110,32 +109,7 @@ pub struct ProtocolConstants {
 // impls //
 ///////////
 
-impl ProtocolConstants {
-    pub fn from_path<P>(path: Option<P>) -> anyhow::Result<Self>
-    where
-        P: AsRef<Path>,
-    {
-        let mut constants = Self::default();
-        if let Some(path) = path {
-            if let Ok(ref contents) = std::fs::read(path) {
-                if let Ok(override_constants) = serde_json::from_slice(contents) {
-                    constants.override_with(override_constants);
-                } else {
-                    error!(
-                        "Error parsing supplied protocol constants. Using default:\n{}",
-                        serde_json::to_string_pretty(&constants)?
-                    )
-                }
-            } else {
-                error!(
-                    "Error reading protocol constants file. Using default:\n{}",
-                    serde_json::to_string_pretty(&constants)?
-                )
-            }
-        }
-        Ok(constants)
-    }
-
+impl GenesisConstants {
     pub fn override_with(&mut self, constants: Self) {
         let Self {
             delta,
@@ -244,7 +218,7 @@ impl GenesisRoot {
 // defaults //
 //////////////
 
-impl std::default::Default for ProtocolConstants {
+impl std::default::Default for GenesisConstants {
     fn default() -> Self {
         Self {
             delta: Some(MAINNET_DELTA),
@@ -339,7 +313,7 @@ impl From<GenesisAccountTiming> for Timing {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{GenesisConstants, GenesisLedger, GenesisRoot};
     use std::path::PathBuf;
 
     #[test]
@@ -399,36 +373,32 @@ mod tests {
 
     #[test]
     fn override_genesis_constants() -> anyhow::Result<()> {
-        // no override
-        let mut none_constants = ProtocolConstants::default();
+        let mut none_constants = GenesisConstants::default();
         let none_path: PathBuf = "./tests/data/genesis_constants/none.json".into();
+        none_constants.override_with(serde_json::from_slice::<GenesisConstants>(&std::fs::read(
+            none_path,
+        )?)?);
+        assert_eq!(none_constants, GenesisConstants::default());
 
-        none_constants.override_with(serde_json::from_slice::<ProtocolConstants>(
-            &std::fs::read(none_path)?,
-        )?);
-        assert_eq!(none_constants, ProtocolConstants::default());
-
-        // override some
-        let mut some_constants = ProtocolConstants::default();
+        let mut some_constants = GenesisConstants::default();
         let some_path: PathBuf = "./tests/data/genesis_constants/some.json".into();
         let some_constants_file =
-            serde_json::from_slice::<ProtocolConstants>(&std::fs::read(some_path)?)?;
+            serde_json::from_slice::<GenesisConstants>(&std::fs::read(some_path)?)?;
 
         some_constants.override_with(some_constants_file);
         assert_eq!(
             some_constants,
-            ProtocolConstants {
+            GenesisConstants {
                 delta: Some(1),
                 txpool_max_size: Some(1000),
-                ..ProtocolConstants::default()
+                ..GenesisConstants::default()
             }
         );
 
-        // override all
-        let mut all_constants = ProtocolConstants::default();
+        let mut all_constants = GenesisConstants::default();
         let all_path: PathBuf = "./tests/data/genesis_constants/all.json".into();
         let all_constants_file =
-            serde_json::from_slice::<ProtocolConstants>(&std::fs::read(all_path)?)?;
+            serde_json::from_slice::<GenesisConstants>(&std::fs::read(all_path)?)?;
 
         all_constants.override_with(all_constants_file.clone());
         assert_eq!(all_constants, all_constants_file);
