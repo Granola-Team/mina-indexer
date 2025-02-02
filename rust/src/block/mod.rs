@@ -455,6 +455,16 @@ mod block_tests {
     }
 
     #[test]
+    fn block_hash_roundtrip() -> anyhow::Result<()> {
+        let input = StateHash("3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT".to_string());
+        let bytes = input.0.as_bytes();
+
+        assert_eq!(input.clone().to_bytes(), bytes, "to_bytes");
+        assert_eq!(input, StateHash::from_bytes(bytes)?, "from_bytes");
+        Ok(())
+    }
+
+    #[test]
     fn test_sort_by_height_and_lexicographical_order() {
         let filename1 = PathBuf::from("mainnet-1-abc123.json");
         let filename2 = PathBuf::from("mainnet-2-def456.json");
