@@ -148,7 +148,7 @@ jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLyWnjZqUECniE1q
 jsonpath "$.data.feetransfers[0].epoch_num_internal_commands" == 196
 jsonpath "$.data.feetransfers[0].total_num_internal_commands" == 399
 
-duration < 1000
+duration < 500
 
 #
 # Fee transfer block state hash & block height LTE query
