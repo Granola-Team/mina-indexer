@@ -123,6 +123,3 @@ pub mod berkeley {
         "3NK512ryRJvj1TUKGgPoGZeHSNbn37e9BbnpyeqHL9tvKLeD8yrY";
     pub const BERKELEY_GENESIS_TIMESTAMP: u64 = 1706882461000;
 }
-
-pub const DEFAULT_WEB_HOSTNAME: &str = "localhost";
-pub const DEFAULT_WEB_PORT: u16 = 8080;
