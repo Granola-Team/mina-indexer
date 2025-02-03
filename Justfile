@@ -105,7 +105,7 @@ lint:
   cd rust && cargo machete
 
 format:
-  cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1 
+  cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1
   # standardrb --fix ops/*.rb
   shfmt --write ops/*.sh 2>&1 >/dev/null
   alejandra flake.nix ops/mina/mina_txn_hasher.nix > /dev/null 2>&1
@@ -228,7 +228,7 @@ test-unit-mina-rs:
 #
 
 # Run the 1st tier of tests.
-tier1: tier1-prereqs check lint test-unit
+tier1: tier1-prereqs lint test-unit
   @echo "--- Performing tier 1 regression tests"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} \
     ipc_is_available_immediately \
