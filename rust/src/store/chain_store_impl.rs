@@ -45,10 +45,10 @@ impl ChainStore for IndexerStore {
 
     fn get_chain_id(&self) -> anyhow::Result<ChainId> {
         trace!("Getting chain id");
-        Ok(ChainId(String::from_utf8(
+        Ok(ChainId::from(
             self.database
                 .get(Self::CHAIN_ID_KEY)?
                 .expect("chain id should exist in database"),
-        )?))
+        ))
     }
 }
