@@ -9,6 +9,10 @@ set -euo pipefail
 IDXR="$1"
 shift
 
+#############
+# Artifacts #
+#############
+
 # Collect the binaries under test and the test ledgers.
 SRC="$(git rev-parse --show-toplevel)"
 REV="$(git rev-parse --short=8 HEAD)"
@@ -20,8 +24,16 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 : "${VOLUMES_DIR:=/mnt}"
 DEV_DIR="$VOLUMES_DIR"/mina-indexer-dev
 BASE_DIR="$DEV_DIR"/rev-"$REV"
+
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"
+
+###########
+# Helpers #
+###########
+
+MAINNET_GENESIS_STATE_HASH=3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
+HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
 
 idxr() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock "$@"
@@ -172,6 +184,10 @@ assert_directory_exists() {
     fi
 }
 
+#########
+# Tests #
+#########
+
 test_indexer_cli_reports() {
     # Indexer reports usage with no arguments
     ( "$IDXR" 2>&1 || true ) | grep -iq "Usage:"
@@ -282,8 +298,8 @@ test_indexer_cli_reports() {
         grep -iq "Usage: mina-indexer database version"
 }
 
-# Indexer server starts up without blocks & staking ledger directories
-test_server_startup() {
+# Indexer v1 server starts up without blocks & staking ledger directories
+test_server_startup_v1() {
     idxr database create --database-dir ./database
     idxr_server_start --database-dir ./database
     wait_for_socket
@@ -291,7 +307,19 @@ test_server_startup() {
     best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     root=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
     assert $root $best
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $best
+    assert $MAINNET_GENESIS_STATE_HASH $best
+}
+
+# Indexer v2 server starts up without blocks & staking ledger directories
+test_server_startup_v2() {
+    idxr database create --database-dir ./database --genesis-hash $HARDFORK_GENESIS_STATE_HASH
+    idxr_server_start --database-dir ./database
+    wait_for_socket
+
+    best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    root=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
+    assert $root $best
+    assert $HARDFORK_GENESIS_STATE_HASH $best
 }
 
 # Indexer server ipc is available during initialization
@@ -314,6 +342,7 @@ test_startup_dirs_get_created() {
     assert_directory_exists "./blocks-dir"
     assert_directory_exists "./staking-ledgers-dir"
     assert_directory_exists "./database-dir"
+
     rm -fr ./database-dir
     rm -fr ./staking-ledgers-dir
     rm -fr ./blocks-dir
@@ -510,7 +539,7 @@ test_block_copy() {
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
     # add block 11
     stage_mainnet_single 11 ./blocks
@@ -525,7 +554,7 @@ test_block_copy() {
     assert 11 $best_length
     assert 1 $canonical_length
     assert '3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 }
 
 # Indexer handles missing blocks correctly
@@ -548,7 +577,7 @@ test_missing_blocks() {
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
     # add missing block which connects the dangling branches
     stage_mainnet_single 21 ./blocks
@@ -566,7 +595,7 @@ test_missing_blocks() {
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
     # add remaining missing block
     stage_mainnet_single 11 ./blocks
@@ -1249,7 +1278,7 @@ test_startup_staking_ledgers() {
     idxr database create \
         --database-dir ./database \
         --staking-ledgers-dir $STAKING_LEDGERS
-    idxr_server start --database-dir ./database --self-check
+    idxr_server start --database-dir ./database
     wait_for_socket
 
     # epoch 0 staking ledger should be in the store, write it to a file
@@ -1469,14 +1498,12 @@ test_internal_commands_csv() {
     rm -f $csv_file
 }
 
-# Indexer correctly starts from config file
-test_start_from_config() {
-    stage_mainnet_blocks 15 ./blocks
-
+# Indexer correctly starts from v1 config file
+test_start_from_config_v1() {
     port=$(ephemeral_port)
     file=./config.json
     echo "
-    { \"genesis_hash\": \"3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ\",
+    { \"genesis_hash\": \"$MAINNET_GENESIS_STATE_HASH\",
       \"blocks_dir\": \"./blocks\",
       \"staking_ledgers_dir\": \"./staking-ledgers\",
       \"database_dir\": \"./database\",
@@ -1498,8 +1525,43 @@ test_start_from_config() {
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    assert 15 $length
-    assert '3NKkVW47d5Zxi7zvKufBrbiAvLzyKnFgsnN9vgCw65sffvHpv63M' $hash
+    assert '1' $length
+    assert $MAINNET_GENESIS_STATE_HASH $hash
+
+    rm -rf $file
+}
+
+# Indexer correctly starts from v2 config file
+test_start_from_config_v2() {
+    port=$(ephemeral_port)
+    file=./config.json
+    echo "
+    { \"genesis_hash\": \"$HARDFORK_GENESIS_STATE_HASH\",
+      \"blocks_dir\": \"./blocks\",
+      \"staking_ledgers_dir\": \"./staking-ledgers\",
+      \"database_dir\": \"./database\",
+      \"log_level\": \"info\",
+      \"ledger_cadence\": 100,
+      \"reporting_freq\": 1000,
+      \"prune_interval\": 10,
+      \"canonical_threshold\": 10,
+      \"canonical_update_threshold\": 2,
+      \"web_hostname\": \"localhost\",
+      \"web_port\": ${port},
+      \"network\": \"mainnet\",
+      \"do_not_ingest_orphan_blocks\": false
+    }" > $file
+
+    idxr_server_start_standard --config $file
+    wait_for_socket
+
+    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+
+    assert '359605' $length
+    assert $HARDFORK_GENESIS_STATE_HASH $hash
+
+    rm -rf $file
 }
 
 test_clean_shutdown() {
@@ -1649,7 +1711,7 @@ test_version_file() {
 test_fetch_new_blocks() {
     stage_mainnet_blocks 9 ./blocks
 
-    # start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
+    # start the indexer using the block fetching exe on path "$SRC"/tests/recovery.sh
     # wait for 3s in between recovery attempts
     idxr database create \
         --blocks-dir ./blocks \
@@ -1701,7 +1763,7 @@ test_missing_block_recovery() {
     assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
 
     # wait for missing block recovery to work its magic
-    sleep 20
+    sleep 30
 
     # check that all dangling branches have resolved & the best block has the right height
     best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1726,7 +1788,7 @@ test_database_create() {
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 }
 
 # Create an indexer database snapshot from a db directory without a running indexer.
@@ -1757,7 +1819,7 @@ test_snapshot_database_dir() {
     assert 10 $best_length
     assert 1 $canonical_length
     assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_hash
-    assert '3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ' $canonical_hash
+    assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
     rm -fr ./restore-dir
 }
@@ -1837,7 +1899,8 @@ test_do_not_ingest_orphan_blocks() {
 for test_name in "$@"; do
     case $test_name in
         "test_indexer_cli_reports") test_indexer_cli_reports ;;
-        "test_server_startup") test_server_startup ;;
+        "test_server_startup_v1") test_server_startup_v1 ;;
+        "test_server_startup_v2") test_server_startup_v2 ;;
         "test_ipc_is_available_immediately") test_ipc_is_available_immediately ;;
         "test_database_create") test_database_create ;;
         "test_reuse_databases") test_reuse_databases ;;
@@ -1871,7 +1934,8 @@ for test_name in "$@"; do
         "test_staking_delegations") test_staking_delegations ;;
         "test_internal_commands") test_internal_commands ;;
         "test_internal_commands_csv") test_internal_commands_csv ;;
-        "test_start_from_config") test_start_from_config ;;
+        "test_start_from_config_v1") test_start_from_config_v1 ;;
+        "test_start_from_config_v2") test_start_from_config_v2 ;;
         "test_hurl") test_hurl ;;
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
