@@ -208,27 +208,38 @@ dev-continue subtest='': debug-build
 #
 
 # Run unit debug tests
-test-unit:
+test-unit-tier1:
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
   @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run --run-ignored all
 
-# Lint & run debug unit test(s)
-test-unit-dev test='': lint
+# Lint & run debug tier 1 unit test(s)
+test-unit-tier1-dev test='': lint
   @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run {{test}}
 
-test-unit-mina-rs:
-  @echo "--- Performing long-running mina-rs unit tests"
-  cd rust && time cargo nextest run --release --features mina_rs
+# Run debug tier 2 unit test(s)
+test-unit-tier2-dev:
+  @echo "--- Performing long-running unit tests"
+  cd rust && time cargo nextest run --features "tier2 mina_rs"
+
+# Run release tier 2 & mina_rs unit test(s)
+test-unit-tier2:
+  @echo "--- Performing long-running unit tests"
+  cd rust && time cargo nextest run --release --features "tier2 mina_rs"
+
+# Run all unit debug tests
+test-unit-dev:
+  @echo "--- Performing all indexer unit tests"
+  cd rust && time cargo nextest run --features tier2 --run-ignored all
 
 #
 # Tier 1 tests
 #
 
 # Run the 1st tier of tests.
-tier1: tier1-prereqs lint test-unit
+tier1: tier1-prereqs lint test-unit-tier1
   @echo "--- Performing tier 1 regression tests"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} \
     ipc_is_available_immediately \
@@ -274,14 +285,14 @@ tier2-regression-tests-dev:
   time {{REGRESSION_TEST}} {{DEBUG_MODE}}
 
 # Run tier 2 tests with Nix-built (release) binary & build OCI image.
-tier2: tier2-prereqs nix-build \
+tier2: tier2-prereqs test-unit-tier2 nix-build \
   tier2-load-test \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests \
   && build-image
 
 # Run tier 2 tests with debug build.
-tier2-dev: tier2-prereqs debug-build \
+tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
   tier2-load-test-dev \
   tier2-best-chain-many-blocks-test-dev \
   tier2-regression-tests-dev
@@ -289,7 +300,7 @@ tier2-dev: tier2-prereqs debug-build \
 # Tier 3 tests
 
 # Run the 3rd tier of tests with Nix-built binary.
-tier3 blocks='5000': nix-build test-unit-mina-rs
+tier3 blocks='5000': nix-build
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY}} test nix {{blocks}}
 
