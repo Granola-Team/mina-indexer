@@ -10,6 +10,7 @@ mod tests {
     use mina_indexer::protocol::serialization_types::common::{ByteVecJson, CharJson};
     use wasm_bindgen_test::*;
 
+    #[allow(dead_code)]
     #[wasm_bindgen_test]
     fn char_json_wasm() {
         char_json().unwrap()
@@ -25,6 +26,7 @@ mod tests {
         Ok(())
     }
 
+    #[allow(dead_code)]
     #[wasm_bindgen_test]
     fn sok_digest_json_wasm() {
         sok_digest_json().unwrap()
