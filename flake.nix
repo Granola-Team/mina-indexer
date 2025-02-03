@@ -189,11 +189,13 @@
 
             # Create wrapper script for mina_txn_hasher.exe
             mkdir -p .local/bin
-            cat > .local/bin/mina_txn_hasher.exe <<EOF
+            if ! [ -x .local/bin/mina_txn_hasher.exe ]; then
+              cat > .local/bin/mina_txn_hasher.exe <<EOF
             #!/bin/sh
             exec ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 ${toString ./.}/ops/mina/mina_txn_hasher.exe "\$@"
             EOF
-            chmod +x .local/bin/mina_txn_hasher.exe
+              chmod +x .local/bin/mina_txn_hasher.exe
+            fi
             export PATH="$PWD/.local/bin:$PATH"
           '';
         };
