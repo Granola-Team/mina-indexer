@@ -4,6 +4,7 @@ pub mod base;
 pub mod block;
 pub mod canonicity;
 pub mod chain;
+pub mod cli;
 pub mod client;
 pub mod command;
 pub mod constants;

@@ -2,10 +2,14 @@ use clap::{Parser, Subcommand};
 use log::{debug, error, info, warn, LevelFilter};
 use mina_indexer::{
     block::precomputed::PcbVersion,
-    chain::Network,
+    chain::ChainId,
+    cli::{
+        database::DatabaseArgs,
+        server::{ServerArgs, ServerArgsJson},
+    },
     client,
     constants::*,
-    ledger::genesis::{GenesisConstants, GenesisLedger},
+    ledger::genesis::GenesisLedger,
     server::{
         initialize_indexer_database, start_indexer, GenesisVersion, IndexerConfiguration,
         InitializationMode,
@@ -19,7 +23,6 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     process,
-    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -116,144 +119,6 @@ enum DatabaseCommand {
         #[arg(long)]
         json: bool,
     },
-}
-
-#[derive(Parser, Debug, Clone, Default)]
-#[command(author, version, about, long_about = None)]
-pub struct ServerArgs {
-    #[clap(flatten)]
-    db: DatabaseArgs,
-
-    /// Web server hostname for REST and GraphQL
-    #[arg(long, default_value = DEFAULT_WEB_HOSTNAME)]
-    web_hostname: String,
-
-    /// Web server port for REST and GraphQL
-    #[arg(long, default_value_t = DEFAULT_WEB_PORT)]
-    web_port: u16,
-
-    /// Start with data consistency checks
-    #[arg(long, default_value_t = false)]
-    self_check: bool,
-
-    /// Path to the fetch new blocks executable
-    #[arg(long)]
-    fetch_new_blocks_exe: Option<PathBuf>,
-
-    /// Delay (sec) in between fetch new blocks attempts
-    #[arg(long)]
-    fetch_new_blocks_delay: Option<u64>,
-
-    /// Path to the missing block recovery executable
-    #[arg(long)]
-    missing_block_recovery_exe: Option<PathBuf>,
-
-    /// Delay (sec) in between missing block recovery attempts
-    #[arg(long)]
-    missing_block_recovery_delay: Option<u64>,
-
-    /// Recover all blocks at all missing heights
-    #[arg(long)]
-    missing_block_recovery_batch: Option<bool>,
-
-    /// Indexer process ID
-    #[arg(last = true)]
-    pid: Option<u32>,
-}
-
-#[derive(Parser, Debug, Clone, Default)]
-#[command(author, version, about, long_about = None)]
-pub struct DatabaseArgs {
-    /// Path to the genesis ledger (JSON)
-    #[arg(long, value_name = "FILE")]
-    genesis_ledger: Option<PathBuf>,
-
-    /// Hash of the initial state
-    #[arg(
-        long,
-        default_value = MAINNET_GENESIS_HASH
-    )]
-    genesis_hash: String,
-
-    /// Path to the genesis constants (JSON)
-    #[arg(long)]
-    genesis_constants: Option<PathBuf>,
-
-    /// Override the constraint system digests
-    #[arg(long)]
-    constraint_system_digests: Option<Vec<String>>,
-
-    /// Override the protocol transaction version digest
-    #[arg(long)]
-    protocol_txn_version_digest: Option<String>,
-
-    /// Override the protocol network version digest
-    #[arg(long)]
-    protocol_network_version_digest: Option<String>,
-
-    /// Directory of precomputed blocks
-    #[arg(long)]
-    blocks_dir: Option<PathBuf>,
-
-    /// Directory of staking ledgers
-    #[arg(long)]
-    staking_ledgers_dir: Option<PathBuf>,
-
-    /// Path to directory for speedb
-    #[arg(long, default_value = "/var/log/mina-indexer/database")]
-    pub database_dir: PathBuf,
-
-    /// Max stdout log level
-    #[arg(long, default_value_t = LogLevelFilter::default())]
-    pub log_level: LogLevelFilter,
-
-    /// Number of blocks to add to the canonical chain before persisting a
-    /// ledger snapshot
-    #[arg(long, default_value_t = LEDGER_CADENCE)]
-    ledger_cadence: u32,
-
-    /// Number of blocks to process before reporting progress
-    #[arg(long, default_value_t = BLOCK_REPORTING_FREQ_NUM)]
-    reporting_freq: u32,
-
-    /// Interval for pruning the root branch
-    #[arg(long, default_value_t = PRUNE_INTERVAL_DEFAULT)]
-    prune_interval: u32,
-
-    /// Threshold for determining the canonicity of a block
-    #[arg(long, default_value_t = MAINNET_CANONICAL_THRESHOLD)]
-    canonical_threshold: u32,
-
-    /// Threshold for updating the canonical root/ledger
-    #[arg(long, default_value_t = CANONICAL_UPDATE_THRESHOLD)]
-    canonical_update_threshold: u32,
-
-    /// Start from a config file (bypasses other args)
-    #[arg(long)]
-    config: Option<PathBuf>,
-
-    /// Network name
-    #[arg(long, default_value = Network::Mainnet)]
-    network: Network,
-
-    /// Switch to not ingest orphan blocks
-    #[arg(long, default_value_t = false)]
-    do_not_ingest_orphan_blocks: bool,
-}
-
-#[derive(Parser, Debug, Clone)]
-#[command(author, version, about, long_about = None)]
-pub struct ConfigArgs {
-    /// Path to the server config file
-    #[arg(short, long)]
-    path: Option<PathBuf>,
-}
-
-impl ServerArgs {
-    fn with_dynamic_defaults(mut self, pid: u32) -> Self {
-        self.pid = Some(pid);
-        self
-    }
 }
 
 #[tokio::main]
@@ -439,16 +304,12 @@ impl DatabaseCommand {
 /// Returns indexer config.
 fn process_indexer_configuration(
     args: ServerArgs,
-    mode: InitializationMode,
+    initialization_mode: InitializationMode,
     domain_socket_path: PathBuf,
 ) -> anyhow::Result<IndexerConfiguration> {
     let genesis_hash = args.db.genesis_hash;
     let blocks_dir = args.db.blocks_dir;
     let staking_ledgers_dir = args.db.staking_ledgers_dir;
-    let genesis_constants = args.db.genesis_constants;
-    let constraint_system_digests = args.db.constraint_system_digests;
-    let protocol_txn_version_digest = args.db.protocol_txn_version_digest;
-    let protocol_network_version_digest = args.db.protocol_network_version_digest;
     let prune_interval = args.db.prune_interval;
     let canonical_threshold = args.db.canonical_threshold;
     let canonical_update_threshold = args.db.canonical_update_threshold;
@@ -598,150 +459,5 @@ fn check_or_write_pid_file<P: AsRef<Path>>(database_dir: P) {
     if let Err(e) = write_pid_to_file(&pid_path) {
         error!("Error writing PID to {pid_path:?}: {e}");
         process::exit(131);
-    }
-}
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct ServerArgsJson {
-    genesis_ledger: Option<String>,
-    genesis_hash: String,
-    genesis_constants: Option<String>,
-    constraint_system_digests: Option<Vec<String>>,
-    protocol_txn_version_digest: Option<String>,
-    protocol_network_version_digest: Option<String>,
-    blocks_dir: Option<String>,
-    staking_ledgers_dir: Option<String>,
-    database_dir: String,
-    log_level: String,
-    ledger_cadence: u32,
-    reporting_freq: u32,
-    prune_interval: u32,
-    canonical_threshold: u32,
-    canonical_update_threshold: u32,
-    web_hostname: String,
-    web_port: u16,
-    pid: Option<u32>,
-    do_not_ingest_orphan_blocks: bool,
-    fetch_new_blocks_exe: Option<String>,
-    fetch_new_blocks_delay: Option<u64>,
-    missing_block_recovery_exe: Option<String>,
-    missing_block_recovery_delay: Option<u64>,
-    missing_block_recovery_batch: Option<bool>,
-    network: String,
-}
-
-impl From<ServerArgs> for ServerArgsJson {
-    fn from(value: ServerArgs) -> Self {
-        let pid = value.pid.unwrap();
-        let value = value.with_dynamic_defaults(pid);
-        Self {
-            genesis_ledger: value
-                .db
-                .genesis_ledger
-                .map(|path| path.display().to_string()),
-            genesis_hash: value.db.genesis_hash,
-            genesis_constants: value.db.genesis_constants.map(|g| g.display().to_string()),
-            constraint_system_digests: value.db.constraint_system_digests,
-            protocol_txn_version_digest: value.db.protocol_txn_version_digest,
-            protocol_network_version_digest: value.db.protocol_network_version_digest,
-            blocks_dir: value.db.blocks_dir.map(|d| d.display().to_string()),
-            staking_ledgers_dir: value
-                .db
-                .staking_ledgers_dir
-                .map(|d| d.display().to_string()),
-            database_dir: value.db.database_dir.display().to_string(),
-            log_level: value.db.log_level.to_string(),
-            ledger_cadence: value.db.ledger_cadence,
-            reporting_freq: value.db.reporting_freq,
-            prune_interval: value.db.prune_interval,
-            canonical_threshold: value.db.canonical_threshold,
-            canonical_update_threshold: value.db.canonical_update_threshold,
-            web_hostname: value.web_hostname,
-            web_port: value.web_port,
-            pid: value.pid,
-            fetch_new_blocks_delay: value.fetch_new_blocks_delay,
-            fetch_new_blocks_exe: value.fetch_new_blocks_exe.map(|p| p.display().to_string()),
-            missing_block_recovery_delay: value.missing_block_recovery_delay,
-            missing_block_recovery_exe: value
-                .missing_block_recovery_exe
-                .map(|p| p.display().to_string()),
-            missing_block_recovery_batch: value.missing_block_recovery_batch,
-            network: value.db.network.to_string(),
-            do_not_ingest_orphan_blocks: value.db.do_not_ingest_orphan_blocks,
-        }
-    }
-}
-
-impl From<ServerArgsJson> for ServerArgs {
-    fn from(value: ServerArgsJson) -> Self {
-        let db = DatabaseArgs {
-            genesis_ledger: value.genesis_ledger.and_then(|path| path.parse().ok()),
-            genesis_hash: value.genesis_hash,
-            genesis_constants: value.genesis_constants.map(|g| g.into()),
-            protocol_txn_version_digest: value.protocol_txn_version_digest,
-            protocol_network_version_digest: value.protocol_network_version_digest,
-            constraint_system_digests: value.constraint_system_digests,
-            blocks_dir: value.blocks_dir.map(|d| d.into()),
-            staking_ledgers_dir: value.staking_ledgers_dir.map(|d| d.into()),
-            database_dir: value.database_dir.into(),
-            log_level: LogLevelFilter::from_str(&value.log_level).expect("log level"),
-            ledger_cadence: value.ledger_cadence,
-            reporting_freq: value.reporting_freq,
-            prune_interval: value.prune_interval,
-            canonical_threshold: value.canonical_threshold,
-            canonical_update_threshold: value.canonical_update_threshold,
-            config: None,
-            network: (&value.network as &str).into(),
-            do_not_ingest_orphan_blocks: value.do_not_ingest_orphan_blocks,
-        };
-        Self {
-            db,
-            web_hostname: value.web_hostname,
-            web_port: value.web_port,
-            self_check: false,
-            pid: value.pid,
-            fetch_new_blocks_delay: value.fetch_new_blocks_delay,
-            fetch_new_blocks_exe: value.fetch_new_blocks_exe.map(|p| p.into()),
-            missing_block_recovery_delay: value.missing_block_recovery_delay,
-            missing_block_recovery_exe: value.missing_block_recovery_exe.map(|p| p.into()),
-            missing_block_recovery_batch: value.missing_block_recovery_batch,
-        }
-    }
-}
-
-impl From<DatabaseArgs> for ServerArgs {
-    fn from(value: DatabaseArgs) -> Self {
-        Self {
-            db: value,
-            web_hostname: DEFAULT_WEB_HOSTNAME.to_string(),
-            web_port: DEFAULT_WEB_PORT,
-            ..Default::default()
-        }
-    }
-}
-
-const DEFAULT_WEB_HOSTNAME: &str = "localhost";
-const DEFAULT_WEB_PORT: u16 = 8080;
-
-#[derive(Debug, Clone)]
-pub struct LogLevelFilter(LevelFilter);
-
-impl Default for LogLevelFilter {
-    fn default() -> Self {
-        Self(LevelFilter::Warn)
-    }
-}
-
-impl std::fmt::Display for LogLevelFilter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl FromStr for LogLevelFilter {
-    type Err = <LevelFilter as FromStr>::Err;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        LevelFilter::from_str(s).map(Self)
     }
 }
