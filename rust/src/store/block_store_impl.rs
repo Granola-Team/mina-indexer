@@ -11,7 +11,7 @@ use crate::{
     },
     canonicity::{store::CanonicityStore, Canonicity},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::{MAINNET_EPOCH_SLOT_COUNT, MAINNET_GENESIS_HASH, MAINNET_GENESIS_PREV_STATE_HASH},
+    constants::*,
     event::{db::*, store::EventStore, IndexerEvent},
     ledger::{
         coinbase::Coinbase,
@@ -99,14 +99,10 @@ impl BlockStore for IndexerStore {
         )?;
 
         // add to genesis state hash index
-        let genesis_state_hash = block.genesis_state_hash();
-        if genesis_state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
-            self.set_block_genesis_state_hash_batch(
-                &state_hash,
-                &MAINNET_GENESIS_HASH.into(),
-                &mut batch,
-            )?;
+        if state_hash.0 == MAINNET_GENESIS_HASH || state_hash.0 == HARDFORK_GENESIS_HASH {
+            self.set_block_genesis_state_hash_batch(&state_hash, &state_hash, &mut batch)?;
         } else {
+            let genesis_state_hash = block.genesis_state_hash();
             self.set_block_genesis_state_hash_batch(&state_hash, &genesis_state_hash, &mut batch)?;
         }
 
@@ -220,7 +216,7 @@ impl BlockStore for IndexerStore {
     }
 
     fn get_best_block_hash(&self) -> anyhow::Result<Option<StateHash>> {
-        trace!("Getting best block hash");
+        trace!("Getting best block state hash");
         Ok(self
             .database
             .get(Self::BEST_TIP_STATE_HASH_KEY)?
@@ -228,18 +224,21 @@ impl BlockStore for IndexerStore {
     }
 
     fn get_best_block_height(&self) -> anyhow::Result<Option<u32>> {
+        trace!("Getting best block height");
         Ok(self
             .get_best_block_hash()?
             .and_then(|state_hash| self.get_block_height(&state_hash).ok().flatten()))
     }
 
     fn get_best_block_global_slot(&self) -> anyhow::Result<Option<u32>> {
+        trace!("Getting best block global slot");
         Ok(self
             .get_best_block_hash()?
             .and_then(|state_hash| self.get_block_global_slot(&state_hash).ok().flatten()))
     }
 
     fn get_best_block_genesis_hash(&self) -> anyhow::Result<Option<StateHash>> {
+        trace!("Getting best block genesis state hash");
         Ok(self.get_best_block_hash()?.and_then(|state_hash| {
             self.get_block_genesis_state_hash(&state_hash)
                 .ok()
@@ -289,7 +288,7 @@ impl BlockStore for IndexerStore {
         new_best_tip: &StateHash,
     ) -> anyhow::Result<DbBlockUpdate> {
         trace!(
-            "Getting common ancestor account balance updates:\n  old: {}\n  new: {}",
+            "Getting common ancestor block updates:\n  old: {}\n  new: {}",
             old_best_tip,
             new_best_tip
         );
@@ -306,9 +305,10 @@ impl BlockStore for IndexerStore {
         // bring b back to the same height as a
         for _ in 0..b_length.saturating_sub(self.get_block_height(&a)?.expect("a has length")) {
             // check if there's a previous block
-            if b.0 == MAINNET_GENESIS_HASH {
+            if b.0 == MAINNET_GENESIS_HASH || b.0 == HARDFORK_GENESIS_HASH {
                 break;
             }
+
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
@@ -316,6 +316,7 @@ impl BlockStore for IndexerStore {
                     .get_block_global_slot(&b)?
                     .expect("b has global slot"),
             });
+
             b = self.get_block_parent_hash(&b)?.expect("b has a parent");
         }
 
@@ -323,18 +324,21 @@ impl BlockStore for IndexerStore {
         let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-        while a != b && a.0 != MAINNET_GENESIS_HASH {
+        while a != b && (a.0 != MAINNET_GENESIS_HASH || a.0 != HARDFORK_GENESIS_HASH) {
             // add blocks to appropriate collection
+            let a_length = self.get_block_height(&a)?.expect("a has length");
+            let b_length = self.get_block_height(&b)?.expect("b has length");
+
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
-                blockchain_length: self.get_block_height(&b)?.expect("b has length"),
+                blockchain_length: b_length,
                 global_slot_since_genesis: self
                     .get_block_global_slot(&b)?
                     .expect("b has global slot"),
             });
             unapply.push(BlockUpdate {
                 state_hash: a.clone(),
-                blockchain_length: self.get_block_height(&a)?.expect("a has length"),
+                blockchain_length: a_length,
                 global_slot_since_genesis: self
                     .get_block_global_slot(&a)?
                     .expect("a has global slot"),
@@ -343,8 +347,15 @@ impl BlockStore for IndexerStore {
             // descend
             a = a_prev;
             b = b_prev;
-            a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-            b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
+
+            a_prev = self
+                .get_block_parent_hash(&a)?
+                .with_context(|| format!("block missing parent (length {}): {}", a_length - 1, a))
+                .expect("a should have a parent");
+            b_prev = self
+                .get_block_parent_hash(&b)?
+                .with_context(|| format!("block missing parent (length {}): {}", b_length - 1, b))
+                .expect("b should have a parent");
         }
 
         apply.reverse();
@@ -428,9 +439,15 @@ impl BlockStore for IndexerStore {
 
     fn get_block_height(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting block height {state_hash}");
+
         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
             return Ok(Some(0));
         }
+
+        if state_hash.0 == HARDFORK_GENESIS_PREV_STATE_HASH {
+            return Ok(Some(HARDFORK_GENESIS_BLOCKCHAIN_LENGTH - 1));
+        }
+
         Ok(self
             .database
             .get_cf(self.block_height_cf(), state_hash.0.as_bytes())?
@@ -851,11 +868,13 @@ impl BlockStore for IndexerStore {
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
+
         batch.put_cf(
             self.block_genesis_state_hash_cf(),
             state_hash.0.as_bytes(),
             genesis_state_hash.0.as_bytes(),
         );
+
         Ok(())
     }
 
@@ -864,6 +883,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
     ) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting block genesis state hash {state_hash}");
+
         Ok(self
             .database
             .get_cf(self.block_genesis_state_hash_cf(), state_hash.0.as_bytes())?

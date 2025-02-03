@@ -87,9 +87,10 @@ pub trait StagedLedgerStore {
         block_height: u32,
     ) -> anyhow::Result<()>;
 
-    /// Add a ledger with assoociated hashes
+    /// Add a staged ledger hash with associated the given state hash
+    ///
     /// Returns true if ledger already present
-    fn add_staged_ledger_hashes(
+    fn add_staged_ledger_hash(
         &self,
         ledger_hash: &LedgerHash,
         state_hash: &StateHash,
