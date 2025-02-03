@@ -1,3 +1,5 @@
-pub mod blocks;
-pub mod chain_discovery;
-pub mod ledgers;
+#[cfg(all(test, feature = "tier2"))]
+mod blocks;
+mod chain_discovery;
+#[cfg(all(test, feature = "tier2"))]
+mod ledgers;

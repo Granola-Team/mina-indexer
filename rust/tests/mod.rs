@@ -7,7 +7,7 @@ mod canonicity;
 mod command;
 mod event;
 mod ledger;
-#[cfg(all(test, feature = "mina_rs"))]
+#[cfg(all(test, feature = "tier2"))]
 mod protocol;
 mod snark_work;
 mod state;
@@ -34,6 +34,7 @@ pub mod helpers {
         }
     }
 
+    #[cfg(all(test, feature = "tier2"))]
     pub mod state {
         use mina_indexer::{
             constants::{MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K},
