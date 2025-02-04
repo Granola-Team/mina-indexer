@@ -174,8 +174,7 @@ impl ServerCommand {
 
         debug!("Reading mina indexer config from store");
         let db = Arc::new(IndexerStore::new(&database_dir)?);
-        let mut config = IndexerConfiguration::read_indexer_config(&db)?;
-        config.initialization_mode = mode;
+        let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
 
         info!("Starting the mina indexer filesystem watchers & UDS server");
         let store = db.clone();

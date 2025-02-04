@@ -313,7 +313,7 @@ test_server_startup_v1() {
 # Indexer v2 server starts up without blocks & staking ledger directories
 test_server_startup_v2() {
     idxr database create --database-dir ./database --genesis-hash $HARDFORK_GENESIS_STATE_HASH
-    idxr_server_start --database-dir ./database
+    idxr_server_start --database-dir ./database --genesis-hash $HARDFORK_GENESIS_STATE_HASH
     wait_for_socket
 
     best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)

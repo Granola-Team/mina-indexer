@@ -12,7 +12,7 @@ use crate::{
         store::staking::StakingLedgerStore,
     },
     state::{IndexerState, IndexerStateConfig},
-    store::{fixed_keys::FixedKeys, IndexerStore},
+    store::{IndexerStore},
     unix_socket_server::{create_socket_listener, handle_connection},
 };
 use log::{debug, error, info, trace, warn};
@@ -93,7 +93,7 @@ impl IndexerConfiguration {
         self,
         store: &Arc<IndexerStore>,
     ) -> anyhow::Result<()> {
-        let state = self.initialize(store, false).await.unwrap_or_else(|e| {
+        let state = self.initialize(store).await.unwrap_or_else(|e| {
             error!("Failed to initialize mina indexer store: {e}");
             std::process::exit(1);
         });
@@ -109,7 +109,6 @@ impl IndexerConfiguration {
     async fn initialize(
         self,
         store: &Arc<IndexerStore>,
-        reuse: bool,
     ) -> anyhow::Result<IndexerState> {
         info!("Initializing mina indexer database");
         let db_path = store.db_path.clone();
@@ -128,16 +127,7 @@ impl IndexerConfiguration {
             version,
             do_not_ingest_orphan_blocks,
             ..
-        } = if reuse {
-            self
-        } else {
-            debug!("Persisting mina indexer config");
-            store
-                .database
-                .put(IndexerStore::INDEXER_CONFIG_KEY, serde_json::to_vec(&self)?)?;
-
-            self
-        };
+        } = self;
 
         // blocks dir
         if let Some(ref blocks_dir) = blocks_dir {
@@ -308,7 +298,7 @@ impl IndexerConfiguration {
 
         // initialize witness tree & connect database
         let state = Arc::new(RwLock::new(
-            self.initialize(&store, true).await.unwrap_or_else(|e| {
+            self.initialize(&store).await.unwrap_or_else(|e| {
                 error!("Failed to initialize mina indexer state: {e}");
                 std::process::exit(1);
             }),
@@ -340,16 +330,6 @@ impl IndexerConfiguration {
         .await?;
 
         Ok(())
-    }
-
-    /// Read the indexer config from the given store or panic
-    pub fn read_indexer_config(store: &Arc<IndexerStore>) -> anyhow::Result<Self> {
-        if let Some(config_bytes) = store.database.get(IndexerStore::INDEXER_CONFIG_KEY)? {
-            debug!("Reading mina indexer config from store");
-            Ok(serde_json::from_slice(&config_bytes)?)
-        } else {
-            panic!("Indexer config missing from store");
-        }
     }
 }
 
