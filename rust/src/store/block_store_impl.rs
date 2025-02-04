@@ -324,7 +324,7 @@ impl BlockStore for IndexerStore {
         let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-        while a != b && (a.0 != MAINNET_GENESIS_HASH || a.0 != HARDFORK_GENESIS_HASH) {
+        while a != b && (a.0 != MAINNET_GENESIS_HASH && a.0 != HARDFORK_GENESIS_HASH) {
             // add blocks to appropriate collection
             let a_length = self.get_block_height(&a)?.expect("a has length");
             let b_length = self.get_block_height(&b)?.expect("b has length");
