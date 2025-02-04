@@ -880,6 +880,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
     #[test]
     fn txn_hash_signed_command_v2() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
@@ -896,6 +897,7 @@ mod tests {
         Ok(())
     }
 
+    #[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
     #[test]
     fn txn_hash_zkapp_command() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
