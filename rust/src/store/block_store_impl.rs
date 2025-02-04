@@ -99,7 +99,7 @@ impl BlockStore for IndexerStore {
         )?;
 
         // add to genesis state hash index
-        if state_hash.0 == MAINNET_GENESIS_HASH || state_hash.0 == HARDFORK_GENESIS_HASH {
+        if is_genesis_hash(&state_hash) {
             self.set_block_genesis_state_hash_batch(&state_hash, &state_hash, &mut batch)?;
         } else {
             let genesis_state_hash = block.genesis_state_hash();
@@ -305,7 +305,7 @@ impl BlockStore for IndexerStore {
         // bring b back to the same height as a
         for _ in 0..b_length.saturating_sub(self.get_block_height(&a)?.expect("a has length")) {
             // check if there's a previous block
-            if b.0 == MAINNET_GENESIS_HASH || b.0 == HARDFORK_GENESIS_HASH {
+            if is_genesis_hash(&b) {
                 break;
             }
 
@@ -324,7 +324,7 @@ impl BlockStore for IndexerStore {
         let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
         let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
 
-        while a != b && (a.0 != MAINNET_GENESIS_HASH && a.0 != HARDFORK_GENESIS_HASH) {
+        while a != b && !is_genesis_hash(&a) {
             // add blocks to appropriate collection
             let a_length = self.get_block_height(&a)?.expect("a has length");
             let b_length = self.get_block_height(&b)?.expect("b has length");
@@ -1597,6 +1597,10 @@ impl BlockStore for IndexerStore {
         }
         Ok(blocks)
     }
+}
+
+fn is_genesis_hash(hash: &StateHash) -> bool {
+    hash.0 == MAINNET_GENESIS_HASH || hash.0 == HARDFORK_GENESIS_HASH
 }
 
 fn block_cmp(db: &IndexerStore, a: &StateHash, b: &StateHash) -> std::cmp::Ordering {
