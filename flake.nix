@@ -2,6 +2,7 @@
   inputs = {
     rust-overlay.url = "github:oxalica/rust-overlay";
     nixpkgs.url = "github:NixOS/nixpkgs?ref=59e618d90c065f55ae48446f307e8c09565d5ab0";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = {
@@ -27,6 +28,9 @@
         cargo = rust;
         rustc = rust;
       };
+
+      # Add mina_txn_hasher package
+      mina_txn_hasher = pkgs.callPackage ./ops/mina/mina_txn_hasher.nix {};
 
       # Define common libraries needed for both runtime and development
       commonLibs = with pkgs; [
@@ -111,6 +115,8 @@
     in
       with pkgs; {
         packages = flake-utils.lib.flattenTree rec {
+          inherit mina_txn_hasher;
+
           mina-indexer = rustPlatform.buildRustPackage rec {
             meta = with lib; {
               description = ''
@@ -183,21 +189,7 @@
               LIBCLANG_PATH = "${libclang.lib}/lib";
             }
             // commonEnv;
-          buildInputs = developmentDependencies;
-          shellHook = lib.optionalString (!stdenv.isDarwin) ''
-            export TMPDIR=/var/tmp
-
-            # Create wrapper script for mina_txn_hasher.exe
-            mkdir -p .local/bin
-            if ! [ -x .local/bin/mina_txn_hasher.exe ]; then
-              cat > .local/bin/mina_txn_hasher.exe <<EOF
-            #!/bin/sh
-            exec ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 ${toString ./.}/ops/mina/mina_txn_hasher.exe "\$@"
-            EOF
-              chmod +x .local/bin/mina_txn_hasher.exe
-            fi
-            export PATH="$PWD/.local/bin:$PATH"
-          '';
+          buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher;
         };
       });
 }
