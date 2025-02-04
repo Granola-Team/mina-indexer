@@ -4,8 +4,8 @@ use super::{
     precomputed::{PcbVersion, PrecomputedBlock},
 };
 use crate::{
-    canonicity::canonical_chain_discovery::discovery, chain::ChainData,
-    utility::functions::calculate_total_size,
+    block::extract_network_height_hash, canonicity::canonical_chain_discovery::discovery,
+    chain::ChainData, utility::functions::calculate_total_size,
 };
 use anyhow::{anyhow, bail};
 use glob::glob;
@@ -249,7 +249,16 @@ impl BlockParser {
                 self.bytes_processed += block_bytes;
                 Ok(Some((parsed_block, block_bytes)))
             }
-            Err(e) => bail!("Block parsing error: {e}"),
+            Err(e) => {
+                let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
+                bail!(
+                    "Block parsing error {}-{}-{}: {}",
+                    network,
+                    blockchain_length,
+                    state_hash,
+                    e
+                )
+            }
         }
     }
 
