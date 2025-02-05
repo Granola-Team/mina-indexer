@@ -300,10 +300,12 @@ impl BlockStore for IndexerStore {
         // follows the new best tip back to the common ancestor
         let mut b = new_best_tip.clone();
         let mut apply = vec![];
-        let b_length = self.get_block_height(&b)?.expect("b has length");
+
+        let b_length = block_height(self, &b)?;
+        let a_length = block_height(self, &a)?;
 
         // bring b back to the same height as a
-        for _ in 0..b_length.saturating_sub(self.get_block_height(&a)?.expect("a has length")) {
+        for _ in 0..b_length.saturating_sub(a_length) {
             // check if there's a previous block
             if is_genesis_hash(&b) {
                 break;
@@ -312,36 +314,30 @@ impl BlockStore for IndexerStore {
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
-                global_slot_since_genesis: self
-                    .get_block_global_slot(&b)?
-                    .expect("b has global slot"),
+                global_slot_since_genesis: block_slot(self, &b)?,
             });
 
-            b = self.get_block_parent_hash(&b)?.expect("b has a parent");
+            b = block_parent(self, &b)?;
         }
 
         // find the common ancestor
-        let mut a_prev = self.get_block_parent_hash(&a)?.expect("a has a parent");
-        let mut b_prev = self.get_block_parent_hash(&b)?.expect("b has a parent");
+        let mut a_prev = block_parent(self, &a)?;
+        let mut b_prev = block_parent(self, &b)?;
 
         while a != b && !is_genesis_hash(&a) {
             // add blocks to appropriate collection
-            let a_length = self.get_block_height(&a)?.expect("a has length");
-            let b_length = self.get_block_height(&b)?.expect("b has length");
+            let a_length = block_height(self, &a)?;
+            let b_length = block_height(self, &b)?;
 
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
-                global_slot_since_genesis: self
-                    .get_block_global_slot(&b)?
-                    .expect("b has global slot"),
+                global_slot_since_genesis: block_slot(self, &b)?,
             });
             unapply.push(BlockUpdate {
                 state_hash: a.clone(),
                 blockchain_length: a_length,
-                global_slot_since_genesis: self
-                    .get_block_global_slot(&a)?
-                    .expect("a has global slot"),
+                global_slot_since_genesis: block_slot(self, &a)?,
             });
 
             // descend
@@ -1599,16 +1595,43 @@ impl BlockStore for IndexerStore {
     }
 }
 
+/////////////
+// helpers //
+/////////////
+
+fn block_height(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<u32> {
+    Ok(db
+        .get_block_height(state_hash)?
+        .with_context(|| format!("{state_hash}"))
+        .expect("block height"))
+}
+
+fn block_slot(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<u32> {
+    Ok(db
+        .get_block_global_slot(state_hash)?
+        .with_context(|| format!("{state_hash}"))
+        .expect("global slot"))
+}
+
+fn block_parent(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<StateHash> {
+    Ok(db
+        .get_block_parent_hash(state_hash)?
+        .with_context(|| format!("{state_hash}"))
+        .expect("parent state hash"))
+}
+
 fn is_genesis_hash(hash: &StateHash) -> bool {
     hash.0 == MAINNET_GENESIS_HASH || hash.0 == HARDFORK_GENESIS_HASH
 }
 
 fn block_cmp(db: &IndexerStore, a: &StateHash, b: &StateHash) -> std::cmp::Ordering {
     use std::cmp::Ordering;
+
     let a_canonicity = db.get_block_canonicity(a).ok().flatten();
     let b_canonicity = db.get_block_canonicity(b).ok().flatten();
     let a_cmp = db.get_block_comparison(a).unwrap().unwrap();
     let b_cmp = db.get_block_comparison(b).unwrap().unwrap();
+
     match (a_canonicity, b_canonicity) {
         (Some(Canonicity::Canonical), _) => Ordering::Less,
         (_, Some(Canonicity::Canonical)) => Ordering::Greater,
