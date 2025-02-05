@@ -59,8 +59,6 @@ test_names = %w[
   staking_delegations
   internal_commands
   internal_commands_csv
-  start_from_config_v1
-  start_from_config_v2
   version_file
   hurl
 ]

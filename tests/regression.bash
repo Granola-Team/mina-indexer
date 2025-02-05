@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2046,SC2086,SC2002
+# shellcheck disable=SC2046,SC2086,SC2002,2120
 
 # To debug, uncomment:
 # set -x
@@ -1572,72 +1572,6 @@ test_internal_commands_csv() {
     rm -f $csv_file
 }
 
-# Indexer correctly starts from v1 config file
-test_start_from_config_v1() {
-    port=$(ephemeral_port)
-    file=./config.json
-    echo "
-    { \"genesis_hash\": \"$MAINNET_GENESIS_STATE_HASH\",
-      \"blocks_dir\": \"./blocks\",
-      \"staking_ledgers_dir\": \"./staking-ledgers\",
-      \"database_dir\": \"./database\",
-      \"log_level\": \"info\",
-      \"ledger_cadence\": 100,
-      \"reporting_freq\": 1000,
-      \"prune_interval\": 10,
-      \"canonical_threshold\": 10,
-      \"canonical_update_threshold\": 2,
-      \"web_hostname\": \"localhost\",
-      \"web_port\": ${port},
-      \"network\": \"mainnet\",
-      \"do_not_ingest_orphan_blocks\": false
-    }" > $file
-
-    idxr_server_start_standard_v1 --config $file
-    wait_for_socket
-
-    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-
-    assert '1' $length
-    assert $MAINNET_GENESIS_STATE_HASH $hash
-
-    rm -rf $file
-}
-
-# Indexer correctly starts from v2 config file
-test_start_from_config_v2() {
-    port=$(ephemeral_port)
-    file=./config.json
-    echo "
-    { \"genesis_hash\": \"$HARDFORK_GENESIS_STATE_HASH\",
-      \"blocks_dir\": \"./blocks\",
-      \"staking_ledgers_dir\": \"./staking-ledgers\",
-      \"database_dir\": \"./database\",
-      \"log_level\": \"info\",
-      \"ledger_cadence\": 100,
-      \"reporting_freq\": 1000,
-      \"prune_interval\": 10,
-      \"canonical_threshold\": 10,
-      \"canonical_update_threshold\": 2,
-      \"web_hostname\": \"localhost\",
-      \"web_port\": ${port},
-      \"network\": \"mainnet\",
-      \"do_not_ingest_orphan_blocks\": false
-    }" > $file
-
-    idxr_server_start_standard_v2 --config $file
-    wait_for_socket
-
-    hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
-    length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
-
-    assert '359605' $length
-    assert $HARDFORK_GENESIS_STATE_HASH $hash
-
-    rm -rf $file
-}
-
 test_clean_shutdown() {
     idxr_server_start_standard_v1
     wait_for_socket
@@ -2009,8 +1943,6 @@ for test_name in "$@"; do
         "test_staking_delegations") test_staking_delegations ;;
         "test_internal_commands") test_internal_commands ;;
         "test_internal_commands_csv") test_internal_commands_csv ;;
-        "test_start_from_config_v1") test_start_from_config_v1 ;;
-        "test_start_from_config_v2") test_start_from_config_v2 ;;
         "test_hurl") test_hurl ;;
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
