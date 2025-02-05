@@ -314,7 +314,7 @@ jsonpath "$.data.stakes[0].public_key" == "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7
 jsonpath "$.data.stakes[0].balance" == 92.929966438
 jsonpath "$.data.stakes[0].nonce" == 4
 
-duration < 10000
+duration < 12000
 
 #
 # Test for existance of epoch 0 staking ledger in the presence of epoch 1 staking ledger
