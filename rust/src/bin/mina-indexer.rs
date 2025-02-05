@@ -172,11 +172,10 @@ impl ServerCommand {
 
         check_or_write_pid_file(&database_dir);
 
-        debug!("Reading mina indexer config from store");
-        let db = Arc::new(IndexerStore::new(&database_dir)?);
         let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
 
         info!("Starting the mina indexer filesystem watchers & UDS server");
+        let db = Arc::new(IndexerStore::new(&database_dir)?);
         let store = db.clone();
 
         subsys.start(SubsystemBuilder::new("Indexer", move |s| {
