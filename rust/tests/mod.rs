@@ -34,7 +34,6 @@ pub mod helpers {
         }
     }
 
-    #[cfg(all(test, feature = "tier2"))]
     pub mod state {
         use mina_indexer::{
             constants::{MAINNET_CANONICAL_THRESHOLD, MAINNET_TRANSITION_FRONTIER_K},
@@ -44,7 +43,7 @@ pub mod helpers {
         use std::path::Path;
 
         /// Creates an indexer from the original mainnet genesis ledger & block
-        pub(crate) fn mainnet_genesis_state<P>(path: P) -> anyhow::Result<IndexerState>
+        pub fn mainnet_genesis_state<P>(path: P) -> anyhow::Result<IndexerState>
         where
             P: AsRef<Path>,
         {
@@ -58,7 +57,7 @@ pub mod helpers {
         }
 
         /// Creates an indexer from the hardfork genesis ledger & block
-        pub(crate) fn hardfork_genesis_state<P>(path: P) -> anyhow::Result<IndexerState>
+        pub fn hardfork_genesis_state<P>(path: P) -> anyhow::Result<IndexerState>
         where
             P: AsRef<Path>,
         {
