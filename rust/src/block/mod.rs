@@ -176,9 +176,13 @@ impl std::cmp::PartialOrd for BlockComparison {
 
 impl std::cmp::Ord for BlockComparison {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.version == PcbVersion::V2 && other.version == PcbVersion::V1 {
-            // hardfork blocks are better than pre-hardfork blocks
-            return Ordering::Less;
+        use PcbVersion::*;
+
+        // hardfork blocks are better than pre-hardfork blocks
+        match (&self.version, &other.version) {
+            (V1, V2) => return Ordering::Greater,
+            (V2, V1) => return Ordering::Less,
+            _ => (),
         }
 
         let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
@@ -205,11 +209,14 @@ impl std::cmp::Ord for Block {
     /// A < B means A is better than B
     /// https://github.com/MinaProtocol/mina/tree/develop/docs/specs/consensus#62-select-chain
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.genesis_state_hash.0 == HARDFORK_GENESIS_HASH
-            && other.genesis_state_hash.0 == MAINNET_GENESIS_HASH
-        {
-            // hardfork blocks are better than pre-hardfork blocks
-            return Ordering::Less;
+        // hardfork blocks are better than pre-hardfork blocks
+        match (
+            &self.genesis_state_hash.0 as &str,
+            &other.genesis_state_hash.0 as &str,
+        ) {
+            (MAINNET_GENESIS_HASH, HARDFORK_GENESIS_HASH) => return Ordering::Greater,
+            (HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH) => return Ordering::Less,
+            _ => (),
         }
 
         let length_cmp = self.blockchain_length.cmp(&other.blockchain_length);
