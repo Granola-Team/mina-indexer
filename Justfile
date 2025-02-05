@@ -195,6 +195,10 @@ clean-test rev=GIT_COMMIT_HASH:
 download-mina-block height state_hash dir='.':
   gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-{{state_hash}}.json" {{dir}}
 
+# Download mainnet PCBs from the mina_network_block_data Google bucket
+download-mina-blocks height dir='.':
+  gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-*.json" {{dir}}
+
 # Debug build and run regression tests
 dev subtest='': debug-build
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} {{subtest}}
@@ -252,7 +256,9 @@ tier1: tier1-prereqs lint test-unit-tier1
     reuse_databases \
     hurl
 
+#
 # Tier 2 tests
+#
 
 # Run tier 2 nix (release) load test
 tier2-load-test:
@@ -285,7 +291,7 @@ tier2-regression-tests-dev:
   time {{REGRESSION_TEST}} {{DEBUG_MODE}}
 
 # Run tier 2 tests with Nix-built (release) binary & build OCI image.
-tier2: tier2-prereqs test-unit-tier2 nix-build \
+tier2: tier2-prereqs nix-build \
   tier2-load-test \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests \
@@ -297,7 +303,9 @@ tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
   tier2-best-chain-many-blocks-test-dev \
   tier2-regression-tests-dev
 
+#
 # Tier 3 tests
+#
 
 # Run the 3rd tier of tests with Nix-built binary.
 tier3 blocks='5000': nix-build
