@@ -13,13 +13,15 @@ require "fileutils"
 #
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
+
 FileUtils.mkdir_p(DEV_DIR)
+
 block_count = [9999, END_BLOCK].max
 BLOCKS_DIR = "#{DEV_DIR}/blocks-#{block_count}"
 args = [
   "#{__dir__}/download-mina-blocks.rb",
-  "1",
-  block_count.to_s,
+  START_BLOCK.to_s,
+  END_BLOCK.to_s,
   BLOCKS_DIR
 ]
 warn "stage-blocks.rb issuing: #{args}"
