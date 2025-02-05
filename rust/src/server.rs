@@ -12,7 +12,7 @@ use crate::{
         store::staking::StakingLedgerStore,
     },
     state::{IndexerState, IndexerStateConfig},
-    store::{IndexerStore},
+    store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
 };
 use log::{debug, error, info, trace, warn};
@@ -106,10 +106,7 @@ impl IndexerConfiguration {
     }
 
     /// Initializes the indexer with the given config & store
-    async fn initialize(
-        self,
-        store: &Arc<IndexerStore>,
-    ) -> anyhow::Result<IndexerState> {
+    async fn initialize(self, store: &Arc<IndexerStore>) -> anyhow::Result<IndexerState> {
         info!("Initializing mina indexer database");
         let db_path = store.db_path.clone();
 
@@ -297,12 +294,12 @@ impl IndexerConfiguration {
         let domain_socket_path = self.domain_socket_path.clone();
 
         // initialize witness tree & connect database
-        let state = Arc::new(RwLock::new(
-            self.initialize(&store).await.unwrap_or_else(|e| {
+        let state = Arc::new(RwLock::new(self.initialize(&store).await.unwrap_or_else(
+            |e| {
                 error!("Failed to initialize mina indexer state: {e}");
                 std::process::exit(1);
-            }),
-        ));
+            },
+        )));
 
         // read-only state
         start_uds_server(&subsys, state.clone(), &domain_socket_path).await?;

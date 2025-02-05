@@ -150,6 +150,7 @@ impl PrecomputedBlock {
             },
             version,
         )?;
+
         Ok(precomputed_block)
     }
 
@@ -1320,7 +1321,7 @@ impl PrecomputedBlock {
 
     pub fn summary(&self) -> String {
         format!(
-            "{} (length {}): {}",
+            "{}-{}-{}",
             self.network(),
             self.blockchain_length(),
             self.state_hash()

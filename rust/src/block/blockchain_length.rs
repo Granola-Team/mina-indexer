@@ -9,12 +9,16 @@ pub struct BlockchainLength(u32);
 
 impl BlockchainLength {
     pub fn from_path(path: &Path) -> anyhow::Result<u32> {
+        const BUFFER_CAPACITY: usize = 1000;
+
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        let mut buffer = String::with_capacity(1000);
+        let mut buffer = String::with_capacity(BUFFER_CAPACITY);
 
-        // Limit the reader to read only the first 1000 bytes
-        reader.take(1000).read_to_string(&mut buffer)?;
+        // Limit the reader to read only the first BUFFER_CAPACITY bytes
+        reader
+            .take(BUFFER_CAPACITY as u64)
+            .read_to_string(&mut buffer)?;
 
         // Locate "blockchain_length" within the buffer
         let blockchain_length_key = "\"blockchain_length\"";

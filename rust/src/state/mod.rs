@@ -472,6 +472,7 @@ impl IndexerState {
         block_parser: &mut BlockParser,
     ) -> anyhow::Result<()> {
         info!("Initializing indexer with canonical chain blocks");
+
         let total_time = Instant::now();
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             let mut ledger_diffs = vec![];
