@@ -56,12 +56,8 @@ impl BestLedgerStore for IndexerStore {
             {
                 if memoize {
                     trace!("Memoizing best ledger (state hash {state_hash})");
-                    self.add_staged_ledger_at_state_hash(
-                        &state_hash,
-                        best_ledger.clone(),
-                        block_height,
-                    )
-                    .ok();
+                    self.add_staged_ledger_at_state_hash(&state_hash, best_ledger, block_height)
+                        .ok();
                 }
             }
         }))

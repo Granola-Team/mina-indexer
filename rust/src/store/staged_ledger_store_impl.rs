@@ -212,7 +212,7 @@ impl StagedLedgerStore for IndexerStore {
     fn add_staged_ledger_at_state_hash(
         &self,
         state_hash: &StateHash,
-        ledger: Ledger,
+        ledger: &Ledger,
         block_height: u32,
     ) -> anyhow::Result<()> {
         trace!("Adding staged ledger at state hash {state_hash}");
@@ -296,7 +296,7 @@ impl StagedLedgerStore for IndexerStore {
     fn add_genesis_ledger(
         &self,
         state_hash: &StateHash,
-        genesis_ledger: Ledger,
+        genesis_ledger: &Ledger,
         height: u32,
     ) -> anyhow::Result<()> {
         trace!("Adding genesis ledger to the store");
@@ -374,11 +374,9 @@ impl StagedLedgerStore for IndexerStore {
                 trace!("Memoizing ledger for block {state_hash}");
 
                 match self.get_block_height(state_hash)? {
-                    Some(block_height) => self.add_staged_ledger_at_state_hash(
-                        state_hash,
-                        ledger.clone(),
-                        block_height,
-                    )?,
+                    Some(block_height) => {
+                        self.add_staged_ledger_at_state_hash(state_hash, &ledger, block_height)?
+                    }
                     None => bail!("Block missing from store {state_hash}"),
                 }
             }

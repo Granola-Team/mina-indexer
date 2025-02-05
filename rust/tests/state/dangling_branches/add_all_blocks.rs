@@ -43,7 +43,7 @@ async fn extension() -> anyhow::Result<()> {
     if let Some((block, block_bytes)) = block_parser.next_block().await? {
         let block: PrecomputedBlock = block.into();
         let mut state =
-            IndexerState::new_testing(&block, block_bytes, Some(ledger), None, None, None, None)?;
+            IndexerState::new_testing(&block, block_bytes, Some(&ledger), None, None, None, None)?;
         n += 1;
 
         while let Some((block, _)) = block_parser.next_block().await? {

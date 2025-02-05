@@ -100,7 +100,7 @@ pub trait StagedLedgerStore {
     fn add_staged_ledger_at_state_hash(
         &self,
         state_hash: &StateHash,
-        ledger: Ledger,
+        ledger: &Ledger,
         block_height: u32,
     ) -> anyhow::Result<()>;
 
@@ -108,7 +108,7 @@ pub trait StagedLedgerStore {
     fn add_genesis_ledger(
         &self,
         state_hash: &StateHash,
-        genesis_ledger: Ledger,
+        genesis_ledger: &Ledger,
         block_height: u32,
     ) -> anyhow::Result<()>;
 

@@ -317,7 +317,7 @@ impl IndexerState {
         let genesis_ledger: Ledger = config.genesis_ledger.into();
         config.indexer_store.add_genesis_ledger(
             &genesis_block.previous_state_hash(),
-            genesis_ledger.clone(),
+            &genesis_ledger,
             config.version.genesis.blockchain_lenth,
         )?;
         info!("Genesis ledger added to indexer store");
@@ -403,7 +403,7 @@ impl IndexerState {
     pub fn new_testing(
         root_block: &PrecomputedBlock,
         root_block_bytes: u64,
-        root_ledger: Option<Ledger>,
+        root_ledger: Option<&Ledger>,
         speedb_path: Option<&Path>,
         transition_frontier_length: Option<u32>,
         ledger_cadence: Option<u32>,
@@ -412,7 +412,8 @@ impl IndexerState {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = speedb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
-            if let Some(ledger) = root_ledger.clone() {
+
+            if let Some(ledger) = root_ledger {
                 store
                     .add_staged_ledger_at_state_hash(
                         &root_block.state_hash(),
@@ -420,10 +421,12 @@ impl IndexerState {
                         root_block.blockchain_length(),
                     )
                     .expect("ledger add succeeds");
+
                 store
                     .set_best_block(&root_block.state_hash())
                     .expect("set best block to root block");
             }
+
             store
         });
 
@@ -435,7 +438,7 @@ impl IndexerState {
         // apply root block to root ledger and keep its ledger diff
         Ok(Self {
             ledger: root_ledger
-                .and_then(|x| x.apply_diff_from_precomputed(root_block).ok())
+                .and_then(|x| x.clone().apply_diff_from_precomputed(root_block).ok())
                 .unwrap_or_default(),
             diffs_map: HashMap::from([(
                 root_block.state_hash(),
@@ -520,7 +523,7 @@ impl IndexerState {
                         ledger_diffs.clear();
                         indexer_store.add_staged_ledger_at_state_hash(
                             &state_hash,
-                            self.ledger.clone(),
+                            &self.ledger,
                             block.blockchain_length(),
                         )?;
                     }
@@ -1560,7 +1563,7 @@ impl IndexerState {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
                     indexer_store.add_staged_ledger_at_state_hash(
                         &canonical_block.state_hash,
-                        self.ledger.clone(),
+                        &self.ledger,
                         canonical_block.blockchain_length,
                     )?;
                 }
