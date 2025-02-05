@@ -51,6 +51,10 @@ else
 end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
+def invoke_mina_indexer(*args)
+  system({'RUST_BACKTRACE' => 'full'}, EXE, *args)
+end
+
 def config_exe_dir
   FileUtils.mkdir_p(EXE_DIR)
   return if File.exist?(EXE)

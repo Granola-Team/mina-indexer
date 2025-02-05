@@ -54,8 +54,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
     ingest_orphan_blocks = ingest_orphan_blocks == "y"
 
     if !ingest_staking_ledgers && !ingest_orphan_blocks
-      system(
-        EXE,
+      invoke_mina_indexer(
         "database", "create",
         "--log-level", "DEBUG",
         "--ledger-cadence", "5000",
@@ -64,8 +63,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
         "--do-not-ingest-orphan-blocks"
       )
     elsif !ingest_staking_ledgers && ingest_orphan_blocks
-      system(
-        EXE,
+      invoke_mina_indexer(
         "database", "create",
         "--log-level", "DEBUG",
         "--ledger-cadence", "5000",
@@ -73,8 +71,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
         "--blocks-dir", blocks_dir(BLOCKS_COUNT)
       )
     elsif ingest_staking_ledgers && !ingest_orphan_blocks
-      system(
-        EXE,
+      invoke_mina_indexer(
         "database", "create",
         "--log-level", "DEBUG",
         "--ledger-cadence", "5000",
@@ -84,8 +81,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
         "--do-not-ingest-orphan-blocks"
       )
     else
-      system(
-        EXE,
+      invoke_mina_indexer(
         "database", "create",
         "--log-level", "DEBUG",
         "--ledger-cadence", "5000",
@@ -96,8 +92,7 @@ unless File.exist?(db_dir(BLOCKS_COUNT))
     end
   else
     # deploy-local-prod
-    system(
-      EXE,
+    invoke_mina_indexer(
       "database", "create",
       "--log-level", "DEBUG",
       "--ledger-cadence", "5000",
@@ -112,19 +107,26 @@ end
 # Terminate the current version, if any.
 #
 if File.exist? CURRENT
-  current = File.read(CURRENT)
-  if current != REV
-    socket = "#{BASE_DIR}/mina-indexer-#{current}.sock"
-    system(
-      EXE,
-      "--socket", socket,
-      "server", "shutdown"
-    ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
 
-    # Maybe the shutdown worked, maybe it didn't. Either way, give the process
-    # a second to clean up.
-    sleep 1
-  end
+  # The version expected to be currently running is the one given in the fille
+  # CURRENT.
+  #
+  current = File.read(CURRENT)
+
+  # The socket used for that mina-indexer is named after the version.
+  #
+  socket = "#{BASE_DIR}/mina-indexer-#{current}.sock"
+
+  # Send the currently running Indexer the shutdown command.
+  #
+  invoke_mina_indexer(
+    "--socket", socket,
+    "server", "shutdown"
+  ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
+
+  # Maybe the shutdown worked, maybe it didn't. Either way, give the process a
+  # second to clean up.
+  sleep 1
 end
 
 # Now, we take over.
@@ -134,13 +136,14 @@ File.write(CURRENT, REV)
 if DEPLOY_TYPE == "test"
   puts "Restarting server..."
   PORT = random_port
-  pid = spawn EXE +
+  command_line = EXE +
     " --socket #{SOCKET} " \
     " server start" \
     " --log-level DEBUG" \
     " --web-port #{PORT}" \
     " --database-dir #{db_dir(BLOCKS_COUNT)}" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+  pid = spawn({'RUST_BACKTRACE' => 'full'}, command_line)
   wait_for_socket(10)
   puts "Server restarted."
 
@@ -148,8 +151,7 @@ if DEPLOY_TYPE == "test"
   #
   puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
   config_snapshots_dir
-  system(
-    EXE,
+  invoke_mina_indexer(
     "--socket", SOCKET,
     "database", "snapshot",
     "--output-path", snapshot_path(BLOCKS_COUNT)
@@ -206,8 +208,7 @@ if DEPLOY_TYPE == "test"
   #
   puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
   restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
-  unless system(
-    EXE,
+  unless invoke_mina_indexer(
     "database", "restore",
     "--snapshot-file", snapshot_path(BLOCKS_COUNT),
     "--restore-dir", restore_path
@@ -220,8 +221,7 @@ if DEPLOY_TYPE == "test"
   # Shutdown indexer
   #
   puts "Initiating shutdown..."
-  unless system(
-    EXE,
+  unless invoke_mina_indexer(
     "--socket", SOCKET,
     "shutdown"
   )
@@ -270,7 +270,7 @@ else
   else
     # I am the child. (The child gets a nil return value.)
     Process.setsid
-    pid = spawn EXE +
+    command_line = EXE +
       " --socket #{SOCKET} " \
       " server start" \
       " --log-level DEBUG" \
@@ -278,6 +278,8 @@ else
       " --web-port #{WEB_PORT}" \
       " --database-dir #{db_dir(BLOCKS_COUNT)}" \
       " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+    puts "Command line: #{command_line}"
+    pid = spawn({'RUST_BACKTRACE' => 'full'}, command_line)
     Process.detach pid
     puts "Mina Indexer daemon dispatched with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
   end
