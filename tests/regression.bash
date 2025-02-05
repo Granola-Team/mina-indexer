@@ -33,8 +33,12 @@ cd "$BASE_DIR"
 ###########
 
 MAINNET_GENESIS_STATE_HASH=3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
 
+HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
+HARDFORK_GENESIS_BLOCK_HEIGHT=359605
+
+# Indexer helpers
+#
 idxr() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock "$@"
 }
@@ -127,6 +131,8 @@ idxr_database_create() {
         "$@"
 }
 
+# Indexer server & db helpers
+#
 idxr_server() {
     RUST_BACKTRACE=full "$IDXR" --socket ./mina-indexer.sock server "$@" &
     echo $! > ./idxr_pid
@@ -137,11 +143,11 @@ idxr_server_start() {
     idxr_server start --web-port "$port" "$@"
 }
 
-idxr_server_start_standard() {
-    echo "Creating mina indexer database"
+idxr_server_start_standard_v1() {
+    echo "Creating v1 mina indexer database"
     idxr_database_create "$@"
 
-    echo "Starting mina indexer server from database"
+    echo "Starting mina indexer server from v1 database"
     idxr_server_start \
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
@@ -149,6 +155,20 @@ idxr_server_start_standard() {
         "$@"
 }
 
+idxr_server_start_standard_v2() {
+    echo "Creating v2 mina indexer database"
+    idxr_database_create --genesis-hash $HARDFORK_GENESIS_STATE_HASH "$@"
+
+    echo "Starting mina indexer server from v2 database"
+    idxr_server_start \
+        --blocks-dir ./blocks \
+        --staking-ledgers-dir ./staking-ledgers \
+        --database-dir ./database \
+        "$@"
+}
+
+# Stage pre-hardfork blocks
+#
 stage_mainnet_blocks() {
     "$SRC"/ops/stage-blocks.rb 2 "$1" mainnet "$2"
 }
@@ -161,6 +181,37 @@ stage_mainnet_range() {
     "$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
 }
 
+check_height() {
+    if (( "$1" <= "$HARDFORK_GENESIS_BLOCK_HEIGHT" )) ; then
+        echo "Hardfork block heights should be >= $HARDFORK_GENESIS_BLOCK_HEIGHT"
+        exit 1
+    fi
+}
+
+# Stage post-hardfork blocks
+#
+stage_hardfork_blocks() {
+    # must go to a block after the hardfork genesis
+    check_height "$1"
+
+    # block height after hardfork genesis
+    start="$(( HARDFORK_GENESIS_BLOCK_HEIGHT + 1 ))"
+    "$SRC"/ops/stage-blocks.rb "$start" "$1" mainnet "$2"
+}
+
+stage_hardfork_single() {
+    check_height "$1"
+    "$SRC"/ops/stage-blocks.rb "$1" "$1" mainnet "$2"
+}
+
+stage_hardfork_range() {
+    check_height "$1"
+    check_height "$2"
+    "$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
+}
+
+# Assert helpers
+#
 assert() {
     expected="$1"
     actual="$2"
@@ -326,7 +377,7 @@ test_server_startup_v2() {
 test_ipc_is_available_immediately() {
     stage_mainnet_blocks 100 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     idxr summary
@@ -350,7 +401,7 @@ test_startup_dirs_get_created() {
 
 # Indexer server reports correct balance for Genesis Ledger Account
 test_account_balance_cli() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     result=$(idxr accounts public-key --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .balance)
@@ -359,7 +410,7 @@ test_account_balance_cli() {
 
 # Indexer server returns the correct account
 test_account_public_key_json() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     result=$(idxr accounts public-key --public-key B62qqDJCQsfDoHJvJCh1hgTpiVbmgBg8SbNKLMXsjuVsX5pxCELDyFk | jq -r .public_key)
@@ -370,7 +421,7 @@ test_account_public_key_json() {
 test_canonical_root() {
     stage_mainnet_blocks 15 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
@@ -386,7 +437,7 @@ test_canonical_threshold() {
     canonical_threshold=2
     stage_mainnet_blocks $num_seq_blocks ./blocks
 
-    idxr_server_start_standard --canonical-threshold $canonical_threshold
+    idxr_server_start_standard_v1 --canonical-threshold $canonical_threshold
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
@@ -400,7 +451,7 @@ test_canonical_threshold() {
 test_best_tip() {
     stage_mainnet_blocks 15 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # best tip query
@@ -423,7 +474,7 @@ test_best_tip() {
 test_blocks() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # basic height query
@@ -527,7 +578,7 @@ test_blocks() {
 test_block_copy() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # start without block 11
@@ -563,7 +614,7 @@ test_missing_blocks() {
     stage_mainnet_range 12 20 ./blocks # missing 11
     stage_mainnet_range 22 30 ./blocks # missing 21
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # start out missing block 11 & 21
@@ -620,7 +671,7 @@ test_best_chain() {
     stage_mainnet_blocks 12 ./blocks
     mkdir -p best_chain
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     result=$(idxr chain best --num 1 | jq -r .[0].state_hash)
@@ -665,7 +716,7 @@ test_ledgers() {
     stage_mainnet_blocks 15 ./blocks
     mkdir -p ledgers
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     pk=B62qp1RJRL7x249Z6sHCjKm1dbkpUWHRdiQbcDaz1nWUGa9rx48tYkR # non-genesis account
@@ -735,7 +786,7 @@ test_ledgers() {
 test_sync() {
     stage_mainnet_blocks 15 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     idxr summary --verbose
@@ -765,7 +816,7 @@ test_sync() {
 test_replay() {
     stage_mainnet_blocks 15 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     assert 26 $(idxr summary --json | jq -r .blocks_processed)
@@ -797,7 +848,7 @@ test_transactions() {
     stage_mainnet_blocks 13 ./blocks
     mkdir -p transactions
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # basic pk transaction queries
@@ -889,7 +940,7 @@ test_transactions() {
 test_transactions_csv() {
     stage_mainnet_blocks 5 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # write transactions to CSV
@@ -917,7 +968,7 @@ test_snark_work() {
     stage_mainnet_blocks 120 ./blocks
     mkdir -p snark_work
 
-    idxr_server_start_standard --canonical-threshold 5
+    idxr_server_start_standard_v1 --canonical-threshold 5
     wait_for_socket
 
     # pk SNARK work queries
@@ -970,7 +1021,7 @@ test_snark_work() {
 test_snapshot() {
     stage_mainnet_blocks 13 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # pre-snapshot results
@@ -1137,7 +1188,7 @@ test_rest_blocks() {
 test_best_chain_many_blocks() {
     stage_mainnet_blocks 5000 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_forever_for_socket
 
     # write best chain to file
@@ -1240,7 +1291,7 @@ test_best_chain_many_blocks() {
 }
 
 test_genesis_block_creator() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
@@ -1253,7 +1304,7 @@ test_genesis_block_creator() {
 test_txn_nonces() {
     stage_mainnet_blocks 100 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # after block 3
@@ -1308,7 +1359,7 @@ test_startup_staking_ledgers() {
 }
 
 test_watch_staking_ledgers() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # copy epoch 0 staking ledger from data to watched directory
@@ -1421,7 +1472,7 @@ test_staking_delegations() {
 test_internal_commands() {
     stage_mainnet_blocks 11 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     pk=B62qs2YyNuo1LbNo5sbhPByDDAB7NZiejFM6H1ctND5ui7wH4PWa7qm
@@ -1479,7 +1530,7 @@ test_internal_commands() {
 test_internal_commands_csv() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # write transactions to CSV
@@ -1519,7 +1570,7 @@ test_start_from_config_v1() {
       \"do_not_ingest_orphan_blocks\": false
     }" > $file
 
-    idxr_server_start_standard --config $file
+    idxr_server_start_standard_v1 --config $file
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1552,7 +1603,7 @@ test_start_from_config_v2() {
       \"do_not_ingest_orphan_blocks\": false
     }" > $file
 
-    idxr_server_start_standard --config $file
+    idxr_server_start_standard_v2 --config $file
     wait_for_socket
 
     hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1565,13 +1616,13 @@ test_start_from_config_v2() {
 }
 
 test_clean_shutdown() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
     shutdown_idxr
 }
 
 test_clean_kill() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     if [ ! -e ./idxr_pid ]; then
@@ -1607,7 +1658,7 @@ test_clean_kill() {
 test_block_children() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     block_5_state_hash=3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY
@@ -1702,7 +1753,7 @@ test_hurl() {
 }
 
 test_version_file() {
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     [ -e "./database/INDEXER_VERSION" ]
@@ -1776,7 +1827,7 @@ test_missing_block_recovery() {
 test_database_create() {
     stage_mainnet_blocks 10 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # check data
@@ -1829,7 +1880,7 @@ test_reuse_databases() {
     stage_mainnet_blocks 10 ./blocks
 
     # create initial db
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     assert 10 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
@@ -1839,7 +1890,7 @@ test_reuse_databases() {
     stage_mainnet_range 11 12 ./blocks
 
     # sync from previous indexer db
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # includes new blocks
@@ -1850,7 +1901,7 @@ test_reuse_databases() {
 test_do_not_ingest_orphan_blocks() {
     stage_mainnet_blocks 20 ./blocks
 
-    idxr_server_start_standard --do-not-ingest-orphan-blocks
+    idxr_server_start_standard_v1 --do-not-ingest-orphan-blocks
     wait_for_socket
 
     orphan_blocks=(
@@ -1880,7 +1931,7 @@ test_do_not_ingest_orphan_blocks() {
     # start a "normal" indexer to compare the best ledger
     stage_mainnet_blocks 20 ./blocks
 
-    idxr_server_start_standard
+    idxr_server_start_standard_v1
     wait_for_socket
 
     # check best ledger
