@@ -190,8 +190,8 @@ pub enum Chain {
         path: Option<PathBuf>,
 
         /// Constrain chain query with a start state hash
-        #[arg(long, default_value_t = MAINNET_GENESIS_HASH.into())]
-        start_state_hash: String,
+        #[arg(long)]
+        start_state_hash: Option<String>,
 
         /// Constrain chain query with an end state hash
         #[arg(long)]

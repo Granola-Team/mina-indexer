@@ -1,11 +1,16 @@
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
-    block::{precomputed::PrecomputedBlockWithCanonicity, store::BlockStore, BlockWithoutHeight},
+    block::{
+        precomputed::{PcbVersion, PrecomputedBlockWithCanonicity},
+        store::BlockStore,
+        BlockWithoutHeight,
+    },
     canonicity::store::CanonicityStore,
     client::*,
     command::{
         internal::store::InternalCommandStore, signed::TxnHash, store::UserCommandStore, Command,
     },
+    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
     ledger::{
         staking::AggregatedEpochStakeDelegation,
         store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
@@ -458,17 +463,27 @@ pub async fn handle_connection(
                     path,
                 } => {
                     info!("Received best-chain command");
-                    let start_state_hash: StateHash = start_state_hash.into();
-                    if let Some(best_tip) = db.get_best_block()? {
-                        let end_state_hash: String = {
-                            if end_state_hash.is_none() {
-                                best_tip.state_hash().0
+                    let start_state_hash: StateHash = match start_state_hash {
+                        None => {
+                            if let Ok(Some(PcbVersion::V2)) = db.get_best_block_version() {
+                                HARDFORK_GENESIS_HASH.into()
                             } else {
-                                let end_state_hash = &end_state_hash.unwrap();
-                                if !StateHash::is_valid(end_state_hash) {
-                                    best_tip.state_hash().0
-                                } else {
-                                    end_state_hash.into()
+                                MAINNET_GENESIS_HASH.into()
+                            }
+                        }
+                        Some(start_state_hash) => start_state_hash.into(),
+                    };
+
+                    if let Some(best_tip) = db.get_best_block()? {
+                        let end_state_hash = {
+                            match end_state_hash {
+                                None => best_tip.state_hash(),
+                                Some(end_state_hash) => {
+                                    if !StateHash::is_valid(&end_state_hash) {
+                                        best_tip.state_hash()
+                                    } else {
+                                        end_state_hash.into()
+                                    }
                                 }
                             }
                         };
@@ -476,7 +491,7 @@ pub async fn handle_connection(
                         if !StateHash::is_valid(&start_state_hash.0) {
                             invalid_state_hash(&start_state_hash.0)
                         } else if let (Some((end_block, _)), Some((start_block, _))) = (
-                            db.get_block(&end_state_hash.into())?,
+                            db.get_block(&end_state_hash)?,
                             db.get_block(&start_state_hash)?,
                         ) {
                             let start_height = start_block.blockchain_length();
