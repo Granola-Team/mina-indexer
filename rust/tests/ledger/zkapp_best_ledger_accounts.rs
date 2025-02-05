@@ -5,6 +5,7 @@ use mina_indexer::{
 };
 use std::path::PathBuf;
 
+#[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
 #[tokio::test]
 async fn zkapp_best_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("zkapp-best-ledger-accounts")?;
