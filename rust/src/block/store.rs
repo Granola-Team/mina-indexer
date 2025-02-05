@@ -51,6 +51,9 @@ pub trait BlockStore {
     /// Get best block epoch count without deserializing the PCB
     fn get_current_epoch(&self) -> anyhow::Result<u32>;
 
+    /// Get best block PCB version
+    fn get_best_block_version(&self) -> anyhow::Result<Option<PcbVersion>>;
+
     /// Get best block state hash without deserializing the PCB
     fn get_best_block_hash(&self) -> anyhow::Result<Option<StateHash>>;
 

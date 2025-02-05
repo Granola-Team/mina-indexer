@@ -215,6 +215,14 @@ impl BlockStore for IndexerStore {
         }
     }
 
+    fn get_best_block_version(&self) -> anyhow::Result<Option<PcbVersion>> {
+        trace!("Getting best block version");
+        match self.get_best_block_hash()? {
+            None => Ok(None),
+            Some(state_hash) => self.get_block_version(&state_hash),
+        }
+    }
+
     fn get_best_block_hash(&self) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting best block state hash");
         Ok(self
