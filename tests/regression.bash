@@ -447,11 +447,34 @@ test_canonical_threshold() {
     assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $hash
 }
 
-# Indexer server returns the correct best tip
-test_best_tip() {
+# Indexer server returns the correct v1 best tip
+test_best_tip_v1() {
     stage_mainnet_blocks 15 ./blocks
 
     idxr_server_start_standard_v1
+    wait_for_socket
+
+    # best tip query
+    hash=$(idxr blocks best | jq -r .state_hash)
+    canonicity=$(idxr blocks best | jq -r .canonicity)
+    length=$(idxr blocks best | jq -r .blockchain_length)
+    canonicity_v=$(idxr blocks best --verbose | jq -r .canonicity)
+
+    # witness tree summary
+    wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+    wt_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
+
+    assert $wt_hash $hash
+    assert $wt_length $length
+    assert 'Canonical' $canonicity
+    assert 'Canonical' $canonicity_v
+}
+
+# Indexer server returns the correct v2 best tip
+test_best_tip_v2() {
+    stage_hardfork_blocks 359617 ./blocks
+
+    idxr_server_start_standard_v2
     wait_for_socket
 
     # best tip query
@@ -1961,7 +1984,8 @@ for test_name in "$@"; do
         "test_account_public_key_json") test_account_public_key_json ;;
         "test_canonical_root") test_canonical_root ;;
         "test_canonical_threshold") test_canonical_threshold ;;
-        "test_best_tip") test_best_tip ;;
+        "test_best_tip_v1") test_best_tip_v1 ;;
+        "test_best_tip_v2") test_best_tip_v2 ;;
         "test_blocks") test_blocks ;;
         "test_block_copy") test_block_copy ;;
         "test_missing_blocks") test_missing_blocks ;;

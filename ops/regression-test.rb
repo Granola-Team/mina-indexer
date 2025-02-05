@@ -32,7 +32,8 @@ test_names = %w[
   account_public_key_json
   canonical_root
   canonical_threshold
-  best_tip
+  best_tip_v1
+  best_tip_v2
   blocks
   block_copy
   missing_blocks
@@ -65,7 +66,7 @@ test_names = %w[
 ]
 
 puts "Regression testing..."
-BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
+
 tests = if ARGV.empty?
   # Run all tests, but not the long-running ones.
   test_names
@@ -121,6 +122,10 @@ def cleanup
   cleanup_database_pid
   remove_dirs
 end
+
+# Run the tests
+#
+BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
 
 tests.each do |tn|
   puts "\nTesting: #{tn}"
