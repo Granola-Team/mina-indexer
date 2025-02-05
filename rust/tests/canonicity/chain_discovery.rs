@@ -140,6 +140,7 @@ async fn discovery_algorithm() -> anyhow::Result<()> {
     let pattern = format!("{}/*-*-*.json", blocks_dir.display());
     let paths: Vec<PathBuf> = glob(&pattern)?.filter_map(|x| x.ok()).collect();
     let (canonical_paths, recent_paths, orphaned_paths) = discovery(
+        &MAINNET_GENESIS_HASH.into(),
         MAINNET_CANONICAL_THRESHOLD,
         BLOCK_REPORTING_FREQ_NUM,
         paths.iter().collect(),

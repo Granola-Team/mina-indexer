@@ -4,8 +4,11 @@ use super::{
     precomputed::{PcbVersion, PrecomputedBlock},
 };
 use crate::{
-    block::extract_network_height_hash, canonicity::canonical_chain_discovery::discovery,
-    chain::ChainData, utility::functions::calculate_total_size,
+    block::extract_network_height_hash,
+    canonicity::canonical_chain_discovery::discovery,
+    chain::ChainData,
+    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
+    utility::functions::calculate_total_size,
 };
 use anyhow::{anyhow, bail};
 use glob::glob;
@@ -171,13 +174,22 @@ impl BlockParser {
         reporting_freq: u32,
     ) -> anyhow::Result<Self> {
         info!("Block parser with canonical chain discovery");
+        let genesis_state_hash = if version == PcbVersion::V2 {
+            HARDFORK_GENESIS_HASH
+        } else {
+            MAINNET_GENESIS_HASH
+        };
+
         if blocks_dir.exists() {
             let pattern = format!("{}/*-*-*.json", blocks_dir.display());
             let blocks_dir = blocks_dir.to_owned();
             let paths: Vec<PathBuf> = glob(&pattern)?.flatten().collect();
-            if let Ok((canonical_paths, recent_paths, orphaned_paths)) =
-                discovery(canonical_threshold, reporting_freq, paths.iter().collect())
-            {
+            if let Ok((canonical_paths, recent_paths, orphaned_paths)) = discovery(
+                &genesis_state_hash.into(),
+                canonical_threshold,
+                reporting_freq,
+                paths.iter().collect(),
+            ) {
                 info!("Canonical chain discovery successful");
                 let deep_canonical_bytes = canonical_paths
                     .iter()
@@ -247,6 +259,7 @@ impl BlockParser {
             Ok(parsed_block) => {
                 self.blocks_processed += 1;
                 self.bytes_processed += block_bytes;
+
                 Ok(Some((parsed_block, block_bytes)))
             }
             Err(e) => {
