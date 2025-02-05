@@ -160,7 +160,7 @@
             checkPhase = ''
               set -ex
               cargo clippy --all-targets --all-features -- -D warnings
-              cargo nextest run --release
+              cargo nextest run --release --features "tier2 mina_rs"
             '';
             preInstall = "mkdir -p $out/var/log/mina-indexer";
           };
