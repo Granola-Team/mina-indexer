@@ -357,8 +357,8 @@ test_server_startup_v1() {
 
     best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     root=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    assert $root $best
-    assert $MAINNET_GENESIS_STATE_HASH $best
+    assert "$root" "$best"
+    assert "$MAINNET_GENESIS_STATE_HASH" "$best"
 }
 
 # Indexer v2 server starts up without blocks & staking ledger directories
@@ -369,8 +369,8 @@ test_server_startup_v2() {
 
     best=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     root=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
-    assert $root $best
-    assert $HARDFORK_GENESIS_STATE_HASH $best
+    assert "$root" "$best"
+    assert "$HARDFORK_GENESIS_STATE_HASH" "$best"
 }
 
 # Indexer server ipc is available during initialization
@@ -464,10 +464,10 @@ test_best_tip_v1() {
     wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    assert $wt_hash $hash
-    assert $wt_length $length
-    assert 'Canonical' $canonicity
-    assert 'Canonical' $canonicity_v
+    assert "$wt_hash" "$hash"
+    assert "$wt_length" "$length"
+    assert 'Canonical' "$canonicity"
+    assert 'Canonical' "$canonicity_v"
 }
 
 # Indexer server returns the correct v2 best tip
@@ -487,10 +487,10 @@ test_best_tip_v2() {
     wt_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
     wt_length=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-    assert $wt_hash $hash
-    assert $wt_length $length
-    assert 'Canonical' $canonicity
-    assert 'Canonical' $canonicity_v
+    assert "$wt_hash" "$hash"
+    assert "$wt_length" "$length"
+    assert 'Canonical' "$canonicity"
+    assert 'Canonical' "$canonicity_v"
 }
 
 # Indexer server returns the correct blocks for height and slot queries
@@ -689,47 +689,90 @@ test_missing_blocks() {
     assert '3NLPpt5SyVnD1U5uJAqR3DL1Cqj5dG26SuWutRQ6AQpbQtQUWSYA' $canonical_hash
 }
 
-# Indexer server returns the correct best chain
-test_best_chain() {
+# Indexer server returns the correct v1 best chain
+test_best_chain_v1() {
     stage_mainnet_blocks 12 ./blocks
     mkdir -p best_chain
 
     idxr_server_start_standard_v1
     wait_for_socket
 
+    BEST_TIP_HASH=3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY
+
     result=$(idxr chain best --num 1 | jq -r .[0].state_hash)
-    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
+    assert "$BEST_TIP_HASH" "$result"
 
     result=$(idxr chain best --verbose | jq -r .[0].state_hash)
-    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $result
+    assert "$BEST_TIP_HASH" "$result"
 
     # best chain with bounds
     bounds=$(idxr chain best \
         --start-state-hash 3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R \
         --end-state-hash 3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY \
         | jq -r .[0].state_hash)
-    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' $bounds
+    assert '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' "$bounds"
 
     bounds=$(idxr chain best \
         --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
         --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
         | jq -r .[1].state_hash)
-    assert '3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG' $bounds
+    assert '3NL9qBsNibXPm5Nh8cSg5CCqrbzX5VUVY9gJzAbg7EVCF3hfhazG' "$bounds"
 
     bounds=$(idxr chain best --start-state-hash '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' \
         --end-state-hash '3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY' \
         | jq -r .[2].state_hash)
-    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $bounds
+    assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' "$bounds"
 
     # write best chain to file
     file=./best_chain/best_chain.json
     idxr chain best --path $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
+    assert "$BEST_TIP_HASH" "$file_result"
 
     idxr chain best --verbose --path $file
     file_result=$(cat $file | jq -r .[0].state_hash)
-    assert '3NKkJDmNZGYdKVDDJkkamGdvNzASia2SXxKpu18imps7KqbNXENY' $file_result
+    assert "$BEST_TIP_HASH" "$file_result"
+
+    rm -rf best_chain
+}
+
+# Indexer server returns the correct v2 best chain
+test_best_chain_v2() {
+    stage_hardfork_blocks 359617 ./blocks
+    mkdir -p best_chain
+
+    idxr_server_start_standard_v2
+    wait_for_socket
+
+    BEST_TIP_HASH=3NLXcoYjz1bqK3QzKZYmQxa7kZ7CyLqLisGLgHH6vikHokW3xYz6
+
+    result=$(idxr chain best --num 1 | jq -r .[0].state_hash)
+    assert "$BEST_TIP_HASH" "$result"
+
+    result=$(idxr chain best --verbose | jq -r .[0].state_hash)
+    assert "$BEST_TIP_HASH" "$result"
+
+    # best chain with bounds
+    bounds=$(idxr chain best \
+        --start-state-hash 3NK7T1MeiFA4ALVxqZLuGrWr1PeufYQAm9i1TfMnN9Cu6U5crhot \
+        --end-state-hash 3NKybkb8C3R5PjwkxNUVCL6tb5qVf5i4jPWkDCcyJbka9Qgvr8CG \
+        | jq -r .[0].state_hash)
+    assert '3NKybkb8C3R5PjwkxNUVCL6tb5qVf5i4jPWkDCcyJbka9Qgvr8CG' "$bounds"
+
+    bounds=$(idxr chain best \
+        --end-state-hash '3NKybkb8C3R5PjwkxNUVCL6tb5qVf5i4jPWkDCcyJbka9Qgvr8CG' \
+        | jq -r .[6].state_hash)
+    assert "$HARDFORK_GENESIS_STATE_HASH" "$bounds"
+
+    # write best chain to file
+    file=./best_chain/best_chain.json
+    idxr chain best --path $file
+    file_result=$(cat $file | jq -r .[0].state_hash)
+    assert "$BEST_TIP_HASH" "$file_result"
+
+    idxr chain best --verbose --path $file
+    file_result=$(cat $file | jq -r .[0].state_hash)
+    assert "$BEST_TIP_HASH" "$file_result"
 
     rm -rf best_chain
 }
@@ -1925,7 +1968,8 @@ for test_name in "$@"; do
         "test_missing_blocks") test_missing_blocks ;;
         "test_missing_block_recovery") test_missing_block_recovery ;;
         "test_fetch_new_blocks") test_fetch_new_blocks ;;
-        "test_best_chain") test_best_chain ;;
+        "test_best_chain_v1") test_best_chain_v1 ;;
+        "test_best_chain_v2") test_best_chain_v2 ;;
         "test_block_children") test_block_children ;;
         "test_ledgers") test_ledgers ;;
         "test_sync") test_sync ;;

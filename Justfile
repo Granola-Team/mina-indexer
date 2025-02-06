@@ -251,7 +251,7 @@ tier1: tier1-prereqs lint test-unit-tier1
     clean_kill \
     block_copy \
     account_balance_cli \
-    best_chain \
+    best_chain_v1 \
     rest_accounts_summary \
     reuse_databases \
     hurl

@@ -37,7 +37,8 @@ test_names = %w[
   blocks
   block_copy
   missing_blocks
-  best_chain
+  best_chain_v1
+  best_chain_v2
   block_children
   ledgers
   sync
