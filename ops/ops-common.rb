@@ -12,7 +12,7 @@ puts "Using base directory: #{BASE_DIR}"
 FileUtils.mkdir_p(BASE_DIR)
 
 SRC_TOP = `git rev-parse --show-toplevel`.strip
-CURRENT = "#{BASE_DIR}/CURRENT"
+CURRENT = "#{DEPLOY_DIR}/CURRENT"
 
 # Port
 
