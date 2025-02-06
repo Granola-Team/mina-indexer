@@ -18,6 +18,7 @@ use crate::{
     },
     web::graphql::{gen::TransactionQueryInput, DateTime},
 };
+use anyhow::Context as AC;
 use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use serde::Serialize;
 use speedb::{Direction, IteratorMode};
@@ -127,11 +128,12 @@ impl TransactionsQueryRoot {
         if let Some(state_hash) = query
             .as_ref()
             .and_then(|input| input.block.as_ref())
-            .and_then(|block| block.state_hash.clone())
+            .and_then(|block| block.state_hash.as_ref())
         {
-            let query = query.expect("query input to exists");
+            let query = query.as_ref().expect("query input to exists");
             let block_height = db
                 .get_block_height(&state_hash.into())?
+                .with_context(|| state_hash.to_string())
                 .expect("block height");
             let (min, max) = match sort_by {
                 BlockHeightAsc | BlockHeightDesc => (block_height, block_height + 1),
