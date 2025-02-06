@@ -1690,10 +1690,11 @@ test_block_children() {
 }
 
 test_load() {
-    test_hurl true
+    test_hurl_v1 true
 }
 
-test_hurl() {
+# Test v1 GQL functionality
+test_hurl_v1() {
     stage_mainnet_blocks 120 ./blocks
 
     port=$(ephemeral_port)
@@ -1724,10 +1725,10 @@ test_hurl() {
         basename "$file" | cut -d'.' -f1
     }
 
-    # Create an array of test files and their corresponding URLs
+    # Create an array of v1 test files and their corresponding URLs
     test_file_url_pairs=(
-        "$SRC/tests/hurl/*.hurl" "http://localhost:$port/graphql"
-        "$SRC/tests/hurl/rest/summary.hurl" "http://localhost:$port/summary"
+        "$SRC/tests/hurl/v1/*.hurl" "http://localhost:$port/graphql"
+        "$SRC/tests/hurl/v1/rest/summary.hurl" "http://localhost:$port/summary"
     )
 
     # Loop through the array in pairs (file path and URL)
@@ -1742,11 +1743,11 @@ test_hurl() {
             # If HURL_TEST is set, only run the matching test
             if [[ -z "${HURL_TEST:-}" || "$test_name" == "$HURL_TEST" ]]; then
                 echo "Running test file: $test_file with URL: $url"
-                if [[ -z "${HURL_VERBOSE:-}" ]]; then
-                    hurl --variable url=$url --test $parallel_flag "$test_file"
-                else
-                    hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
-                fi
+                hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+            fi
+        done
+    done
+}
             fi
         done
     done
@@ -1987,7 +1988,7 @@ for test_name in "$@"; do
         "test_staking_delegations") test_staking_delegations ;;
         "test_internal_commands") test_internal_commands ;;
         "test_internal_commands_csv") test_internal_commands_csv ;;
-        "test_hurl") test_hurl ;;
+        "test_hurl_v1") test_hurl_v1 ;;
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;

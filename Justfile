@@ -254,7 +254,7 @@ tier1: tier1-prereqs lint test-unit-tier1
     best_chain_v1 \
     rest_accounts_summary \
     reuse_databases \
-    hurl
+    hurl_v1
 
 #
 # Tier 2 tests
