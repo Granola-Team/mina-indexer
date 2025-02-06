@@ -323,27 +323,18 @@ impl SignedCommand {
                 ))
             }
             Self::V2(data) => {
-                // Jank hashing
-                // convert versioned signed command to bin_prot bytes
                 let bytes = serde_json::to_vec(data)?;
-
-                // base58 encode + Blake2b hash
-                let bytes_bs58 = bs58::encode(&bytes[..])
-                    .with_check_version(USER_COMMAND)
-                    .into_string();
                 let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(bytes_bs58.as_bytes())?;
+                hasher.write_all(&bytes[..])?;
 
-                // add length + version bytes
                 let mut hash = hasher.finalize_boxed().to_vec();
                 hash.insert(0, hash.len() as u8);
 
-                // base58 encode txn hash
-                TxnHash::new(
+                Ok(TxnHash::V2(
                     bs58::encode(hash)
                         .with_check_version(V2_TXN_HASH)
                         .into_string(),
-                )
+                ))
             }
         }
     }
@@ -859,7 +850,6 @@ mod tests {
         Ok(())
     }
 
-    #[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
     #[test]
     fn txn_hash_signed_command_v2() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
@@ -870,13 +860,12 @@ mod tests {
         assert_eq!(
             hashes,
             vec![TxnHash::V2(
-                "5JucQZd5jkfMMJ6idWUed1Qk8ViFdGM9CidNBbXqafhELYkk9TzL".to_string()
+                "5JtZ6p9SepL8GeAyjjFVj1JCQUAvSTHwzUQe9fxbNtqkA7X8ZAzf".to_string()
             )]
         );
         Ok(())
     }
 
-    #[ignore = "only tested in tier 1 via cargo nextest --run-ignored all"]
     #[test]
     fn txn_hash_zkapp_command() -> anyhow::Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
@@ -899,8 +888,8 @@ mod tests {
         assert_eq!(
             hashes,
             vec![
-                TxnHash::V2("5JvKrG4z9uSnBthMdSqAMRLcNggiZZhMw4N3gp9kLPnqmUYpUfPs".to_string()),
-                TxnHash::V2("5JtYpYoz8BtwDnVyM2ZqZMfYZ4oQQdoqqgMzm63nSnuGgQuPnJjT".to_string()),
+                TxnHash::V2("5JtXBs7Xtf2QDgTmd6sdkWPLNxPXT9eu2tBWgihjB35DUZ4o1SwR".to_string()),
+                TxnHash::V2("5JupfF1RRVYXdEW1KGZXad11ugerCagr2K8qjBFq692MRbuDeJCN".to_string()),
             ]
         );
         Ok(())
