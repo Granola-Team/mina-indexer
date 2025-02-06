@@ -8,14 +8,13 @@ use crate::{
         bin_prot,
         serialization_types::{
             staged_ledger_diff as mina_rs,
-            version_bytes::{USER_COMMAND, V1_TXN_HASH},
+            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
         },
     },
 };
-use anyhow::bail;
 use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
-use std::io::{ErrorKind, Write};
+use std::io::Write;
 
 // re-export [txn_hash::TxnHash]
 pub type TxnHash = txn_hash::TxnHash;
@@ -324,12 +323,27 @@ impl SignedCommand {
                 ))
             }
             Self::V2(data) => {
-                let json: serde_json::Value = data.to_owned().to_mina_json();
+                // Jank hashing
+                // convert versioned signed command to bin_prot bytes
+                let bytes = serde_json::to_vec(data)?;
 
-                match serde_json::to_string(&json) {
-                    Ok(cmd_str) => hash_signed_command_v2(cmd_str),
-                    Err(e) => bail!("Error serializing JSON: {}\ndata: {:?}", e, data),
-                }
+                // base58 encode + Blake2b hash
+                let bytes_bs58 = bs58::encode(&bytes[..])
+                    .with_check_version(USER_COMMAND)
+                    .into_string();
+                let mut hasher = blake2::Blake2bVar::new(32)?;
+                hasher.write_all(bytes_bs58.as_bytes())?;
+
+                // add length + version bytes
+                let mut hash = hasher.finalize_boxed().to_vec();
+                hash.insert(0, hash.len() as u8);
+
+                // base58 encode txn hash
+                TxnHash::new(
+                    bs58::encode(hash)
+                        .with_check_version(V2_TXN_HASH)
+                        .into_string(),
+                )
             }
         }
     }
@@ -343,41 +357,6 @@ impl SignedCommand {
                 signed_command: Self::from(u),
             })
             .collect()
-    }
-}
-
-/// Hash a V2 transaction JSON string via `mina_txn_hasher.exe`
-fn hash_signed_command_v2(cmd_str: String) -> anyhow::Result<TxnHash> {
-    let mut proc = std::process::Command::new("mina_txn_hasher.exe");
-    proc.arg(&cmd_str);
-
-    match proc.output() {
-        Ok(output) => {
-            if !output.status.success() {
-                let err = String::from_utf8_lossy(&output.stderr);
-                bail!("Process failed: {}\ndata: {}", err, cmd_str);
-            }
-
-            let txn_hash = String::from_utf8(output.stdout)
-                .map_err(|e| anyhow::anyhow!("Invalid UTF-8 in output: {}", e))?;
-            TxnHash::new(txn_hash.trim().to_string())
-        }
-        Err(e) => {
-            let err_msg = match e.kind() {
-                ErrorKind::NotFound => "Executable not found",
-                ErrorKind::PermissionDenied => "Permission denied",
-                ErrorKind::InvalidInput => "Invalid input",
-                _ => "Unknown error occurred",
-            };
-
-            bail!(
-                "Error executing command '{:?}': {} ({})\ndata: {}",
-                proc.get_program(),
-                err_msg,
-                e,
-                cmd_str
-            )
-        }
     }
 }
 
@@ -891,7 +870,7 @@ mod tests {
         assert_eq!(
             hashes,
             vec![TxnHash::V2(
-                "5JuJ1eRNWdE8jSMmCDoHnAdBGhLyBnCk2gkcvkfCZ7WvrKtGuWHB".to_string()
+                "5JucQZd5jkfMMJ6idWUed1Qk8ViFdGM9CidNBbXqafhELYkk9TzL".to_string()
             )]
         );
         Ok(())
@@ -920,8 +899,8 @@ mod tests {
         assert_eq!(
             hashes,
             vec![
-                TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string()),
-                TxnHash::V2("5JvQqrHBgDtB7gew76AkFhSkkfUTCtYQhPT53erZZQYibV6ms9YD".to_string()),
+                TxnHash::V2("5JvKrG4z9uSnBthMdSqAMRLcNggiZZhMw4N3gp9kLPnqmUYpUfPs".to_string()),
+                TxnHash::V2("5JtYpYoz8BtwDnVyM2ZqZMfYZ4oQQdoqqgMzm63nSnuGgQuPnJjT".to_string()),
             ]
         );
         Ok(())
