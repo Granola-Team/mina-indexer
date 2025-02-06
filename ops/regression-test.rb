@@ -2,19 +2,10 @@
 
 # -*- mode: ruby -*-
 
-VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
 BUILD_TYPE = ARGV.shift
+DEPLOY_TYPE = 'dev'
 
-require "fileutils"
-
-abort "Failure: #{DEV_DIR} must exist." unless File.exist?(DEV_DIR)
-
-rev = `git rev-parse --short=8 HEAD`.chomp
-BASE_DIR = "#{DEV_DIR}/rev-#{rev}"
-FileUtils.mkdir_p(BASE_DIR)
-
-require "#{__dir__}/ops-common" # Expects BASE_DIR & BUILD_TYPE to exist.
+require "#{__dir__}/ops-common"
 
 # TODO add these back once fixed
 # missing_block_recovery

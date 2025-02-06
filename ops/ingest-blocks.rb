@@ -6,18 +6,11 @@ DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
 BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
 BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
 
-VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
-
-require "fileutils"
-require "#{__dir__}/ops-common" # Expects BASE_DIR to be defined
-
-abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exist?(BASE_DIR)
+require "#{__dir__}/ops-common"
 
 puts "Ingesting blocks (mode: #{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
 # Configure the directories as needed.
-config_base_dir
 config_exe_dir
 config_log_dir
 get_blocks BLOCKS_COUNT

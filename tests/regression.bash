@@ -23,7 +23,7 @@ SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
 # this temporary directory.
 : "${VOLUMES_DIR:=/mnt}"
 DEV_DIR="$VOLUMES_DIR"/mina-indexer-dev
-BASE_DIR="$DEV_DIR"/rev-"$REV"
+BASE_DIR="$DEV_DIR"/"$REV"
 
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"

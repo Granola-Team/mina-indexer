@@ -11,13 +11,7 @@ end
 DEPLOY_TYPE = ARGV[0] # 'dev', 'prod', or 'test'
 BUILD_TYPE = "debug"
 
-VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
-
-require "fileutils"
 require "#{__dir__}/ops-common" # Requires BASE_DIR & BUILD_TYPE
-
-DEV_DIR = "#{BASE_DIR}/rev-#{REV}" # Only makes sense for DEPLOY_TYPE == 'dev'
 
 #
 # Clean
@@ -25,13 +19,7 @@ DEV_DIR = "#{BASE_DIR}/rev-#{REV}" # Only makes sense for DEPLOY_TYPE == 'dev'
 
 def clean_dev(type)
   if type == "dev"
-    if ARGV[2] == "all"
-      puts "Removing all dev rev directories"
-      FileUtils.rm_rf(Dir.glob("#{BASE_DIR}/rev-*"))
-    elsif Dir.exist? DEV_DIR
-      puts "Removing #{DEV_DIR}"
-      FileUtils.rm_rf(Dir.glob(DEV_DIR))
-    end
+    idxr_cleanup(ARGV[2])
     exit 0
   end
 end
