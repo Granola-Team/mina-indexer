@@ -15,7 +15,7 @@ VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 
 require "fileutils"
-require "#{__dir__}/helpers" # Requires BASE_DIR & BUILD_TYPE
+require "#{__dir__}/ops-common" # Requires BASE_DIR & BUILD_TYPE
 
 DEV_DIR = "#{BASE_DIR}/rev-#{REV}" # Only makes sense for DEPLOY_TYPE == 'dev'
 

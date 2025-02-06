@@ -11,7 +11,7 @@ VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 
 require "fileutils"
-require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
+require "#{__dir__}/ops-common" # Expects BASE_DIR to be defined
 
 abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exist?(BASE_DIR)
 
@@ -229,11 +229,17 @@ if DEPLOY_TYPE == "test"
     success = false
   end
   Process.wait(pid)
+  puts 'Shutdown complete.'
+  File.delete(CURRENT)
 
   # Delete the snapshot and the database directory restored to.
   #
   FileUtils.rm_rf(restore_path)
   File.unlink(snapshot_path(BLOCKS_COUNT))
+
+  # Delete the database directory. We have the snapshot if we want it.
+  #
+  # FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
 
   # Do a database self-check
   #
@@ -248,17 +254,6 @@ if DEPLOY_TYPE == "test"
   #             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   # wait_for_socket(10)
   # puts 'Self-check complete.'
-
-  # puts 'Initiating shutdown...'
-  # system(
-  #   EXE,
-  #   '--socket', SOCKET,
-  #   'shutdown'
-  # ) || puts('Shutdown failed after snapshot.')
-  # Process.wait(pid)
-  # puts 'Shutdown complete.'
-
-  File.delete(CURRENT)
 else
   # Daemonize the EXE.
   #

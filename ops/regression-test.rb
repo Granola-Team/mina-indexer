@@ -14,7 +14,7 @@ rev = `git rev-parse --short=8 HEAD`.chomp
 BASE_DIR = "#{DEV_DIR}/rev-#{rev}"
 FileUtils.mkdir_p(BASE_DIR)
 
-require "#{__dir__}/helpers" # Expects BASE_DIR & BUILD_TYPE to exist.
+require "#{__dir__}/ops-common" # Expects BASE_DIR & BUILD_TYPE to exist.
 
 # TODO add these back once fixed
 # missing_block_recovery

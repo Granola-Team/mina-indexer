@@ -10,7 +10,7 @@ VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 BASE_DIR = "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
 
 require "fileutils"
-require "#{__dir__}/helpers" # Expects BASE_DIR to be defined
+require "#{__dir__}/ops-common" # Expects BASE_DIR to be defined
 
 abort "Error: #{BASE_DIR} must exist to perform the deployment." unless File.exist?(BASE_DIR)
 
