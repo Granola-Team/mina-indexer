@@ -1690,8 +1690,11 @@ test_block_children() {
     assert '3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45' $(echo "$children" | jq -r .[3].state_hash)
 }
 
-test_load() {
+test_load_v1() {
     test_hurl_v1 true
+}
+
+test_load_v2() {
     test_hurl_v2 true
 }
 
@@ -1745,7 +1748,11 @@ test_hurl_v1() {
             # If HURL_TEST is set, only run the matching test
             if [[ -z "${HURL_TEST:-}" || "$test_name" == "$HURL_TEST" ]]; then
                 echo "Running test file: $test_file with URL: $url"
-                hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+                if [[ -z "${HURL_VERBOSE:-}" ]]; then
+                    hurl --variable url=$url --test $parallel_flag "$test_file"
+                else
+                    hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+                fi
             fi
         done
     done
@@ -1802,7 +1809,11 @@ test_hurl_v2() {
             # If HURL_TEST is set, only run the matching test
             if [[ -z "${HURL_TEST:-}" || "$test_name" == "$HURL_TEST" ]]; then
                 echo "Running test file: $test_file with URL: $url"
-                hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+                if [[ -z "${HURL_VERBOSE:-}" ]]; then
+                    hurl --variable url=$url --test $parallel_flag "$test_file"
+                else
+                    hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
+                fi
             fi
         done
     done
@@ -2051,7 +2062,8 @@ for test_name in "$@"; do
         "test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
         # Tier 2 tests:
         "test_best_chain_many_blocks") test_best_chain_many_blocks ;;
-        "test_load") test_load ;;
+        "test_load_v1") test_load_v1 ;;
+        "test_load_v2") test_load_v2 ;;
         *) echo "Unknown test: $test_name"
            exit 1
            ;;

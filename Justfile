@@ -263,7 +263,8 @@ tier1: tier1-prereqs lint test-unit-tier1
 # Run tier 2 nix (release) load test
 tier2-load-test:
   @echo "--- Performing a simple load test with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}} load
+  time {{REGRESSION_TEST}} {{PROD_MODE}} load_v1 \
+  && {{REGRESSION_TEST}} {{PROD_MODE}} load_v2
 
 # Run tier 2 nix (release) best_chain_many_blocks test
 tier2-best-chain-many-blocks-test:
@@ -278,7 +279,8 @@ tier2-regression-tests:
 # Run tier 2 dev (debug) load test
 tier2-load-test-dev:
   @echo "--- Performing a simple load test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load
+  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load_v1 \
+  && {{REGRESSION_TEST}} {{DEBUG_MODE}} load_v2
 
 # Run tier 2 dev (debug) best_chain_many_blocks test
 tier2-best-chain-many-blocks-test-dev:
