@@ -216,7 +216,7 @@ test-unit-tier1:
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
   @echo "--- Invoking 'cargo nextest'"
-  cd rust && time cargo nextest run --run-ignored all
+  cd rust && time cargo nextest run
 
 # Lint & run debug tier 1 unit test(s)
 test-unit-tier1-dev test='': lint
@@ -236,7 +236,7 @@ test-unit-tier2:
 # Run all unit debug tests
 test-unit-dev:
   @echo "--- Performing all indexer unit tests"
-  cd rust && time cargo nextest run --features tier2 --run-ignored all
+  cd rust && time cargo nextest run --features tier2
 
 #
 # Tier 1 tests
