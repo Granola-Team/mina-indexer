@@ -19,7 +19,7 @@ require "#{__dir__}/ops-common" # Requires BASE_DIR & BUILD_TYPE
 
 def clean_dev(type)
   if type == "dev"
-    idxr_cleanup(ARGV[2])
+    idxr_cleanup(ARGV[2], ARGV.last)
     exit 0
   end
 end
