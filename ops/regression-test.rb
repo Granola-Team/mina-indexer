@@ -62,6 +62,7 @@ test_names = %w[
   internal_commands_csv
   version_file
   hurl_v1
+  hurl_v2
 ]
 
 puts "Regression testing..."

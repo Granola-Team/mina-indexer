@@ -1691,6 +1691,7 @@ test_block_children() {
 
 test_load() {
     test_hurl_v1 true
+    test_hurl_v2 true
 }
 
 # Test v1 GQL functionality
@@ -1748,6 +1749,59 @@ test_hurl_v1() {
         done
     done
 }
+
+# Test v2 GQL functionality
+test_hurl_v2() {
+    stage_hardfork_blocks 359617 ./blocks
+
+    port=$(ephemeral_port)
+    idxr database create \
+        --blocks-dir ./blocks \
+        --database-dir ./database \
+        --genesis-hash $HARDFORK_GENESIS_STATE_HASH
+    idxr_server start \
+        --web-port "$port" \
+        --web-hostname "0.0.0.0" \
+        --database-dir ./database \
+        --genesis-hash $HARDFORK_GENESIS_STATE_HASH
+    wait_for_socket
+    sleep 10
+
+    local parallel_flag=""
+    if [[ "${1:-}" == "true" ]]; then
+        parallel_flag="--parallel"
+    fi
+
+    extract_endpoint() {
+        file="$1"
+        basename "$file" | cut -d'.' -f1
+    }
+
+    # Function to extract the base filename without extension
+    extract_test_name() {
+        file="$1"
+        basename "$file" | cut -d'.' -f1
+    }
+
+    # Create an array of v2 test files and their corresponding URLs
+    test_file_url_pairs=(
+        "$SRC/tests/hurl/v2/*.hurl" "http://localhost:$port/graphql"
+        "$SRC/tests/hurl/v2/rest/summary.hurl" "http://localhost:$port/summary"
+    )
+
+    # Loop through the array in pairs (file path and URL)
+    for ((i=0; i<${#test_file_url_pairs[@]}; i+=2)); do
+        test_files=${test_file_url_pairs[i]}
+        url=${test_file_url_pairs[i+1]}
+
+        # Run each file
+        for test_file in $test_files; do
+            test_name=$(extract_test_name "$test_file")
+
+            # If HURL_TEST is set, only run the matching test
+            if [[ -z "${HURL_TEST:-}" || "$test_name" == "$HURL_TEST" ]]; then
+                echo "Running test file: $test_file with URL: $url"
+                hurl --very-verbose --variable url=$url --test $parallel_flag "$test_file"
             fi
         done
     done
@@ -1989,6 +2043,7 @@ for test_name in "$@"; do
         "test_internal_commands") test_internal_commands ;;
         "test_internal_commands_csv") test_internal_commands_csv ;;
         "test_hurl_v1") test_hurl_v1 ;;
+        "test_hurl_v2") test_hurl_v2 ;;
         "test_clean_shutdown") test_clean_shutdown ;;
         "test_clean_kill") test_clean_kill ;;
         "test_version_file") test_version_file ;;
