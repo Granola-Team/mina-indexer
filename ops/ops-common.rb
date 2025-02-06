@@ -126,8 +126,7 @@ def idxr_cleanup(which)
 end
 
 def idxr_shutdown
-  mina_indexer = "mina-indexer-#{rev}"
-  puts "Shutting down #{mina_indexer}"
+  puts "Shutting down mina-indexer-#{File.basename(BASE_DIR)}"
   idxr_shutdown_via_socket(EXE, "#{BASE_DIR}/mina-indexer.sock")
 end
 

@@ -333,8 +333,8 @@ deploy-local-prod-dev blocks='5000' web_port='': debug-build
   @echo "--- Deploying dev prod indexer"
   time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
 
-# Shutdown a running local prod indexer.
-shutdown rev=GIT_COMMIT_HASH:
-  @echo "Shutting down prod indexer"
-  {{UTILS}} prod shutdown {{rev}}
-  @echo "Successfully shutdown. You may also want to do 'just clean-prod'"
+# Shutdown a running local test/dev/prod indexer.
+shutdown which='dev':
+  @echo "Shutting down {{which}} indexer"
+  {{UTILS}} {{which}} shutdown
+  @echo "Successfully shutdown. You may also want to do 'just clean-{{which}}'"

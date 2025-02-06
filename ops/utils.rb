@@ -81,7 +81,7 @@ end
 
 # Check if we're shutting down a running indexer
 #
-if ARGV.length == 3 && ARGV[-2] == "shutdown"
-  idxr_shutdown(ARGV.last)
+if ARGV.length == 2 && ARGV.last == "shutdown"
+  idxr_shutdown
   exit 0
 end
