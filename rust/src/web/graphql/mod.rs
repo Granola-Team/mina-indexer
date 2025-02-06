@@ -140,7 +140,7 @@ pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &StateHash) -> Preco
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 #[graphql(name = "PublicKey")]
-pub(crate) struct PK {
+pub struct PK {
     pub public_key: String,
 }
 

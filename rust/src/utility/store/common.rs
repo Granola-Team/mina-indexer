@@ -104,13 +104,13 @@ pub fn pk_index_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + U32_LEN
     key
 }
 
-/// Extracts state hash suffix from the iterator key.
+/// Extracts [StateHash] suffix from the iterator key.
 /// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
 pub fn state_hash_suffix(key: &[u8]) -> anyhow::Result<StateHash> {
     StateHash::from_bytes(&key[key.len() - StateHash::LEN..])
 }
 
-/// Extracts u32 BE prefix from the iterator key.
+/// Extracts [u32] BE prefix from the iterator key.
 /// Used with [blocks_height_iterator] & [blocks_global_slot_iterator]
 pub fn block_u32_prefix_from_key(key: &[u8]) -> anyhow::Result<u32> {
     u32_from_be_bytes(&key[..U32_LEN])

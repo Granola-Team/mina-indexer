@@ -1,9 +1,11 @@
+//! REST `blocks` endpoint
+
 use crate::{
     base::state_hash::StateHash,
     block::store::BlockStore,
     store::IndexerStore,
     web::graphql::{
-        blocks::{get_counts, Block},
+        blocks::{block::Block, get_counts},
         get_block,
     },
 };

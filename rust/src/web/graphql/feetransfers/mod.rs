@@ -1,5 +1,5 @@
 use super::{
-    blocks::{Block, BlockWithoutCanonicity},
+    blocks::block::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,
     get_block, get_block_canonicity,
 };
