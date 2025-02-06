@@ -110,15 +110,22 @@ end
 
 # Deploy
 
-def idxr_cleanup(which, rev)
+def idxr_cleanup(which)
   if which == "one"
+    puts "Removing #{BASE_DIR}"
     FileUtils.rm_rf(BASE_DIR)
   elsif which == "all"
-    FileUtils.rm_rf(Dir.glob("#{DEPLOY_DIR}/*"))
+    Dir.glob("#{DEPLOY_DIR}/*").each do |path|
+      # remove everything except blocks dirs & blocks.list
+      if /blocks.*/.match(File.basename(path)).nil?
+        puts "Removing #{path}"
+        FileUtils.rm_rf(path)
+      end
+    end
   end
 end
 
-def idxr_shutdown(rev)
+def idxr_shutdown
   mina_indexer = "mina-indexer-#{rev}"
   puts "Shutting down #{mina_indexer}"
   idxr_shutdown_via_socket(EXE, "#{BASE_DIR}/mina-indexer.sock")

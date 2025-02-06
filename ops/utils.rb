@@ -19,21 +19,21 @@ require "#{__dir__}/ops-common" # Requires BASE_DIR & BUILD_TYPE
 
 def clean_dev(type)
   if type == "dev"
-    idxr_cleanup(ARGV[2], ARGV.last)
+    idxr_cleanup(ARGV.last)
     exit 0
   end
 end
 
 def clean_prod(type)
   if type == "prod"
-    idxr_cleanup(ARGV[-2], ARGV.last)
+    idxr_cleanup(ARGV.last)
     exit 0
   end
 end
 
 def clean_test(type)
   if type == "test"
-    idxr_cleanup("one", ARGV.last)
+    idxr_cleanup("one")
     exit 0
   end
 end
