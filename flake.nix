@@ -93,6 +93,7 @@
           shellcheck
           shfmt
           mdformat
+          samply # rust profiling
         ]
         ++ buildDependencies;
 
