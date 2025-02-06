@@ -164,6 +164,7 @@ idxr_server_start_standard_v2() {
         --blocks-dir ./blocks \
         --staking-ledgers-dir ./staking-ledgers \
         --database-dir ./database \
+        --genesis-hash $HARDFORK_GENESIS_STATE_HASH \
         "$@"
 }
 
