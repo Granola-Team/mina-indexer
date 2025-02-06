@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct AppState(pub String);
 
-// conversions
+/////////////////
+// conversions //
+/////////////////
 
 impl<T> From<T> for AppState
 where
@@ -21,10 +23,22 @@ where
     }
 }
 
-// default
+/////////////
+// default //
+/////////////
 
 impl std::default::Default for AppState {
     fn default() -> Self {
         Self("0x0000000000000000000000000000000000000000000000000000000000000000".to_string())
+    }
+}
+
+/////////////
+// display //
+/////////////
+
+impl std::fmt::Display for AppState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

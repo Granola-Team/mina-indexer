@@ -1,8 +1,11 @@
+mod zkapp;
+
 use super::db;
 use crate::{
     base::public_key::PublicKey,
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
+    constants::MINA_TOKEN_ADDRESS,
     ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::username::UsernameStore,
@@ -10,6 +13,7 @@ use crate::{
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::IteratorMode;
+use zkapp::ZkappAccount;
 
 #[derive(InputObject)]
 pub struct AccountQueryInput {
@@ -36,15 +40,6 @@ pub struct AccountQueryInput {
     balance_ne: Option<u64>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum AccountSortByInput {
-    BalanceAsc,
-    BalanceDesc,
-}
-
-#[derive(Default)]
-pub struct AccountQueryRoot;
-
 #[derive(SimpleObject)]
 pub struct Account {
     public_key: String,
@@ -54,6 +49,8 @@ pub struct Account {
     nonce: u32,
     time_locked: bool,
     timing: Option<Timing>,
+    token: String,
+    zkapp: Option<ZkappAccount>,
 
     #[graphql(name = "is_genesis_account")]
     is_genesis_account: bool,
@@ -82,6 +79,15 @@ pub struct Account {
     #[graphql(name = "pk_total_num_internal_commands")]
     pk_total_num_internal_commands: u32,
 }
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum AccountSortByInput {
+    BalanceAsc,
+    BalanceDesc,
+}
+
+#[derive(Default)]
+pub struct AccountQueryRoot;
 
 #[Object]
 impl AccountQueryRoot {
@@ -325,8 +331,13 @@ impl
             nonce: account.0.nonce.map_or(0, |n| n.0),
             balance: account.0.balance.0,
             time_locked: account.0.timing.is_some(),
-            timing: account.0.timing.map(|t| t.into()),
+            timing: account.0.timing.map(Into::into),
             is_genesis_account: account.0.genesis_account,
+            token: account
+                .0
+                .token
+                .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
+            zkapp: account.0.zkapp.map(Into::into),
             pk_epoch_num_blocks: account.1,
             pk_total_num_blocks: account.2,
             pk_epoch_num_snarks: account.3,
