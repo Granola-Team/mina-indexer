@@ -148,19 +148,19 @@ show-pids:
   {{UTILS}} pids show
 
 # Show the mina-indexer-dev directory
-show-dev rev=GIT_COMMIT_HASH:
+show-dev which='one':
   @echo "Showing dev directory"
-  {{UTILS}} dev show {{rev}}
+  {{UTILS}} dev show {{which}}
 
 # Show prod directories
-show-prod rev=GIT_COMMIT_HASH:
+show-prod:
   @echo "Showing prod directory"
-  {{UTILS}} prod show {{rev}}
+  {{UTILS}} prod show
 
 # Show test directories
-show-test rev=GIT_COMMIT_HASH:
+show-test:
   @echo "Showing test directory"
-  {{UTILS}} test show {{rev}}
+  {{UTILS}} test show
 
 #
 # Clean

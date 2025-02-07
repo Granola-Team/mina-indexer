@@ -50,10 +50,13 @@ end
 # Show
 #
 
-def show_dev(type)
+def show_dev(type, which)
   if type == "dev"
-    if Dir.exist? DEV_DIR
-      system("ls", "-l", DEV_DIR)
+    if which == "one"
+      system("ls", "-l", BASE_DIR)
+      exit 0
+    elsif which == "all"
+      system("ls", "-l", DEPLOY_DIR)
       exit 0
     end
   end
@@ -70,7 +73,7 @@ end
 
 # show directories
 if ARGV[1] == "show"
-  show_dev(DEPLOY_TYPE)
+  show_dev(DEPLOY_TYPE, ARGV.last)
   show(DEPLOY_TYPE)
   exit 0
 end
