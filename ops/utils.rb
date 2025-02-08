@@ -11,7 +11,7 @@ end
 DEPLOY_TYPE = ARGV[0] # 'dev', 'prod', or 'test'
 BUILD_TYPE = "debug"
 
-require "#{__dir__}/ops-common" # Requires BASE_DIR & BUILD_TYPE
+require "#{__dir__}/ops-common"
 
 #
 # Clean

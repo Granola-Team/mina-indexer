@@ -51,11 +51,7 @@ end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
 def invoke_mina_indexer(*)
-  opts = {
-    out: "#{LOGS_DIR}/out",
-    err: "#{LOGS_DIR}/err"
-  }
-  system({"RUST_BACKTRACE" => "full"}, EXE, *, opts)
+  system({"RUST_BACKTRACE" => "full"}, EXE, *)
 end
 
 def config_exe_dir
