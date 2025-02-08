@@ -139,7 +139,7 @@ if DEPLOY_TYPE == "test"
     " --web-port #{PORT}" \
     " --database-dir #{db_dir(BLOCKS_COUNT)}" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  pid = spawn({'RUST_BACKTRACE' => 'full'}, command_line)
+  pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
   wait_for_socket(10)
   puts "Server restarted."
 
@@ -225,7 +225,7 @@ if DEPLOY_TYPE == "test"
     success = false
   end
   Process.wait(pid)
-  puts 'Shutdown complete.'
+  puts "Shutdown complete."
   File.delete(CURRENT)
 
   # Delete the snapshot and the database directory restored to.
@@ -270,7 +270,7 @@ else
       " --database-dir #{db_dir(BLOCKS_COUNT)}" \
       " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
     puts "Command line: #{command_line}"
-    pid = spawn({'RUST_BACKTRACE' => 'full'}, command_line)
+    pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
     Process.detach pid
     puts "Mina Indexer daemon dispatched with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
   end

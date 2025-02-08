@@ -1,12 +1,12 @@
 require "fileutils"
 require "json"
 
-BUILD_TYPE ||= "dev"
-DEPLOY_TYPE ||= "test"
-REV ||= `git rev-parse --short=8 HEAD`.strip
+BUILD_TYPE ||= "dev" # standard:disable Lint/OrAssignmentToConstant
+DEPLOY_TYPE ||= "test" # standard:disable Lint/OrAssignmentToConstant
+REV ||= `git rev-parse --short=8 HEAD`.strip # standard:disable Lint/OrAssignmentToConstant
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-DEPLOY_DIR ||= "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}"
-BASE_DIR ||= "#{DEPLOY_DIR}/#{REV}"
+DEPLOY_DIR ||= "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}" # standard:disable Lint/OrAssignmentToConstant
+BASE_DIR ||= "#{DEPLOY_DIR}/#{REV}" # standard:disable Lint/OrAssignmentToConstant
 
 puts "Using base directory: #{BASE_DIR}"
 FileUtils.mkdir_p(BASE_DIR)
@@ -50,8 +50,8 @@ else
 end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
-def invoke_mina_indexer(*args)
-  system({'RUST_BACKTRACE' => 'full'}, EXE, *args)
+def invoke_mina_indexer(*)
+  system({"RUST_BACKTRACE" => "full"}, EXE, *)
 end
 
 def config_exe_dir

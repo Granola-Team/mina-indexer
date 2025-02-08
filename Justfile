@@ -79,8 +79,7 @@ audit:
 lint:
   @echo "--- Linting ops scripts"
   ruby -cw ops/*.rb
-  # TODO: find another package for Ruby linting
-  # standardrb --no-fix ops/*.rb
+  standardrb --no-fix ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Nix configs"
   alejandra --check flake.nix ops/mina/mina_txn_hasher.nix

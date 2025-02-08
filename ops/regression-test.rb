@@ -3,7 +3,7 @@
 # -*- mode: ruby -*-
 
 BUILD_TYPE = ARGV.shift
-DEPLOY_TYPE = 'dev'
+DEPLOY_TYPE = "dev"
 
 require "#{__dir__}/ops-common"
 

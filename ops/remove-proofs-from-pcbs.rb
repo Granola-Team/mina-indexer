@@ -21,10 +21,10 @@ end
 def process_file(path)
   json_data = JSON.parse(File.read(path))
 
-    # Remove all occurrences of "proofs"
+  # Remove all occurrences of "proofs"
   remove_proofs(json_data)
 
-    # Overwrite the original file with compact JSON (single line)
+  # Overwrite the original file with compact JSON (single line)
   File.write(path, JSON.generate(json_data))
 
   puts "Successfully removed 'proofs' from #{path}"
@@ -39,7 +39,7 @@ def process_directory(directory)
   thread_queue = Queue.new
   threads = Array.new(Etc.nprocessors * 4) do
     Thread.new do
-      while path = thread_queue.pop
+      while (path = thread_queue.pop)
         process_file(path)
       end
     end
@@ -47,7 +47,7 @@ def process_directory(directory)
 
   # Feed files to queue as we find them
   Find.find(directory) do |path|
-    thread_queue << path if path.end_with?('.json')
+    thread_queue << path if path.end_with?(".json")
   end
 
   # Signal threads to finish

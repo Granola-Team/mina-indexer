@@ -87,7 +87,7 @@
           openssh # Needed by 'git' but not declared.
           rclone
           ruby
-          # rubyPackages.standard
+          rubyPackages.standard
           rubyPackages.rspec
           rust
           shellcheck
