@@ -1,7 +1,7 @@
 require "fileutils"
 require "json"
 
-BUILD_TYPE ||= "dev" # standard:disable Lint/OrAssignmentToConstant
+BUILD_TYPE ||= "nix" # standard:disable Lint/OrAssignmentToConstant
 DEPLOY_TYPE ||= "test" # standard:disable Lint/OrAssignmentToConstant
 REV ||= `git rev-parse --short=8 HEAD`.strip # standard:disable Lint/OrAssignmentToConstant
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"

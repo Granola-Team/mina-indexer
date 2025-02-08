@@ -23,82 +23,17 @@ config_log_dir
 get_blocks BLOCKS_COUNT
 fetch_ledgers
 
-# Create the database, if needed.
-#
-unless File.exist?(db_dir(BLOCKS_COUNT))
-  puts "Creating database..."
-
-  # deploy-local-prod-dev
-  if BUILD_TYPE == "debug"
-    puts "Ingest staking ledgers? (y/n)"
-    ingest_staking_ledgers = $stdin.gets[0].downcase
-    until ["n", "y"].include? ingest_staking_ledgers
-      warn("Invalid response")
-      puts "Ingest staking ledgers? (y/n)"
-      ingest_staking_ledgers = $stdin.gets[0].downcase
-    end
-
-    puts "Ingest orphan blocks? (y/n)"
-    ingest_orphan_blocks = $stdin.gets[0].downcase
-    until ["n", "y"].include? ingest_orphan_blocks
-      warn("Invalid response")
-      puts "Ingest staking ledgers? (y/n)"
-      ingest_orphan_blocks = $stdin.gets[0].downcase
-    end
-
-    ingest_staking_ledgers = ingest_staking_ledgers == "y"
-    ingest_orphan_blocks = ingest_orphan_blocks == "y"
-
-    if !ingest_staking_ledgers && !ingest_orphan_blocks
-      invoke_mina_indexer(
-        "database", "create",
-        "--log-level", "DEBUG",
-        "--ledger-cadence", "5000",
-        "--database-dir", db_dir(BLOCKS_COUNT),
-        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-        "--do-not-ingest-orphan-blocks"
-      )
-    elsif !ingest_staking_ledgers && ingest_orphan_blocks
-      invoke_mina_indexer(
-        "database", "create",
-        "--log-level", "DEBUG",
-        "--ledger-cadence", "5000",
-        "--database-dir", db_dir(BLOCKS_COUNT),
-        "--blocks-dir", blocks_dir(BLOCKS_COUNT)
-      )
-    elsif ingest_staking_ledgers && !ingest_orphan_blocks
-      invoke_mina_indexer(
-        "database", "create",
-        "--log-level", "DEBUG",
-        "--ledger-cadence", "5000",
-        "--database-dir", db_dir(BLOCKS_COUNT),
-        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-        "--staking-ledgers-dir", LEDGERS_DIR,
-        "--do-not-ingest-orphan-blocks"
-      )
-    else
-      invoke_mina_indexer(
-        "database", "create",
-        "--log-level", "DEBUG",
-        "--ledger-cadence", "5000",
-        "--database-dir", db_dir(BLOCKS_COUNT),
-        "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-        "--staking-ledgers-dir", LEDGERS_DIR
-      )
-    end
-  else
-    # deploy-local-prod
-    invoke_mina_indexer(
-      "database", "create",
-      "--log-level", "DEBUG",
-      "--ledger-cadence", "5000",
-      "--database-dir", db_dir(BLOCKS_COUNT),
-      "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-      "--staking-ledgers-dir", LEDGERS_DIR
-    )
-  end || abort("database creation failed")
-  puts "Database creation succeeded."
-end
+puts "Creating database..."
+invoke_mina_indexer(
+  "database", "create",
+  "--log-level", "DEBUG",
+  "--ledger-cadence", "5000",
+  "--database-dir", db_dir(BLOCKS_COUNT),
+  "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+  "--staking-ledgers-dir", LEDGERS_DIR,  # Comment out this line to skip staking ledger ingestion.
+  "--do-not-ingest-orphan-blocks"        # Comment out this line to ingest orphan blocks.
+) || abort("database creation failed")
+puts "Database creation succeeded."
 
 # Terminate the current version, if any.
 #
