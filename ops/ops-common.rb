@@ -22,7 +22,7 @@ end
 
 # Logs
 
-LOGS_DIR = "#{BASE_DIR}/logs/"
+LOGS_DIR = "#{BASE_DIR}/logs"
 
 def config_log_dir
   FileUtils.mkdir_p(LOGS_DIR)
