@@ -1,3 +1,5 @@
+//! Mina ledger representation
+
 pub mod account;
 pub mod coinbase;
 pub mod diff;
@@ -388,15 +390,9 @@ impl TokenLedger {
     }
 }
 
-impl std::fmt::Display for TokenLedger {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut accounts = HashMap::new();
-        for (pk, acct) in self.accounts.iter() {
-            accounts.insert(pk.to_address(), acct.clone().display());
-        }
-        write!(f, "{}", serde_json::to_string(&accounts).unwrap())
-    }
-}
+/////////////////
+// conversions //
+/////////////////
 
 impl FromStr for TokenLedger {
     type Err = anyhow::Error;
@@ -452,6 +448,20 @@ impl PartialEq for TokenLedger {
 
 impl Eq for TokenLedger {}
 
+///////////////////
+// debug/display //
+///////////////////
+
+impl std::fmt::Display for TokenLedger {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut accounts = HashMap::new();
+        for (pk, acct) in self.accounts.iter() {
+            accounts.insert(pk.to_address(), acct.clone().display());
+        }
+        write!(f, "{}", serde_json::to_string(&accounts).unwrap())
+    }
+}
+
 impl std::fmt::Debug for TokenLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (pk, acct) in &self.accounts {
@@ -470,14 +480,38 @@ mod tests {
             account::{AccountDiff, DelegationDiff, PaymentDiff, UpdateType},
             LedgerDiff,
         },
-        Amount, LedgerHash,
+        genesis::GenesisLedger,
+        Amount, Ledger, LedgerHash,
     };
     use crate::{
         base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
         constants::MINA_SCALE,
         ledger::{token::TokenAddress, TokenLedger},
+        utility::functions::nanomina_to_mina,
     };
     use std::collections::{BTreeMap, HashMap};
+
+    #[test]
+    fn ledger_balance_display() -> anyhow::Result<()> {
+        let ledger: Ledger = GenesisLedger::new_v1()?.into();
+        let ledger = ledger.get_token_ledger(&TokenAddress::default()).unwrap();
+
+        // make the serialized ledger
+        let mut ser_ledger = HashMap::new();
+        for (pk, account) in ledger.accounts.iter() {
+            ser_ledger.insert(pk.to_address(), account.clone().display());
+        }
+
+        // check balance serialization
+        for (_, account) in ser_ledger.iter() {
+            let expect = format!("{:?}", nanomina_to_mina(account.balance.0));
+
+            assert!(expect.chars().filter(|c| *c == '.').count() <= 1);
+            assert_eq!(expect, serde_json::to_string(&account.balance)?);
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn default_ledger_hash_is_valid_public_key() {

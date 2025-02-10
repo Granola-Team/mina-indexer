@@ -78,7 +78,7 @@ impl AddAssign<Amount> for Amount {
 
 impl From<u64> for Amount {
     fn from(value: u64) -> Self {
-        Amount(value)
+        Self(value)
     }
 }
 
