@@ -58,10 +58,9 @@ pub fn pk_txn_sort_key_prefix(public_key: &PublicKey, sort: u32) -> [u8; PublicK
 
 /// Drop [PublicKey::LEN] + [U32_LEN] bytes & parse the next [U32_LEN] bytes
 pub fn pk_txn_sort_key_nonce(key: &[u8]) -> Nonce {
-    Nonce(
-        u32_from_be_bytes(&key[PublicKey::LEN..][U32_LEN..][..U32_LEN])
-            .expect("u32 nonce BE bytes"),
-    )
+    u32_from_be_bytes(&key[PublicKey::LEN..][U32_LEN..][..U32_LEN])
+        .expect("u32 nonce BE bytes")
+        .into()
 }
 
 /// Drop [PublicKey::LEN] + [U32_LEN] + [U32_LEN] bytes & parse the next
@@ -97,14 +96,14 @@ pub fn user_commands_iterator_u32_prefix(key: &[u8]) -> u32 {
 }
 
 /// Transaction hash from `key`
-/// - discard 4 bytes, keep [TxnHash::V1_LEN] bytes
+/// - discard [U32_LEN] bytes, keep [TxnHash::V1_LEN] bytes
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<TxnHash> {
     TxnHash::from_bytes(key[U32_LEN..][..TxnHash::V1_LEN].to_vec())
 }
 
 /// State hash from `key`
-/// - discard the first 4 + [TxnHash::V1_LEN] bytes
+/// - discard the first [U32_LEN] + [TxnHash::V1_LEN] bytes
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<StateHash> {
     StateHash::from_bytes(&key[U32_LEN..][TxnHash::V1_LEN..])

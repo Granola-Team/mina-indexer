@@ -710,7 +710,7 @@ impl TransactionWithoutBlock {
                 public_key: receiver.first().expect("receiver").0.to_owned(),
             },
             to: receiver.first().expect("receiver").0.to_owned(),
-            token: cmd.command.fee_token(),
+            token: cmd.command.fee_token().map(|t| t.0),
             epoch_num_user_commands,
             total_num_user_commands,
         }

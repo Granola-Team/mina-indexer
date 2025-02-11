@@ -1,3 +1,5 @@
+//! User command store helpers
+
 pub mod block;
 pub mod command;
 pub mod common;

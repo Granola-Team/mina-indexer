@@ -5,9 +5,9 @@ use crate::{
 use anyhow::bail;
 use std::mem::size_of;
 
-pub(crate) const U32_LEN: usize = size_of::<u32>();
-pub(crate) const U64_LEN: usize = size_of::<u64>();
-pub(crate) const I64_LEN: usize = size_of::<i64>();
+pub const U32_LEN: usize = size_of::<u32>();
+pub const U64_LEN: usize = size_of::<u64>();
+pub const I64_LEN: usize = size_of::<i64>();
 
 pub fn u32_from_be_bytes(u32_be_bytes: &[u8]) -> anyhow::Result<u32> {
     if u32_be_bytes.len() != U32_LEN {

@@ -102,10 +102,9 @@ pub enum UserCommand1 {
 }
 
 /// v2 post-hardfork
-#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum UserCommand2 {
-    SignedCommand(SignedCommandV2),
+    SignedCommand(Box<SignedCommandV2>),
     ZkappCommand(ZkappCommandV1),
 }
 
