@@ -242,7 +242,7 @@ test-unit-dev:
 #
 
 # Run the 1st tier of tests.
-tier1: tier1-prereqs lint test-unit-tier1
+tier1: tier1-prereqs lint test-unit-tier1 && clean-dev
   @echo "--- Performing tier 1 regression tests"
   time {{REGRESSION_TEST}} {{DEBUG_MODE}} \
     ipc_is_available_immediately \
@@ -296,7 +296,7 @@ tier2: tier2-prereqs nix-build \
   tier2-load-test \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests \
-  && build-image
+  && build-image clean-dev clean-test
 
 # Run tier 2 tests with debug build.
 tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
