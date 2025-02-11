@@ -438,13 +438,13 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
-                decode_memo(&v1.t.t.payload.t.t.common.t.t.t.memo.t.0)
+                decode_memo(&v1.t.t.payload.t.t.common.t.t.t.memo.t.0, true)
             }
             Self::V2(v2) => match &v2.data.1 {
                 UserCommandData::SignedCommandData(data) => {
-                    decode_memo(data.payload.common.memo.as_bytes())
+                    decode_memo(data.payload.common.memo.as_bytes(), false)
                 }
-                UserCommandData::ZkappCommandData(data) => decode_memo(data.memo.as_bytes()),
+                UserCommandData::ZkappCommandData(data) => decode_memo(data.memo.as_bytes(), false),
             },
         }
     }
@@ -469,13 +469,21 @@ pub const MEMO_LEN: usize = 32;
 
 /// Decode memo
 ///
-/// 0th byte - tag to distinguish digests from other data
-/// 1st byte - is length, always 32 for digests
-/// bytes 2 to 33 - are data, 0-right-padded if length is less than 32
-
-pub fn decode_memo(encoded: &[u8]) -> String {
-    let value = &encoded[2..(encoded[1] as usize + 2).min(encoded.len())];
-    String::from_utf8(value.to_vec()).unwrap_or_default()
+/// - v1
+///   - 0th byte - tag to distinguish digests from other data
+///   - 1st byte - is length, always 32 for digests
+///   - bytes 2..33 - are data, 0-right-padded if length is less than 32
+/// - v2 - simple base58 decode
+pub fn decode_memo(encoded: &[u8], v1: bool) -> String {
+    if v1 {
+        let value = &encoded[2..encoded[1] as usize + 2];
+        String::from_utf8(value.to_vec()).unwrap_or_default()
+    } else {
+        let decoded = bs58::decode(encoded)
+            .into_vec()
+            .expect("base58 decode memo");
+        String::from_utf8(decoded).unwrap_or_default()
+    }
 }
 
 impl From<String> for mina_rs::SignedCommandMemo {
@@ -1078,15 +1086,28 @@ mod test {
     use std::path::PathBuf;
 
     #[test]
-    fn decode_memo_test() {
+    fn decode_memo_v1() {
         let expected = "MIP4".to_string();
+
         // encoded memo for: MIP4
         let bytes: Vec<u8> = vec![
             1, 4, 77, 73, 80, 52, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 177, 160, 56, 149,
         ];
-        let actual = decode_memo(&bytes);
-        assert_eq!(&expected, &actual);
+        let actual = decode_memo(&bytes, true);
+
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn decode_memo_v2() {
+        let expected = "".to_string();
+
+        // encoded memo
+        let bytes = "E4Z6SU8DEmNRnD5vn9WFTVx8fjUtQAKxX8XFZaDg9prFcG8FZs1EG".as_bytes();
+        let actual = decode_memo(bytes, false);
+
+        assert_eq!(expected, actual);
     }
 
     #[tokio::test]

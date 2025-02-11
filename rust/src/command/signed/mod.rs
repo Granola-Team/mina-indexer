@@ -121,13 +121,15 @@ impl SignedCommand {
 
     /// Decoded memo
     pub fn memo(&self) -> String {
-        decode_memo(match self {
-            Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.memo.t.0.as_slice(),
+        match self {
+            Self::V1(v1) => decode_memo(v1.t.t.payload.t.t.common.t.t.t.memo.t.0.as_slice(), true),
             Self::V2(v2) => match &v2 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.memo.as_bytes(),
-                UserCommandData::ZkappCommandData(data) => data.memo.as_bytes(),
+                UserCommandData::SignedCommandData(data) => {
+                    decode_memo(data.payload.common.memo.as_bytes(), false)
+                }
+                UserCommandData::ZkappCommandData(data) => decode_memo(data.memo.as_bytes(), false),
             },
-        })
+        }
     }
 
     /// Fee token id
@@ -697,7 +699,7 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
         "valid_until".into(),
         Value::Number(Number::from(valid_until.t.t as u32)),
     );
-    common.insert("memo".into(), Value::String(decode_memo(&memo.t.0)));
+    common.insert("memo".into(), Value::String(decode_memo(&memo.t.0, true)));
 
     use mina_rs::SignedCommandPayloadBody1::*;
     let body = match &payload.t.t.body.t.t {
@@ -776,7 +778,10 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
     );
     common.insert("nonce".into(), Value::Number(nonce.0.into()));
     common.insert("valid_until".into(), Value::Number(valid_until.0.into()));
-    common.insert("memo".into(), Value::String(memo.to_owned()));
+    common.insert(
+        "memo".into(),
+        Value::String(decode_memo(memo.as_bytes(), false)),
+    );
 
     use v2::staged_ledger_diff::{SignedCommandPayloadBody::*, *};
     let body = match &payload.body.1 {
@@ -979,7 +984,7 @@ mod tests {
     "common": {
       "fee": 1100000,
       "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
-      "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH",
+      "memo": "",
       "nonce": 765,
       "valid_until": 4294967295
     }

@@ -482,7 +482,7 @@ mod tests {
     "common": {
       "fee": "0.0011",
       "fee_payer_pk": "B62qpjxUpgdjzwQfd8q2gzxi99wN7SCgmofpvw27MBkfNHfHoY2VH32",
-      "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH",
+      "memo": "",
       "nonce": "765",
       "valid_until": "4294967295"
     }
