@@ -2,6 +2,7 @@ mod txn_hash;
 
 use crate::{
     command::*,
+    ledger::token::TokenId,
     mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
     proof_systems::signer::signature::Signature,
     protocol::{
@@ -12,6 +13,7 @@ use crate::{
         },
     },
 };
+use anyhow::Result;
 use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -58,10 +60,8 @@ impl SignedCommand {
     pub fn fee(&self) -> u64 {
         match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.fee.t.t,
-            Self::V2(v2) => match &v2 {
-                UserCommandData::SignedCommandData(data) => data.payload.common.fee.0,
-                UserCommandData::ZkappCommandData(data) => data.fee_payer.body.fee.0,
-            },
+            Self::V2(UserCommandData::SignedCommandData(data)) => data.payload.common.fee.0,
+            Self::V2(UserCommandData::ZkappCommandData(data)) => data.fee_payer.body.fee.0,
         }
     }
 
@@ -92,14 +92,13 @@ impl SignedCommand {
     }
 
     pub fn nonce(&self) -> Nonce {
-        let nonce = match self {
+        Nonce(match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.nonce.t.t as u32,
             Self::V2(v2) => match &v2 {
                 UserCommandData::SignedCommandData(data) => data.payload.common.nonce.0,
                 UserCommandData::ZkappCommandData(data) => data.fee_payer.body.nonce.0,
             },
-        };
-        Nonce(nonce)
+        })
     }
 
     pub fn valid_until(&self) -> i32 {
@@ -122,19 +121,19 @@ impl SignedCommand {
 
     /// Decoded memo
     pub fn memo(&self) -> String {
-        let encoded = match self {
+        decode_memo(match self {
             Self::V1(v1) => v1.t.t.payload.t.t.common.t.t.t.memo.t.0.as_slice(),
             Self::V2(v2) => match &v2 {
                 UserCommandData::SignedCommandData(data) => data.payload.common.memo.as_bytes(),
                 UserCommandData::ZkappCommandData(data) => data.memo.as_bytes(),
             },
-        };
-        decode_memo(encoded)
+        })
     }
 
-    pub fn fee_token(&self) -> Option<u64> {
+    /// Fee token id
+    pub fn fee_token(&self) -> Option<TokenId> {
         match self {
-            Self::V1(v1) => Some(v1.t.t.payload.t.t.common.t.t.t.fee_token.t.t.t),
+            Self::V1(v1) => Some(v1.t.t.payload.t.t.common.t.t.t.fee_token.t.t.t.into()),
             Self::V2(_v2) => None,
         }
     }
@@ -295,7 +294,7 @@ impl SignedCommand {
     }
 
     /// Returns a user command (transaction) hash
-    pub fn hash_signed_command(&self) -> anyhow::Result<TxnHash> {
+    pub fn hash_signed_command(&self) -> Result<TxnHash> {
         match self {
             Self::V1(v1) => {
                 // convert versioned signed command to bin_prot bytes
@@ -366,6 +365,10 @@ impl SignedCommandWithStateHash {
 }
 
 impl SignedCommandWithData {
+    pub fn is_zkapp_command(&self) -> bool {
+        matches!(self.command.kind(), CommandType::Zkapp)
+    }
+
     pub fn from(
         user_cmd: &UserCommandWithStatus,
         state_hash: &str,
@@ -430,7 +433,7 @@ impl From<mina_rs::UserCommandWithStatus1> for SignedCommand {
 impl From<UserCommandWithStatus> for SignedCommand {
     fn from(value: UserCommandWithStatus) -> Self {
         match value {
-            UserCommandWithStatus::V1(v1) => v1.t.to_owned().into(),
+            UserCommandWithStatus::V1(v1) => v1.t.into(),
             UserCommandWithStatus::V2(v2) => Self::V2(v2.data.1),
         }
     }
@@ -833,7 +836,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn txn_hash_v1() -> anyhow::Result<()> {
+    fn txn_hash_v1() -> Result<()> {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
@@ -851,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn txn_hash_signed_command_v2() -> anyhow::Result<()> {
+    fn txn_hash_signed_command_v2() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block.command_hashes();
@@ -867,7 +870,7 @@ mod tests {
     }
 
     #[test]
-    fn txn_hash_zkapp_command() -> anyhow::Result<()> {
+    fn txn_hash_zkapp_command() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block
@@ -896,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn signed_command_json_v1() -> anyhow::Result<()> {
+    fn signed_command_json_v1() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
         let signed_cmds = precomputed_block
@@ -953,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    fn signed_command_json_v2() -> anyhow::Result<()> {
+    fn signed_command_json_v2() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let signed_cmds = precomputed_block

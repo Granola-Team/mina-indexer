@@ -40,6 +40,12 @@ impl From<TokenAddress> for TokenId {
     }
 }
 
+impl From<u64> for TokenId {
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+
 ///////////
 // serde //
 ///////////
