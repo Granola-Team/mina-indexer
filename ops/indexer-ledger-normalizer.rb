@@ -17,12 +17,11 @@ result = {}
 
 mina_ledger.each_value do |value|
   balance_mina = value["balance"].to_s
-  normalized_balance = balance_mina.sub(/\.?0+$/, "")
   nonce = (value["nonce"] || 0).to_s
   delegate = value["delegate"] || value["public_key"]
   result[value["public_key"]] = {
     "nonce" => nonce,
-    "balance" => normalized_balance,
+    "balance" => balance_mina,
     "delegate" => delegate
   }
 end
