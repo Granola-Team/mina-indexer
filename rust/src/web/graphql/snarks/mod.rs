@@ -1,3 +1,5 @@
+//! GraphQL `snarks` endpoint
+
 use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

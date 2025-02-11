@@ -1,5 +1,12 @@
+//! GraphQL server & helpers
+
+mod date_time;
+mod long;
+
 pub mod accounts;
+pub mod actions;
 pub mod blocks;
+pub mod events;
 pub mod feetransfers;
 pub mod gen;
 pub mod snarks;
@@ -20,9 +27,11 @@ use crate::{
 use actix_web::HttpResponse;
 use anyhow::Context as aContext;
 use async_graphql::{
-    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, InputValueError,
-    InputValueResult, MergedObject, Scalar, ScalarType, Schema, SimpleObject, Value,
+    http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, MergedObject, Schema,
+    SimpleObject,
 };
+use date_time::DateTime;
+use long::Long;
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -58,6 +67,12 @@ pub struct Timing {
     pub vesting_increment: Option<u64>,
 }
 
+#[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
+#[graphql(name = "PublicKey")]
+pub struct PK {
+    pub public_key: String,
+}
+
 /// Build schema for all endpoints
 pub fn build_schema(store: Arc<IndexerStore>) -> Schema<Root, EmptyMutation, EmptySubscription> {
     Schema::build(Root::default(), EmptyMutation, EmptySubscription)
@@ -74,47 +89,6 @@ pub async fn indexer_graphiql() -> actix_web::Result<HttpResponse> {
 pub(crate) fn db<'a>(ctx: &'a Context) -> &'a Arc<IndexerStore> {
     ctx.data::<Arc<IndexerStore>>()
         .expect("Database should be in the context")
-}
-
-#[derive(Debug, Clone)]
-pub struct Long(pub String);
-
-#[Scalar]
-impl ScalarType for Long {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        match value {
-            Value::String(s) => Ok(Long(s)),
-            _ => Err(InputValueError::expected_type(value)),
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct DateTime(pub String);
-
-impl DateTime {
-    pub fn timestamp_millis(&self) -> i64 {
-        let date_time = chrono::DateTime::parse_from_rfc3339(&self.0).expect("RFC3339 date time");
-        date_time.timestamp_millis()
-    }
-}
-
-#[Scalar]
-impl ScalarType for DateTime {
-    fn parse(value: Value) -> InputValueResult<Self> {
-        match value {
-            Value::String(s) => Ok(DateTime(s)),
-            _ => Err(InputValueError::expected_type(value)),
-        }
-    }
-
-    fn to_value(&self) -> Value {
-        Value::String(self.0.to_string())
-    }
 }
 
 /// Convert epoch milliseconds to an ISO 8601 formatted [DateTime] Scalar.
@@ -136,55 +110,4 @@ pub(crate) fn get_block(db: &Arc<IndexerStore>, state_hash: &StateHash) -> Preco
         .unwrap()
         .unwrap()
         .0
-}
-
-#[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
-#[graphql(name = "PublicKey")]
-pub struct PK {
-    pub public_key: String,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::DateTime;
-    use crate::constants::*;
-
-    #[test]
-    fn date_time_millis() {
-        assert_eq!(
-            DateTime("1970-01-01T00:00:00.000Z".into()).timestamp_millis(),
-            0
-        );
-        assert_eq!(
-            DateTime("2021-03-17T00:00:00.000Z".into()).timestamp_millis(),
-            1615939200000
-        );
-        assert_eq!(
-            DateTime("2024-06-02T00:00:00.000Z".into()).timestamp_millis(),
-            1717286400000
-        );
-        assert_eq!(
-            DateTime("2024-06-03T00:00:00.000Z".into()).timestamp_millis(),
-            1717372800000
-        );
-        assert_eq!(
-            DateTime("2024-06-05T00:00:00.000Z".into()).timestamp_millis(),
-            1717545600000
-        );
-    }
-
-    #[test]
-    fn date_time_to_global_slot() {
-        assert_eq!(millis_to_global_slot(MAINNET_GENESIS_TIMESTAMP as i64), 0);
-        assert_eq!(
-            millis_to_global_slot(HARDFORK_GENESIS_TIMESTAMP as i64),
-            564480
-        );
-
-        let dt_millis = DateTime("2024-06-02T00:00:00.000Z".into()).timestamp_millis();
-        assert_eq!(millis_to_global_slot(dt_millis), 563040);
-
-        let dt_millis = DateTime("2024-06-03T00:00:00.000Z".into()).timestamp_millis();
-        assert_eq!(millis_to_global_slot(dt_millis), 563520);
-    }
 }

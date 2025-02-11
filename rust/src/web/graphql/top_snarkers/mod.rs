@@ -1,3 +1,5 @@
+//! GraphQL `topSnarkers` endpoint
+
 use super::db;
 use crate::{
     base::public_key::PublicKey,

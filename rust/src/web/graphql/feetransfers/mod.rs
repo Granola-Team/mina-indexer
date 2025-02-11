@@ -1,3 +1,5 @@
+//! GraphQL `feetransfers` endpoint
+
 use super::{
     blocks::block::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,

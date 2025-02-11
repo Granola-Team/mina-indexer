@@ -1,3 +1,5 @@
+//! GraphQL `accounts` endpoint
+
 mod zkapp;
 
 use super::db;

@@ -1,4 +1,4 @@
-//! GraphQL `transactions` endpoint
+//! GraphQL `transaction` & `transactions` endpoint
 
 use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{

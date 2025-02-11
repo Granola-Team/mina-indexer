@@ -1,3 +1,5 @@
+//! GraphQL `stakes` endpoint
+
 use super::db;
 use crate::{
     block::store::BlockStore,

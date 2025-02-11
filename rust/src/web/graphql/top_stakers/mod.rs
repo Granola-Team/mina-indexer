@@ -1,3 +1,5 @@
+//! GraphQL `topStakers` endpoint
+
 use super::db;
 use crate::{
     base::public_key::PublicKey,

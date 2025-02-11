@@ -1,3 +1,5 @@
+//! GraphQL `stagedLedgerAccounts` endpoint
+
 use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
 use crate::{
     canonicity::store::CanonicityStore,

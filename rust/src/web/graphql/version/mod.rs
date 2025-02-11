@@ -1,3 +1,5 @@
+//! GraphQL `version` endpoint
+
 use super::db;
 use crate::{constants, store::version::VersionStore};
 use async_graphql::{Context, Object};
