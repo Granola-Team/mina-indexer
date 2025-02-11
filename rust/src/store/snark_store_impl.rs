@@ -1081,7 +1081,7 @@ fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + Publi
     start
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tier2"))]
 mod snark_store_impl_tests {
     use super::*;
     use crate::store::IndexerStore;

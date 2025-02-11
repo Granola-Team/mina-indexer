@@ -554,14 +554,13 @@ impl<'a> CsvRecordInternalCommand<'a> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tier2"))]
 mod internal_command_store_impl_tests {
     use super::*;
     use anyhow::Result;
     use std::env;
     use tempfile::TempDir;
 
-    // Utility function to create an in-memory IndexerStore for testing
     fn create_indexer_store() -> Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
         let store = IndexerStore::new(temp_dir.path())?;
