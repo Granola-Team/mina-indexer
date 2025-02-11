@@ -218,6 +218,35 @@ impl ColumnFamilyHelpers for IndexerStore {
     // User command store CFs //
     ////////////////////////////
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {txn_hash}{state_hash}
+    /// - value: [SignedCommandWithData] serde bytes
+    /// where
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (v2 is right-padded)
+    /// - state_hash: [StateHash] bytes
+    fn user_commands_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands")
+            .expect("user-commands column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: [TxnHash] bytes
+    /// - value: [Vec<StateHash>] serde bytes (sorted)
+    fn user_commands_state_hashes_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-state-hashes")
+            .expect("user-commands-state-hashes column family exists")
+    }
+
+    fn user_commands_per_block_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-block")
+            .expect("user-commands-block column family exists")
+    }
+
     fn user_commands_pk_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk")
@@ -228,24 +257,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("user-commands-pk-num")
             .expect("user-commands-pk-num column family exists")
-    }
-
-    fn user_command_state_hashes_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("user-command-state-hashes")
-            .expect("user-command-state-hashes column family exists")
-    }
-
-    fn user_commands_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("user-commands")
-            .expect("user-commands column family exists")
-    }
-
-    fn user_commands_per_block_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("user-commands-block")
-            .expect("user-commands-block column family exists")
     }
 
     fn user_commands_block_order_cf(&self) -> &ColumnFamily {
@@ -377,6 +388,59 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("txn-to-height-sort")
             .expect("txn-to-height-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {txn_hash}{state_hash}
+    /// - value: [SignedCommandWithData] serde bytes
+    /// where
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (v2 is right-padded)
+    /// - state_hash: [StateHash] bytes
+    fn zkapp_user_commands_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-user-commands")
+            .expect("zkapp-user-commands column family exists")
+    }
+
+    fn zkapp_user_commands_pk_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-pk")
+            .expect("user-commands-pk column family exists")
+    }
+
+    fn zkapp_user_commands_pk_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-pk-num")
+            .expect("user-commands-pk-num column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {height}{txn_hash}{state_hash}
+    /// - val: b""
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
+    /// - state_hash: [StateHash] bytes
+    fn zkapp_user_commands_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-user-commands-height-sort")
+            .expect("zkapp-user-commands-height-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {slot}{txn_hash}{state_hash}
+    /// - val: b""
+    /// where
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
+    /// - state_hash: [StateHash] bytes
+    fn zkapp_user_commands_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-user-commands-slot-sort")
+            .expect("zkapp-user-commands-slot-sort column family exists")
     }
 
     /////////////////////

@@ -101,11 +101,11 @@ pub trait ColumnFamilyHelpers {
     // User command store CFs //
     ////////////////////////////
 
-    /// CF for storing user commands by `{txn_hash}{state_hash}`
+    /// CF for storing all user commands
     fn user_commands_cf(&self) -> &ColumnFamily;
 
     /// CF for storing state hashes of containing blocks
-    fn user_command_state_hashes_cf(&self) -> &ColumnFamily;
+    fn user_commands_state_hashes_cf(&self) -> &ColumnFamily;
 
     /// CF for storing user commands by state hash
     fn user_commands_per_block_cf(&self) -> &ColumnFamily;
@@ -145,6 +145,23 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for sorting user commands by sender public key
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily;
+
+    // zkapp user commands
+
+    /// CF for storing zkapp user commands
+    fn zkapp_user_commands_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp user commands by public key
+    fn zkapp_user_commands_pk_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing number of zkapp user commands by public key
+    fn zkapp_user_commands_pk_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting zkapp user commands by blockchain length
+    fn zkapp_user_commands_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting zkapp user commands by global slot
+    fn zkapp_user_commands_slot_sort_cf(&self) -> &ColumnFamily;
 
     /////////////////////
     // Zkapp store CFs //

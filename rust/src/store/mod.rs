@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 129] = [
+    const COLUMN_FAMILIES: [&'static str; 134] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -97,16 +97,22 @@ impl IndexerStore {
         "user-commands-block",
         "user-commands-block-order",
         "user-commands-num-blocks",
-        "user-commands-slot-sort",
-        "user-commands-height-sort",
         "user-commands-to-global-slot",
         "user-commands-to-block-height",
-        "user-command-state-hashes",
+        "user-commands-slot-sort",
+        "user-commands-height-sort",
+        "user-commands-state-hashes",
         // sorting user commands by sender/receiver
         "txn-from-slot-sort",
         "txn-from-height-sort",
         "txn-to-slot-sort",
         "txn-to-height-sort",
+        // zkapp user commands
+        "zkapp-user-commands",
+        "zkapp-user-commands-pk",
+        "zkapp-user-commands-pk-num",
+        "zkapp-user-commands-slot-sort",
+        "zkapp-user-commands-height-sort",
         /////////////////////
         // Zkapp store CFs //
         /////////////////////
