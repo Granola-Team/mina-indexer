@@ -1,3 +1,5 @@
+//! User command store trait implementation
+
 use super::{
     column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, user_command_db_key_pk,
     username::UsernameStore, IndexerStore,
@@ -20,7 +22,7 @@ use crate::{
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key},
     },
 };
-use anyhow::bail;
+use anyhow::{bail, Context, Result};
 use log::{trace, warn};
 use speedb::{DBIterator, IteratorMode, WriteBatch};
 use std::path::PathBuf;
@@ -30,7 +32,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Adding user commands from block {}", block.summary());
 
         let epoch = block.epoch_count();
@@ -49,17 +51,26 @@ impl UserCommandStore for IndexerStore {
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command
+            let signed_command_with_data = SignedCommandWithData::from(
+                command,
+                &state_hash.0,
+                block.blockchain_length(),
+                block.timestamp(),
+                block.global_slot_since_genesis(),
+            );
             batch.put_cf(
                 self.user_commands_cf(),
                 txn_block_key(&txn_hash, &state_hash),
-                serde_json::to_vec(&SignedCommandWithData::from(
-                    command,
-                    &state_hash.0,
-                    block.blockchain_length(),
-                    block.timestamp(),
-                    block.global_slot_since_genesis(),
-                ))?,
+                serde_json::to_vec(&signed_command_with_data)?,
             );
+
+            if command.is_zkapp_command() {
+                batch.put_cf(
+                    self.zkapp_user_commands_cf(),
+                    txn_block_key(&txn_hash, &state_hash),
+                    serde_json::to_vec(&signed_command_with_data)?,
+                );
+            }
 
             // add state hash index
             self.set_user_command_state_hash_batch(state_hash.clone(), &txn_hash, batch)?;
@@ -71,6 +82,14 @@ impl UserCommandStore for IndexerStore {
                 b"",
             );
 
+            if command.is_zkapp_command() {
+                batch.put_cf(
+                    self.zkapp_user_commands_height_sort_cf(),
+                    txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
+                    serde_json::to_vec(&signed_command_with_data)?,
+                );
+            }
+
             // add index for block height sorting
             batch.put_cf(
                 self.user_commands_height_sort_cf(),
@@ -78,8 +97,20 @@ impl UserCommandStore for IndexerStore {
                 b"",
             );
 
+            if command.is_zkapp_command() {
+                batch.put_cf(
+                    self.zkapp_user_commands_slot_sort_cf(),
+                    txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
+                    serde_json::to_vec(&signed_command_with_data)?,
+                );
+            }
+
             // increment counts
             self.increment_user_commands_counts(command, epoch)?;
+
+            if command.is_zkapp_command() {
+                self.increment_user_commands_counts(command, epoch)?;
+            }
 
             // add: `txn_hash -> global_slot`
             // so we can reconstruct the key
@@ -88,8 +119,6 @@ impl UserCommandStore for IndexerStore {
                 txn_hash.ref_inner().as_bytes(),
                 block.global_slot_since_genesis().to_be_bytes(),
             );
-
-            // TODO zkapp txns
 
             // add sender index
             let sender = command.sender();
@@ -179,6 +208,7 @@ impl UserCommandStore for IndexerStore {
                 );
             }
         }
+
         Ok(())
     }
 
@@ -186,7 +216,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         txn_hash: &TxnHash,
         index: u32,
-    ) -> anyhow::Result<Option<SignedCommandWithData>> {
+    ) -> Result<Option<SignedCommandWithData>> {
         trace!("Getting user command {txn_hash} index {index}");
         Ok(self
             .get_user_command_state_hashes(txn_hash)
@@ -197,6 +227,7 @@ impl UserCommandStore for IndexerStore {
                     txn_hash,
                     blocks.get(index as usize).expect("user command in block"),
                 )
+                .with_context(|| format!("txn hash {txn_hash} index {index}"))
                 .expect("user command in block at index")
             }))
     }
@@ -205,26 +236,31 @@ impl UserCommandStore for IndexerStore {
         &self,
         txn_hash: &TxnHash,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<SignedCommandWithData>> {
+    ) -> Result<Option<SignedCommandWithData>> {
         trace!("Getting user command {txn_hash} in block {state_hash}");
         Ok(self
             .database
             .get_pinned_cf(self.user_commands_cf(), txn_block_key(txn_hash, state_hash))?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .map(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("txn hash {txn_hash} state hash {state_hash}"))
+                    .expect("user command")
+            }))
     }
 
-    fn get_user_command_state_hashes(
-        &self,
-        txn_hash: &TxnHash,
-    ) -> anyhow::Result<Option<Vec<StateHash>>> {
+    fn get_user_command_state_hashes(&self, txn_hash: &TxnHash) -> Result<Option<Vec<StateHash>>> {
         trace!("Getting user command blocks {txn_hash}");
         Ok(self
             .database
             .get_pinned_cf(
-                self.user_command_state_hashes_cf(),
+                self.user_commands_state_hashes_cf(),
                 txn_hash.ref_inner().as_bytes(),
             )?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .map(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("txn hash {txn_hash}"))
+                    .expect("user command state hashes")
+            }))
     }
 
     fn set_user_command_state_hash_batch(
@@ -232,7 +268,7 @@ impl UserCommandStore for IndexerStore {
         state_hash: StateHash,
         txn_hash: &TxnHash,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting user command {txn_hash} block {state_hash}");
         let mut blocks = self
             .get_user_command_state_hashes(txn_hash)?
@@ -256,7 +292,7 @@ impl UserCommandStore for IndexerStore {
 
         // set containing blocks
         batch.put_cf(
-            self.user_command_state_hashes_cf(),
+            self.user_commands_state_hashes_cf(),
             txn_hash.ref_inner().as_bytes(),
             serde_json::to_vec(&blocks)?,
         );
@@ -267,32 +303,38 @@ impl UserCommandStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let state_hash = block.state_hash();
         trace!("Setting block user commands {state_hash}");
+
         batch.put_cf(
             self.user_commands_per_block_cf(),
             state_hash.0.as_bytes(),
             serde_json::to_vec(&block.commands())?,
         );
+
         Ok(())
     }
 
     fn get_block_user_commands(
         &self,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<Vec<UserCommandWithStatus>>> {
+    ) -> Result<Option<Vec<UserCommandWithStatus>>> {
         trace!("Getting block user commands {state_hash}");
         Ok(self
             .database
             .get_pinned_cf(self.user_commands_per_block_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .map(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("state hash {state_hash}"))
+                    .expect("user commands")
+            }))
     }
 
     fn get_user_commands_for_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Option<Vec<SignedCommandWithData>>> {
+    ) -> Result<Option<Vec<SignedCommandWithData>>> {
         trace!("Getting user commands for public key {pk}");
 
         let mut commands = vec![];
@@ -306,8 +348,10 @@ impl UserCommandStore for IndexerStore {
                 if let Some(mut block_m_commands) = self
                     .database
                     .get_pinned_cf(self.user_commands_pk_cf(), key_n(pk, m))?
-                    .and_then(|bytes| {
-                        serde_json::from_slice::<Vec<SignedCommandWithData>>(&bytes).ok()
+                    .map(|bytes| {
+                        serde_json::from_slice::<Vec<SignedCommandWithData>>(&bytes)
+                            .with_context(|| format!("user command pk {pk} index {m}"))
+                            .expect("")
                     })
                 {
                     commands.append(&mut block_m_commands);
@@ -326,7 +370,7 @@ impl UserCommandStore for IndexerStore {
         pk: &PublicKey,
         start_state_hash: &StateHash,
         end_state_hash: &StateHash,
-    ) -> anyhow::Result<Vec<SignedCommandWithData>> {
+    ) -> Result<Vec<SignedCommandWithData>> {
         let start_block_opt = self.get_block(start_state_hash)?.map(|b| b.0);
         let end_block_opt = self.get_block(end_state_hash)?.map(|b| b.0);
         trace!(
@@ -347,6 +391,7 @@ impl UserCommandStore for IndexerStore {
             let mut num = end_height - start_height;
             let mut prev_hash = end_block.previous_state_hash();
             let mut state_hashes: Vec<StateHash> = vec![end_block.state_hash()];
+
             while let Some((block, _)) = self.get_block(&prev_hash)? {
                 if num == 0 {
                     break;
@@ -364,13 +409,11 @@ impl UserCommandStore for IndexerStore {
                     .collect());
             }
         }
+
         Ok(vec![])
     }
 
-    fn get_user_commands_num_containing_blocks(
-        &self,
-        txn_hash: &TxnHash,
-    ) -> anyhow::Result<Option<u32>> {
+    fn get_user_commands_num_containing_blocks(&self, txn_hash: &TxnHash) -> Result<Option<u32>> {
         trace!("Getting user commands num containing blocks {txn_hash}");
         Ok(self
             .database
@@ -381,11 +424,7 @@ impl UserCommandStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn write_user_commands_csv(
-        &self,
-        pk: &PublicKey,
-        path: Option<PathBuf>,
-    ) -> anyhow::Result<PathBuf> {
+    fn write_user_commands_csv(&self, pk: &PublicKey, path: Option<PathBuf>) -> Result<PathBuf> {
         let mut txns = vec![];
         let start = pk_txn_sort_key_prefix(pk, u32::MAX);
         let mode = IteratorMode::From(&start, speedb::Direction::Reverse);
@@ -396,9 +435,11 @@ impl UserCommandStore for IndexerStore {
             if txn_pk != *pk {
                 break;
             }
+
             let height = pk_txn_sort_key_sort(&key);
             let nonce = pk_txn_sort_key_nonce(&key);
             let txn_hash = txn_hash_of_key(&key);
+
             txns.push((height, nonce, txn_hash));
         }
 
@@ -408,29 +449,28 @@ impl UserCommandStore for IndexerStore {
             if txn_pk != *pk {
                 break;
             }
+
             let height = pk_txn_sort_key_sort(&key);
             let nonce = pk_txn_sort_key_nonce(&key);
             let txn_hash = txn_hash_of_key(&key);
+
             txns.push((height, nonce, txn_hash));
         }
 
+        // sort highest to lowest block height & nonce
         txns.sort();
         txns.reverse();
 
         // write txn records to csv
-        let path = if let Some(path) = path {
-            path.display().to_string()
-        } else {
-            let dir = if let Ok(dir) = std::env::var("VOLUMES_DIR") {
-                dir
-            } else {
-                "/mnt".into()
-            };
-            format!("{dir}/mina-indexer-user-commands/{pk}.csv")
+        let path = match (path, std::env::var("VOLUMES_DIR")) {
+            (Some(path), _) => path,
+            (_, Ok(dir)) => format!("{dir}/mina-indexer-user-commands/{pk}.csv").into(),
+            (_, _) => format!("/mnt/mina-indexer-user-commands/{pk}.csv").into(),
         };
         let mut csv_writer = csv::WriterBuilder::new()
             .has_headers(true)
-            .from_path(path.clone())?;
+            .from_path(&path)?;
+
         for (_, _, txn_hash) in txns {
             if let Some(cmd) = self.get_user_command(&txn_hash, 0)?.as_ref() {
                 csv_writer.serialize(TxnCsvRecord::from_user_command(cmd))?;
@@ -440,7 +480,7 @@ impl UserCommandStore for IndexerStore {
         }
 
         csv_writer.flush()?;
-        Ok(path.into())
+        Ok(path)
     }
 
     ///////////////
@@ -476,11 +516,21 @@ impl UserCommandStore for IndexerStore {
         self.database.iterator_cf(self.txn_to_slot_sort_cf(), mode)
     }
 
+    fn zkapp_user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.zkapp_user_commands_slot_sort_cf(), mode)
+    }
+
+    fn zkapp_user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.zkapp_user_commands_height_sort_cf(), mode)
+    }
+
     /////////////////////////
     // User command counts //
     /////////////////////////
 
-    fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {
+    fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> Result<Option<u32>> {
         trace!("Getting number of user commands for {pk}");
         Ok(self
             .database
@@ -488,7 +538,7 @@ impl UserCommandStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting user command epoch {epoch}");
         Ok(self
@@ -497,7 +547,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_user_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
+    fn increment_user_commands_epoch_count(&self, epoch: u32) -> Result<()> {
         trace!("Incrementing user command epoch {epoch}");
         let old = self.get_user_commands_epoch_count(Some(epoch))?;
         Ok(self.database.put_cf(
@@ -507,7 +557,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    fn get_user_commands_total_count(&self) -> anyhow::Result<u32> {
+    fn get_user_commands_total_count(&self) -> Result<u32> {
         trace!("Getting user command total");
         Ok(self
             .database
@@ -515,7 +565,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_user_commands_total_count(&self) -> anyhow::Result<()> {
+    fn increment_user_commands_total_count(&self) -> Result<()> {
         trace!("Incrementing user command total");
         let old = self.get_user_commands_total_count()?;
         Ok(self
@@ -523,11 +573,7 @@ impl UserCommandStore for IndexerStore {
             .put(Self::TOTAL_NUM_USER_COMMANDS_KEY, (old + 1).to_be_bytes())?)
     }
 
-    fn get_user_commands_pk_epoch_count(
-        &self,
-        pk: &PublicKey,
-        epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    fn get_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting user command epoch {epoch} num {pk}");
         Ok(self
@@ -536,11 +582,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_pk_epoch_count(
-        &self,
-        pk: &PublicKey,
-        epoch: u32,
-    ) -> anyhow::Result<()> {
+    fn increment_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()> {
         trace!("Incrementing pk epoch {epoch} user commands count {pk}");
         let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
@@ -550,7 +592,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total user commands count {pk}");
         Ok(self
             .database
@@ -558,7 +600,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, |bytes| from_be_bytes(bytes.to_vec())))
     }
 
-    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
+    fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()> {
         trace!("Incrementing user command pk total num {pk}");
         let old = self.get_user_commands_pk_total_count(pk)?;
         Ok(self.database.put_cf(
@@ -573,7 +615,7 @@ impl UserCommandStore for IndexerStore {
         state_hash: &StateHash,
         count: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block user command count {state_hash} -> {count}");
         batch.put_cf(
             self.block_user_command_counts_cf(),
@@ -583,7 +625,7 @@ impl UserCommandStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_user_commands_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_user_commands_count(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block user command count {state_hash}");
         Ok(self
             .database
@@ -595,7 +637,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!(
             "Incrementing user commands counts {:?}",
             command.to_command()
@@ -625,8 +667,7 @@ impl UserCommandStore for IndexerStore {
         self.increment_user_commands_total_count()
     }
 
-    /// Get applied user commands count
-    fn get_applied_user_commands_count(&self) -> anyhow::Result<u32> {
+    fn get_applied_user_commands_count(&self) -> Result<u32> {
         trace!("Getting applied user command count");
         Ok(self
             .database
@@ -634,8 +675,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    /// Get failed user commands count
-    fn get_failed_user_commands_count(&self) -> anyhow::Result<u32> {
+    fn get_failed_user_commands_count(&self) -> Result<u32> {
         trace!("Getting failed user command count");
         Ok(self
             .database
@@ -643,8 +683,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    /// Increment applied user commands count
-    fn increment_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_applied_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing applied user command count");
         let old = self.get_applied_user_commands_count()?;
         Ok(self.database.put(
@@ -653,8 +692,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Increment failed user commands count
-    fn increment_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_failed_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing failed user command count");
         let old = self.get_failed_user_commands_count()?;
         Ok(self.database.put(
@@ -663,8 +701,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Decrement applied user commands count
-    fn decrement_applied_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn decrement_applied_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing applied user command count");
         let old = self.get_applied_user_commands_count()?;
         Ok(self.database.put(
@@ -673,8 +710,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Decrement failed user commands count
-    fn decrement_failed_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn decrement_failed_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing failed user command count");
         let old = self.get_failed_user_commands_count()?;
         Ok(self.database.put(
@@ -683,8 +719,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Get canonical user commands count
-    fn get_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+    fn get_canonical_user_commands_count(&self) -> Result<u32> {
         trace!("Getting canonical user command count");
         Ok(self
             .database
@@ -692,8 +727,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    /// Increment canonical user commands count
-    fn increment_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing canonical user command count");
         let old = self.get_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -702,8 +736,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Decrement canonical user commands count
-    fn decrement_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn decrement_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing canonical user command count");
         let old = self.get_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -712,8 +745,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Get applied canonical user commands count
-    fn get_applied_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+    fn get_applied_canonical_user_commands_count(&self) -> Result<u32> {
         trace!("Getting applied canonical user command count");
         Ok(self
             .database
@@ -721,8 +753,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    /// Increment canonical user commands count
-    fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing applied canonical user command count");
         let old = self.get_applied_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -731,8 +762,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Decrement canonical user commands count
-    fn decrement_applied_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn decrement_applied_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing applied canonical user command count");
         let old = self.get_applied_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -741,8 +771,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// Get failed canonical user commands count
-    fn get_failed_canonical_user_commands_count(&self) -> anyhow::Result<u32> {
+    fn get_failed_canonical_user_commands_count(&self) -> Result<u32> {
         trace!("Getting failed canonical user command count");
         Ok(self
             .database
@@ -750,8 +779,7 @@ impl UserCommandStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    /// Increment canonical user commands count
-    fn increment_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_failed_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing failed canonical user command count");
         let old = self.get_failed_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -760,8 +788,7 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    /// decrement canonical user commands count
-    fn decrement_failed_canonical_user_commands_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn decrement_failed_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing failed canonical user command count");
         let old = self.get_failed_canonical_user_commands_count()?;
         Ok(self.database.put(
@@ -770,18 +797,17 @@ impl UserCommandStore for IndexerStore {
         )?)
     }
 
-    fn update_user_commands(&self, block: &DbBlockUpdate) -> anyhow::Result<()> {
+    fn update_user_commands(&self, block: &DbBlockUpdate) -> Result<()> {
         for update in block.unapply.iter() {
             if let Some(user_commands) = self
                 .get_block_user_commands(&update.state_hash)
                 .ok()
                 .flatten()
             {
+                let (applied_uc, failed_uc): (Vec<_>, Vec<_>) =
+                    user_commands.iter().partition(|uc| uc.is_applied());
+
                 self.decrement_canonical_user_commands_count(user_commands.len() as u32)?;
-                let (applied_uc, failed_uc): (
-                    Vec<UserCommandWithStatus>,
-                    Vec<UserCommandWithStatus>,
-                ) = user_commands.into_iter().partition(|uc| uc.is_applied());
                 self.decrement_applied_canonical_user_commands_count(applied_uc.len() as u32)?;
                 self.decrement_failed_canonical_user_commands_count(failed_uc.len() as u32)?;
             }
@@ -793,11 +819,10 @@ impl UserCommandStore for IndexerStore {
                 .ok()
                 .flatten()
             {
+                let (applied_uc, failed_uc): (Vec<_>, Vec<_>) =
+                    user_commands.iter().partition(|uc| uc.is_applied());
+
                 self.increment_canonical_user_commands_count(user_commands.len() as u32)?;
-                let (applied_uc, failed_uc): (
-                    Vec<UserCommandWithStatus>,
-                    Vec<UserCommandWithStatus>,
-                ) = user_commands.into_iter().partition(|uc| uc.is_applied());
                 self.increment_applied_canonical_user_commands_count(applied_uc.len() as u32)?;
                 self.increment_failed_canonical_user_commands_count(failed_uc.len() as u32)?;
             }
@@ -847,11 +872,10 @@ impl<'a> TxnCsvRecord<'a> {
     }
 }
 
-#[cfg(test)]
-mod user_command_store_impl_tests {
+#[cfg(all(test, feature = "tier2"))]
+mod tier2_tests {
     use super::*;
     use crate::block::precomputed::PcbVersion;
-    use anyhow::Result;
     use std::{env, path::Path};
     use tempfile::TempDir;
 
