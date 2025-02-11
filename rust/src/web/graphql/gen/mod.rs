@@ -803,6 +803,7 @@ pub struct TransactionQueryInput {
     pub memo: Option<String>,
     pub token: Option<u64>,
     pub is_delegation: Option<bool>,
+    pub zkapp: Option<bool>,
 
     /// Failure reason only applies to failed transactions
     pub failure_reason: Option<String>,

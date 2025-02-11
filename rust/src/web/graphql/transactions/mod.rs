@@ -1,3 +1,5 @@
+//! GraphQL `transactions` endpoint
+
 use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
     base::public_key::PublicKey,
@@ -23,6 +25,14 @@ use async_graphql::{Context, Enum, Object, Result, SimpleObject};
 use serde::Serialize;
 use speedb::{Direction, IteratorMode};
 use std::sync::Arc;
+
+#[derive(Clone, Debug, SimpleObject)]
+pub struct Transaction {
+    block: TransactionBlock,
+
+    #[graphql(flatten)]
+    transaction: TransactionWithoutBlock,
+}
 
 #[derive(Clone, Copy, Debug, Enum, Eq, PartialEq)]
 pub enum TransactionSortByInput {
@@ -50,6 +60,7 @@ pub struct TransactionWithoutBlock {
     canonical: bool,
     failure_reason: Option<String>,
     is_applied: bool,
+    zkapp: bool,
     fee: u64,
     from: String,
     hash: String,
@@ -68,14 +79,6 @@ pub struct TransactionWithoutBlock {
     /// Total number of user commands
     #[graphql(name = "total_num_user_commands")]
     total_num_user_commands: u32,
-}
-
-#[derive(Clone, Debug, SimpleObject)]
-pub struct Transaction {
-    block: TransactionBlock,
-
-    #[graphql(flatten)]
-    transaction: TransactionWithoutBlock,
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject)]
@@ -150,22 +153,39 @@ impl TransactionsQueryRoot {
                     )
                 }
             };
-            let iter = match sort_by {
-                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+            let iter = match (sort_by, query.zkapp) {
+                (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &max.to_be_bytes(),
                     Direction::Reverse,
                 )),
-                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
-                    &min.to_be_bytes(),
-                    Direction::Forward,
-                )),
-                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
+                (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
+                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
+                        &max.to_be_bytes(),
+                        Direction::Reverse,
+                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
             for (key, _) in iter.flatten() {
@@ -238,22 +258,39 @@ impl TransactionsQueryRoot {
                     )
                 }
             };
-            let iter = match sort_by {
-                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+            let iter = match (sort_by, query.zkapp) {
+                (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &max.to_be_bytes(),
                     Direction::Reverse,
                 )),
-                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
-                    &min.to_be_bytes(),
-                    Direction::Forward,
-                )),
-                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
+                (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
+                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
+                        &max.to_be_bytes(),
+                        Direction::Reverse,
+                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
             for (key, _) in iter.flatten() {
@@ -380,22 +417,39 @@ impl TransactionsQueryRoot {
             };
 
             // reverse is exclusive so we increment
-            let iter = match sort_by {
-                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+            let iter = match (sort_by, query.zkapp) {
+                (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
-                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
-                    &min.to_be_bytes(),
-                    Direction::Forward,
-                )),
-                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
+                (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
+                ),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
+                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
+                        &max.saturating_add(1).to_be_bytes(),
+                        Direction::Reverse,
+                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
             for (key, _) in iter.flatten() {
@@ -477,22 +531,39 @@ impl TransactionsQueryRoot {
             };
 
             // reverse is exclusive so we increment
-            let iter = match sort_by {
-                BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::From(
+            let iter = match (sort_by, query.zkapp) {
+                (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::From(
+                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::From(
                     &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
-                GlobalSlotAsc | DateTimeAsc => db.user_commands_slot_iterator(IteratorMode::From(
-                    &min.to_be_bytes(),
-                    Direction::Forward,
-                )),
-                GlobalSlotDesc | DateTimeDesc => db.user_commands_slot_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
+                (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
+                (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
+                (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
+                ),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
+                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
+                        &max.saturating_add(1).to_be_bytes(),
+                        Direction::Reverse,
+                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
             for (key, _) in iter.flatten() {
@@ -529,12 +600,33 @@ impl TransactionsQueryRoot {
             return Ok(transactions);
         }
 
-        let iter = match sort_by {
-            BlockHeightAsc => db.user_commands_height_iterator(IteratorMode::Start),
-            BlockHeightDesc => db.user_commands_height_iterator(IteratorMode::End),
-            DateTimeAsc | GlobalSlotAsc => db.user_commands_slot_iterator(IteratorMode::Start),
-            DateTimeDesc | GlobalSlotDesc => db.user_commands_slot_iterator(IteratorMode::End),
+        let iter = match (sort_by, query.as_ref().and_then(|q| q.zkapp)) {
+            (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::Start),
+            (BlockHeightAsc, Some(true)) => {
+                db.zkapp_user_commands_height_iterator(IteratorMode::Start)
+            }
+            (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
+            (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::End),
+            (BlockHeightDesc, Some(true)) => {
+                db.zkapp_user_commands_height_iterator(IteratorMode::End)
+            }
+            (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
+            (GlobalSlotAsc | DateTimeAsc, None) => {
+                db.user_commands_slot_iterator(IteratorMode::Start)
+            }
+            (GlobalSlotAsc | DateTimeAsc, Some(true)) => {
+                db.zkapp_user_commands_slot_iterator(IteratorMode::Start)
+            }
+            (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
+            (GlobalSlotDesc | DateTimeDesc, None) => {
+                db.user_commands_slot_iterator(IteratorMode::End)
+            }
+            (GlobalSlotDesc | DateTimeDesc, Some(true)) => {
+                db.zkapp_user_commands_slot_iterator(IteratorMode::End)
+            }
+            (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
         };
+
         for (key, _) in iter.flatten() {
             if let Some(ref q) = query {
                 // early exit if txn hashes don't match if we're filtering by it
@@ -684,6 +776,7 @@ impl TransactionWithoutBlock {
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
     ) -> Self {
+        let zkapp = cmd.is_zkapp_command();
         let receiver = cmd.command.receiver_pk();
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
@@ -694,6 +787,7 @@ impl TransactionWithoutBlock {
         let is_applied = failure_reason.is_none();
 
         Self {
+            zkapp,
             canonical,
             is_applied,
             failure_reason,
@@ -763,6 +857,7 @@ impl TransactionQueryInput {
             block,
             failure_reason,
             is_applied,
+            zkapp,
             fee_payer: _,
             source: _,
             from_account: _,
@@ -776,36 +871,49 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(hash) = hash {
             if transaction.transaction.hash != *hash {
                 return false;
             }
         }
+
+        if let Some(zkapp) = zkapp {
+            if transaction.transaction.zkapp != *zkapp {
+                return false;
+            }
+        }
+
         if let Some(kind) = kind {
             if transaction.transaction.kind != *kind {
                 return false;
             }
         }
+
         if let Some(canonical) = canonical {
             if transaction.transaction.canonical != *canonical {
                 return false;
             }
         }
+
         if let Some(from) = from {
             if transaction.transaction.from != *from {
                 return false;
             }
         }
+
         if let Some(to) = to {
             if transaction.transaction.to != *to {
                 return false;
             }
         }
+
         if let Some(memo) = memo {
             if transaction.transaction.memo != *memo {
                 return false;
             }
         }
+
         if let Some(fee_token) = fee_token {
             if transaction.transaction.token != Some(*fee_token) {
                 return false;
@@ -818,6 +926,7 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(is_applied) = is_applied {
             if transaction.transaction.failure_reason.is_none() != *is_applied {
                 return false;
@@ -830,6 +939,7 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(query) = or {
             if !query.is_empty() && query.iter().any(|or| or.matches(transaction)) {
                 return false;
@@ -842,21 +952,25 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(amount_gt) = amount_gt {
             if transaction.transaction.amount <= *amount_gt {
                 return false;
             }
         }
+
         if let Some(amount_gte) = amount_gte {
             if transaction.transaction.amount < *amount_gte {
                 return false;
             }
         }
+
         if let Some(amount_lt) = amount_lt {
             if transaction.transaction.amount >= *amount_lt {
                 return false;
             }
         }
+
         if let Some(amount_lte) = amount_lte {
             if transaction.transaction.amount > *amount_lte {
                 return false;
@@ -869,21 +983,25 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(fee_gt) = fee_gt {
             if transaction.transaction.fee <= *fee_gt {
                 return false;
             }
         }
+
         if let Some(fee_gte) = fee_gte {
             if transaction.transaction.fee < *fee_gte {
                 return false;
             }
         }
+
         if let Some(fee_lt) = fee_lt {
             if transaction.transaction.fee >= *fee_lt {
                 return false;
             }
         }
+
         if let Some(fee_lte) = fee_lte {
             if transaction.transaction.fee > *fee_lte {
                 return false;
@@ -896,21 +1014,25 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(block_height_gt) = block_height_gt {
             if transaction.transaction.block_height <= *block_height_gt {
                 return false;
             }
         }
+
         if let Some(block_height_gte) = block_height_gte {
             if transaction.transaction.block_height < *block_height_gte {
                 return false;
             }
         }
+
         if let Some(block_height_lt) = block_height_lt {
             if transaction.transaction.block_height >= *block_height_lt {
                 return false;
             }
         }
+
         if let Some(block_height_lte) = block_height_lte {
             if transaction.transaction.block_height > *block_height_lte {
                 return false;
@@ -923,21 +1045,25 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(global_slot_gt) = global_slot_gt {
             if transaction.transaction.global_slot <= *global_slot_gt {
                 return false;
             }
         }
+
         if let Some(global_slot_gte) = global_slot_gte {
             if transaction.transaction.global_slot < *global_slot_gte {
                 return false;
             }
         }
+
         if let Some(global_slot_lt) = global_slot_lt {
             if transaction.transaction.global_slot >= *global_slot_lt {
                 return false;
             }
         }
+
         if let Some(global_slot_lte) = global_slot_lte {
             if transaction.transaction.global_slot > *global_slot_lte {
                 return false;
@@ -951,21 +1077,25 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(date_time_gt) = date_time_gt {
             if txn_date_time_millis <= (*date_time_gt).timestamp_millis() {
                 return false;
             }
         }
+
         if let Some(date_time_gte) = date_time_gte {
             if txn_date_time_millis < (*date_time_gte).timestamp_millis() {
                 return false;
             }
         }
+
         if let Some(date_time_lt) = date_time_lt {
             if txn_date_time_millis >= (*date_time_lt).timestamp_millis() {
                 return false;
             }
         }
+
         if let Some(date_time_lte) = date_time_lte {
             if txn_date_time_millis > (*date_time_lte).timestamp_millis() {
                 return false;
@@ -978,26 +1108,31 @@ impl TransactionQueryInput {
                 return false;
             }
         }
+
         if let Some(nonce_gt) = nonce_gt {
             if transaction.transaction.nonce <= *nonce_gt {
                 return false;
             }
         }
+
         if let Some(nonce_gte) = nonce_gte {
             if transaction.transaction.nonce < *nonce_gte {
                 return false;
             }
         }
+
         if let Some(nonce_lt) = nonce_lt {
             if transaction.transaction.nonce >= *nonce_lt {
                 return false;
             }
         }
+
         if let Some(nonce_lte) = nonce_lte {
             if transaction.transaction.nonce > *nonce_lte {
                 return false;
             }
         }
+
         true
     }
 }
