@@ -31,7 +31,7 @@ pub fn discovery(
     let mut parent_hash_map: HashMap<&str, &str> = HashMap::new();
 
     // store block paths by height
-    for path in paths {
+    for path in paths.iter() {
         let height = extract_block_height(path);
         tree_map.entry(height).or_default().push(path);
     }
@@ -45,28 +45,39 @@ pub fn discovery(
     )
     .to_owned();
 
-    // walk back from tip to root of tree
-    let mut canonical_branch =
-        canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, &best_tip)?;
+    // best tip found
+    if let Some(best_tip) = best_tip {
+        // walk back from tip to root of tree
+        let mut canonical_branch =
+            canonical_branch_from_best_tip(&mut tree_map, &parent_hash_map, best_tip)?;
 
-    // split off recent paths from canonical branch and tree map
-    let recent_paths =
-        split_off_recent_paths(&mut canonical_branch, &mut tree_map, canonical_threshold);
+        // split off recent paths from canonical branch and tree map
+        let recent_paths =
+            split_off_recent_paths(&mut canonical_branch, &mut tree_map, canonical_threshold);
 
-    // all other paths in the tree map are orphaned
-    let orphaned_paths = get_orphaned_paths(&mut tree_map);
+        // all other paths in the tree map are orphaned
+        let orphaned_paths = get_orphaned_paths(&mut tree_map);
 
-    assert!(tree_map.is_empty(), "Not all paths have been discovered");
-    info!(
-        "Found {} blocks in the canonical chain in {}",
-        1 + canonical_branch.len() as u32 + canonical_threshold,
-        pretty_print_duration(time.elapsed())
-    );
+        assert!(tree_map.is_empty(), "Not all paths have been discovered");
+        info!(
+            "Found {} blocks in the canonical chain in {}",
+            1 + canonical_branch.len() as u32 + canonical_threshold,
+            pretty_print_duration(time.elapsed())
+        );
 
+        return Ok((
+            canonical_branch.into_iter().cloned().collect::<Vec<_>>(),
+            recent_paths.into_iter().cloned().collect::<Vec<_>>(),
+            orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
+        ));
+    }
+
+    // no best tip found
+    info!("No best best tip found. Ingesting all blocks in length-sorted order.");
     Ok((
-        canonical_branch.into_iter().cloned().collect::<Vec<_>>(),
-        recent_paths.into_iter().cloned().collect::<Vec<_>>(),
-        orphaned_paths.into_iter().cloned().collect::<Vec<_>>(),
+        vec![],
+        paths.into_iter().cloned().collect::<Vec<_>>(),
+        vec![],
     ))
 }
 
@@ -75,7 +86,7 @@ fn find_best_tip<'a>(
     tree_map: &BTreeMap<u32, Vec<&'a PathBuf>>,
     parent_hash_map: &mut HashMap<&'a str, &'a str>,
     reporting_freq: u32,
-) -> &'a PathBuf {
+) -> Option<&'a PathBuf> {
     let time = Instant::now();
     let mut queue = VecDeque::new();
     let mut best_tip = None;
@@ -110,15 +121,16 @@ fn find_best_tip<'a>(
         }
     }
 
-    let best_tip = best_tip.expect("No valid best tip found");
-    let height = extract_block_height(best_tip);
-    info!(
-        "Found best tip at height {} in {}",
-        height,
-        pretty_print_duration(time.elapsed())
-    );
+    best_tip.map(|best_tip| {
+        let height = extract_block_height(best_tip);
+        info!(
+            "Found best tip at height {} in {}",
+            height,
+            pretty_print_duration(time.elapsed())
+        );
 
-    best_tip
+        *best_tip
+    })
 }
 
 fn canonical_branch_from_best_tip<'a>(
