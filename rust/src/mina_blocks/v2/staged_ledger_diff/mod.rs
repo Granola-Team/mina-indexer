@@ -10,7 +10,7 @@ use crate::{
     },
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
-    ledger::token::TokenAddress,
+    ledger::{token::TokenAddress, LedgerHash},
     protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
     utility::functions::nanomina_to_mina,
 };
@@ -291,11 +291,11 @@ pub struct Preconditions {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NetworkPreconditions {
-    pub snarked_ledger_hash: Precondition<String>,
-    pub blockchain_length: Precondition<String>,
-    pub min_window_density: Precondition<String>,
-    pub total_currency: Precondition<String>,
-    pub global_slot_since_genesis: Precondition<String>,
+    pub snarked_ledger_hash: Precondition<LedgerHashBounds>,
+    pub blockchain_length: Precondition<NumericBounds>,
+    pub min_window_density: Precondition<NumericBounds>,
+    pub total_currency: Precondition<NumericBounds>,
+    pub global_slot_since_genesis: Precondition<NumericBounds>,
     pub staking_epoch_data: StakingEpochDataPreconditions,
     pub next_epoch_data: StakingEpochDataPreconditions,
 }
@@ -341,6 +341,20 @@ pub struct NumericBounds {
 }
 
 impl std::str::FromStr for NumericBounds {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s).map_err(anyhow::Error::new)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct LedgerHashBounds {
+    lower: LedgerHash,
+    upper: LedgerHash,
+}
+
+impl std::str::FromStr for LedgerHashBounds {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {

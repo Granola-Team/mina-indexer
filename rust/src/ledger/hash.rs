@@ -5,7 +5,7 @@ use crate::protocol::serialization_types::{
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash, Serialize)]
 pub struct LedgerHash(pub String);
 
 impl LedgerHash {
