@@ -1052,18 +1052,22 @@ pub async fn handle_connection(
                 Transactions::Hash { hash, verbose } => {
                     info!("Received tx-hash command for {hash}");
                     let hash = TxnHash::new(hash)?;
-                    let response = db.get_user_command(&hash, 0)?.map(|cmd| {
-                        if verbose {
-                            format!("{cmd:?}")
-                        } else {
-                            let cmd: Command = cmd.into();
-                            format!("{cmd:?}")
+                    match db.get_user_command(&hash, 0) {
+                        Ok(Some(cmd)) => {
+                            let msg = if verbose {
+                                format!("{cmd:?}")
+                            } else {
+                                let cmd: Command = cmd.into();
+                                format!("{cmd:?}")
+                            };
+                            ServerCliResponse::Success(msg)
                         }
-                    });
-                    if let Some(msg) = response {
-                        ServerCliResponse::Success(msg)
-                    } else {
-                        ServerCliResponse::Error("Failed to retrieve tx-hash".to_string())
+                        Ok(None) => ServerCliResponse::Success(format!(
+                            "Transaction at hash not present in store: '{hash}'"
+                        )),
+                        Err(e) => ServerCliResponse::Error(format!(
+                            "Failed to retrieve transaction hash for '{hash}': {e}"
+                        )),
                     }
                 }
                 Transactions::StateHash {
