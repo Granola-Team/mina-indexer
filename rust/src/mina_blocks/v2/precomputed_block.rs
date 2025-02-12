@@ -38,6 +38,7 @@ pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<PrecomputedBlock> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{block::extract_block_height, constants::HARDFORK_GENESIS_BLOCKCHAIN_LENGTH};
     use std::time::Instant;
 
     #[test]
@@ -65,6 +66,7 @@ mod tests {
                 }
             }
         });
+
         // non-sequential blocks
         glob::glob("./tests/data/berkeley/non_sequential_blocks/berkeley-*-*.json")?.for_each(
             |path| {
@@ -79,6 +81,21 @@ mod tests {
                 }
             },
         );
+
+        // misc hardfork blocks
+        glob::glob("./tests/data/misc_blocks/mainnet-*-*.json")?
+            .flatten()
+            .filter(|path| extract_block_height(path) >= HARDFORK_GENESIS_BLOCKCHAIN_LENGTH)
+            .for_each(|path| {
+                if let Err(e) = parse_file(&path) {
+                    panic!(
+                        "Error parsing block {}: {}",
+                        path.file_name().unwrap().to_str().unwrap(),
+                        e
+                    )
+                }
+            });
+
         Ok(())
     }
 }
