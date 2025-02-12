@@ -162,38 +162,45 @@ pub async fn handle_connection(
                     info!("Received block-state-hash command");
                     if !StateHash::is_valid(&state_hash) {
                         invalid_state_hash(&state_hash)
-                    } else if let Ok(Some((ref block, _))) =
-                        db.get_block(&state_hash.clone().into())
-                    {
-                        let block_str = if let Some(canonicity) =
-                            db.get_block_canonicity(&block.state_hash())?
-                        {
-                            if verbose {
-                                serde_json::to_string_pretty(&block.with_canonicity(canonicity))?
-                            } else {
-                                let block = BlockWithoutHeight::with_canonicity(block, canonicity);
-                                serde_json::to_string_pretty(&block)?
-                            }
-                        } else {
-                            block_missing_from_db(&block.state_hash().0)
-                        };
-                        if path.is_some() {
-                            let path = &path.unwrap();
-                            info!("Writing block {state_hash} to {path:?}");
-                            std::fs::write(path, block_str)?;
-                            ServerCliResponse::Success(format!(
-                                "Block {} written to {:?}",
-                                block.state_hash().0,
-                                path
-                            ))
-                        } else {
-                            info!("Writing block to stdout {}", block.summary());
-                            ServerCliResponse::Success(block_str)
-                        }
                     } else {
-                        ServerCliResponse::Error(format!(
-                            "Block at state hash not present in store: {state_hash}"
-                        ))
+                        match db.get_block(&state_hash.clone().into()) {
+                            Ok(Some((ref block, _))) => {
+                                let block_str = if let Some(canonicity) =
+                                    db.get_block_canonicity(&block.state_hash())?
+                                {
+                                    if verbose {
+                                        serde_json::to_string_pretty(
+                                            &block.with_canonicity(canonicity),
+                                        )?
+                                    } else {
+                                        let block =
+                                            BlockWithoutHeight::with_canonicity(block, canonicity);
+                                        serde_json::to_string_pretty(&block)?
+                                    }
+                                } else {
+                                    block_missing_from_db(&block.state_hash().0)
+                                };
+                                if path.is_some() {
+                                    let path = &path.unwrap();
+                                    info!("Writing block {state_hash} to {path:?}");
+                                    std::fs::write(path, block_str)?;
+                                    ServerCliResponse::Success(format!(
+                                        "Block {} written to {:?}",
+                                        block.state_hash().0,
+                                        path
+                                    ))
+                                } else {
+                                    info!("Writing block to stdout {}", block.summary());
+                                    ServerCliResponse::Success(block_str)
+                                }
+                            }
+                            Ok(None) => ServerCliResponse::Success(format!(
+                                "Block at state hash not present in store: {state_hash}"
+                            )),
+                            Err(e) => ServerCliResponse::Error(format!(
+                                "Failed to lookup block for '{state_hash}': {e}"
+                            )),
+                        }
                     }
                 }
                 Blocks::Height {
