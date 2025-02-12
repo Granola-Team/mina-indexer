@@ -113,7 +113,7 @@ if DEPLOY_TYPE == "test"
   # puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
   IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
   IDXR_NORM_LEDGER = "#{IDXR_LEDGER}.norm.json"
-  MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledger-359604/mina_ledger.json"
+  MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledgers/ledger-359604-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json"
   IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.diff"
 
   # normalize indexer best ledger
