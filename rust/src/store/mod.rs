@@ -267,8 +267,10 @@ impl IndexerStore {
             IndexerStoreVersion::MINOR,
             IndexerStoreVersion::PATCH,
         )?;
+
         let version = primary.get_db_version().expect("db version exists");
         persist_indexer_version(&version, path)?;
+
         Ok(primary)
     }
 
@@ -278,6 +280,7 @@ impl IndexerStore {
 
         let mut snapshot_temp_dir = output_file.to_path_buf();
         snapshot_temp_dir.set_extension("tmp-snapshot");
+
         Checkpoint::new(&self.database)?
             .create_checkpoint(&snapshot_temp_dir)
             .map_err(|e| anyhow!("Error creating database snapshot: {e}"))
@@ -318,6 +321,7 @@ impl IndexerStore {
                 column_families,
             )?,
         };
+
         Ok(read_only)
     }
 }

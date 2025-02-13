@@ -338,6 +338,7 @@ impl InternalCommandStore for IndexerStore {
     fn get_internal_commands_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting internal command epoch {epoch}");
+
         Ok(self
             .database
             .get_cf(self.internal_commands_epoch_cf(), epoch.to_be_bytes())?
@@ -347,6 +348,7 @@ impl InternalCommandStore for IndexerStore {
     fn increment_internal_commands_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
         trace!("Incrementing internal command epoch {epoch}");
         let old = self.get_internal_commands_epoch_count(Some(epoch))?;
+
         Ok(self.database.put_cf(
             self.internal_commands_epoch_cf(),
             epoch.to_be_bytes(),
@@ -365,6 +367,7 @@ impl InternalCommandStore for IndexerStore {
     fn increment_internal_commands_total_count(&self, incr: u32) -> anyhow::Result<()> {
         trace!("Incrementing internal command total");
         let old = self.get_internal_commands_total_count()?;
+
         Ok(self.database.put(
             Self::TOTAL_NUM_FEE_TRANSFERS_KEY,
             (old + incr).to_be_bytes(),
@@ -378,6 +381,7 @@ impl InternalCommandStore for IndexerStore {
     ) -> anyhow::Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting internal command epoch {epoch} num {pk}");
+
         Ok(self
             .database
             .get_cf(
@@ -394,6 +398,7 @@ impl InternalCommandStore for IndexerStore {
     ) -> anyhow::Result<()> {
         trace!("Incrementing pk epoch {epoch} internal commands count {pk}");
         let old = self.get_internal_commands_pk_epoch_count(pk, Some(epoch))?;
+
         Ok(self.database.put_cf(
             self.internal_commands_pk_epoch_cf(),
             u32_prefix_key(epoch, pk),
@@ -412,6 +417,7 @@ impl InternalCommandStore for IndexerStore {
     fn increment_internal_commands_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
         trace!("Incrementing internal command pk total num {pk}");
         let old = self.get_internal_commands_pk_total_count(pk)?;
+
         Ok(self.database.put_cf(
             self.internal_commands_pk_total_cf(),
             pk.0.as_bytes(),
@@ -445,6 +451,7 @@ impl InternalCommandStore for IndexerStore {
             state_hash.0.as_bytes(),
             count.to_be_bytes(),
         );
+
         Ok(())
     }
 
@@ -480,6 +487,7 @@ impl InternalCommandStore for IndexerStore {
     fn increment_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()> {
         trace!("Increment canonical internal commands count");
         let old = self.get_canonical_internal_commands_count()?;
+
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_FEE_TRANSFERS_KEY,
             (old + incr).to_be_bytes(),
@@ -490,6 +498,7 @@ impl InternalCommandStore for IndexerStore {
     fn decrement_canonical_internal_commands_count(&self, incr: u32) -> anyhow::Result<()> {
         trace!("Decrement canonical internal commands count");
         let old = self.get_canonical_internal_commands_count()?;
+
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_FEE_TRANSFERS_KEY,
             (old.saturating_sub(incr)).to_be_bytes(),

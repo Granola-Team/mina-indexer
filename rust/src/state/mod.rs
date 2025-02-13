@@ -722,6 +722,7 @@ impl IndexerState {
                     ExtensionType::RootComplex(block) => block.clone(),
                     _ => unreachable!(),
                 };
+
                 return Ok((
                     root_extension,
                     Some(WitnessTreeEvent::UpdateBestTip {
@@ -822,6 +823,7 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
     ) -> Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
+
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
             let min_length = dangling_branch.root_block().blockchain_length;
             let max_length = dangling_branch.best_tip().unwrap().blockchain_length;
@@ -853,6 +855,7 @@ impl IndexerState {
                 }
             }
         }
+
         Ok(extension)
     }
 
@@ -873,12 +876,14 @@ impl IndexerState {
 
         if !branches_to_update.is_empty() {
             let mut extended_branch = self.dangling_branches.remove(extended_branch_index);
+
             for (n, dangling_branch_index) in branches_to_update.iter().enumerate() {
                 let index = if extended_branch_index < *dangling_branch_index {
                     dangling_branch_index - n - 1
                 } else {
                     *dangling_branch_index
                 };
+
                 let branch_to_update = self.dangling_branches.get_mut(index).unwrap();
                 extended_branch.merge_on(&new_node_id, branch_to_update);
 
@@ -899,6 +904,7 @@ impl IndexerState {
     /// Spawns a new dangling branch in the witness tree
     fn new_dangling(&mut self, precomputed_block: &PrecomputedBlock) -> Result<ExtensionType> {
         self.dangling_branches.push(Branch::new(precomputed_block)?);
+
         Ok(ExtensionType::DanglingNew)
     }
 
@@ -928,6 +934,7 @@ impl IndexerState {
     fn prune_root_branch(&mut self) -> Result<Vec<Block>> {
         let k = self.transition_frontier_length;
         let canonical_event = self.update_canonical()?;
+
         if self.root_branch.height() > self.prune_interval * k {
             let best_tip_block = self.best_tip_block().clone();
             debug!(
@@ -940,6 +947,7 @@ impl IndexerState {
             self.root_branch
                 .prune_transition_frontier(k, &best_tip_block);
         }
+
         Ok(canonical_event)
     }
 
@@ -970,6 +978,7 @@ impl IndexerState {
 
             return Ok(new_canonical_blocks);
         }
+
         Ok(vec![])
     }
 
@@ -983,6 +992,7 @@ impl IndexerState {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_block_canonicity(state_hash);
         }
+
         Ok(None)
     }
 
@@ -1049,14 +1059,17 @@ impl IndexerState {
                 return Ok(indexer_store.get_block(&state_hash)?.map(|b| b.0));
             }
         }
+
         Ok(None)
     }
 
     pub fn len(&self) -> u32 {
         let mut len = self.root_branch.len();
+
         for dangling in &self.dangling_branches {
             len += dangling.len();
         }
+
         len
     }
 
@@ -1102,6 +1115,7 @@ impl IndexerState {
                 let _ = task.await;
             }
         }
+
         Ok(())
     }
 
@@ -1122,6 +1136,7 @@ impl IndexerState {
             store.add_staking_ledger(staking_ledger, genesis_state_hash)?;
             info!("Added staking ledger {summary}");
         }
+
         Ok(())
     }
 
@@ -1136,9 +1151,11 @@ impl IndexerState {
             self.blocks_processed += 1;
             self.bytes_processed += num_block_bytes;
         }
+
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.add_block(block, num_block_bytes);
         }
+
         Ok(None)
     }
 
@@ -1183,8 +1200,10 @@ impl IndexerState {
         let mut min_length_filter = None;
         let mut witness_tree_blocks = vec![];
         let mut staking_ledgers = HashMap::new();
+
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             debug!("Looking for witness tree root block");
+
             let next_seq_num = indexer_store.get_next_seq_num()?;
             let best_block_height = indexer_store.get_best_block_height()?.unwrap_or_default();
             let witness_tree_root_block_event = indexer_store
@@ -1200,12 +1219,14 @@ impl IndexerState {
                             .try_into()
                             .expect("Byte length is incorrect. Unable to parse block height"),
                     );
+
                     if bytes[4] == IndexerEvent::NEW_BEST_TIP_KIND
                         && height
                             == 1.max(best_block_height.saturating_sub(self.canonical_threshold))
                     {
                         return serde_json::from_slice::<IndexerEvent>(&bytes[5..]).ok();
                     }
+
                     None
                 });
 
@@ -1223,12 +1244,14 @@ impl IndexerState {
                         state_hash: self.root_branch.root_block().state_hash.clone(),
                         node_id: self.root_branch.root.clone(),
                     };
+
                     self.diffs_map.insert(
                         tip.state_hash.clone(),
                         LedgerDiff::from_precomputed(&root_block),
                     );
                     self.canonical_root = tip.clone();
                     self.best_tip = tip;
+
                     debug!("Witness tree root block (length {root_block_height}): {state_hash}");
 
                     // collect witness tree blocks
@@ -1291,6 +1314,7 @@ impl IndexerState {
                         }
                     });
             }
+
             self.blocks_processed = indexer_store.get_block_production_total_count()?;
             self.bytes_processed = indexer_store
                 .database
@@ -1304,10 +1328,12 @@ impl IndexerState {
 
         // update witness tree blocks/staking ledgers
         self.staking_ledgers = Arc::new(Mutex::new(staking_ledgers));
+
         for block in witness_tree_blocks {
             debug!("Sync: add block {}", block.summary());
             self.add_block_to_witness_tree(&block, false, true)?;
         }
+
         Ok(min_length_filter)
     }
 
@@ -1335,6 +1361,7 @@ impl IndexerState {
                     }
                 });
         }
+
         Ok(min_length_filter)
     }
 
@@ -1377,9 +1404,11 @@ impl IndexerState {
                                 indexer_store.get_block_height(state_hash)?,
                                 Some(*blockchain_length),
                             );
+
                             self.add_block_to_witness_tree(&block, true, true)?;
                             return Ok(());
                         }
+
                         panic!("Fatal: block missing from store {block_summary}")
                     }
                 },
@@ -1425,6 +1454,7 @@ impl IndexerState {
                 }) => {
                     info!("Replaying aggregate delegations epoch {epoch}");
                     let indexer_store = self.indexer_store_or_panic();
+
                     if let Some(aggregated_delegations) = indexer_store
                         .build_aggregated_delegations(*epoch, Some(genesis_state_hash))?
                     {
@@ -1438,8 +1468,10 @@ impl IndexerState {
                             );
                             return Ok(());
                         }
+
                         panic!("Fatal: no staking ledger epoch {epoch}");
                     }
+
                     panic!("Fatal: aggregate delegations epoch {epoch}");
                 }
                 DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
@@ -1462,10 +1494,13 @@ impl IndexerState {
                                 indexer_store.get_block_height(state_hash)?,
                                 Some(*blockchain_length),
                             );
+
                             return Ok(());
                         }
+
                         panic!("Fatal: block not in store {block_summary}");
                     }
+
                     panic!("Fatal: canonical block not in store {block_summary}");
                 }
             },
@@ -1561,6 +1596,7 @@ impl IndexerState {
         if !ledger_diff.account_diffs.is_empty() {
             self.ledger._apply_diff(&ledger_diff)?;
         }
+
         Ok(())
     }
 
@@ -1577,6 +1613,7 @@ impl IndexerState {
                 }
             }
         }
+
         Ok(())
     }
 
@@ -1590,12 +1627,14 @@ impl IndexerState {
             .unwrap()
         {
             let block = self.get_block_from_id(&node_id);
+
             if block != self.canonical_root_block()
                 && block.height <= self.canonical_root_block().height
             {
                 self.diffs_map.remove(&block.state_hash.clone());
             }
         }
+
         Ok(())
     }
 
@@ -1633,6 +1672,7 @@ impl IndexerState {
         };
         let staking_ledgers = self.staking_ledgers.lock().unwrap();
         let max_staking_ledger_epoch = staking_ledgers.keys().max().cloned();
+
         SummaryShort {
             witness_tree,
             max_staking_ledger_epoch,
@@ -1681,6 +1721,7 @@ impl IndexerState {
         };
         let staking_ledgers = self.staking_ledgers.lock().unwrap();
         let max_staking_ledger_epoch = staking_ledgers.keys().max().cloned();
+
         SummaryVerbose {
             witness_tree,
             max_staking_ledger_epoch,
@@ -1708,6 +1749,7 @@ impl IndexerState {
             } else {
                 u64::MAX
             };
+
             info!(
                 "{}/{} blocks ({:?}/{:?}) parsed and applied in {}",
                 self.blocks_processed,
@@ -1727,6 +1769,7 @@ impl IndexerState {
                     .saturating_sub(self.bytes_processed)
                     / bytes_rate,
             );
+
             if !dur.is_zero() {
                 info!("Estimated time remaining: {}", pretty_print_duration(dur));
             }
@@ -1750,6 +1793,7 @@ impl IndexerState {
             } else {
                 u64::MAX
             };
+
             info!(
                 "Parsed and added {}/{} blocks ({:?}/{:?}) to the witness tree in {}",
                 self.blocks_processed,
@@ -1765,16 +1809,19 @@ impl IndexerState {
                 bytesize::ByteSize::b(bytes_rate)
             );
             info!("Current best tip {}", best_tip.summary());
+
             let dur = Duration::from_secs(
                 block_parser
                     .total_num_bytes
                     .saturating_sub(self.bytes_processed)
                     / bytes_rate,
             );
+
             if !dur.is_zero() {
                 info!("Estimated time remaining: {}", pretty_print_duration(dur));
             }
         }
+
         Ok(())
     }
 }

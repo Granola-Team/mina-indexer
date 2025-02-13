@@ -65,6 +65,7 @@ impl UsernameStore for IndexerStore {
                 })
                 .collect(),
         };
+
         self.update_usernames(username_updates)
     }
 
@@ -123,6 +124,7 @@ impl UsernameStore for IndexerStore {
                 )?;
             }
         }
+
         Ok(())
     }
 

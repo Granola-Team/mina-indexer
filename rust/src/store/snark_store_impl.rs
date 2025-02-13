@@ -749,6 +749,7 @@ impl SnarkStore for IndexerStore {
                 )
                 .collect(),
         };
+
         self.update_snarks(snark_updates)
     }
 
@@ -776,6 +777,7 @@ impl SnarkStore for IndexerStore {
                 SnarkApplication::Apply,
             )?;
         }
+
         Ok(())
     }
 
@@ -807,6 +809,7 @@ impl SnarkStore for IndexerStore {
                 )
                 .flatten(),
         };
+
         if let Some((key, value)) = iter.next() {
             let pk_bytes = &key[..PublicKey::LEN];
             if pk_bytes != prover.0.as_bytes() {
@@ -827,8 +830,10 @@ impl SnarkStore for IndexerStore {
                     return Ok(None);
                 }
             }
+
             return Ok(Some(value.to_vec()));
         }
+
         Ok(None)
     }
 

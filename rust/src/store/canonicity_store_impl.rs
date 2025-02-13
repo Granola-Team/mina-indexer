@@ -174,6 +174,7 @@ impl CanonicityStore for IndexerStore {
                 )
                 .collect(),
         };
+
         self.update_canonicity(canonicity_updates)
     }
 
@@ -188,6 +189,7 @@ impl CanonicityStore for IndexerStore {
             )?;
             self.database
                 .delete_cf(self.canonicity_slot_cf(), unapply.global_slot.to_be_bytes())?;
+
             self.decrement_block_canonical_production_count(&unapply.state_hash)?;
         }
 
@@ -204,8 +206,10 @@ impl CanonicityStore for IndexerStore {
                 apply.global_slot.to_be_bytes(),
                 apply.state_hash.0.as_bytes(),
             )?;
+
             self.increment_block_canonical_production_count(&apply.state_hash)?;
         }
+
         Ok(())
     }
 }

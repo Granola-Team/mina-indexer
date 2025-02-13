@@ -186,6 +186,7 @@ impl BestLedgerStore for IndexerStore {
                 })
                 .collect(),
         };
+
         self.update_best_accounts(state_hash, account_updates)
     }
 
@@ -202,6 +203,7 @@ impl BestLedgerStore for IndexerStore {
             .unapply
             .iter()
             .fold(apply_acc, |acc, update| acc - update.1.len() as i32);
+
         self.update_num_accounts(adjust)?;
 
         // update accounts
@@ -306,6 +308,7 @@ impl BestLedgerStore for IndexerStore {
                 self.update_best_account(&pk, &token, before_values, Some(after))?;
             }
         }
+
         Ok(())
     }
 
@@ -326,6 +329,7 @@ impl BestLedgerStore for IndexerStore {
             pk_index_key(pk, num),
             delegate.0.as_bytes(),
         )?;
+
         Ok(())
     }
 
@@ -389,6 +393,7 @@ impl BestLedgerStore for IndexerStore {
                 )?;
             }
         }
+
         Ok(())
     }
 
@@ -417,6 +422,7 @@ impl BestLedgerStore for IndexerStore {
 
             return Ok(Some(Ledger::from_mina_ledger(TokenLedger { accounts })));
         }
+
         Ok(None)
     }
 
