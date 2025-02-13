@@ -24,9 +24,9 @@ alias bt := dev
 alias btc := dev-continue
 
 # Test
-alias tu := test-unit-dev
+alias tu := test-unit
 alias t1 := tier1
-alias t2 := tier2-dev
+alias t2 := tier2
 alias t3 := tier3-dev
 
 # Prod
@@ -210,30 +210,20 @@ dev-continue subtest='': dev-build
 # Unit tests
 #
 
-# Run unit debug tests
-test-unit-tier1:
+# Run unit tests 
+test-unit-tier1 test='':
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
   @echo "--- Invoking 'cargo nextest'"
-  cd rust && time cargo nextest run
-
-# Lint & run debug tier 1 unit test(s)
-test-unit-tier1-dev test='': lint
-  @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run {{test}}
 
-# Run dev tier 2 unit test(s)
-test-unit-tier2-dev:
-  @echo "--- Performing long-running unit tests"
-  cd rust && time cargo nextest run --features "tier2 mina_rs"
-
-# Run release tier 2 & mina_rs unit test(s)
+# Run release tier 2 & mina_rs unit test(s).
 test-unit-tier2:
   @echo "--- Performing long-running unit tests"
   cd rust && time cargo nextest run --release --features "tier2 mina_rs"
 
-# Run all unit dev tests
-test-unit-dev:
+# Run all unit tests of tier 2. (TODO: why this?)
+test-unit:
   @echo "--- Performing all indexer unit tests"
   cd rust && time cargo nextest run --features tier2
 
@@ -259,49 +249,27 @@ tier1: tier1-prereqs lint test-unit-tier1
 # Tier 2 tests
 #
 
-# Run tier 2 nix (release) load test
+# Run tier 2 load test
 tier2-load-test:
-  @echo "--- Performing a simple load test with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}} load_v1 \
-  && {{REGRESSION_TEST}} {{PROD_MODE}} load_v2
-
-# Run tier 2 nix (release) best_chain_many_blocks test
-tier2-best-chain-many-blocks-test:
-  @echo "--- Performing best_chain_many_blocks regression test with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}} best_chain_many_blocks
-
-# Run tier 2 nix (release) regression tests
-tier2-regression-tests:
-  @echo "--- Performing tier 2 regression tests with Nix-built binary"
-  time {{REGRESSION_TEST}} {{PROD_MODE}}
-
-# Run tier 2 dev load test
-tier2-load-test-dev:
   @echo "--- Performing a simple load test with dev-built binary"
   time {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v1 \
   && {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v2
 
-# Run tier 2 dev best_chain_many_blocks test
-tier2-best-chain-many-blocks-test-dev:
+# Run tier 2 best_chain_many_blocks test
+tier2-best-chain-many-blocks-test:
   @echo "--- Performing best_chain_many_blocks regression test with dev-built binary"
   time {{REGRESSION_TEST}} {{BUILD_TYPE}} best_chain_many_blocks
 
-# Run tier 2 dev regression tests
-tier2-regression-tests-dev:
+# Run tier 2 regression tests.
+tier2-regression-tests:
   @echo "--- Performing tier 2 regression tests with dev-built binary"
   time {{REGRESSION_TEST}} {{BUILD_TYPE}}
 
-# Run tier 2 tests with Nix-built (release) binary & build OCI image.
-tier2: tier2-prereqs nix-build \
+# Run tier 2 tests.
+tier2: tier2-prereqs dev-build test-unit-tier2 \
   tier2-load-test \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests
-
-# Run tier 2 tests with dev build.
-tier2-dev: tier2-prereqs dev-build test-unit-tier2-dev \
-  tier2-load-test-dev \
-  tier2-best-chain-many-blocks-test-dev \
-  tier2-regression-tests-dev
 
 #
 # Tier 3 tests

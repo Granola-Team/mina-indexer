@@ -9,7 +9,7 @@ if ARGV == ["pids", "show"]
 end
 
 DEPLOY_TYPE = ARGV[0] # 'dev', 'prod', or 'test'
-BUILD_TYPE = "debug"
+BUILD_TYPE = "dev"
 
 require "#{__dir__}/ops-common"
 
