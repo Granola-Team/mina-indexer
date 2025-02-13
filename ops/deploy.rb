@@ -3,7 +3,7 @@
 # -*- mode: ruby -*-
 
 DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
-BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
+BUILD_TYPE = ARGV[1]        # 'nix' or 'dev'
 BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
 WEB_PORT = ARGV[3] || 8080  # optional web port for server
 

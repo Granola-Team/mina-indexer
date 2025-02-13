@@ -38,7 +38,7 @@ alias dlp := deploy-local-prod-dev
 is_rustfmt_nightly := `cd rust && rustfmt --version | grep stable || echo "true"`
 nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" }
 
-DEBUG_MODE := "debug"
+BUILD_TYPE := "dev"
 PROD_MODE := "nix"
 REGRESSION_TEST := "./ops/regression-test.rb"
 DEPLOY := "./ops/deploy.rb"
@@ -123,8 +123,8 @@ nix-build:
   @echo "--- Performing Nix build"
   nom build
 
-# Perform a debug build
-debug-build:
+# Perform a dev build
+dev-build:
   cd rust && cargo build
 
 # Build OCI images.
@@ -199,12 +199,12 @@ download-mina-blocks height dir='.':
   gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-*.json" {{dir}}
 
 # Debug build and run regression tests
-dev subtest='': debug-build
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} {{subtest}}
+dev subtest='': dev-build
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} {{subtest}}
 
 # Debug build and continue regression tests from given test
-dev-continue subtest='': debug-build
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} continue {{subtest}}
+dev-continue subtest='': dev-build
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} continue {{subtest}}
 
 #
 # Unit tests
@@ -222,7 +222,7 @@ test-unit-tier1-dev test='': lint
   @echo "--- Invoking 'cargo nextest'"
   cd rust && time cargo nextest run {{test}}
 
-# Run debug tier 2 unit test(s)
+# Run dev tier 2 unit test(s)
 test-unit-tier2-dev:
   @echo "--- Performing long-running unit tests"
   cd rust && time cargo nextest run --features "tier2 mina_rs"
@@ -232,7 +232,7 @@ test-unit-tier2:
   @echo "--- Performing long-running unit tests"
   cd rust && time cargo nextest run --release --features "tier2 mina_rs"
 
-# Run all unit debug tests
+# Run all unit dev tests
 test-unit-dev:
   @echo "--- Performing all indexer unit tests"
   cd rust && time cargo nextest run --features tier2
@@ -244,7 +244,7 @@ test-unit-dev:
 # Run the 1st tier of tests.
 tier1: tier1-prereqs lint test-unit-tier1
   @echo "--- Performing tier 1 regression tests"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} \
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} \
     ipc_is_available_immediately \
     clean_shutdown \
     clean_kill \
@@ -275,21 +275,21 @@ tier2-regression-tests:
   @echo "--- Performing tier 2 regression tests with Nix-built binary"
   time {{REGRESSION_TEST}} {{PROD_MODE}}
 
-# Run tier 2 dev (debug) load test
+# Run tier 2 dev load test
 tier2-load-test-dev:
-  @echo "--- Performing a simple load test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} load_v1 \
-  && {{REGRESSION_TEST}} {{DEBUG_MODE}} load_v2
+  @echo "--- Performing a simple load test with dev-built binary"
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v1 \
+  && {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v2
 
-# Run tier 2 dev (debug) best_chain_many_blocks test
+# Run tier 2 dev best_chain_many_blocks test
 tier2-best-chain-many-blocks-test-dev:
-  @echo "--- Performing best_chain_many_blocks regression test with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}} best_chain_many_blocks
+  @echo "--- Performing best_chain_many_blocks regression test with dev-built binary"
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} best_chain_many_blocks
 
-# Run tier 2 dev (debug) regression tests
+# Run tier 2 dev regression tests
 tier2-regression-tests-dev:
-  @echo "--- Performing tier 2 regression tests with debug-built binary"
-  time {{REGRESSION_TEST}} {{DEBUG_MODE}}
+  @echo "--- Performing tier 2 regression tests with dev-built binary"
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}}
 
 # Run tier 2 tests with Nix-built (release) binary & build OCI image.
 tier2: tier2-prereqs nix-build \
@@ -297,8 +297,8 @@ tier2: tier2-prereqs nix-build \
   tier2-best-chain-many-blocks-test \
   tier2-regression-tests
 
-# Run tier 2 tests with debug build.
-tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
+# Run tier 2 tests with dev build.
+tier2-dev: tier2-prereqs dev-build test-unit-tier2-dev \
   tier2-load-test-dev \
   tier2-best-chain-many-blocks-test-dev \
   tier2-regression-tests-dev
@@ -312,10 +312,10 @@ tier3 blocks='5000': nix-build && build-image
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY}} test nix {{blocks}}
 
-# Run the 3rd tier of tests with debug build & no unit tests.
-tier3-dev blocks='5000': debug-build
-  @echo "--- Performing tier3 regression tests with debug-built binary"
-  time {{DEPLOY}} test debug {{blocks}}
+# Run the 3rd tier of tests with dev build & no unit tests.
+tier3-dev blocks='5000': dev-build
+  @echo "--- Performing tier3 regression tests with dev-built binary"
+  time {{DEPLOY}} test dev {{blocks}}
 
 #
 # Deploy local prod
@@ -326,10 +326,10 @@ deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying prod indexer"
   time {{DEPLOY}} prod nix {{blocks}} {{web_port}}
 
-# Run a server as if in production with the debug-built binary.
-deploy-local-prod-dev blocks='5000' web_port='': debug-build
+# Run a server as if in production with the dev-built binary.
+deploy-local-prod-dev blocks='5000' web_port='': dev-build
   @echo "--- Deploying dev prod indexer"
-  time {{DEPLOY}} prod debug {{blocks}} {{web_port}}
+  time {{DEPLOY}} prod dev {{blocks}} {{web_port}}
 
 # Shutdown a running local test/dev/prod indexer.
 shutdown which='dev':
