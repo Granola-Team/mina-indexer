@@ -102,7 +102,7 @@ if DEPLOY_TYPE == "test"
     "--socket", SOCKET,
     "ledgers",
     "height",
-    "--height", BLOCKS_COUNT.to_s,
+    "--height", "359604",
     "--path", IDXR_LEDGER
   )
     warn("Ledger extraction failed.")
