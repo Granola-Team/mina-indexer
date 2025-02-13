@@ -314,11 +314,6 @@ impl BlockStore for IndexerStore {
 
         // bring b back to the same height as a
         for _ in 0..b_length.saturating_sub(a_length) {
-            // check if there's a previous block
-            if is_genesis_hash(&b) {
-                break;
-            }
-
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
