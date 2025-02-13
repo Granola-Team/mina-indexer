@@ -295,8 +295,7 @@ tier2-regression-tests-dev:
 tier2: tier2-prereqs nix-build \
   tier2-load-test \
   tier2-best-chain-many-blocks-test \
-  tier2-regression-tests \
-  && build-image
+  tier2-regression-tests
 
 # Run tier 2 tests with debug build.
 tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
@@ -309,7 +308,7 @@ tier2-dev: tier2-prereqs debug-build test-unit-tier2-dev \
 #
 
 # Run the 3rd tier of tests with Nix-built binary.
-tier3 blocks='5000': nix-build
+tier3 blocks='5000': nix-build && build-image
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY}} test nix {{blocks}}
 
