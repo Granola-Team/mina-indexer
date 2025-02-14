@@ -95,23 +95,11 @@ def cleanup_database_pid
   sleep 1 # Give it a chance to shut down.
 end
 
-def remove_dirs
-  %w[epoch_42_ledger.json epoch_0_staking_delegations.json epoch_0_ledger.json
-    mina-indexer.sock].each do |f|
-    target = "#{BASE_DIR}/#{f}"
-    FileUtils.rm_f(target)
-  end
-  %w[blocks staking-ledgers database].each do |f|
-    target = "#{BASE_DIR}/#{f}"
-    FileUtils.rm_rf(target)
-  end
-end
-
 def cleanup
   idxr_shutdown_via_socket(EXE_SRC, "#{BASE_DIR}/mina-indexer.sock")
   cleanup_idxr_pid
   cleanup_database_pid
-  remove_dirs
+  FileUtils.rm_rf(BASE_DIR)
 end
 
 # Run the tests
@@ -120,9 +108,8 @@ BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
 
 tests.each do |tn|
   puts "\nTesting: #{tn}"
-  test_success = system(BASH_TEST_DRIVER, EXE_SRC, "test_#{tn}")
+  system(BASH_TEST_DRIVER, EXE_SRC, "test_#{tn}") || abort("Failure from: #{tn}")
   cleanup
-  test_success || abort("Failure from: #{tn}")
 end
 
 puts "Regression testing complete."
