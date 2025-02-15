@@ -6,7 +6,12 @@ DEPLOY_TYPE ||= "test" # standard:disable Lint/OrAssignmentToConstant
 REV ||= `git rev-parse --short=8 HEAD`.strip # standard:disable Lint/OrAssignmentToConstant
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 DEPLOY_DIR ||= "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}" # standard:disable Lint/OrAssignmentToConstant
-BASE_DIR ||= "#{DEPLOY_DIR}/#{REV}" # standard:disable Lint/OrAssignmentToConstant
+
+def base_dir_from_rev(rev)
+  "#{DEPLOY_DIR}/#{rev}"
+end
+
+BASE_DIR ||= base_dir_from_rev(REV) # standard:disable Lint/OrAssignmentToConstant
 
 puts "Using base directory: #{BASE_DIR}"
 FileUtils.mkdir_p(BASE_DIR)
@@ -63,7 +68,11 @@ end
 
 # Socket
 
-SOCKET = "#{BASE_DIR}/mina-indexer.sock"
+def socket_from_rev(rev)
+  "#{base_dir_from_rev(rev)}/mina-indexer.sock"
+end
+
+SOCKET = socket_from_dev(REV)
 
 def wait_for_socket(wait_interval)
   wait_seconds = 0

@@ -46,7 +46,7 @@ if File.exist? CURRENT
 
   # The socket used for that mina-indexer is named after the version.
   #
-  socket = "#{BASE_DIR}/mina-indexer-#{current}.sock"
+  socket = socket_from_rev(current)
 
   # Send the currently running Indexer the shutdown command.
   #
