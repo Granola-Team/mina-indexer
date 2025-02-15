@@ -72,7 +72,7 @@ def socket_from_rev(rev)
   "#{base_dir_from_rev(rev)}/mina-indexer.sock"
 end
 
-SOCKET = socket_from_dev(REV)
+SOCKET = socket_from_rev(REV)
 
 def wait_for_socket(wait_interval)
   wait_seconds = 0
