@@ -71,7 +71,7 @@ impl Eq for UserCommand {}
 #[serde(untagged)]
 pub enum Status {
     Status((StatusKind,)),
-    StatusAndFailure(StatusKind, (((TransactionStatusFailedType,),),)),
+    StatusAndFailure(StatusKind, Vec<Vec<(TransactionStatusFailedType,)>>),
 }
 
 /// User command

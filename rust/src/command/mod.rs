@@ -153,10 +153,11 @@ impl CommandStatusData {
                 auxiliary_data: None,
                 balance_data: None,
             },
-            StatusAndFailure(_, (((fails,),),)) => Self::Failed(
-                vec![fails]
-                    .into_iter()
-                    .map(|reason| reason.to_owned())
+            StatusAndFailure(_, fails) => Self::Failed(
+                fails
+                    .iter()
+                    .flatten()
+                    .map(|(reason,)| reason.to_owned())
                     .collect(),
                 None,
             ),
@@ -708,9 +709,13 @@ impl From<v2::staged_ledger_diff::Status> for mina_rs::TransactionStatus2 {
 
         match value {
             Status::Status((StatusKind::Applied,)) => Self::Applied,
-            Status::StatusAndFailure(StatusKind::Failed, (((failure,),),)) => {
-                Self::Failed(vec![Versioned::new(failure)])
-            }
+            Status::StatusAndFailure(StatusKind::Failed, failures) => Self::Failed(
+                failures
+                    .iter()
+                    .flatten()
+                    .map(|(reason,)| vec![Versioned::new(reason.to_owned())])
+                    .collect(),
+            ),
             _ => unreachable!(),
         }
     }

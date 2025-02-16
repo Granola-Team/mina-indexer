@@ -487,7 +487,7 @@ pub enum TransactionStatus1 {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TransactionStatus2 {
     Applied,
-    Failed(Vec<TransactionStatusFailedTypeV1>),
+    Failed(Vec<Vec<TransactionStatusFailedTypeV2>>),
 }
 
 // v1 pre-hardfork
