@@ -30,6 +30,7 @@ use crate::{
     snark_work::SnarkWorkSummary,
     store::username::UsernameUpdate,
 };
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -1275,17 +1276,27 @@ impl PrecomputedBlock {
             // check for the special name service txns
             if cmd.is_applied() {
                 let sender = cmd.sender();
-                let receiver = cmd.receiver();
-                let receiver = receiver.first().expect("receiver");
-                let memo = cmd.memo();
-                if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
-                    && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
-                        || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
-                {
-                    updates.insert(
-                        sender,
-                        Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+
+                let receivers = cmd.receiver();
+                let receiver = receivers.first();
+                if receiver.is_none() {
+                    warn!(
+                        "receiver is missing for state hash '{}'",
+                        self.state_hash().0
                     );
+                }
+
+                if let Some(receiver) = receiver {
+                    let memo = cmd.memo();
+                    if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
+                        && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
+                            || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
+                    {
+                        updates.insert(
+                            sender,
+                            Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                        );
+                    }
                 }
             }
         });
