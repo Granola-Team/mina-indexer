@@ -1,25 +1,6 @@
-use super::{protocol_state::ProtocolState, staged_ledger_diff::StagedLedgerDiff};
-use crate::base::scheduled_time::ScheduledTime;
-use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PrecomputedBlock {
-    /// Time the block is scheduled to be produced
-    pub scheduled_time: ScheduledTime,
-
-    /// Summary of the current state
-    pub protocol_state: ProtocolState,
-
-    /// Collection of ledger updates
-    pub staged_ledger_diff: StagedLedgerDiff,
-
-    #[serde(skip_deserializing)]
-    pub protocol_state_proof: serde_json::Value,
-
-    #[serde(skip_deserializing)]
-    pub delta_transition_chain_proof: serde_json::Value,
-}
+pub type PrecomputedBlock = crate::block::precomputed::v1::BlockFileV1;
 
 pub fn parse_file<P: AsRef<Path>>(path: P) -> anyhow::Result<PrecomputedBlock> {
     let contents = std::fs::read(path)?;

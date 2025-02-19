@@ -1,7 +1,7 @@
 //! Indexer internal precomputed block representation
 
-mod v1;
-mod v2;
+pub(crate) mod v1;
+pub(crate) mod v2;
 
 use super::{
     epoch_data::EpochSeed,
