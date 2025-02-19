@@ -9,7 +9,7 @@ use std::path::PathBuf;
 #[tokio::test]
 async fn check_staking_accounts() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("staking-ledger-balance-sorted-db")?;
-    let ledgers_dir = PathBuf::from("./tests/data/staking_ledgers");
+    let ledgers_dir = PathBuf::from("../tests/data/staking_ledgers");
 
     let mut state = mainnet_genesis_state(store_dir.as_ref())?;
     let epoch = 0;
