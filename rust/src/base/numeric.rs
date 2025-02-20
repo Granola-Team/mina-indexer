@@ -23,7 +23,9 @@ where
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let num = s.parse::<T>().unwrap();
+        let num = s
+            .parse::<T>()
+            .map_err(|e| anyhow::anyhow!("Failed to parse number '{}' : {:?}", s, e))?;
         Ok(Self(num))
     }
 }
