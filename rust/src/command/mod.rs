@@ -165,8 +165,15 @@ impl CommandStatusData {
                                 outer.iter().filter_map(|inner| {
                                     if inner.is_empty() {
                                         None
+                                    } else if inner.len() == 2 && inner[0].as_str() == Some("Account_app_state_precondition_unsatisfied") {
+                                        // Handle both numeric and string representations
+                                        inner[1].as_i64()
+                                            .or_else(|| inner[1].as_str().and_then(|s| s.parse::<i64>().ok()))
+                                            .map(TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied)
                                     } else {
-                                        inner[0].parse::<TransactionStatusFailedType>().ok()
+                                        // Handle regular cases
+                                        inner[0].as_str()
+                                            .and_then(|s| s.parse::<TransactionStatusFailedType>().ok())
                                     }
                                 })
                             })
@@ -174,8 +181,7 @@ impl CommandStatusData {
                     })
                     .unwrap_or_default();
 
-                CommandStatusData::Failed(failures, None) // Pass None for
-                                                          // balance_data
+                CommandStatusData::Failed(failures, None)
             }
             _ => CommandStatusData::Failed(vec![], None),
         }
@@ -1080,6 +1086,7 @@ mod test {
         constants::*,
     };
     use mina_rs::{TransactionStatus2, TransactionStatusFailedType};
+    use serde_json::json;
     use std::path::PathBuf;
     use v2::staged_ledger_diff::Status;
 
@@ -1427,12 +1434,16 @@ mod test {
     fn test_app_state_preconditions_with_parameters() {
         let status = Status::failed(vec![
             vec![],
-            vec![
-                vec!["Account_app_state_precondition_unsatisfied,1".to_string()],
-                vec!["Account_app_state_precondition_unsatisfied,0".to_string()],
-                vec!["Account_app_state_precondition_unsatisfied, 7".to_string()],
-            ],
-            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
+            vec![vec![
+                json!("Account_app_state_precondition_unsatisfied"),
+                // test number
+                json!(7),
+            ]],
+            vec![vec![
+                json!("Account_app_state_precondition_unsatisfied"),
+                // test string
+                json!("1"),
+            ]],
         ]);
 
         if let CommandStatusData::Failed(failures, _) =
@@ -1441,10 +1452,8 @@ mod test {
             assert_eq!(
                 failures,
                 vec![
-                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(1),
-                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(0),
                     TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(7),
-                    TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied
+                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(1)
                 ]
             );
         } else {
@@ -1456,10 +1465,10 @@ mod test {
     fn test_multiple_cancelled_statuses() {
         let status = Status::failed(vec![
             vec![],
-            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
-            vec![vec!["Cancelled".to_string()]],
-            vec![vec!["Cancelled".to_string()]],
-            vec![vec!["Cancelled".to_string()]],
+            vec![vec![json!("Account_nonce_precondition_unsatisfied")]],
+            vec![vec![json!("Cancelled")]],
+            vec![vec![json!("Cancelled")]],
+            vec![vec![json!("Cancelled")]],
         ]);
 
         if let CommandStatusData::Failed(failures, _) =
@@ -1481,9 +1490,9 @@ mod test {
 
     #[test]
     fn test_amount_insufficient_single_failure() {
-        let status = Status::failed(vec![vec![vec![
-            "Amount_insufficient_to_create_account".to_string()
-        ]]]);
+        let status = Status::failed(vec![vec![vec![json!(
+            "Amount_insufficient_to_create_account"
+        )]]]);
 
         if let CommandStatusData::Failed(failures, _) =
             CommandStatusData::from_transaction_status_v2(&status)
@@ -1505,9 +1514,9 @@ mod test {
 
     #[test]
     fn test_failed_status() {
-        let status = Status::failed(vec![vec![vec![
-            "Amount_insufficient_to_create_account".to_string()
-        ]]]);
+        let status = Status::failed(vec![vec![vec![json!(
+            "Amount_insufficient_to_create_account"
+        )]]]);
 
         let result: TransactionStatus2 = status.into();
         assert!(matches!(result, TransactionStatus2::Failed(_)));

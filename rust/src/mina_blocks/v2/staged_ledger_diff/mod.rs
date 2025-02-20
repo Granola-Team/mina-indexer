@@ -19,6 +19,7 @@ use crate::{
 use completed_work::CompletedWork;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,8 +76,7 @@ impl Eq for UserCommand {}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Status {
     pub status: Vec<String>,
-    #[serde(default)]
-    pub failure_data: Option<Vec<Vec<Vec<String>>>>,
+    pub failure_data: Option<Vec<Vec<Vec<Value>>>>, // Using serde_json::Value instead of String
 }
 
 // Custom serialization module for Status
@@ -135,7 +135,7 @@ impl Status {
         }
     }
 
-    pub fn failed(failure_data: Vec<Vec<Vec<String>>>) -> Self {
+    pub fn failed(failure_data: Vec<Vec<Vec<Value>>>) -> Self {
         Status {
             status: vec!["Failed".to_string()],
             failure_data: Some(failure_data),
@@ -163,25 +163,33 @@ impl From<Status> for TransactionStatus2 {
                         fails
                             .iter()
                             .map(|outer| {
-                                outer
+                                vec![outer
                                     .iter()
-                                    .map(|inner| {
-                                        inner
-                                            .iter()
-                                            .map(|reason| {
-                                                Versioned::new(
+                                    .filter_map(|inner| {
+                                        if inner.is_empty() {
+                                            None
+                                        } else if inner.len() == 2
+                                            && inner[0].as_str() == Some("Account_app_state_precondition_unsatisfied") {
+                                            // Handle numeric parameter case
+                                            inner[1].as_i64().map(|n| {
+                                                vec![Versioned::new(
+                                                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(n)
+                                                )]
+                                            })
+                                        } else {
+                                            // Handle regular failure types
+                                            inner[0].as_str().map(|reason| {
+                                                vec![Versioned::new(
                                                     TransactionStatusFailedType::from_str(reason)
                                                         .unwrap_or_else(|_| {
-                                                            panic!(
-                                                                "Invalid failure reason: {}",
-                                                                reason
-                                                            )
-                                                        }),
-                                                )
+                                                            panic!("Invalid failure reason: {}", reason)
+                                                        })
+                                                )]
                                             })
-                                            .collect()
+                                        }
                                     })
-                                    .collect()
+                                    .flatten()
+                                    .collect()]
                             })
                             .collect()
                     })
