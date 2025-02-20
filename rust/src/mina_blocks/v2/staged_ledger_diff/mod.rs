@@ -11,11 +11,15 @@ use crate::{
     command::{to_mina_format, to_zkapp_json},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{token::TokenAddress, LedgerHash},
-    protocol::serialization_types::staged_ledger_diff::TransactionStatusFailedType,
+    protocol::serialization_types::staged_ledger_diff::{
+        TransactionStatus2, TransactionStatusFailedType,
+    },
     utility::functions::nanomina_to_mina,
 };
 use completed_work::CompletedWork;
+use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StagedLedgerDiff {
@@ -62,16 +66,130 @@ pub struct CoinbasePayload {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UserCommand {
     pub data: (UserCommandKind, UserCommandData),
+    #[serde(with = "status_format")]
     pub status: Status,
 }
 
 impl Eq for UserCommand {}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum Status {
-    Status((StatusKind,)),
-    StatusAndFailure(StatusKind, Vec<Vec<(TransactionStatusFailedType,)>>),
+pub struct Status {
+    pub status: Vec<String>,
+    #[serde(default)]
+    pub failure_data: Option<Vec<Vec<Vec<String>>>>,
+}
+
+// Custom serialization module for Status
+mod status_format {
+    use super::Status;
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Status, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value: Vec<serde_json::Value> = Vec::deserialize(deserializer)?;
+
+        if value.is_empty() {
+            return Err(serde::de::Error::custom("Status array cannot be empty"));
+        }
+
+        let status_str = value[0]
+            .as_str()
+            .ok_or_else(|| serde::de::Error::custom("First element must be a string"))?;
+
+        Ok(Status {
+            status: vec![status_str.to_string()],
+            failure_data: if value.len() > 1 {
+                Some(serde_json::from_value(value[1].clone()).map_err(serde::de::Error::custom)?)
+            } else {
+                None
+            },
+        })
+    }
+
+    pub fn serialize<S>(status: &Status, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeSeq;
+
+        let mut seq =
+            serializer.serialize_seq(Some(if status.failure_data.is_some() { 2 } else { 1 }))?;
+
+        seq.serialize_element(&status.status[0])?;
+
+        if let Some(ref failure_data) = status.failure_data {
+            seq.serialize_element(failure_data)?;
+        }
+
+        seq.end()
+    }
+}
+
+impl Status {
+    pub fn applied() -> Self {
+        Status {
+            status: vec!["Applied".to_string()],
+            failure_data: None,
+        }
+    }
+
+    pub fn failed(failure_data: Vec<Vec<Vec<String>>>) -> Self {
+        Status {
+            status: vec!["Failed".to_string()],
+            failure_data: Some(failure_data),
+        }
+    }
+}
+
+impl From<Vec<String>> for Status {
+    fn from(status: Vec<String>) -> Self {
+        Status {
+            status,
+            failure_data: None,
+        }
+    }
+}
+
+impl From<Status> for TransactionStatus2 {
+    fn from(status: Status) -> Self {
+        match status.status.first() {
+            Some(s) if s == "Applied" => TransactionStatus2::Applied,
+            Some(s) if s == "Failed" => TransactionStatus2::Failed(
+                status
+                    .failure_data
+                    .map(|fails| {
+                        fails
+                            .iter()
+                            .map(|outer| {
+                                outer
+                                    .iter()
+                                    .map(|inner| {
+                                        inner
+                                            .iter()
+                                            .map(|reason| {
+                                                Versioned::new(
+                                                    TransactionStatusFailedType::from_str(reason)
+                                                        .unwrap_or_else(|_| {
+                                                            panic!(
+                                                                "Invalid failure reason: {}",
+                                                                reason
+                                                            )
+                                                        }),
+                                                )
+                                            })
+                                            .collect()
+                                    })
+                                    .collect()
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            ),
+            _ => panic!("Unexpected status value: {:?}", status.status),
+        }
+    }
 }
 
 /// User command

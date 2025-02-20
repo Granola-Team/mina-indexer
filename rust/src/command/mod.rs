@@ -6,20 +6,24 @@ pub mod zkapp;
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
-    command::signed::{SignedCommand, SignedCommandWithKind},
+    command::signed::SignedCommand,
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{
-            SignedCommandPayloadBody, StakeDelegationPayload, UserCommandData, ZkappCommandData,
+            SignedCommandPayloadBody, StakeDelegationPayload, Status, UserCommandData,
+            ZkappCommandData,
         },
     },
-    protocol::serialization_types::staged_ledger_diff as mina_rs,
+    protocol::serialization_types::staged_ledger_diff::{
+        self as mina_rs, TransactionStatus1, TransactionStatusFailedType,
+    },
     utility::functions::nanomina_to_mina,
 };
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
-use signed::SignedCommandWithCreationData;
+use signed::{SignedCommandWithCreationData, SignedCommandWithKind};
+use std::str::FromStr;
 
 // re-export types
 pub type TxnHash = signed::TxnHash;
@@ -133,34 +137,45 @@ impl CommandStatusData {
             .and_then(|b| b.created_token.as_ref().map(|b| b.t.t.t))
     }
 
-    pub fn from_transaction_status_v1(data: &mina_rs::TransactionStatus1) -> Self {
+    pub fn from_transaction_status_v1(data: &TransactionStatus1) -> Self {
         match data {
-            mina_rs::TransactionStatus1::Applied(auxiliary_data, balance_data) => Self::Applied {
+            TransactionStatus1::Applied(auxiliary_data, balance_data) => Self::Applied {
                 auxiliary_data: Some(auxiliary_data.t.to_owned()),
                 balance_data: Some(balance_data.t.to_owned()),
             },
-            mina_rs::TransactionStatus1::Failed(fails, balance_data) => Self::Failed(
+            TransactionStatus1::Failed(fails, balance_data) => Self::Failed(
                 fails.iter().map(|reason| reason.t.to_owned()).collect(),
                 Some(balance_data.t.to_owned()),
             ),
         }
     }
 
-    pub fn from_transaction_status_v2(data: &v2::staged_ledger_diff::Status) -> Self {
-        use v2::staged_ledger_diff::Status::*;
-        match data {
-            Status(_) => Self::Applied {
+    pub fn from_transaction_status_v2(status: &Status) -> Self {
+        match status.status.first() {
+            Some(s) if s == "Applied" => CommandStatusData::Applied {
                 auxiliary_data: None,
                 balance_data: None,
             },
-            StatusAndFailure(_, fails) => Self::Failed(
-                fails
-                    .iter()
-                    .flatten()
-                    .map(|(reason,)| reason.to_owned())
-                    .collect(),
-                None,
-            ),
+            Some(s) if s == "Failed" => {
+                let failures = status
+                    .failure_data
+                    .as_ref()
+                    .map(|data| {
+                        data.iter()
+                            .flat_map(|group| {
+                                group.iter().flat_map(|failures| {
+                                    failures.iter().filter_map(|failure| {
+                                        TransactionStatusFailedType::from_str(failure).ok()
+                                    })
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                CommandStatusData::Failed(failures, None)
+            }
+            _ => CommandStatusData::Failed(vec![], None),
         }
     }
 }
@@ -695,32 +710,6 @@ impl From<UserCommandWithStatus> for Command {
     }
 }
 
-// status conversions
-
-impl From<UserCommandWithStatus> for CommandStatusData {
-    fn from(value: UserCommandWithStatus) -> Self {
-        value.status_data()
-    }
-}
-
-impl From<v2::staged_ledger_diff::Status> for mina_rs::TransactionStatus2 {
-    fn from(value: v2::staged_ledger_diff::Status) -> Self {
-        use v2::staged_ledger_diff::{Status, StatusKind};
-
-        match value {
-            Status::Status((StatusKind::Applied,)) => Self::Applied,
-            Status::StatusAndFailure(StatusKind::Failed, failures) => Self::Failed(
-                failures
-                    .iter()
-                    .flatten()
-                    .map(|(reason,)| vec![Versioned::new(reason.to_owned())])
-                    .collect(),
-            ),
-            _ => unreachable!(),
-        }
-    }
-}
-
 // debug/display
 
 impl std::fmt::Debug for CommandType {
@@ -856,7 +845,7 @@ impl From<UserCommandWithStatus> for serde_json::Value {
             UserCommandWithStatus::V1(v1) => v1.inner().into(),
             UserCommandWithStatus::V2(_) => value,
         };
-        let status: CommandStatusData = user_cmd.clone().into();
+        let status: CommandStatusData = user_cmd.status_data();
         let data: SignedCommandWithKind = user_cmd.into();
 
         let mut object = Map::new();
@@ -1088,7 +1077,9 @@ mod test {
         command::decode_memo,
         constants::*,
     };
+    use mina_rs::{TransactionStatus2, TransactionStatusFailedType};
     use std::path::PathBuf;
+    use v2::staged_ledger_diff::Status;
 
     #[test]
     fn decode_memo_v1() {
@@ -1428,5 +1419,116 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn test_simple_failure_with_nonce_and_cancelled() {
+        let status = Status::failed(vec![
+            vec![],
+            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
+            vec![vec!["Cancelled".to_string()]],
+        ]);
+
+        if let CommandStatusData::Failed(failures, _) =
+            CommandStatusData::from_transaction_status_v2(&status)
+        {
+            assert_eq!(
+                failures,
+                vec![
+                    TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied,
+                    TransactionStatusFailedType::Cancelled
+                ]
+            );
+        } else {
+            panic!("Expected Failed status");
+        }
+    }
+
+    #[test]
+    fn test_app_state_preconditions_with_parameters() {
+        let status = Status::failed(vec![
+            vec![],
+            vec![
+                vec!["Account_app_state_precondition_unsatisfied,1".to_string()],
+                vec!["Account_app_state_precondition_unsatisfied,0".to_string()],
+            ],
+            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
+        ]);
+
+        if let CommandStatusData::Failed(failures, _) =
+            CommandStatusData::from_transaction_status_v2(&status)
+        {
+            assert_eq!(
+                failures,
+                vec![
+                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(1),
+                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(0),
+                    TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied
+                ]
+            );
+        } else {
+            panic!("Expected Failed status");
+        }
+    }
+
+    #[test]
+    fn test_multiple_cancelled_statuses() {
+        let status = Status::failed(vec![
+            vec![],
+            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
+            vec![vec!["Cancelled".to_string()]],
+            vec![vec!["Cancelled".to_string()]],
+            vec![vec!["Cancelled".to_string()]],
+        ]);
+
+        if let CommandStatusData::Failed(failures, _) =
+            CommandStatusData::from_transaction_status_v2(&status)
+        {
+            assert_eq!(
+                failures,
+                vec![
+                    TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied,
+                    TransactionStatusFailedType::Cancelled,
+                    TransactionStatusFailedType::Cancelled,
+                    TransactionStatusFailedType::Cancelled
+                ]
+            );
+        } else {
+            panic!("Expected Failed status");
+        }
+    }
+
+    #[test]
+    fn test_amount_insufficient_single_failure() {
+        let status = Status::failed(vec![vec![vec![
+            "Amount_insufficient_to_create_account".to_string()
+        ]]]);
+
+        if let CommandStatusData::Failed(failures, _) =
+            CommandStatusData::from_transaction_status_v2(&status)
+        {
+            assert_eq!(
+                failures,
+                vec![TransactionStatusFailedType::AmountInsufficientToCreateAccount]
+            );
+        } else {
+            panic!("Expected Failed status");
+        }
+    }
+
+    #[test]
+    fn test_applied_status() {
+        let result: TransactionStatus2 = Status::applied().into();
+        assert!(matches!(result, TransactionStatus2::Applied));
+    }
+
+    #[test]
+    fn test_failed_status() {
+        let status = Status::failed(vec![vec![vec![
+            "Amount_insufficient_to_create_account".to_string()
+        ]]]);
+
+        let result: TransactionStatus2 = status.into();
+        assert!(matches!(result, TransactionStatus2::Failed(_)));
     }
 }

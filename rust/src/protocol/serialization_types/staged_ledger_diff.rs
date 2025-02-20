@@ -20,6 +20,7 @@ use mina_serialization_versioned::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use smart_default::SmartDefault;
+use std::str::FromStr;
 
 /// Top level wrapper type for a StagedLedgerDiff
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -487,7 +488,7 @@ pub enum TransactionStatus1 {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum TransactionStatus2 {
     Applied,
-    Failed(Vec<Vec<TransactionStatusFailedTypeV2>>),
+    Failed(Vec<Vec<Vec<TransactionStatusFailedTypeV2>>>),
 }
 
 // v1 pre-hardfork
@@ -674,6 +675,88 @@ pub enum TransactionStatusFailedType {
     #[serde(rename = "Invalid_fee_excess")]
     InvalidFeeExcess,
     Cancelled,
+}
+
+impl FromStr for TransactionStatusFailedType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Predicate" => Ok(Self::Predicate),
+            "Source_not_present" => Ok(Self::SourceNotPresent),
+            "Receiver_not_present" => Ok(Self::ReceiverNotPresent),
+            "Amount_insufficient_to_create_account" => Ok(Self::AmountInsufficientToCreateAccount),
+            "Cannot_pay_creation_fee_in_token" => Ok(Self::CannotPayCreationFeeInToken),
+            "Source_insufficient_balance" => Ok(Self::SourceInsufficientBalance),
+            "Source_minimum_balance_violation" => Ok(Self::SourceMinimumBalanceViolation),
+            "Receiver_already_exists" => Ok(Self::ReceiverAlreadyExists),
+            "Token_owner_not_caller" => Ok(Self::TokenOwnerNotCaller),
+            "Overflow" => Ok(Self::Overflow),
+            "Global_excess_overflow" => Ok(Self::GlobalExcessOverflow),
+            "Local_excess_overflow" => Ok(Self::LocalExcessOverflow),
+            "Local_supply_increase_overflow" => Ok(Self::LocalSupplyIncreaseOverflow),
+            "Global_supply_increase_overflow" => Ok(Self::GlobalSupplyIncreaseOverflow),
+            "Signed_command_on_zkapp_account" => Ok(Self::SignedCommandOnZkappAccount),
+            "Zkapp_account_not_present" => Ok(Self::ZkappAccountNotPresent),
+            "Update_not_permitted_balance" => Ok(Self::UpdateNotPermittedBalance),
+            "Update_not_permitted_access" => Ok(Self::UpdateNotPermittedAccess),
+            "Update_not_permitted_timing" => Ok(Self::UpdateNotPermittedTiming),
+            "Update_not_permitted_delegate" => Ok(Self::UpdateNotPermittedDelegate),
+            "Update_not_permitted_app_state" => Ok(Self::UpdateNotPermittedAppState),
+            "Update_not_permitted_verification_key" => Ok(Self::UpdateNotPermittedVerificationKey),
+            "Update_not_permitted_action_state" => Ok(Self::UpdateNotPermittedactionState),
+            "Update_not_permitted_zkapp_uri" => Ok(Self::UpdateNotPermittedZkappUri),
+            "Update_not_permitted_token_symbol" => Ok(Self::UpdateNotPermittedTokenSymbol),
+            "Update_not_permitted_permissions" => Ok(Self::UpdateNotPermittedpermissions),
+            "Update_not_permitted_nonce" => Ok(Self::UpdateNotPermittedNonce),
+            "Update_not_permitted_voting_for" => Ok(Self::UpdateNotPermittedVotingFor),
+            "Zkapp_command_replay_check_failed" => Ok(Self::ZkappCommandReplayCheckFailed),
+            "Fee_payer_nonce_must_increase" => Ok(Self::FeePayerNonceMustIncrease),
+            "Fee_payer_must_be_signed" => Ok(Self::FeePayerMustBeSigned),
+            "Account_balance_precondition_unsatisfied" => {
+                Ok(Self::AccountBalancePreconditionUnsatisfied)
+            }
+            "Account_nonce_precondition_unsatisfied" => {
+                Ok(Self::AccountNoncePreconditionUnsatisfied)
+            }
+            "Account_receipt_chain_hash_precondition_unsatisfied" => {
+                Ok(Self::AccountReceiptChainHashPreconditionUnsatisfied)
+            }
+            "Account_delegate_precondition_unsatisfied" => {
+                Ok(Self::AccountDelegatePreconditionUnsatisfied)
+            }
+            "Account_action_state_precondition_unsatisfied" => {
+                Ok(Self::AccountActionStatePreconditionUnsatisfied)
+            }
+            "Account_proved_state_precondition_unsatisfied" => {
+                Ok(Self::AccountProvedStatePreconditionUnsatisfied)
+            }
+            "Account_is_new_precondition_unsatisfied" => {
+                Ok(Self::AccountIsNewPreconditionUnsatisfied)
+            }
+            "Protocol_state_precondition_unsatisfied" => {
+                Ok(Self::ProtocolStatePreconditionUnsatisfied)
+            }
+            "Unexpected_verification_key_hash" => Ok(Self::UnexpectedVerificationKeyHash),
+            "Valid_while_precondition_unsatisfied" => Ok(Self::ValidWhilePreconditionUnsatisfied),
+            "Incorrect_nonce" => Ok(Self::IncorrectNonce),
+            "Invalid_fee_excess" => Ok(Self::InvalidFeeExcess),
+            "Cancelled" => Ok(Self::Cancelled),
+            s if s.starts_with("Account_app_state_precondition_unsatisfied") => {
+                // Handle the parameterized variant
+                if let Some(num_str) = s.split(',').nth(1) {
+                    if let Ok(num) = num_str.trim().parse::<i64>() {
+                        return Ok(Self::AccountAppStatePreconditionUnsatisfied(num));
+                    }
+                }
+                Err(format!(
+                    "Invalid Account_app_state_precondition_unsatisfied parameter: {}",
+                    s
+                ))
+            }
+            _ => Err(format!("Unknown failure type: {}", s)),
+        }
+    }
 }
 
 // v1 pre-hardfork
