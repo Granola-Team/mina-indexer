@@ -1,6 +1,5 @@
 //! Indexer internal block representation used in the witness tree
 
-pub mod blockchain_length;
 pub mod epoch_data;
 pub mod genesis;
 pub mod genesis_state_hash;
@@ -14,7 +13,7 @@ mod post_hardfork;
 
 use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
-    base::state_hash::StateHash, canonicity::Canonicity, chain::Network, constants::*,
+    base::{blockchain_length::BlockchainLength, state_hash::StateHash},
     utility::functions::is_valid_file_name,
 };
 use precomputed::PcbVersion;
