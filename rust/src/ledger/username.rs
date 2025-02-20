@@ -5,6 +5,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct Username(pub String);
 
+//////////
+// impl //
+//////////
+
 impl Username {
     pub const MAX_LEN: usize = MEMO_LEN - NAME_SERVICE_MEMO_PREFIX.len();
 
@@ -14,6 +18,21 @@ impl Username {
             .map(Self)
     }
 }
+
+/////////////////
+// conversions //
+/////////////////
+
+impl From<&str> for Username {
+    fn from(value: &str) -> Self {
+        let username = value.to_string();
+        Self(username)
+    }
+}
+
+///////////////////
+// display/debug //
+///////////////////
 
 impl std::default::Default for Username {
     fn default() -> Self {

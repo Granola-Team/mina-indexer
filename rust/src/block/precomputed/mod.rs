@@ -23,14 +23,12 @@ use crate::{
     ledger::{
         coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
         token::TokenAddress,
-        username::Username,
         LedgerHash,
     },
     protocol::serialization_types::staged_ledger_diff as mina_rs,
     snark_work::SnarkWorkSummary,
     store::username::UsernameUpdate,
 };
-use log::warn;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
@@ -1269,37 +1267,31 @@ impl PrecomputedBlock {
         }
     }
 
-    /// Returns the map username updates in the block
+    /// Returns the map of username updates in the block
     pub fn username_updates(&self) -> UsernameUpdate {
         let mut updates = HashMap::new();
+
         self.commands().iter().for_each(|cmd| {
             // check for the special name service txns
             if cmd.is_applied() {
                 let sender = cmd.sender();
-
                 let receivers = cmd.receiver();
-                let receiver = receivers.first();
-                if receiver.is_none() {
-                    warn!(
-                        "receiver is missing for state hash '{}'",
-                        self.state_hash().0
-                    );
-                }
 
-                if let Some(receiver) = receiver {
+                for receiver in receivers {
                     let memo = cmd.memo();
                     if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
                         && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
                             || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
                     {
                         updates.insert(
-                            sender,
-                            Username(memo[NAME_SERVICE_MEMO_PREFIX.len()..].to_string()),
+                            sender.to_owned(),
+                            memo[NAME_SERVICE_MEMO_PREFIX.len()..].into(),
                         );
                     }
                 }
             }
         });
+
         UsernameUpdate(updates)
     }
 
