@@ -23,7 +23,6 @@ use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use signed::{SignedCommandWithCreationData, SignedCommandWithKind};
-use std::str::FromStr;
 
 // re-export types
 pub type TxnHash = signed::TxnHash;
@@ -162,18 +161,21 @@ impl CommandStatusData {
                     .as_ref()
                     .map(|data| {
                         data.iter()
-                            .flat_map(|group| {
-                                group.iter().flat_map(|failures| {
-                                    failures.iter().filter_map(|failure| {
-                                        TransactionStatusFailedType::from_str(failure).ok()
-                                    })
+                            .flat_map(|outer| {
+                                outer.iter().filter_map(|inner| {
+                                    if inner.is_empty() {
+                                        None
+                                    } else {
+                                        inner[0].parse::<TransactionStatusFailedType>().ok()
+                                    }
                                 })
                             })
                             .collect()
                     })
                     .unwrap_or_default();
 
-                CommandStatusData::Failed(failures, None)
+                CommandStatusData::Failed(failures, None) // Pass None for
+                                                          // balance_data
             }
             _ => CommandStatusData::Failed(vec![], None),
         }
@@ -1428,6 +1430,7 @@ mod test {
             vec![
                 vec!["Account_app_state_precondition_unsatisfied,1".to_string()],
                 vec!["Account_app_state_precondition_unsatisfied,0".to_string()],
+                vec!["Account_app_state_precondition_unsatisfied, 7".to_string()],
             ],
             vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
         ]);
@@ -1440,6 +1443,7 @@ mod test {
                 vec![
                     TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(1),
                     TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(0),
+                    TransactionStatusFailedType::AccountAppStatePreconditionUnsatisfied(7),
                     TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied
                 ]
             );
