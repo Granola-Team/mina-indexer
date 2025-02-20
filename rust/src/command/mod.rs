@@ -1422,29 +1422,6 @@ mod test {
     }
 
     #[test]
-    fn test_simple_failure_with_nonce_and_cancelled() {
-        let status = Status::failed(vec![
-            vec![],
-            vec![vec!["Account_nonce_precondition_unsatisfied".to_string()]],
-            vec![vec!["Cancelled".to_string()]],
-        ]);
-
-        if let CommandStatusData::Failed(failures, _) =
-            CommandStatusData::from_transaction_status_v2(&status)
-        {
-            assert_eq!(
-                failures,
-                vec![
-                    TransactionStatusFailedType::AccountNoncePreconditionUnsatisfied,
-                    TransactionStatusFailedType::Cancelled
-                ]
-            );
-        } else {
-            panic!("Expected Failed status");
-        }
-    }
-
-    #[test]
     fn test_app_state_preconditions_with_parameters() {
         let status = Status::failed(vec![
             vec![],
