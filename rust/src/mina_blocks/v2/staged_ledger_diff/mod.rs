@@ -418,10 +418,10 @@ pub struct Preconditions {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct NetworkPreconditions {
     pub snarked_ledger_hash: Precondition<LedgerHashBounds>,
-    pub blockchain_length: Precondition<NumericBounds>,
-    pub min_window_density: Precondition<NumericBounds>,
-    pub total_currency: Precondition<NumericBounds>,
-    pub global_slot_since_genesis: Precondition<NumericBounds>,
+    pub blockchain_length: Precondition<NumericBoundsU32>,
+    pub min_window_density: Precondition<NumericBoundsU32>,
+    pub total_currency: Precondition<NumericBoundsU32>,
+    pub global_slot_since_genesis: Precondition<NumericBoundsU32>,
     pub staking_epoch_data: StakingEpochDataPreconditions,
     pub next_epoch_data: StakingEpochDataPreconditions,
 }
@@ -443,8 +443,8 @@ pub struct LedgerPreconditions {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct AccountPreconditions {
-    pub balance: Precondition<NumericBounds>,
-    pub nonce: Precondition<NumericBounds>,
+    pub balance: Precondition<NumericBoundsU64>,
+    pub nonce: Precondition<NumericBoundsU32>,
     pub receipt_chain_hash: Precondition<String>,
     pub delegate: Precondition<PublicKey>,
     pub state: [Precondition<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
@@ -461,31 +461,21 @@ pub enum Precondition<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
-pub struct NumericBounds {
+pub struct NumericBoundsU32 {
     lower: Numeric<u32>,
     upper: Numeric<u32>,
 }
 
-impl std::str::FromStr for NumericBounds {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(anyhow::Error::new)
-    }
+#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
+pub struct NumericBoundsU64 {
+    lower: Numeric<u64>,
+    upper: Numeric<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct LedgerHashBounds {
     lower: LedgerHash,
     upper: LedgerHash,
-}
-
-impl std::str::FromStr for LedgerHashBounds {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).map_err(anyhow::Error::new)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize)]
