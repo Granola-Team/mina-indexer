@@ -14,6 +14,9 @@ mod post_hardfork;
 use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{
     base::{blockchain_length::BlockchainLength, state_hash::StateHash},
+    canonicity::Canonicity,
+    chain::Network,
+    constants::*,
     utility::functions::is_valid_file_name,
 };
 use precomputed::PcbVersion;
@@ -354,7 +357,7 @@ pub fn extract_network(path: &Path) -> Network {
 /// Extracts all three values from file name
 ///
 /// Valid block file names have the form: {network}-{block height}-{state hash}
-pub fn extract_network_height_hash(path: &Path) -> (Network, u32, StateHash) {
+pub fn extract_network_height_hash(path: &Path) -> (Network, BlockchainLength, StateHash) {
     let name = path.file_stem().and_then(|x| x.to_str()).unwrap();
     let network_end = name.find('-').expect("valid block file has network");
     let height_end = name[network_end + 1..]
@@ -366,7 +369,7 @@ pub fn extract_network_height_hash(path: &Path) -> (Network, u32, StateHash) {
     let state_hash = &name[network_end + 1..][height_end + 1..];
     (
         Network::from(&name[..network_end]),
-        block_height,
+        block_height.into(),
         state_hash.into(),
     )
 }
@@ -423,7 +426,7 @@ mod block_tests {
         assert_eq!(
             (
                 Network::Mainnet,
-                2,
+                2.into(),
                 StateHash::from("3NLyWnjZqUECniE1q719CoLmes6WDQAod4vrTeLfN7XXJbHv6EHH")
             ),
             extract_network_height_hash(path0)
@@ -431,7 +434,7 @@ mod block_tests {
         assert_eq!(
             (
                 Network::Devnet,
-                3,
+                3.into(),
                 StateHash::from("3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R")
             ),
             extract_network_height_hash(path1)

@@ -118,18 +118,18 @@ impl PrecomputedBlock {
     }
 
     pub fn new(
-        network: &str,
-        blockchain_length: u32,
-        state_hash: &str,
+        network: Network,
+        blockchain_length: BlockchainLength,
+        state_hash: StateHash,
         contents: Vec<u8>,
         version: PcbVersion,
     ) -> anyhow::Result<Self> {
         let precomputed_block = PrecomputedBlock::from_file_contents(
             BlockFileContents {
                 contents,
-                network: network.into(),
-                state_hash: state_hash.into(),
-                blockchain_length: blockchain_length.into(),
+                network,
+                state_hash,
+                blockchain_length,
             },
             version,
         )?;

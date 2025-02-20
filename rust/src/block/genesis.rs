@@ -1,6 +1,8 @@
 use super::precomputed::PcbVersion;
 use crate::{
+    base::{blockchain_length::BlockchainLength, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
+    chain::Network,
     constants::{HARDFORK_GENESIS_BLOCKCHAIN_LENGTH, HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
 };
 
@@ -20,9 +22,9 @@ impl GenesisBlock {
     pub fn new_v1() -> anyhow::Result<Self> {
         let contents = GENESIS_MAINNET_BLOCK_CONTENTS.as_bytes().to_vec();
         let size = contents.len() as u64;
-        let network = "mainnet";
-        let blockchain_length: u32 = 1;
-        let state_hash = MAINNET_GENESIS_HASH;
+        let network = Network::Mainnet;
+        let blockchain_length: BlockchainLength = 1.into();
+        let state_hash: StateHash = MAINNET_GENESIS_HASH.into();
 
         Ok(Self(
             PrecomputedBlock::new(
@@ -40,9 +42,9 @@ impl GenesisBlock {
     pub fn new_v2() -> anyhow::Result<Self> {
         let contents = GENESIS_HARDFORK_BLOCK_CONTENTS.as_bytes().to_vec();
         let size = contents.len() as u64;
-        let network = "mainnet";
-        let blockchain_length = HARDFORK_GENESIS_BLOCKCHAIN_LENGTH;
-        let state_hash = HARDFORK_GENESIS_HASH;
+        let network = Network::Mainnet;
+        let blockchain_length: BlockchainLength = HARDFORK_GENESIS_BLOCKCHAIN_LENGTH.into();
+        let state_hash: StateHash = HARDFORK_GENESIS_HASH.into();
 
         Ok(Self(
             PrecomputedBlock::new(
