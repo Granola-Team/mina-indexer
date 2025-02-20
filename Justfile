@@ -210,7 +210,7 @@ dev-continue subtest='': dev-build
 # Unit tests
 #
 
-# Run unit tests 
+# Run unit tests
 test-unit-tier1 test='':
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
@@ -218,14 +218,14 @@ test-unit-tier1 test='':
   cd rust && time cargo nextest run {{test}}
 
 # Run release tier 2 & mina_rs unit test(s).
-test-unit-tier2:
+test-unit-tier2 test='':
   @echo "--- Performing long-running unit tests"
-  cd rust && time cargo nextest run --release --features "tier2 mina_rs"
+  cd rust && time cargo nextest run --release --features "tier2 mina_rs" {{test}}
 
 # Run all unit tests of tier 2. (TODO: why this?)
-test-unit:
+test-unit test='':
   @echo "--- Performing all indexer unit tests"
-  cd rust && time cargo nextest run --features tier2
+  cd rust && time cargo nextest run --features "tier2" {{test}}
 
 #
 # Tier 1 tests
