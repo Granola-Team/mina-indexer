@@ -140,17 +140,7 @@ impl PrecomputedBlock {
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
         let contents = std::fs::read(path)?;
-        let precomputed_block = PrecomputedBlock::from_file_contents(
-            BlockFileContents {
-                contents,
-                network,
-                state_hash,
-                blockchain_length: blockchain_length.into(),
-            },
-            version,
-        )?;
-
-        Ok(precomputed_block)
+        Self::new(network, blockchain_length, state_hash, contents, version)
     }
 
     pub fn scheduled_time(&self) -> String {
