@@ -136,6 +136,15 @@ impl PrecomputedBlock {
         Ok(precomputed_block)
     }
 
+    /// Parses the precomputed block if the path is a valid block file and
+    /// automatically determines the version.
+    pub fn from_path(path: &Path) -> anyhow::Result<Self> {
+        let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
+        let version: PcbVersion = blockchain_length.into();
+        let contents = std::fs::read(path)?;
+        Self::new(network, blockchain_length, state_hash, contents, version)
+    }
+
     /// Parses the precomputed block if the path is a valid block file
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
@@ -1417,5 +1426,87 @@ mod tests {
             "rWxD4L_t-VXaoDDVJipD5OR9OU6X4T6WwEWCxvoEAAA=".to_string()
         );
         Ok(())
+    }
+
+    /// This may take a while to run, so it's only enabled when the
+    /// `local_tests` feature is enabled. This requires the BLOCKS_DIR
+    /// environment variable to be set.
+    #[allow(dead_code)]
+    #[cfg(all(test, feature = "local_tests"))]
+    fn test_parse_blocks_dir() -> anyhow::Result<()> {
+        use rayon::prelude::*;
+        use std::{
+            path::PathBuf,
+            sync::atomic::{AtomicUsize, Ordering},
+            time::Instant,
+        };
+
+        let start_time = Instant::now();
+        println!("Starting block parsing at {}", chrono::Local::now());
+
+        // Get blocks directory with better error handling
+        let blocks_dir = std::env::var("BLOCKS_DIR")
+            .map(PathBuf::from)
+            .map_err(|_| anyhow::anyhow!("BLOCKS_DIR environment variable must be set"))?;
+
+        // Construct glob pattern more safely
+        let pattern = blocks_dir.join("mainnet-*.json");
+        let pattern_str = pattern
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid path pattern"))?;
+
+        // Collect paths with better error handling
+        let paths: Vec<PathBuf> = glob::glob(pattern_str)?.filter_map(Result::ok).collect();
+
+        let total_files = paths.len();
+        let processed_count = AtomicUsize::new(0);
+        let error_count = AtomicUsize::new(0);
+
+        println!("Found {} files to parse", total_files);
+
+        // Process files in parallel with better progress tracking
+        paths
+            .par_iter()
+            .try_for_each(|path| -> anyhow::Result<()> {
+                let result = PrecomputedBlock::from_path(path);
+
+                match result {
+                    Ok(_) => {
+                        let count = processed_count.fetch_add(1, Ordering::Relaxed);
+                        if count % 1000 == 0 {
+                            println!("Processed {} files...", count);
+                        }
+                    }
+                    Err(e) => {
+                        error_count.fetch_add(1, Ordering::Relaxed);
+                        eprintln!("Error parsing {:?}: {}", path, e);
+                    }
+                }
+                Ok(())
+            })?;
+
+        let duration = start_time.elapsed();
+        let errors = error_count.load(Ordering::Relaxed);
+        let processed = processed_count.load(Ordering::Relaxed);
+
+        println!("\nParsing Summary:");
+        println!("Finished at: {}", chrono::Local::now());
+        println!("Total time: {:.2?}", duration);
+        println!("Files processed: {}/{}", processed, total_files);
+        println!("Errors encountered: {}", errors);
+        println!(
+            "Average time per file: {:.2?}",
+            duration / total_files as u32
+        );
+        println!(
+            "Processing rate: {:.2} files/second",
+            total_files as f64 / duration.as_secs_f64()
+        );
+
+        if errors > 0 {
+            Err(anyhow::anyhow!("{} files failed to parse", errors))
+        } else {
+            Ok(())
+        }
     }
 }

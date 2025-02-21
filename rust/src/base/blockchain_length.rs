@@ -1,5 +1,6 @@
 //! Indexer blockchain length type
 
+use crate::{block::precomputed::PcbVersion, constants::HARDFORK_GENESIS_BLOCKCHAIN_LENGTH};
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -29,6 +30,18 @@ impl FromStr for BlockchainLength {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let blockchain_length = s.parse()?;
         Ok(Self(blockchain_length))
+    }
+}
+
+/// If the blockchain length is greater than or equal to the hardfork genesis
+/// blockchain length, return version 2, otherwise return version 1.
+impl From<BlockchainLength> for PcbVersion {
+    fn from(blockchain_length: BlockchainLength) -> Self {
+        if blockchain_length.0 >= HARDFORK_GENESIS_BLOCKCHAIN_LENGTH {
+            PcbVersion::V2
+        } else {
+            PcbVersion::V1
+        }
     }
 }
 
