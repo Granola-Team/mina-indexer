@@ -156,6 +156,29 @@ impl LedgerDiff {
         }
     }
 
+    /// Filter out non-zkapp account diffs
+    pub fn filter_zkapp(self) -> Vec<Vec<AccountDiff>> {
+        self.account_diffs
+            .into_iter()
+            .filter_map(|diffs| {
+                let diffs = diffs
+                    .into_iter()
+                    .filter_map(|diff| match diff {
+                        AccountDiff::Zkapp(_) => Some(diff),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+
+                // throw away non-zkapp account diffs
+                if diffs.is_empty() {
+                    None
+                } else {
+                    Some(diffs)
+                }
+            })
+            .collect::<Vec<_>>()
+    }
+
     pub fn append(&mut self, other: Self) {
         // add public keys
         other.public_keys_seen.into_iter().for_each(|account| {

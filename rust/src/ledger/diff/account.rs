@@ -12,7 +12,7 @@ use crate::{
     mina_blocks::v2::{
         self,
         protocol_state::SupplyAdjustmentSign,
-        staged_ledger_diff::{Authorization, Elt, UpdateKind},
+        staged_ledger_diff::{Authorization, Call, Elt, UpdateKind},
         ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri,
     },
     snark_work::SnarkWorkSummary,
@@ -315,17 +315,13 @@ impl AccountDiff {
                             .into(),
                     );
 
-                    for call in update.elt.calls.iter() {
-                        diffs.push(
-                            (
-                                fee_payer.to_owned(),
-                                nonce,
-                                call.elt.as_ref(),
-                                state_hash.to_owned(),
-                            )
-                                .into(),
-                        );
-                    }
+                    recurse_calls(
+                        &mut diffs,
+                        update.elt.calls.iter(),
+                        fee_payer,
+                        nonce,
+                        state_hash.to_owned(),
+                    );
 
                     diffs
                 })
@@ -741,17 +737,15 @@ impl ZkappDiff {
     }
 
     fn expand_payment_diff(account_diffs: &mut Vec<AccountDiff>, diff: ZkappPaymentDiff) {
-        match diff {
-            ZkappPaymentDiff::Payment { payment, .. } => {
-                account_diffs.push(AccountDiff::Payment(payment))
-            }
-            ZkappPaymentDiff::IncrementNonce(diff) => {
-                account_diffs.push(AccountDiff::ZkappIncrementNonce(diff))
-            }
-            ZkappPaymentDiff::AccountCreationFee(diff) => {
-                account_diffs.push(AccountDiff::ZkappAccountCreationFee(diff))
-            }
-        }
+        use ZkappPaymentDiff::*;
+
+        let acct_diff = match diff {
+            Payment { payment, .. } => AccountDiff::Payment(payment),
+            IncrementNonce(diff) => AccountDiff::ZkappIncrementNonce(diff),
+            AccountCreationFee(diff) => AccountDiff::ZkappAccountCreationFee(diff),
+        };
+
+        account_diffs.push(acct_diff)
     }
 
     fn expand_app_state_diff(
@@ -1284,6 +1278,34 @@ impl std::fmt::Debug for UpdateType {
     }
 }
 
+fn recurse_calls<'a>(
+    diffs: &mut Vec<AccountDiff>,
+    calls: impl Iterator<Item = &'a Call>,
+    fee_payer: PublicKey,
+    nonce: Nonce,
+    state_hash: StateHash,
+) {
+    for call in calls {
+        diffs.push(
+            (
+                fee_payer.to_owned(),
+                nonce,
+                call.elt.as_ref(),
+                state_hash.to_owned(),
+            )
+                .into(),
+        );
+
+        recurse_calls(
+            diffs,
+            call.elt.calls.iter(),
+            fee_payer.to_owned(),
+            nonce,
+            state_hash.to_owned(),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1582,30 +1604,9 @@ mod tests {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-359630-3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
 
-        // all ledger diffs
+        // zkapp ledger diffs
         let diffs = LedgerDiff::from_precomputed_unexpanded(&pcb);
-
-        // filter out non-zkapp account diffs
-        let zkapp_diffs = diffs
-            .account_diffs
-            .into_iter()
-            .filter_map(|diffs| {
-                let diffs = diffs
-                    .into_iter()
-                    .filter_map(|diff| match diff {
-                        AccountDiff::Zkapp(_) => Some(diff),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-
-                // throw away non-zkapp account diffs
-                if diffs.is_empty() {
-                    None
-                } else {
-                    Some(diffs)
-                }
-            })
-            .collect::<Vec<_>>();
+        let zkapp_diffs = diffs.filter_zkapp();
 
         // expected unexpanded zkapp account diffs
         let state_hash: StateHash = "3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL".into();
