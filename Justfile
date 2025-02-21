@@ -255,21 +255,16 @@ tier2-load-test:
   time {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v1 \
   && {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v2
 
-# Run tier 2 best_chain_many_blocks test
-tier2-best-chain-many-blocks-test:
-  @echo "--- Performing best_chain_many_blocks regression test with dev-built binary"
-  time {{REGRESSION_TEST}} {{BUILD_TYPE}} best_chain_many_blocks
-
-# Run tier 2 regression tests.
-tier2-regression-tests:
-  @echo "--- Performing tier 2 regression tests with dev-built binary"
-  time {{REGRESSION_TEST}} {{BUILD_TYPE}}
+# Run regression test(s), either all of them or one named specific test.
+regression-test subtest='':
+  @echo "--- Performing regression tests"
+  time {{REGRESSION_TEST}} {{BUILD_TYPE}} {{subtest}}
 
 # Run tier 2 tests.
 tier2: tier2-prereqs dev-build test-unit-tier2 \
   tier2-load-test \
-  tier2-best-chain-many-blocks-test \
-  tier2-regression-tests
+  (regression-test "best_chain_many_blocks") \
+  regression-test
 
 #
 # Tier 3 tests
