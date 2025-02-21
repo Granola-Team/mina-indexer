@@ -12,8 +12,7 @@ def check_sequence(directory_path)
   Dir.each_child(directory_path) do |filename|
     next unless filename.end_with?(".json")
 
-    match = BLOCK_PATTERN.match(filename)
-    if match
+    if (match = BLOCK_PATTERN.match(filename))
       block_numbers.add(match[1].to_i)
     end
   end

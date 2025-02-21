@@ -14,6 +14,7 @@ FileUtils.mkdir_p(DEST)
 # Fetch the blocks list, if not already present.
 #
 blocks_list = "#{DEST}/../blocks.list"
+
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
   cmd = "#{__dir__}/granola-rclone.rb lsf cloudflare:mina-blocks"
@@ -22,8 +23,10 @@ unless File.exist?(blocks_list)
   new_list = contents.lines(chomp: true).sort! do |a, b|
     a_split = a.split("-")
     b_split = b.split("-")
+
     a_num = a_split[1].to_i
     b_num = b_split[1].to_i
+
     if a_num < b_num
       -1
     elsif a_num > b_num
@@ -32,6 +35,7 @@ unless File.exist?(blocks_list)
       a_split[2] <=> b_split[2]
     end
   end
+
   File.write(blocks_list, new_list.join("\n"))
 end
 
@@ -52,6 +56,7 @@ if fetch.empty?
 else
   # Use 'granola-rclone' to fetch the files.
   File.write("files-to-fetch.list", fetch.join("\n"))
+
   system(
     "#{__dir__}/granola-rclone.rb",
     "sync",
@@ -59,5 +64,6 @@ else
     "--files-from-raw", "files-to-fetch.list",
     DEST
   ) || abort("Files sync failed in download-mina-blocks.rb")
+
   File.delete("files-to-fetch.list")
 end
