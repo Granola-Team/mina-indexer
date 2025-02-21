@@ -5,6 +5,7 @@
 Files in this directory:
 
 - `./calculate-archive-ledgers.sh`
+- `./check-contiguous-blocks.rb`
 - `./correct-file-names.sh`
 - `./deploy.rb`
 - `./download-mina-blocks.rb`
@@ -36,6 +37,10 @@ TBD
 ### `./correct-file-names.sh`
 
 TBD
+
+### `./check-contiguous-blocks.rb`
+
+Scans a directory of Mina PCB JSON files and checks for contiguous block numbers in the filenames.
 
 ### `./deploy.rb`
 
