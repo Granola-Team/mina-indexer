@@ -1,11 +1,11 @@
 //! Indexer amount type
 
 use crate::{
-    constants::{MINA_SCALE, MINA_SCALE_DEC},
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE, MINA_SCALE_DEC},
     utility::functions::nanomina_to_mina,
 };
 use anyhow::anyhow;
-use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign, Sub};
 
@@ -19,6 +19,20 @@ pub struct Amount(pub u64);
 impl Amount {
     pub fn new(amount: u64) -> Self {
         Self(amount * MINA_SCALE)
+    }
+
+    /// Deduct [MAINNET_ACCOUNT_CREATION_FEE] MINA for display
+    pub fn display(self) -> Self {
+        self - MAINNET_ACCOUNT_CREATION_FEE
+    }
+
+    pub fn to_f64(&self) -> f64 {
+        use rust_decimal::prelude::ToPrimitive;
+
+        let mut decimal = Decimal::from(self.0);
+        decimal.set_scale(9).ok();
+
+        decimal.to_f64().unwrap()
     }
 }
 
@@ -86,6 +100,8 @@ impl std::str::FromStr for Amount {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use rust_decimal::prelude::ToPrimitive;
+
         s.parse::<Decimal>()
             .map(|amt| Self((amt * MINA_SCALE_DEC).to_u64().expect("amount")))
             .map_err(|e| anyhow!("{e}"))

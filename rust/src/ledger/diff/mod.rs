@@ -80,6 +80,7 @@ impl LedgerDiff {
                 .intersection(&zkapp_token_accounts)
                 .map(|key| {
                     AccountDiff::ZkappAccountCreationFee(ZkappAccountCreationFee {
+                        state_hash: block.state_hash(),
                         public_key: key.0.to_owned(),
                         token: key.1.to_owned(),
                         amount: all_accounts_created.get(key).cloned().unwrap(),
@@ -113,10 +114,12 @@ impl LedgerDiff {
         // applied user commands
         let mut account_diff_txns: Vec<Vec<AccountDiff>> = block
             .commands()
-            .into_iter()
+            .iter()
             .flat_map(|user_cmd_with_status| {
                 if user_cmd_with_status.is_applied() {
-                    AccountDiff::from_command(user_cmd_with_status.to_command())
+                    let command = user_cmd_with_status.to_command(block.state_hash());
+
+                    AccountDiff::from_command(command)
                 } else {
                     vec![vec![AccountDiff::FailedTransactionNonce(
                         FailedTransactionNonceDiff {

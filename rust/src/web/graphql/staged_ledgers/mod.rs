@@ -1,12 +1,11 @@
 //! GraphQL `stagedLedgerAccounts` endpoint
 
-use super::{db, MAINNET_ACCOUNT_CREATION_FEE};
+use super::db;
 use crate::{
     canonicity::store::CanonicityStore,
     ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 
 #[derive(InputObject)]
 pub struct StagedLedgerQueryInput {
@@ -164,18 +163,16 @@ pub struct StagedLedgerAccount {
 
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
-        // deduct 1 MINA fee for display
-        let balance_nanomina = acct.balance.0 - MAINNET_ACCOUNT_CREATION_FEE.0;
-        let mut decimal = Decimal::from(balance_nanomina);
-        decimal.set_scale(9).ok();
+        let balance = acct.balance.display();
+        let balance_nanomina = balance.0;
 
         Self {
             balance_nanomina,
+            balance: balance.to_f64(),
             nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,
             username: acct.username.map(|u| u.0),
-            balance: decimal.to_f64().unwrap_or_default(),
         }
     }
 }

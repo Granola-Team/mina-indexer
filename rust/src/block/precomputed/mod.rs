@@ -12,7 +12,7 @@ use super::{
     Block, StateHash, VrfOutput,
 };
 use crate::{
-    base::{blockchain_length::BlockchainLength, public_key::PublicKey},
+    base::{amount::Amount, blockchain_length::BlockchainLength, public_key::PublicKey},
     canonicity::Canonicity,
     chain::Network,
     command::{
@@ -308,9 +308,9 @@ impl PrecomputedBlock {
         // maybe coinbase receiver
         if let Some(bal) = self.coinbase_receiver_balance() {
             if [
-                MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+                Amount(MAINNET_COINBASE_REWARD).display().0,
                 // supercharged
-                2 * MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE.0,
+                2 * Amount(MAINNET_COINBASE_REWARD).display().0,
             ]
             .contains(&bal)
             {

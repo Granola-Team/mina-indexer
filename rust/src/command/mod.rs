@@ -198,6 +198,8 @@ pub enum UserCommandWithStatus {
 pub struct ZkappCommand(v2::staged_ledger_diff::ZkappCommandData);
 
 pub trait UserCommandWithStatusT {
+    fn to_command(&self, state_hash: StateHash) -> CommandWithStateHash;
+
     fn is_applied(&self) -> bool;
 
     fn is_zkapp_command(&self) -> bool;
@@ -205,8 +207,6 @@ pub trait UserCommandWithStatusT {
     fn status_data(&self) -> CommandStatusData;
 
     fn contains_public_key(&self, pk: &PublicKey) -> bool;
-
-    fn to_command(&self) -> Command;
 
     fn sender(&self) -> PublicKey;
 
@@ -236,7 +236,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         use v2::staged_ledger_diff as v2;
 
         matches!(
-            *self,
+            self,
             UserCommandWithStatus::V2(v2::UserCommand {
                 data: (_, v2::UserCommandData::ZkappCommandData { .. }),
                 ..
@@ -262,7 +262,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         signed.all_command_public_keys().contains(pk)
     }
 
-    fn to_command(&self) -> Command {
+    fn to_command(&self, state_hash: StateHash) -> CommandWithStateHash {
         match self {
             Self::V1(v1) => match &v1.t.data.t.t {
                 mina_rs::UserCommand1::SignedCommand(v1) => {
@@ -275,24 +275,31 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                                 amount,
                                 ..
                             } = &v1.t.t;
-                            Command::Payment(Payment {
-                                source: source_pk.to_owned().into(),
-                                receiver: receiver_pk.to_owned().into(),
-                                nonce: self.nonce(),
-                                amount: amount.t.t.into(),
-                                is_new_receiver_account: self.receiver_account_creation_fee_paid(),
-                            })
+                            CommandWithStateHash {
+                                state_hash,
+                                command: Command::Payment(Payment {
+                                    source: source_pk.to_owned().into(),
+                                    receiver: receiver_pk.to_owned().into(),
+                                    nonce: self.nonce(),
+                                    amount: amount.t.t.into(),
+                                    is_new_receiver_account: self
+                                        .receiver_account_creation_fee_paid(),
+                                }),
+                            }
                         }
                         StakeDelegation(v1) => {
                             let mina_rs::StakeDelegation1::SetDelegate {
                                 delegator,
                                 new_delegate,
                             } = v1.t.to_owned();
-                            Command::Delegation(Delegation {
-                                delegator: delegator.into(),
-                                delegate: new_delegate.into(),
-                                nonce: self.nonce(),
-                            })
+                            CommandWithStateHash {
+                                state_hash,
+                                command: Command::Delegation(Delegation {
+                                    delegator: delegator.into(),
+                                    delegate: new_delegate.into(),
+                                    nonce: self.nonce(),
+                                }),
+                            }
                         }
                     }
                 }
@@ -302,29 +309,39 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     SignedCommandPayloadBody::Payment(v2::staged_ledger_diff::PaymentPayload {
                         receiver_pk,
                         amount,
-                    }) => Command::Payment(Payment {
-                        nonce: self.nonce(),
-                        amount: amount.0.into(),
-                        source: self.fee_payer_pk(),
-                        receiver: receiver_pk.to_owned(),
-                        is_new_receiver_account: self.receiver_account_creation_fee_paid(),
-                    }),
+                    }) => CommandWithStateHash {
+                        state_hash,
+                        command: Command::Payment(Payment {
+                            nonce: self.nonce(),
+                            amount: amount.0.into(),
+                            source: self.fee_payer_pk(),
+                            receiver: receiver_pk.to_owned(),
+                            is_new_receiver_account: self.receiver_account_creation_fee_paid(),
+                        }),
+                    },
                     SignedCommandPayloadBody::StakeDelegation((
                         _,
                         v2::staged_ledger_diff::StakeDelegationPayload { new_delegate },
-                    )) => Command::Delegation(Delegation {
-                        nonce: self.nonce(),
-                        delegator: self.sender(),
-                        delegate: new_delegate.to_owned(),
-                    }),
+                    )) => CommandWithStateHash {
+                        state_hash,
+                        command: Command::Delegation(Delegation {
+                            nonce: self.nonce(),
+                            delegator: self.sender(),
+                            delegate: new_delegate.to_owned(),
+                        }),
+                    },
                 },
-                UserCommandData::ZkappCommandData(v1) => Command::Zkapp(v1.to_owned()),
+                UserCommandData::ZkappCommandData(v1) => CommandWithStateHash {
+                    state_hash,
+                    command: Command::Zkapp(v1.to_owned()),
+                },
             },
         }
     }
 
     fn sender(&self) -> PublicKey {
         use mina_rs::*;
+
         match self {
             Self::V1(v1) => match &v1.t.data.t.t {
                 UserCommand1::SignedCommand(v1) => match &v1.t.t.payload.t.t.body.t.t {
@@ -352,6 +369,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn receiver(&self) -> Vec<PublicKey> {
         use mina_rs::*;
+
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
@@ -441,6 +459,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     fn amount(&self) -> u64 {
         use v2::staged_ledger_diff::{PaymentPayload, SignedCommandPayloadBody::*};
+
         match self {
             Self::V1(v1) => {
                 let mina_rs::UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
@@ -459,6 +478,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     /// Decoded memo
     fn memo(&self) -> String {
         use mina_rs::*;
+
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
@@ -474,9 +494,11 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 
     fn signer(&self) -> PublicKey {
+        use mina_rs::*;
+
         match self {
             Self::V1(v1) => {
-                let mina_rs::UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
+                let UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
                 v1.t.t.signer.to_owned().into()
             }
             Self::V2(v2) => match &v2.data.1 {
@@ -539,8 +561,8 @@ pub enum StakeDelegation {
 
 impl Command {
     /// Get the list of commands from the precomputed block
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
-        precomputed_block
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
+        block
             .commands()
             .iter()
             .filter(|command| command.is_applied())
@@ -608,7 +630,7 @@ impl Command {
                                 })
                             }
                         }
-                        UserCommandData::ZkappCommandData(data) => Self::Zkapp(data.to_owned()),
+                        UserCommandData::ZkappCommandData(v1) => Self::Zkapp(v1.to_owned())
                     }
                 }}).collect()
     }
@@ -617,7 +639,7 @@ impl Command {
         match self {
             Self::Delegation(Delegation { nonce, .. }) => *nonce,
             Self::Payment(Payment { nonce, .. }) => *nonce,
-            Self::Zkapp(zkapp) => todo!("nonce {zkapp:?}"),
+            Self::Zkapp(data) => todo!("nonce {data:?}"),
         }
     }
 }
@@ -826,7 +848,7 @@ impl From<Command> for serde_json::Value {
                 Value::Object(json)
             }
 
-            Command::Zkapp(zkapp) => to_zkapp_json(&zkapp),
+            Command::Zkapp(v1) => to_zkapp_json(&v1),
         }
     }
 }
@@ -1162,7 +1184,7 @@ mod test {
                     delegations.push((delegate, delegator));
                 }
 
-                Command::Zkapp(_) => unreachable!("no zkapp commands pre-hardfork"),
+                Command::Zkapp { .. } => unreachable!("no zkapp commands pre-hardfork"),
             }
         }
 

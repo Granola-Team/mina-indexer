@@ -2,6 +2,7 @@
 
 use super::db;
 use crate::{
+    base::amount::Amount,
     block::store::BlockStore,
     chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
@@ -371,22 +372,25 @@ impl
             Option<String>,
         ),
     ) -> Self {
-        let balance_nanomina = acc.0.balance;
-        let mut decimal = Decimal::from(balance_nanomina);
-        decimal.set_scale(9).ok();
+        let account = acc.0;
 
-        let balance = decimal.to_f64().unwrap_or_default();
-        let nonce = acc.0.nonce.unwrap_or_default();
-        let delegate = acc.0.delegate.0;
-        let pk = acc.0.pk.0;
+        let balance_nanomina = account.balance;
+        let balance = Amount(balance_nanomina);
+        let balance = balance.to_f64();
+
+        let pk = account.pk.0;
         let public_key = pk.clone();
-        let token = acc.0.token.unwrap_or_default();
-        let receipt_chain_hash = acc.0.receipt_chain_hash.0;
-        let voting_for = acc.0.voting_for.0;
+        let delegate = account.delegate.0;
+
+        let nonce = account.nonce.unwrap_or_default().0;
+        let token = account.token.unwrap_or_default();
+        let receipt_chain_hash = account.receipt_chain_hash.0;
+        let voting_for = account.voting_for.0;
+
         Self {
             chain_id: acc.1,
             balance,
-            nonce: nonce.0,
+            nonce,
             delegate,
             pk,
             public_key,

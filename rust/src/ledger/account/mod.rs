@@ -97,7 +97,7 @@ impl Account {
     /// Display view of account, removes non-genesis account creation fee
     pub fn display(self) -> Self {
         Self {
-            balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
+            balance: self.balance.display(),
             ..self
         }
     }
@@ -328,7 +328,7 @@ impl Account {
 
     /// Apply zkapp state diff
     pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         let mut zkapp = self
             .zkapp
@@ -354,7 +354,7 @@ impl Account {
 
     /// Apply zkapp verification key diff
     pub fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         let mut zkapp = self
             .zkapp
@@ -376,7 +376,7 @@ impl Account {
 
     /// Apply zkapp permissions diff
     pub fn zkapp_permissions(self, diff: &ZkappPermissionsDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         Self {
             permissions: Some(diff.permissions.to_owned()),
@@ -386,7 +386,7 @@ impl Account {
 
     /// Apply zkapp uri diff
     pub fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         let mut zkapp = self
             .zkapp
@@ -408,7 +408,7 @@ impl Account {
 
     /// Apply zkapp token symbol diff
     pub fn zkapp_token_symbol(self, diff: &ZkappTokenSymbolDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         Self {
             token_symbol: Some(diff.token_symbol.to_owned()),
@@ -418,7 +418,7 @@ impl Account {
 
     /// Apply zkapp timing diff
     pub fn zkapp_timing(self, diff: &ZkappTimingDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         Self {
             timing: Some(diff.timing.to_owned()),
@@ -428,7 +428,7 @@ impl Account {
 
     /// Apply zkapp voting for diff
     pub fn zkapp_voting_for(self, diff: &ZkappVotingForDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         Self {
             voting_for: Some(diff.voting_for.to_owned()),
@@ -438,7 +438,7 @@ impl Account {
 
     /// Apply zkapp actions diff
     fn zkapp_actions(self, diff: &ZkappActionsDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         let mut zkapp = self
             .zkapp
@@ -469,7 +469,7 @@ impl Account {
 
     /// Apply zkapp increment
     pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
         Self {
             nonce: Some(self.nonce.unwrap_or_default() + 1),
@@ -479,7 +479,7 @@ impl Account {
 
     /// Apply zkapp account creation fee
     pub fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
-        self.checks(&diff.public_key, &diff.token);
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
         assert_eq!(diff.amount, MAINNET_ACCOUNT_CREATION_FEE);
 
         Self {
@@ -522,6 +522,7 @@ impl Account {
         }
 
         use AccountDiff::*;
+
         Some(match diff {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
                 self.payment_unapply(diff)
@@ -561,33 +562,43 @@ impl Account {
     }
 
     /// Checks application to the expected token account
-    fn checks(&self, pk: &PublicKey, token: &TokenAddress) {
-        self.check_pk(pk);
-        self.check_token(token);
+    fn checks(&self, pk: &PublicKey, token: &TokenAddress, state_hash: &StateHash) {
+        self.check_pk(pk, state_hash);
+        self.check_token(token, state_hash);
     }
 
-    fn check_pk(&self, pk: &PublicKey) {
+    fn check_pk(&self, pk: &PublicKey, state_hash: &StateHash) {
         if self.public_key != *pk {
             error!(
-                "Public key mismatch in zkapp account diff: {} /= {}",
-                self.public_key, pk
+                "Public key mismatch in '{}' zkapp account diff: {} /= {}",
+                state_hash, self.public_key, pk
             );
         }
     }
 
-    fn check_token(&self, token: &TokenAddress) {
-        fn check(t0: &TokenAddress, t1: &TokenAddress) {
-            if t0 != t1 {
-                error!("Token mismatch in zkapp account diff: {t0} /= {t1}");
-            }
-        }
+    fn check_token(&self, token: &TokenAddress, state_hash: &StateHash) {
+        let msg = |acct_token: Option<&TokenAddress>| -> String {
+            let acct_token_str = acct_token
+                .as_ref()
+                .map_or("null".to_string(), |t| t.to_string());
 
-        match self.token.as_ref() {
-            None => check(&TokenAddress::default(), token),
-            Some(account_token) => check(account_token, token),
+            format!(
+                "Token mismatch in '{}' zkapp account diff: {} /= {}",
+                state_hash, acct_token_str, token
+            )
+        };
+
+        if self.token.is_none() && *token != TokenAddress::default()
+            || self.token.as_ref() != Some(token)
+        {
+            error!("{}", msg(self.token.as_ref()))
         }
     }
 }
+
+//////////////
+// ordering //
+//////////////
 
 impl PartialOrd for Account {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -596,8 +607,10 @@ impl PartialOrd for Account {
 }
 
 impl Ord for Account {
+    /// Order by `(balance, public key)`
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         let balance_cmp = self.balance.cmp(&other.balance);
+
         if balance_cmp == std::cmp::Ordering::Equal {
             self.public_key.cmp(&other.public_key)
         } else {
@@ -611,9 +624,10 @@ impl Ord for Account {
 /////////////////
 
 impl From<GenesisBlock> for Account {
+    /// Magic mina for genesis block creator
     fn from(value: GenesisBlock) -> Self {
-        // magic mina
         let block_creator = value.0.block_creator();
+
         Self {
             public_key: block_creator.clone(),
             balance: Amount(1000_u64),
@@ -631,10 +645,7 @@ impl From<GenesisBlock> for Account {
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let deducted = Self {
-            balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
-            ..self.clone()
-        };
+        let deducted = Self::display(self.to_owned());
 
         match serde_json::to_string_pretty(&deducted) {
             Ok(s) => write!(f, "{s}"),
@@ -654,7 +665,7 @@ impl std::fmt::Debug for Account {
 mod tests {
     use super::{Account, Amount};
     use crate::{
-        base::{nonce::Nonce, public_key::PublicKey},
+        base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
         constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
         ledger::{
             account::{Permission, Permissions, Timing},
@@ -705,12 +716,15 @@ mod tests {
 
         let diff = ZkappDiff {
             public_key: pk.clone(),
-            payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
-                public_key: pk.clone(),
-                update_type: UpdateType::Debit(Some(185.into())),
-                amount,
-                token: TokenAddress::default(),
-            })],
+            payment_diffs: vec![ZkappPaymentDiff::Payment {
+                state_hash: StateHash::default(),
+                payment: PaymentDiff {
+                    public_key: pk.clone(),
+                    update_type: UpdateType::Debit(Some(185.into())),
+                    amount,
+                    token: TokenAddress::default(),
+                },
+            }],
             ..Default::default()
         };
 
@@ -847,6 +861,7 @@ mod tests {
         };
 
         let diff = AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
+            state_hash: StateHash::default(),
             token: TokenAddress::default(),
             public_key: pk.clone(),
             proved_state: false,
@@ -885,6 +900,7 @@ mod tests {
         };
 
         let diff = AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
+            state_hash: StateHash::default(),
             token: TokenAddress::default(),
             public_key: pk.clone(),
             permissions: permissions.clone(),

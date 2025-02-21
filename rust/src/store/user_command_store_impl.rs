@@ -638,11 +638,6 @@ impl UserCommandStore for IndexerStore {
         command: &UserCommandWithStatus,
         epoch: u32,
     ) -> Result<()> {
-        trace!(
-            "Incrementing user commands counts {:?}",
-            command.to_command()
-        );
-
         if command.is_applied() {
             self.increment_applied_user_commands_count(1)?;
         } else {
