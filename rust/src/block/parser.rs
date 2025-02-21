@@ -10,7 +10,7 @@ use crate::{
     constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
     utility::functions::calculate_total_size,
 };
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use glob::glob;
 use log::{debug, info};
 use std::{
@@ -230,7 +230,7 @@ impl BlockParser {
                 Ok(Self::empty(&blocks_dir, &paths))
             }
         } else {
-            bail!("blocks_dir {} does not exist!", blocks_dir.display())
+            bail!("blocks_dir {:#?} does not exist!", blocks_dir.display())
         }
     }
 
@@ -239,15 +239,20 @@ impl BlockParser {
         path: &Path,
         designation: &dyn Fn(PrecomputedBlock) -> ParsedBlock,
     ) -> anyhow::Result<Option<(ParsedBlock, u64)>> {
-        let block_bytes = path.metadata().unwrap().len();
+        let block_bytes = path
+            .metadata()
+            .with_context(|| path.display().to_string())
+            .unwrap()
+            .len();
         let genesis_state_hash = GenesisStateHash::from_path(path)?;
         let curr_pcb_version = self.version.clone();
-        let (new_pcb_version, _) = self
+        let new_pcb_version = self
             .chain_data
             .0
             .get(&genesis_state_hash)
-            .cloned()
-            .expect("PCB version");
+            .expect("PCB version")
+            .0
+            .clone();
 
         // if the PCB version changed, change block parser version
         if curr_pcb_version != new_pcb_version {
