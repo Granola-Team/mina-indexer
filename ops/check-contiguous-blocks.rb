@@ -2,9 +2,7 @@
 
 # -*- mode: ruby -*-
 
-require 'set'
-
-BLOCK_PATTERN = /mainnet-(\d+)-/.freeze
+BLOCK_PATTERN = /mainnet-(\d+)-/
 
 def check_sequence(directory_path)
   # Use Set for O(1) lookups
@@ -12,8 +10,10 @@ def check_sequence(directory_path)
 
   # First pass - collect all block numbers
   Dir.each_child(directory_path) do |filename|
-    next unless filename.end_with?('.json')
-    if match = BLOCK_PATTERN.match(filename)
+    next unless filename.end_with?(".json")
+
+    match = BLOCK_PATTERN.match(filename)
+    if match
       block_numbers.add(match[1].to_i)
     end
   end
@@ -61,7 +61,7 @@ end
 
 # Main execution
 begin
-  if ARGV.empty? || ARGV[0] == '-h' || ARGV[0] == '--help'
+  if ARGV.empty? || ARGV[0] == "-h" || ARGV[0] == "--help"
     print_usage
   end
 
