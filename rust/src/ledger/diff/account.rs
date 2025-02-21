@@ -1754,7 +1754,7 @@ mod tests {
         assert_eq!(zkapp_diffs, expect);
 
         // expected expanded zkapp diffs
-        let expect: Vec<Vec<_>> = vec![
+        let expect = vec![
             vec![
                 AccountDiff::Payment(PaymentDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
@@ -1850,6 +1850,122 @@ mod tests {
         ];
 
         assert_eq!(AccountDiff::expand(zkapp_diffs), expect);
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_account_diff_token() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-360930-3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        // zkapp ledger diffs
+        let diffs = LedgerDiff::from_precomputed_unexpanded(&pcb);
+        let zkapp_diffs = diffs.filter_zkapp();
+        let zkapp_diffs = AccountDiff::expand(zkapp_diffs);
+
+        // expected zkapp account diffs
+        let state_hash: StateHash = "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi".into();
+        let public_key: PublicKey =
+            "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into();
+        let nonce = Nonce(1);
+        let token =
+            TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn").unwrap();
+
+        let expect = vec![vec![
+            AccountDiff::Payment(PaymentDiff {
+                public_key: public_key.clone(),
+                update_type: UpdateType::Debit(Some(nonce)),
+                amount: 1000000000.into(),
+                token: TokenAddress::default(),
+            })],
+            vec![AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
+                state_hash: state_hash.clone(),
+                token: TokenAddress::default(),
+                public_key: "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT".into(),
+                events: vec![
+                    "0x0000000000000000000000000000000000000000000000000000000000000002".into(),
+                    "0x0000000000000000000000000000000000000000000000000000017473726966".into(),
+                    "0x1F290436EC95D83FE3964FEF01CDBAC244EA4D5A7FE99052484DDA0F02C86278".into(),
+                    "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
+                    "0x000000000000000000000000000000000000000000000000000000174876E800".into(),
+                    "0x102580B0AD2B843A16580B526009CD92AD58CDA00675DD8940F2A74E78663DC0".into(),
+                    "0x30AF2ED4225D4215C49D1AEE9B7094A0605C0F957219EED3C21CC208119AF5CD".into(),
+                    "0x00367A72767777746773677A6C706F6E3563376D6137616965726B6661623A69".into(),
+                    "0x0001697767343664727679647636663466683465706A626D73376D776C756F32".into(),
+                ]
+            }),
+            AccountDiff::Payment(PaymentDiff {
+                update_type: UpdateType::Debit(Some(nonce)),
+                public_key: public_key.clone(),
+                amount: 19000000000.into(),
+                token: TokenAddress::default(),
+            }),
+            AccountDiff::Payment(PaymentDiff {
+                update_type: UpdateType::Credit,
+                public_key: "B62qq7ecvBQZQK68dwstL27888NEKZJwNXNFjTyu3xpQcfX5UBivCU6".into(),
+                amount: 19000000000.into(),
+                token: TokenAddress::default(),
+            }),
+            AccountDiff::ZkappIncrementNonce(ZkappIncrementNonce {
+                state_hash: state_hash.clone(),
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                token: token.clone(),
+            }),
+            AccountDiff::ZkappStateDiff(ZkappStateDiff {
+                state_hash: state_hash.clone(),
+                token: token.clone(),
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                diffs: [
+                    Some("0x0000000000000000000000000000000000000000000000000000017473726966".into()),
+                    Some("0x102580B0AD2B843A16580B526009CD92AD58CDA00675DD8940F2A74E78663DC0".into()),
+                    Some("0x30AF2ED4225D4215C49D1AEE9B7094A0605C0F957219EED3C21CC208119AF5CD".into()),
+                    Some("0x00367A72767777746773677A6C706F6E3563376D6137616965726B6661623A69".into()),
+                    Some("0x0001697767343664727679647636663466683465706A626D73376D776C756F32".into()),
+                    Some("0x29E337A3B00D49D78EAAC1CADEBF4E9278D530F94C9E9259EBCA7B09BFCD4A8A".into()),
+                    Some("0x0000000000000000000000000000000000000000000000000000000000000000".into()),
+                    Some("0x000000000000000000000000000000000000000000000001000000174876E800".into()),
+                ],
+                ..Default::default()
+            }),
+            AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
+                state_hash: state_hash.clone(),
+                token: token.clone(),
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                proved_state: false,
+                verification_key: VerificationKey {
+                    data: "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".into(),
+                    hash: "0x3ECC0FC66665B96DA4ED0CC9EF3926C359B0EA44D81E537D02051DAD97F49BED".into()
+                },
+            }),
+            AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
+                state_hash: state_hash.clone(),
+                token: token.clone(),
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                permissions: Permissions {
+                    edit_state: Permission::Proof,
+                    access: Permission::None,
+                    send: Permission::Proof,
+                    receive: Permission::None,
+                    set_delegate: Permission::Signature,
+                    set_permissions: Permission::Signature,
+                    set_verification_key: (Permission::Signature, "3".to_string()),
+                    set_zkapp_uri: Permission::Signature,
+                    edit_action_state: Permission::Proof,
+                    set_token_symbol: Permission::Signature,
+                    increment_nonce: Permission::Signature,
+                    set_voting_for: Permission::Signature,
+                    set_timing: Permission::Signature
+                }
+            }),
+            AccountDiff::Payment(PaymentDiff {
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                update_type: UpdateType::Credit,
+                amount: Amount(1000000000),
+                token: token.clone(),
+            })
+        ]];
+
+        assert_eq!(zkapp_diffs, expect);
         Ok(())
     }
 }
