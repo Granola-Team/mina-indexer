@@ -122,10 +122,9 @@ fn find_best_tip<'a>(
     }
 
     best_tip.map(|best_tip| {
-        let height = extract_block_height(best_tip);
         info!(
-            "Found best tip at height {} in {}",
-            height,
+            "Found best tip {} in {}",
+            best_tip.file_stem().unwrap().to_str().unwrap(),
             pretty_print_duration(time.elapsed())
         );
 
