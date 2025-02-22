@@ -54,25 +54,15 @@ impl LedgerDiff {
                  }| ((public_key, token), creation_fee),
             )
             .collect();
+
         let accounts_created: HashSet<_> = all_accounts_created.keys().cloned().collect();
 
         // only the zkapp command token accounts
-        let zkapp_token_accounts: HashSet<_> = account_diffs
-            .iter()
-            .flatten()
-            .flat_map(|diff| {
-                use AccountDiff::*;
-                match diff {
-                    Payment(_)
-                    | Delegation(_)
-                    | Coinbase(_)
-                    | FeeTransfer(_)
-                    | FeeTransferViaCoinbase(_)
-                    | FailedTransactionNonce(_) => None,
-                    _ => Some((diff.public_key(), diff.token_address())),
-                }
-            })
-            .collect();
+        let mut zkapp_token_accounts = HashSet::new();
+
+        account_diffs.iter().flatten().for_each(|diff| {
+            diff.add_token_accounts(&mut zkapp_token_accounts);
+        });
 
         // token accounts created via zkapp command
         let mut zkapp_token_accounts_created: Vec<_> = {
@@ -131,20 +121,35 @@ impl LedgerDiff {
             })
             .collect::<Vec<_>>();
 
+        // apply in order: user commands, coinbase, fees
+        account_diffs.append(&mut account_diff_txns);
+
         // replace fee_transfer with fee_transfer_via_coinbase, if any
         let coinbase = Coinbase::from_precomputed(block);
         if coinbase.has_fee_transfer() {
             coinbase.account_diffs_coinbase_mut(&mut account_diff_fees);
         }
 
-        // apply in order: user commands, coinbase, fees
-        account_diffs.append(&mut account_diff_txns);
         if coinbase.is_coinbase_applied() {
             account_diffs.push(coinbase.as_account_diff()[0].clone());
         }
         account_diffs.append(&mut account_diff_fees);
 
-        let accounts_created = block.accounts_created();
+        let mut accounts_created = block.accounts_created();
+
+        for AccountCreated {
+            public_key,
+            token,
+            creation_fee,
+        } in block.accounts_created_v2()
+        {
+            accounts_created
+                .0
+                .get_mut(&public_key)
+                .unwrap_or(&mut BTreeMap::new())
+                .insert(token, creation_fee.0);
+        }
+
         Self {
             account_diffs,
             new_pk_balances: accounts_created.0,

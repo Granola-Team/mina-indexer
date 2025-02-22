@@ -9,7 +9,7 @@ use crate::{
             best::{BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
         },
-        token::TokenAddress,
+        token::{account::TokenAccount, TokenAddress},
         Ledger, TokenLedger,
     },
     store::{
@@ -451,7 +451,7 @@ fn aggregate_token_account_diffs(
 
     for diff in account_diffs {
         let pk = diff.public_key();
-        let token = diff.token_address();
+        let token = diff.token();
 
         if let Some(mut diffs) = token_account_diffs.remove(&(pk.to_owned(), token.to_owned())) {
             diffs.push(diff);

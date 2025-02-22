@@ -1,5 +1,9 @@
-//! Token address, id, & symbol
+//! Token account, address, id, & symbol
 
+// trait
+pub mod account;
+
+// types
 mod address;
 mod id;
 mod symbol;

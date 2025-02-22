@@ -11,7 +11,7 @@ use super::{
         },
         LedgerDiff,
     },
-    token::{TokenAddress, TokenSymbol},
+    token::{account::TokenAccount, TokenAddress, TokenSymbol},
     username::Username,
 };
 use crate::{

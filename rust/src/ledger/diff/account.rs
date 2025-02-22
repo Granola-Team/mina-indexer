@@ -1,3 +1,5 @@
+//! Ledger account diff representation
+
 use crate::{
     base::{nonce::Nonce, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
@@ -6,7 +8,7 @@ use crate::{
     ledger::{
         account::{Permissions, Timing},
         coinbase::Coinbase,
-        token::{TokenAddress, TokenSymbol},
+        token::{account::TokenAccount, TokenAddress, TokenSymbol},
         Amount, PublicKey,
     },
     mina_blocks::v2::{
@@ -18,7 +20,59 @@ use crate::{
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub enum AccountDiff {
+    Payment(PaymentDiff),
+    Delegation(DelegationDiff),
+    Coinbase(CoinbaseDiff),
+    FeeTransfer(PaymentDiff),
+    /// Overrides the fee transfer for SNARK work
+    FeeTransferViaCoinbase(PaymentDiff),
+    /// Updates the nonce for a failed txn
+    FailedTransactionNonce(FailedTransactionNonceDiff),
+
+    // All zkapp diffs
+    Zkapp(Box<ZkappDiff>),
+    ZkappStateDiff(ZkappStateDiff),
+    ZkappPermissionsDiff(ZkappPermissionsDiff),
+    ZkappVerificationKeyDiff(ZkappVerificationKeyDiff),
+    ZkappUriDiff(ZkappUriDiff),
+    ZkappTokenSymbolDiff(ZkappTokenSymbolDiff),
+    ZkappTimingDiff(ZkappTimingDiff),
+    ZkappVotingForDiff(ZkappVotingForDiff),
+    ZkappActionsDiff(ZkappActionsDiff),
+    ZkappEventsDiff(ZkappEventsDiff),
+    ZkappIncrementNonce(ZkappIncrementNonce),
+    ZkappAccountCreationFee(ZkappAccountCreationFee),
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub enum UnapplyAccountDiff {
+    Payment(PaymentDiff),
+    Delegation(DelegationDiff),
+    Coinbase(CoinbaseDiff),
+    FeeTransfer(PaymentDiff),
+    /// Overrides the fee transfer for SNARK work
+    FeeTransferViaCoinbase(PaymentDiff),
+    /// Updates the nonce for a failed txn
+    FailedTransactionNonce(FailedTransactionNonceDiff),
+
+    // All zkapp diffs
+    Zkapp(Box<ZkappDiff>),
+    ZkappStateDiff(ZkappStateDiff),
+    ZkappPermissionsDiff(ZkappPermissionsDiff),
+    ZkappVerificationKeyDiff(ZkappVerificationKeyDiff),
+    ZkappUriDiff(ZkappUriDiff),
+    ZkappTokenSymbolDiff(ZkappTokenSymbolDiff),
+    ZkappTimingDiff(ZkappTimingDiff),
+    ZkappVotingForDiff(ZkappVotingForDiff),
+    ZkappActionsDiff(ZkappActionsDiff),
+    ZkappEventsDiff(ZkappEventsDiff),
+    ZkappIncrementNonce(ZkappIncrementNonce),
+    ZkappAccountCreationFee(ZkappAccountCreationFee),
+}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum UpdateType {
@@ -181,9 +235,7 @@ pub struct ZkappAccountCreationFee {
     pub amount: Amount,
 }
 
-////////////////////////////
-// internal command diffs //
-////////////////////////////
+// internal command diffs
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct CoinbaseDiff {
@@ -197,58 +249,6 @@ pub struct FailedTransactionNonceDiff {
     pub nonce: Nonce,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub enum AccountDiff {
-    Payment(PaymentDiff),
-    Delegation(DelegationDiff),
-    Coinbase(CoinbaseDiff),
-    FeeTransfer(PaymentDiff),
-    /// Overrides the fee transfer for SNARK work
-    FeeTransferViaCoinbase(PaymentDiff),
-    /// Updates the nonce for a failed txn
-    FailedTransactionNonce(FailedTransactionNonceDiff),
-
-    // All zkapp diffs
-    Zkapp(Box<ZkappDiff>),
-    ZkappStateDiff(ZkappStateDiff),
-    ZkappPermissionsDiff(ZkappPermissionsDiff),
-    ZkappVerificationKeyDiff(ZkappVerificationKeyDiff),
-    ZkappUriDiff(ZkappUriDiff),
-    ZkappTokenSymbolDiff(ZkappTokenSymbolDiff),
-    ZkappTimingDiff(ZkappTimingDiff),
-    ZkappVotingForDiff(ZkappVotingForDiff),
-    ZkappActionsDiff(ZkappActionsDiff),
-    ZkappEventsDiff(ZkappEventsDiff),
-    ZkappIncrementNonce(ZkappIncrementNonce),
-    ZkappAccountCreationFee(ZkappAccountCreationFee),
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub enum UnapplyAccountDiff {
-    Payment(PaymentDiff),
-    Delegation(DelegationDiff),
-    Coinbase(CoinbaseDiff),
-    FeeTransfer(PaymentDiff),
-    /// Overrides the fee transfer for SNARK work
-    FeeTransferViaCoinbase(PaymentDiff),
-    /// Updates the nonce for a failed txn
-    FailedTransactionNonce(FailedTransactionNonceDiff),
-
-    // All zkapp diffs
-    Zkapp(Box<ZkappDiff>),
-    ZkappStateDiff(ZkappStateDiff),
-    ZkappPermissionsDiff(ZkappPermissionsDiff),
-    ZkappVerificationKeyDiff(ZkappVerificationKeyDiff),
-    ZkappUriDiff(ZkappUriDiff),
-    ZkappTokenSymbolDiff(ZkappTokenSymbolDiff),
-    ZkappTimingDiff(ZkappTimingDiff),
-    ZkappVotingForDiff(ZkappVotingForDiff),
-    ZkappActionsDiff(ZkappActionsDiff),
-    ZkappEventsDiff(ZkappEventsDiff),
-    ZkappIncrementNonce(ZkappIncrementNonce),
-    ZkappAccountCreationFee(ZkappAccountCreationFee),
-}
-
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum AccountDiffType {
     Payment(Nonce),
@@ -259,15 +259,59 @@ pub enum AccountDiffType {
     Zkapp { token: TokenAddress, nonce: Nonce },
 }
 
-impl AccountDiff {
-    pub fn token_address(&self) -> TokenAddress {
-        if let &Self::Payment(PaymentDiff { ref token, .. }) = self {
-            return token.to_owned();
-        }
+///////////
+// impls //
+///////////
 
-        TokenAddress::default()
+impl TokenAccount for AccountDiff {
+    fn public_key(&self) -> PublicKey {
+        match self {
+            Self::Payment(diff) => diff.public_key.clone(),
+            Self::Delegation(diff) => diff.delegator.clone(),
+            Self::Coinbase(diff) => diff.public_key.clone(),
+            Self::FeeTransfer(diff) => diff.public_key.clone(),
+            Self::FeeTransferViaCoinbase(diff) => diff.public_key.clone(),
+            Self::FailedTransactionNonce(diff) => diff.public_key.clone(),
+            Self::Zkapp(diff) => diff.public_key.clone(),
+            Self::ZkappStateDiff(diff) => diff.public_key.clone(),
+            Self::ZkappPermissionsDiff(diff) => diff.public_key.clone(),
+            Self::ZkappVerificationKeyDiff(diff) => diff.public_key.clone(),
+            Self::ZkappUriDiff(diff) => diff.public_key.clone(),
+            Self::ZkappTokenSymbolDiff(diff) => diff.public_key.clone(),
+            Self::ZkappTimingDiff(diff) => diff.public_key.clone(),
+            Self::ZkappVotingForDiff(diff) => diff.public_key.clone(),
+            Self::ZkappActionsDiff(diff) => diff.public_key.clone(),
+            Self::ZkappEventsDiff(diff) => diff.public_key.clone(),
+            Self::ZkappIncrementNonce(diff) => diff.public_key.clone(),
+            Self::ZkappAccountCreationFee(diff) => diff.public_key.clone(),
+        }
     }
 
+    fn token(&self) -> TokenAddress {
+        match self {
+            Self::Delegation(_)
+            | Self::Coinbase(_)
+            | Self::FeeTransferViaCoinbase(_)
+            | Self::FeeTransfer(_)
+            | Self::FailedTransactionNonce(_) => TokenAddress::default(),
+            Self::Payment(diff) => diff.token.clone(),
+            Self::Zkapp(diff) => diff.token.clone(),
+            Self::ZkappStateDiff(diff) => diff.token.clone(),
+            Self::ZkappPermissionsDiff(diff) => diff.token.clone(),
+            Self::ZkappVerificationKeyDiff(diff) => diff.token.clone(),
+            Self::ZkappUriDiff(diff) => diff.token.clone(),
+            Self::ZkappTokenSymbolDiff(diff) => diff.token.clone(),
+            Self::ZkappTimingDiff(diff) => diff.token.clone(),
+            Self::ZkappVotingForDiff(diff) => diff.token.clone(),
+            Self::ZkappActionsDiff(diff) => diff.token.clone(),
+            Self::ZkappEventsDiff(diff) => diff.token.clone(),
+            Self::ZkappIncrementNonce(diff) => diff.token.clone(),
+            Self::ZkappAccountCreationFee(diff) => diff.token.clone(),
+        }
+    }
+}
+
+impl AccountDiff {
     pub fn from_command(command: CommandWithStateHash) -> Vec<Vec<Self>> {
         let CommandWithStateHash {
             command,
@@ -383,29 +427,6 @@ impl AccountDiff {
         );
 
         res
-    }
-
-    pub fn public_key(&self) -> PublicKey {
-        match self {
-            Self::Payment(diff) => diff.public_key.clone(),
-            Self::Delegation(diff) => diff.delegator.clone(),
-            Self::Coinbase(diff) => diff.public_key.clone(),
-            Self::FeeTransfer(diff) => diff.public_key.clone(),
-            Self::FeeTransferViaCoinbase(diff) => diff.public_key.clone(),
-            Self::FailedTransactionNonce(diff) => diff.public_key.clone(),
-            Self::Zkapp(diff) => diff.public_key.clone(),
-            Self::ZkappStateDiff(diff) => diff.public_key.clone(),
-            Self::ZkappPermissionsDiff(diff) => diff.public_key.clone(),
-            Self::ZkappVerificationKeyDiff(diff) => diff.public_key.clone(),
-            Self::ZkappUriDiff(diff) => diff.public_key.clone(),
-            Self::ZkappTokenSymbolDiff(diff) => diff.public_key.clone(),
-            Self::ZkappTimingDiff(diff) => diff.public_key.clone(),
-            Self::ZkappVotingForDiff(diff) => diff.public_key.clone(),
-            Self::ZkappActionsDiff(diff) => diff.public_key.clone(),
-            Self::ZkappEventsDiff(diff) => diff.public_key.clone(),
-            Self::ZkappIncrementNonce(diff) => diff.public_key.clone(),
-            Self::ZkappAccountCreationFee(diff) => diff.public_key.clone(),
-        }
     }
 
     fn transaction_fees(
@@ -537,6 +558,54 @@ impl AccountDiff {
             | ZkappIncrementNonce(_) => {
                 unreachable!("zkapp commands do not have an amount")
             }
+        }
+    }
+
+    pub fn add_token_accounts(
+        &self,
+        zkapp_token_accounts: &mut HashSet<(PublicKey, TokenAddress)>,
+    ) {
+        use AccountDiff::*;
+        match self {
+            Zkapp(zkapp) => {
+                for diff in zkapp.clone().expand() {
+                    zkapp_token_accounts.insert((diff.public_key(), diff.token()));
+                }
+            }
+            ZkappStateDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappPermissionsDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappVerificationKeyDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappUriDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappTokenSymbolDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappTimingDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappVotingForDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappActionsDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappEventsDiff(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappIncrementNonce(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            ZkappAccountCreationFee(diff) => {
+                zkapp_token_accounts.insert((diff.public_key.to_owned(), diff.token.to_owned()));
+            }
+            _ => (),
         }
     }
 
@@ -991,7 +1060,27 @@ impl PaymentDiff {
     }
 }
 
-// conversions
+impl ZkappPaymentDiff {
+    pub fn public_key(&self) -> PublicKey {
+        match self {
+            Self::Payment { payment, .. } => payment.public_key.to_owned(),
+            Self::IncrementNonce(diff) => diff.public_key.to_owned(),
+            Self::AccountCreationFee(diff) => diff.public_key.to_owned(),
+        }
+    }
+
+    pub fn token(&self) -> TokenAddress {
+        match self {
+            Self::Payment { payment, .. } => payment.token.to_owned(),
+            Self::IncrementNonce(diff) => diff.token.to_owned(),
+            Self::AccountCreationFee(diff) => diff.token.to_owned(),
+        }
+    }
+}
+
+/////////////////
+// conversions //
+/////////////////
 
 impl From<SupplyAdjustmentSign> for UpdateType {
     fn from(value: SupplyAdjustmentSign) -> Self {
@@ -1022,8 +1111,9 @@ impl From<(PublicKey, Nonce, &Elt, StateHash)> for AccountDiff {
             .into();
 
         // pay creation fee of receiver zkapp
+        use ZkappPaymentDiff::*;
         if value.2.account_update.body.implicit_account_creation_fee {
-            payment_diffs.push(ZkappPaymentDiff::Payment {
+            payment_diffs.push(Payment {
                 state_hash: value.3.to_owned(),
                 payment: PaymentDiff {
                     public_key: fee_payer.to_owned(),
@@ -1037,7 +1127,7 @@ impl From<(PublicKey, Nonce, &Elt, StateHash)> for AccountDiff {
         // increment nonce of receiver
         let increment_nonce = value.2.account_update.body.increment_nonce;
         if increment_nonce && amount.0 == 0 {
-            payment_diffs.push(ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonce {
+            payment_diffs.push(IncrementNonce(ZkappIncrementNonce {
                 state_hash: value.3.to_owned(),
                 public_key: public_key.to_owned(),
                 token: token.to_owned(),
@@ -1060,7 +1150,7 @@ impl From<(PublicKey, Nonce, &Elt, StateHash)> for AccountDiff {
 
         // only push non-zero payments
         if amount.0 != 0 {
-            payment_diffs.push(ZkappPaymentDiff::Payment {
+            payment_diffs.push(Payment {
                 state_hash: value.3.to_owned(),
                 payment: PaymentDiff {
                     public_key: public_key.to_owned(),
@@ -1196,7 +1286,9 @@ impl From<(PublicKey, Nonce, &Elt, StateHash)> for AccountDiff {
     }
 }
 
-// debug/display
+///////////////////
+// debug/display //
+///////////////////
 
 impl std::fmt::Debug for PaymentDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

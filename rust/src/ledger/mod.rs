@@ -17,7 +17,7 @@ use crate::{
     ledger::{
         account::Account,
         diff::{account::AccountDiff, LedgerDiff},
-        token::TokenAddress,
+        token::{account::TokenAccount, TokenAddress},
     },
 };
 use serde::{Deserialize, Serialize};
@@ -137,7 +137,7 @@ impl Ledger {
     /// Apply an account diff to a mutable ledger
     pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
-        let token = acct_diff.token_address();
+        let token = acct_diff.token();
 
         if let Some(account) = self
             .tokens
@@ -155,7 +155,7 @@ impl Ledger {
     pub fn _unapply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
             let pk = acct_diff.public_key();
-            let token = acct_diff.token_address();
+            let token = acct_diff.token();
 
             if let Some(account_after) = self
                 .tokens
@@ -313,7 +313,7 @@ impl TokenLedger {
     /// Apply an account diff to a mutable ledger
     pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
-        let token = acct_diff.token_address();
+        let token = acct_diff.token();
 
         if let Some(account) = self
             .accounts
@@ -330,7 +330,7 @@ impl TokenLedger {
     pub fn _unapply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
             let pk = acct_diff.public_key();
-            let token = acct_diff.token_address();
+            let token = acct_diff.token();
 
             if let Some(account_after) = self
                 .accounts
