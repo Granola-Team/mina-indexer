@@ -1433,6 +1433,9 @@ mod tests {
     /// environment variable to be set.
     #[allow(dead_code)]
     #[cfg(all(test, feature = "local_tests"))]
+    /// This requires the BLOCKS_DIR environment variable to be set.
+    #[test]
+    #[ignore = "potentially long running test"]
     fn test_parse_blocks_dir() -> anyhow::Result<()> {
         use rayon::prelude::*;
         use std::{
