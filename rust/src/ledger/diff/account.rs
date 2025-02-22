@@ -1405,7 +1405,7 @@ mod tests {
         base::nonce::Nonce,
         block::precomputed::{PcbVersion, PrecomputedBlock},
         command::{Command, Delegation, Payment},
-        constants::MAINNET_COINBASE_REWARD,
+        constants::{MAINNET_ACCOUNT_CREATION_FEE, MAINNET_COINBASE_REWARD},
         ledger::{
             account::Permission,
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
@@ -1946,13 +1946,36 @@ mod tests {
     }
 
     #[test]
-    fn zkapp_account_diff_token() -> anyhow::Result<()> {
+    fn zkapp_account_diff_new_token() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-360930-3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let ledger_diff = LedgerDiff::from_precomputed(&pcb);
 
-        // zkapp ledger diffs
-        let diffs = LedgerDiff::from_precomputed_unexpanded(&pcb);
-        let zkapp_diffs = diffs.filter_zkapp();
+        // account creation diffs
+        let account_creation_diffs: Vec<_> = ledger_diff
+            .new_pk_balances
+            .iter()
+            .flat_map(|(pk, created)| {
+                let mut creation_diffs = vec![];
+
+                for token in created.keys() {
+                    creation_diffs.push((pk.to_owned(), token.to_owned()));
+                }
+
+                creation_diffs
+            })
+            .collect();
+
+        assert_eq!(
+            account_creation_diffs,
+            vec![(
+                "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn").unwrap()
+            )]
+        );
+
+        // unexpanded zkapp ledger diffs
+        let zkapp_diffs = LedgerDiff::from_precomputed_unexpanded(&pcb).filter_zkapp();
         let zkapp_diffs = AccountDiff::expand(zkapp_diffs);
 
         // expected zkapp account diffs
@@ -2058,6 +2081,28 @@ mod tests {
         ]];
 
         assert_eq!(zkapp_diffs, expect);
+
+        // zkapp accounts created
+        let created: Vec<_> = ledger_diff
+            .account_diffs
+            .iter()
+            .flatten()
+            .filter(|diff| matches!(diff, AccountDiff::ZkappAccountCreationFee(_)))
+            .collect();
+
+        assert_eq!(
+            created,
+            vec![&AccountDiff::ZkappAccountCreationFee(
+                ZkappAccountCreationFee {
+                    state_hash,
+                    amount: MAINNET_ACCOUNT_CREATION_FEE,
+                    public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                    token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn")
+                        .unwrap(),
+                }
+            )],
+        );
+
         Ok(())
     }
 }

@@ -1404,10 +1404,12 @@ mod tests {
     fn vrf_output_v1() -> anyhow::Result<()> {
         let path: PathBuf = "./tests/data/sequential_blocks/mainnet-105489-3NLFXtdzaFW2WX6KgrxMjL4enE4pCa9hAsVUPm47PT6337SXgBGh.json".into();
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
         assert_eq!(
             block.last_vrf_output(),
             "bgHnww8tqHDhk3rBpW9tse_L_WPup7yKDKigNvoeBwA=".to_string()
         );
+
         assert_eq!(
             block.hash_last_vrf_output(),
             VrfOutput::new(
@@ -1421,6 +1423,7 @@ mod tests {
     fn vrf_output_v2() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/berkeley/sequential_blocks/berkeley-2-3NLBi19dn8P4Fm5UZgd2gdmi1WbuxyM1uuk2ci1zEwP4iEijHEwJ.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
         assert_eq!(
             pcb.last_vrf_output(),
             "rWxD4L_t-VXaoDDVJipD5OR9OU6X4T6WwEWCxvoEAAA=".to_string()
@@ -1428,11 +1431,22 @@ mod tests {
         Ok(())
     }
 
-    /// This may take a while to run, so it's only enabled when the
-    /// `local_tests` feature is enabled. This requires the BLOCKS_DIR
-    /// environment variable to be set.
-    #[allow(dead_code)]
-    #[cfg(all(test, feature = "local_tests"))]
+    #[test]
+    fn accounts_created() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-360930-3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        // expected accounts created
+        let expect = vec![AccountCreated {
+            public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+            token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn").unwrap(),
+            creation_fee: Amount(1000000000),
+        }];
+
+        assert_eq!(pcb.accounts_created_v2(), expect);
+        Ok(())
+    }
+
     /// This requires the BLOCKS_DIR environment variable to be set.
     #[test]
     #[ignore = "potentially long running test"]
@@ -1453,7 +1467,7 @@ mod tests {
             .map_err(|_| anyhow::anyhow!("BLOCKS_DIR environment variable must be set"))?;
 
         // Construct glob pattern more safely
-        let pattern = blocks_dir.join("mainnet-*.json");
+        let pattern = blocks_dir.join("mainnet-*-*.json");
         let pattern_str = pattern
             .to_str()
             .ok_or_else(|| anyhow::anyhow!("Invalid path pattern"))?;
@@ -1471,9 +1485,7 @@ mod tests {
         paths
             .par_iter()
             .try_for_each(|path| -> anyhow::Result<()> {
-                let result = PrecomputedBlock::from_path(path);
-
-                match result {
+                match PrecomputedBlock::from_path(path) {
                     Ok(_) => {
                         let count = processed_count.fetch_add(1, Ordering::Relaxed);
                         if count % 1000 == 0 {
@@ -1485,6 +1497,7 @@ mod tests {
                         eprintln!("Error parsing {:?}: {}", path, e);
                     }
                 }
+
                 Ok(())
             })?;
 
