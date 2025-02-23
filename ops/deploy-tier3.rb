@@ -1,0 +1,187 @@
+#!/usr/bin/env -S ruby -w
+
+BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
+BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
+WEB_PORT = ARGV[2] || 8080  # optional web port for server
+
+DEPLOY_TYPE = "test"
+require "#{__dir__}/ops-common"
+
+puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
+
+success = true
+
+# Configure the directories as needed.
+#
+config_base_dir
+config_exe_dir
+config_log_dir
+stage_blocks BLOCKS_COUNT
+fetch_ledgers
+
+puts "Creating database..."
+invoke_mina_indexer(
+  "database", "create",
+  "--log-level", "DEBUG",
+  "--ledger-cadence", "5000",
+  "--database-dir", db_dir(BLOCKS_COUNT),
+  "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+  # "--staking-ledgers-dir", LEDGERS_DIR,  # Comment out this line to skip staking ledger ingestion.
+  "--do-not-ingest-orphan-blocks"        # Comment out this line to ingest orphan blocks.
+) || abort("database creation failed")
+puts "Database creation succeeded."
+
+# Terminate the current version, if any.
+#
+if File.exist? CURRENT
+
+  # The version expected to be currently running is the one given in the fille
+  # CURRENT.
+  #
+  current = File.read(CURRENT)
+
+  # The socket used for that mina-indexer is named after the version.
+  #
+  socket = socket_from_rev(current)
+
+  # Send the currently running Indexer the shutdown command.
+  #
+  invoke_mina_indexer(
+    "--socket", socket,
+    "server", "shutdown"
+  ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
+
+  # Maybe the shutdown worked, maybe it didn't. Either way, give the process a
+  # second to clean up.
+  sleep 1
+end
+
+# Now, we take over.
+#
+File.write(CURRENT, REV)
+
+puts "Restarting server..."
+PORT = random_port
+command_line = EXE +
+  " --socket #{SOCKET} " \
+  " server start" \
+  " --log-level DEBUG" \
+  " --web-port #{PORT}" \
+  " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+  " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
+wait_for_socket(10)
+puts "Server restarted."
+
+# Create an indexer db snapshot to restore from later
+#
+puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
+config_snapshots_dir
+invoke_mina_indexer(
+  "--socket", SOCKET,
+  "database", "snapshot",
+  "--output-path", snapshot_path(BLOCKS_COUNT)
+) || abort("Snapshot creation failed. Aborting.")
+puts "Snapshot complete."
+
+# TODO include more ledger diff tests.
+# https://github.com/Granola-Team/mina-indexer/issues/1735
+
+IDXR_LEDGER = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.json"
+
+# Compare the indexer best ledger with the Mina pre-hardfork ledger
+#
+if BLOCKS_COUNT >= 359604
+  puts "Attempting ledger extraction..."
+  unless system(
+    EXE,
+    "--socket", SOCKET,
+    "ledgers",
+    "height",
+    "--height", "359604",
+    "--path", IDXR_LEDGER
+  )
+    warn("Ledger extraction failed.")
+    success = false
+  end
+  puts "Ledger extraction complete."
+
+  # puts "Verifying ledger at height #{BLOCKS_COUNT} is identical to the mainnet state dump"
+  IDXR_NORM_EXE = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
+  IDXR_NORM_LEDGER = "#{IDXR_LEDGER}.norm.json"
+  MINA_NORM_LEDGER = "#{SRC_TOP}/tests/data/ledgers/ledger-359604-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.json"
+  IDXR_LEDGER_DIFF = "#{LOGS_DIR}/ledger-#{BLOCKS_COUNT}.diff"
+
+  # normalize indexer best ledger
+  unless system(
+    IDXR_NORM_EXE,
+    IDXR_LEDGER,
+    out: IDXR_NORM_LEDGER
+  )
+    warn("Normalizing Indexer Ledger at height #{BLOCKS_COUNT} failed.")
+    success = false
+  end
+
+  # check ledgers match
+  unless system(
+    "diff --unified #{IDXR_NORM_LEDGER} #{MINA_NORM_LEDGER}",
+    out: IDXR_LEDGER_DIFF
+  ) && `cat #{IDXR_LEDGER_DIFF}`.empty?
+    warn("Regression introduced to ledger calculations. Inspect diff file: #{IDXR_LEDGER_DIFF}")
+    success = false
+  end
+end
+
+# Restore database from the snapshot made earlier
+#
+puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
+restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
+unless invoke_mina_indexer(
+  "database", "restore",
+  "--snapshot-file", snapshot_path(BLOCKS_COUNT),
+  "--restore-dir", restore_path
+)
+  warn("Snapshot restore failed.")
+  success = false
+end
+puts "Snapshot restore complete."
+
+# Shutdown indexer
+#
+puts "Initiating shutdown..."
+unless invoke_mina_indexer(
+  "--socket", SOCKET,
+  "shutdown"
+)
+  warn("Shutdown failed after snapshot.")
+  success = false
+end
+Process.wait(pid)
+puts "Shutdown complete."
+File.delete(CURRENT)
+
+# Delete the snapshot and the database directory restored to.
+#
+FileUtils.rm_rf(restore_path)
+File.unlink(snapshot_path(BLOCKS_COUNT))
+
+# Delete the database directory. We have the snapshot if we want it.
+#
+FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
+
+# TODO: uncomment this!
+# Do a database self-check
+#
+# puts 'Initiating self-check...'
+# pid = spawn EXE +
+#             " --socket #{SOCKET}" \
+#             ' server start' \
+#             ' --self-check' \
+#             ' --log-level DEBUG' \
+#             " --web-port #{PORT}" \
+#             " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+#             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+# wait_for_socket(10)
+# puts 'Self-check complete.'
+
+exit success

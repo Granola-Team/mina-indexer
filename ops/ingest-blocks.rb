@@ -13,7 +13,7 @@ puts "Ingesting blocks (mode: #{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 # Configure the directories as needed.
 config_exe_dir
 config_log_dir
-get_blocks BLOCKS_COUNT
+stage_blocks BLOCKS_COUNT
 fetch_ledgers
 
 # Create the database, if needed.

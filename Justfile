@@ -41,7 +41,8 @@ nightly_if_required := if is_rustfmt_nightly == "true" { "" } else { "+nightly" 
 BUILD_TYPE := "dev"
 PROD_MODE := "nix"
 REGRESSION_TEST := "./ops/regression-test.rb"
-DEPLOY := "./ops/deploy.rb"
+DEPLOY_TIER3 := "./ops/deploy-tier3.rb"
+DEPLOY_PROD := "./ops/deploy-prod.rb"
 UTILS := "./ops/utils.rb"
 
 default:
@@ -273,12 +274,12 @@ tier2: tier2-prereqs dev-build test-unit-tier2 \
 # Run the 3rd tier of tests with Nix-built binary.
 tier3 blocks='5000': nix-build && build-image
   @echo "--- Performing tier3 regression tests with Nix-built binary"
-  time {{DEPLOY}} test nix {{blocks}}
+  time {{DEPLOY_TIER3}} nix {{blocks}}
 
 # Run the 3rd tier of tests with dev build & no unit tests.
 tier3-dev blocks='5000': dev-build
   @echo "--- Performing tier3 regression tests with dev-built binary"
-  time {{DEPLOY}} test dev {{blocks}}
+  time {{DEPLOY_TIER3}} dev {{blocks}}
 
 #
 # Deploy local prod
@@ -287,12 +288,12 @@ tier3-dev blocks='5000': dev-build
 # Run a server as if in production with the Nix-built binary.
 deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying prod indexer"
-  time {{DEPLOY}} prod nix {{blocks}} {{web_port}}
+  time {{DEPLOY_PROD}} nix {{blocks}} {{web_port}}
 
 # Run a server as if in production with the dev-built binary.
 deploy-local-prod-dev blocks='5000' web_port='': dev-build
   @echo "--- Deploying dev prod indexer"
-  time {{DEPLOY}} prod dev {{blocks}} {{web_port}}
+  time {{DEPLOY_PROD}} dev {{blocks}} {{web_port}}
 
 # Shutdown a running local test/dev/prod indexer.
 shutdown which='dev':
