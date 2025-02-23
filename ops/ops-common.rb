@@ -13,10 +13,12 @@ end
 
 BASE_DIR ||= base_dir_from_rev(REV) # standard:disable Lint/OrAssignmentToConstant
 
-puts "Using base directory: #{BASE_DIR}"
-FileUtils.mkdir_p(BASE_DIR)
+def config_base_dir
+  puts "Using base directory: #{BASE_DIR}"
+  FileUtils.mkdir_p(BASE_DIR)
+end
 
-SRC_TOP = `git rev-parse --show-toplevel`.strip
+SRC_TOP ||= `git rev-parse --show-toplevel`.strip # standard:disable Lint/OrAssignmentToConstant
 CURRENT = "#{DEPLOY_DIR}/CURRENT"
 
 # Port
@@ -42,7 +44,7 @@ def config_snapshots_dir
 end
 
 def snapshot_path(block_height)
-  "#{SNAPSHOTS_DIR}/#{DB_VERSION}-#{block_height}.snapshot"
+  "#{SNAPSHOTS_DIR}/mina-#{block_height}.snapshot"
 end
 
 # Executable
@@ -94,8 +96,10 @@ end
 
 # Blocks
 
+MASTER_BLOCKS_DIR = "#{DEPLOY_DIR}/blocks"
+
 def blocks_dir(block_height)
-  "#{DEPLOY_DIR}/blocks-#{block_height}"
+  "#{DEPLOY_DIR}/staged-blocks-#{block_height}"
 end
 
 def get_blocks(block_height)
@@ -103,18 +107,14 @@ def get_blocks(block_height)
     "#{SRC_TOP}/ops/download-mina-blocks.rb",
     "1", # start block
     block_height.to_s, # end block
-    blocks_dir(block_height)
+    MASTER_BLOCKS_DIR
   ) || abort("Downloading Mina blocks failed.")
 end
 
 # Database directory
 
-v = JSON.parse(`#{EXE_SRC} database version --json`)
-DB_VERSION_JSON = v
-DB_VERSION = "#{v["major"]}.#{v["minor"]}.#{v["patch"]}"
-
 def db_dir(block_height)
-  "#{BASE_DIR}/db-#{DB_VERSION}-#{block_height}"
+  "#{BASE_DIR}/db-#{block_height}"
 end
 
 # Deploy

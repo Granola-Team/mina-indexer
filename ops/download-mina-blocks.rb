@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 # Downloads historical Mina PCBs in the Granola Cloudflare R2 Storage bucket by using `rclone`.
 START_BLOCK = ARGV[0]
 END_BLOCK = ARGV[1]

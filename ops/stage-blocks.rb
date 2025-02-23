@@ -7,22 +7,17 @@ END_BLOCK = ARGV[1].to_i
 NETWORK = ARGV[2]
 DEST = ARGV[3]
 
-require "fileutils"
+BUILD_TYPE = "dev"
+DEPLOY_TYPE = "dev"
+REV = "dummy-revision"
+SRC_TOP = "/nowhere"
+require "#{__dir__}/ops-common"
 
-# Fetch the blocks into the blocks directory if they're not already there.
-#
-VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-DEV_DIR = "#{VOLUMES_DIR}/mina-indexer-dev"
-
-FileUtils.mkdir_p(DEV_DIR)
-
-block_count = [9999, END_BLOCK].max
-BLOCKS_DIR = "#{DEV_DIR}/blocks-#{block_count}"
 args = [
   "#{__dir__}/download-mina-blocks.rb",
   START_BLOCK.to_s,
   END_BLOCK.to_s,
-  BLOCKS_DIR
+  MASTER_BLOCKS_DIR
 ]
 warn "stage-blocks.rb issuing: #{args}"
 system(*args) || abort("Failure of download-mina-blocks.rb")
@@ -32,7 +27,7 @@ system(*args) || abort("Failure of download-mina-blocks.rb")
 FileUtils.mkdir_p(DEST)
 print "Staging blocks into #{DEST}... "
 (START_BLOCK..END_BLOCK).each do |block_height|
-  Dir["#{BLOCKS_DIR}/#{NETWORK}-#{block_height}-*.json"].each do |src|
+  Dir["#{MASTER_BLOCKS_DIR}/#{NETWORK}-#{block_height}-*.json"].each do |src|
     print "." # To show progress
     target = "#{DEST}/#{File.basename(src)}"
     unless File.exist?(target)
