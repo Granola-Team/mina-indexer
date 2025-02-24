@@ -103,6 +103,9 @@ def blocks_dir(block_height)
 end
 
 def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
+  end_height = end_height.to_i
+  start_height = start_height.to_i
+
   dest = blocks_dir(end_height) if dest == ""
 
   # If start_height is not 1, then we assume that even if the destination
@@ -128,8 +131,8 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
     #
     Dir["#{MASTER_BLOCKS_DIR}/#{network}-*.json"].each do |block_file|
       /#{MASTER_BLOCKS_DIR}\/#{network}-(.*)-.*\.json/ =~ block_file
-      height = $1
-      if height.to_i.between?(start_height, end_height)
+      height = $1.to_i
+      if height.between?(start_height, end_height)
         # Hard link the correct block files into the destination directory.
         target = "#{dest}/#{File.basename(block_file)}"
         unless File.exist?(target)
