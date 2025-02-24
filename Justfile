@@ -258,7 +258,7 @@ tier2-load-test:
 
 # Run regression test(s), either all of them or one named specific test.
 regression-test subtest='':
-  @echo "--- Performing regression tests"
+  @echo "--- Performing regression tests {{subtest}}"
   time {{REGRESSION_TEST}} {{BUILD_TYPE}} {{subtest}}
 
 # Run tier 2 tests.
