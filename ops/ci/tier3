@@ -5,4 +5,4 @@ git lfs pull
 
 # The argument to "just tier3" is the number of blocks to use.
 #
-nix develop --command just tier3 429590
+nix develop --command just tier3 429355
