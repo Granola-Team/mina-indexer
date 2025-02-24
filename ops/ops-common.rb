@@ -105,32 +105,35 @@ end
 def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
   dest = blocks_dir(end_height) if dest == ""
 
-  # If the destination exists, we assume that it contains blocks 1 to
-  # end_height, as an optimization. If start_height is not 1, then we assume
-  # that even if the destination exists, then it does not contain all
-  # 1..end_height contiguous blocks.
+  # If start_height is not 1, then we assume that even if the destination
+  # exists, then it does not contain all 1..end_height contiguous blocks.
+  #
+  # If the start height is 1, then we assume that if the destination exists,
+  # then it does contain all 1..end_height contiguous blocks.
   #
   if start_height != 1 || !File.exist?(dest)
-    args = [
-      "#{__dir__}/download-mina-blocks.rb",
+
+    # Ensure that the blocks are present in the main blocks directory.
+    #
+    system("#{__dir__}/download-mina-blocks.rb",
       start_height.to_s,
       end_height.to_s,
-      MASTER_BLOCKS_DIR
-    ]
-    warn "stage-blocks.rb issuing: #{args}"
-    system(*args) || abort("Failure of download-mina-blocks.rb")
+      MASTER_BLOCKS_DIR) || abort("Failure of download-mina-blocks.rb")
 
-    # Hard link the correct block files into the destination directory.
-    #
     FileUtils.mkdir_p(dest)
+
     print "Staging #{network} blocks #{start_height} to #{end_height} into #{dest}... "
-    (start_height..end_height).each do |block_height|
-      Dir["#{MASTER_BLOCKS_DIR}/#{network}-#{block_height}-*.json"].each do |src|
-        print "." # To show progress
-        target = "#{dest}/#{File.basename(src)}"
+
+    # Format of file is: "#{MASTER_BLOCKS_DIR}/#{network}-#{block_height}-#{hash}.json"
+    #
+    Dir["#{MASTER_BLOCKS_DIR}/#{network}-*.json"].each do |block_file|
+      /#{MASTER_BLOCKS_DIR}\/#{network}-(.*)-.*\.json/ =~ block_file
+      height = $1
+      if height.to_i.between?(start_height, end_height)
+        # Hard link the correct block files into the destination directory.
+        target = "#{dest}/#{File.basename(block_file)}"
         unless File.exist?(target)
-          # Use hard links to avoid uselessly overfilling the storage.
-          File.link(src, target)
+          File.link(block_file, target)
         end
       end
     end
