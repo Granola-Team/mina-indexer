@@ -6,9 +6,11 @@ require "json"
 
 filename = ARGV[0]
 file = File.read(filename)
-data = JSON.parse(file)
+accounts = JSON.parse(file)
 
-accounts = data["ledger"]["accounts"]
+# for genesis ledgers
+# data = JSON.parse(file)
+# accounts = data["ledger"]["accounts"]
 
 result = {}
 
