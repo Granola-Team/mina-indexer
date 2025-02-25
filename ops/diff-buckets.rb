@@ -1,7 +1,6 @@
 #!/usr/bin/env -S ruby -w
 
-require 'set'
-require 'time'
+require "time"
 
 # Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola
 abort "Usage: #{$0} END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
@@ -69,7 +68,6 @@ def write_list_file(filename, list)
 end
 
 def fetch_and_sort_blocks(source, cmd, filter_prefix: nil)
-  start_time = Time.now
   warn "Creating block list for #{source}, issuing: #{cmd}"
   contents = `#{cmd}`
 
@@ -155,8 +153,8 @@ o1_blocks.select!(&:valid?)
 granola_blocks.select!(&:valid?)
 
 # Analyze blocks for multiple blocks at same height
-o1_heights, _ = analyze_blocks("o1Labs", o1_blocks)
-granola_heights, _ = analyze_blocks("Granola", granola_blocks)
+_o1_heights, _ = analyze_blocks("o1Labs", o1_blocks)
+_granola_heights, _ = analyze_blocks("Granola", granola_blocks)
 
 # Create sets for comparison based on both height and state hash
 o1_set = Set.new(o1_blocks)
