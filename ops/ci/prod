@@ -2,4 +2,4 @@
 # (Buildkite) 'command' for production deployment.
 
 git lfs pull
-nix develop --command just deploy-local-prod 429355
+nix develop --command just deploy-local-prod 375902
