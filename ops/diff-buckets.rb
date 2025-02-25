@@ -1,48 +1,114 @@
 #!/usr/bin/env -S ruby -w
 
-# Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola
-START_BLOCK = 1
-END_BLOCK = ARGV[0]
-RESULTS_FILE = "diff-buckets.log"
+require 'set'
+require 'time'
 
-def parse_block_number(filename)
-  # Match pattern: mainnet-NUMBER-HASH.json
-  match = filename.match(/^mainnet-(\d+)-[A-Za-z0-9]+\.json$/)
-  return nil unless match && !match[1].empty? # Ensure we have a valid number
-  match[1].to_i
+# Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola
+abort "Usage: #{$0} END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
+
+START_BLOCK = 1
+END_BLOCK = ARGV[0].to_i
+RESULTS_FILE = "diff-buckets.log"
+START_TIME = Time.now
+
+def log_time(message)
+  elapsed = Time.now - START_TIME
+  warn "#{message} (#{elapsed.round(2)} seconds)"
+end
+
+class BlockInfo
+  attr_reader :height, :state_hash, :filename
+
+  def initialize(filename)
+    @filename = filename
+    match = filename.match(/^mainnet-(\d+)-([A-Za-z0-9]+)\.json$/)
+    if match && !match[1].empty? && !match[2].empty?
+      @height = match[1].to_i
+      @state_hash = match[2]
+    end
+  end
+
+  def valid?
+    !@height.nil? && !@state_hash.nil?
+  end
+
+  def in_range?(start_block, end_block)
+    valid? && @height >= start_block && @height <= end_block
+  end
+
+  def <=>(other)
+    return nil unless other.is_a?(BlockInfo)
+    [@height, @state_hash] <=> [other.height, other.state_hash]
+  end
+
+  def eql?(other)
+    self.class == other.class && @height == other.height && @state_hash == other.state_hash
+  end
+
+  def hash
+    [@height, @state_hash].hash
+  end
+
+  def to_s
+    "Block #{@height} - #{@state_hash}"
+  end
 end
 
 def read_existing_list(filename)
-  return [] unless File.exist?(filename)
-  File.readlines(filename, chomp: true)
+  return [] unless File.exist?(filename) && !File.empty?(filename)
+  warn "Reading existing file #{filename}"
+  lines = File.readlines(filename, chomp: true)
+  warn "Read #{lines.size} lines from #{filename}"
+  lines
+end
+
+def write_list_file(filename, list)
+  warn "Writing #{list.size} entries to #{filename}"
+  return if list.empty?
+  File.write(filename, list.join("\n"))
 end
 
 def fetch_and_sort_blocks(source, cmd, filter_prefix: nil)
+  start_time = Time.now
   warn "Creating block list for #{source}, issuing: #{cmd}"
-  contents = `#{cmd}` || abort("Failure: #{cmd}")
+  contents = `#{cmd}`
 
-  # Get initial list and apply prefix filter if specified
-  initial_list = contents.lines(chomp: true)
-  initial_list.select! { |f| f.start_with?(filter_prefix) } if filter_prefix
-
-  # Only keep files matching the pattern mainnet-NUMBER-HASH.json
-  initial_list.select! { |f| f.match?(/^mainnet-\d+-[A-Za-z0-9]+\.json$/) }
-
-  # Sort the list
-  sorted = initial_list.sort! do |a, b|
-    a_num = parse_block_number(a)
-    b_num = parse_block_number(b)
-
-    # Both should be valid numbers at this point
-    a_num <=> b_num
+  if contents.nil? || contents.empty?
+    warn "ERROR: Empty or nil response from command: #{cmd}"
+    return []
   end
 
-  # Filter based on block range
-  sorted
-    .select { |f|
-      num = parse_block_number(f)
-      num && num >= START_BLOCK && num <= END_BLOCK.to_i
-    }
+  warn "Received #{contents.bytesize} bytes from #{source}"
+
+  initial_list = contents.lines(chomp: true)
+  warn "Initial line count for #{source}: #{initial_list.size}"
+
+  if filter_prefix
+    initial_list.select! { |f| f.start_with?(filter_prefix) }
+  end
+
+  blocks = initial_list.map { |f| BlockInfo.new(f) }
+  valid_blocks = blocks.select(&:valid?)
+  in_range_blocks = valid_blocks.select { |b| b.in_range?(START_BLOCK, END_BLOCK) }
+
+  result = in_range_blocks.sort.map(&:filename)
+  warn "Final result count for #{source}: #{result.size}"
+  result
+end
+
+def analyze_blocks(source_name, blocks)
+  height_groups = blocks.group_by(&:height)
+  multiple_blocks = height_groups.select { |_, blocks| blocks.size > 1 }
+
+  if multiple_blocks.any?
+    # Only warn if there's an unusually high number of blocks for a height
+    unusual_counts = multiple_blocks.select { |_, blocks| blocks.size > 10 }
+    if unusual_counts.any?
+      warn "\nNOTE: #{source_name} has #{unusual_counts.size} heights with >10 blocks"
+    end
+  end
+
+  [height_groups, multiple_blocks]
 end
 
 # Read existing files if they exist
@@ -54,7 +120,8 @@ if !existing_o1.empty? && !existing_granola.empty?
   o1_list = existing_o1
   granola_list = existing_granola
 else
-  # Create threads for parallel downloads
+  warn "Performing fresh downloads..."
+
   o1_thread = Thread.new do
     o1_cmd = "#{__dir__}/granola-rclone.rb lsf o1:mina_network_block_data"
     fetch_and_sort_blocks("o1Labs", o1_cmd, filter_prefix: "mainnet-")
@@ -65,60 +132,63 @@ else
     fetch_and_sort_blocks("Granola", granola_cmd, filter_prefix: "mainnet-")
   end
 
-  # Wait for both threads to complete and get their results
+  warn "Waiting for threads to complete..."
   o1_list = o1_thread.value
   granola_list = granola_thread.value
 
-  # Write results to files
-  File.write("o1.list", o1_list.join("\n"))
-  File.write("granola.list", granola_list.join("\n"))
+  write_list_file("o1.list", o1_list)
+  write_list_file("granola.list", granola_list)
 end
 
+log_time("Starting comparison")
+
+# Convert lists to BlockInfo objects
+o1_blocks = o1_list.map { |f| BlockInfo.new(f) }
+granola_blocks = granola_list.map { |f| BlockInfo.new(f) }
+
 # Find invalid filenames
-invalid_o1 = o1_list.select { |f| parse_block_number(f).nil? }
-invalid_granola = granola_list.select { |f| parse_block_number(f).nil? }
+invalid_o1 = o1_list.select { |f| !BlockInfo.new(f).valid? }
+invalid_granola = granola_list.select { |f| !BlockInfo.new(f).valid? }
 
-# Remove invalid entries before comparison
-o1_list -= invalid_o1
-granola_list -= invalid_granola
+# Remove invalid entries
+o1_blocks.select!(&:valid?)
+granola_blocks.select!(&:valid?)
 
-# Create hash sets of block numbers for comparison
-o1_blocks = Set.new(o1_list.map { |f| parse_block_number(f) })
-granola_blocks = Set.new(granola_list.map { |f| parse_block_number(f) })
+# Analyze blocks for multiple blocks at same height
+o1_heights, _ = analyze_blocks("o1Labs", o1_blocks)
+granola_heights, _ = analyze_blocks("Granola", granola_blocks)
 
-# Find missing blocks in each source
-blocks_only_in_o1 = o1_blocks - granola_blocks
-blocks_only_in_granola = granola_blocks - o1_blocks
+# Create sets for comparison based on both height and state hash
+o1_set = Set.new(o1_blocks)
+granola_set = Set.new(granola_blocks)
 
-# Get the corresponding files for missing blocks
-files_only_in_o1 = o1_list.select { |f| blocks_only_in_o1.include?(parse_block_number(f)) }.sort
-files_only_in_granola = granola_list.select { |f| blocks_only_in_granola.include?(parse_block_number(f)) }.sort
+# Find unique blocks in each source
+blocks_only_in_o1 = o1_set - granola_set
+blocks_only_in_granola = granola_set - o1_set
+
+log_time("Comparison completed")
 
 # Write detailed results to file
 File.open(RESULTS_FILE, "w") do |f|
   f.puts "Comparison Results (blocks #{START_BLOCK} to #{END_BLOCK})"
+  f.puts "Run started at: #{START_TIME}"
+  f.puts "Run completed at: #{Time.now}"
   f.puts "=" * 50
 
   if !invalid_o1.empty? || !invalid_granola.empty?
     f.puts "\nInvalid filenames found:"
     f.puts "-" * 30
-    f.puts "\nIn o1Labs (#{invalid_o1.size}):"
-    invalid_o1.each { |file| f.puts file }
-    f.puts "\nIn Granola (#{invalid_granola.size}):"
-    invalid_granola.each { |file| f.puts file }
+    f.puts "o1Labs: #{invalid_o1.size}"
+    f.puts "Granola: #{invalid_granola.size}"
   end
 
-  f.puts "\nBlocks missing from Granola (#{blocks_only_in_o1.size}):"
+  f.puts "\nUnique blocks in o1Labs (#{blocks_only_in_o1.size}):"
   f.puts "-" * 30
-  blocks_only_in_o1.to_a.sort.each { |block| f.puts "Block #{block}" }
-  f.puts "\nCorresponding files in o1Labs:"
-  files_only_in_o1.each { |file| f.puts file }
+  blocks_only_in_o1.sort.each { |block| f.puts block }
 
-  f.puts "\nBlocks missing from o1Labs (#{blocks_only_in_granola.size}):"
+  f.puts "\nUnique blocks in Granola (#{blocks_only_in_granola.size}):"
   f.puts "-" * 30
-  blocks_only_in_granola.to_a.sort.each { |block| f.puts "Block #{block}" }
-  f.puts "\nCorresponding files in Granola:"
-  files_only_in_granola.each { |file| f.puts file }
+  blocks_only_in_granola.sort.each { |block| f.puts block }
 end
 
 # Print summary to screen
@@ -128,6 +198,7 @@ puts "Total valid blocks in o1Labs: #{o1_blocks.size}"
 puts "Total valid blocks in Granola: #{granola_blocks.size}"
 puts "Invalid filenames in o1Labs: #{invalid_o1.size}"
 puts "Invalid filenames in Granola: #{invalid_granola.size}"
-puts "Blocks only in o1Labs: #{blocks_only_in_o1.size}"
-puts "Blocks only in Granola: #{blocks_only_in_granola.size}"
-puts "\nDetailed results written to: #{RESULTS_FILE}"
+puts "Unique blocks in o1Labs: #{blocks_only_in_o1.size}"
+puts "Unique blocks in Granola: #{blocks_only_in_granola.size}"
+puts "\nTotal runtime: #{(Time.now - START_TIME).round(2)} seconds"
+puts "Detailed results written to: #{RESULTS_FILE}"
