@@ -185,7 +185,7 @@ impl Coinbase {
 }
 
 #[cfg(test)]
-mod coinbase_tests {
+mod tests {
     use super::*;
 
     #[test]

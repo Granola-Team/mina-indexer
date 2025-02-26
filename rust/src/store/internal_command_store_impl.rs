@@ -564,7 +564,7 @@ impl<'a> CsvRecordInternalCommand<'a> {
 }
 
 #[cfg(all(test, feature = "tier2"))]
-mod internal_command_store_impl_tests {
+mod tests {
     use super::*;
     use anyhow::Result;
     use std::env;

@@ -38,7 +38,7 @@ use std::sync::Arc;
 #[derive(MergedObject, Default)]
 pub struct Root(
     blocks::BlocksQueryRoot,
-    stakes::StakeQueryRoot,
+    stakes::StakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,

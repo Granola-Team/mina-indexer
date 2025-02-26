@@ -22,7 +22,7 @@ use speedb::Direction;
 use std::sync::Arc;
 
 #[derive(InputObject, Default)]
-pub struct StakeQueryInput {
+pub struct StakesQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
@@ -36,7 +36,7 @@ pub struct StakeQueryInput {
 }
 
 #[derive(Enum, Copy, Clone, Eq, PartialEq)]
-pub enum StakeSortByInput {
+pub enum StakesSortByInput {
     #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
     #[graphql(name = "BALANCE_DESC")]
@@ -46,119 +46,6 @@ pub enum StakeSortByInput {
     StakeAsc,
     #[graphql(name = "STAKE_DESC")]
     StakeDesc,
-}
-
-#[derive(Default)]
-pub struct StakeQueryRoot;
-
-#[Object]
-impl StakeQueryRoot {
-    // Cache for 1 day
-    #[graphql(cache_control(max_age = 86400))]
-    async fn stakes<'ctx>(
-        &self,
-        ctx: &Context<'ctx>,
-        query: Option<StakeQueryInput>,
-        sort_by: Option<StakeSortByInput>,
-        #[graphql(default = 100)] limit: usize,
-    ) -> Result<Vec<StakesLedgerAccountWithMeta>> {
-        let db = db(ctx);
-
-        // default to current epoch
-        let curr_epoch = db.get_current_epoch()?;
-        let epoch = match query {
-            Some(ref query) => query.epoch.unwrap_or(curr_epoch),
-            None => curr_epoch,
-        };
-
-        // short-circuited epoch number query
-        if limit == 0 {
-            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-                return match db.get_epoch(&ledger_hash.clone().into())? {
-                    Some(epoch) => Ok(vec![StakesLedgerAccountWithMeta {
-                        epoch,
-                        ledger_hash,
-                        ..Default::default()
-                    }]),
-                    None => Ok(vec![]),
-                };
-            }
-        }
-
-        // if ledger hash is provided as a query input, use it for the ledger
-        // otherwise, use the provided or current epoch number
-        let (ledger_hash, epoch) = match query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch)) {
-            Some((Some(ledger_hash), Some(query_epoch))) => (ledger_hash, query_epoch),
-            Some((Some(ledger_hash), None)) => (
-                ledger_hash.clone(),
-                db.get_epoch(&ledger_hash.clone().into())?
-                    .unwrap_or_default(),
-            ),
-            Some((None, Some(query_epoch))) => (
-                db.get_staking_ledger_hash_by_epoch(query_epoch, None)?
-                    .unwrap_or_default()
-                    .0,
-                query_epoch,
-            ),
-            Some((None, None)) | None => (
-                db.get_staking_ledger_hash_by_epoch(epoch, None)?
-                    .unwrap_or_default()
-                    .0,
-                epoch,
-            ),
-        };
-        let total_currency = db
-            .get_total_currency(&ledger_hash.clone().into())?
-            .unwrap_or_default();
-
-        // balance/stake-sorted queries
-        let mut accounts = Vec::new();
-        let iter = match sort_by {
-            Some(StakeSortByInput::StakeDesc) | None => {
-                db.staking_ledger_account_stake_iterator(epoch, Direction::Reverse)
-            }
-            Some(StakeSortByInput::StakeAsc) => {
-                db.staking_ledger_account_stake_iterator(epoch, Direction::Forward)
-            }
-            Some(StakeSortByInput::BalanceDesc) => {
-                db.staking_ledger_account_balance_iterator(epoch, Direction::Reverse)
-            }
-            Some(StakeSortByInput::BalanceAsc) => {
-                db.staking_ledger_account_balance_iterator(epoch, Direction::Forward)
-            }
-        };
-
-        for (key, value) in iter.flatten() {
-            if key[..U32_LEN] != epoch.to_be_bytes() || accounts.len() >= limit {
-                // no longer the desired staking ledger
-                break;
-            }
-
-            let StakingAccountWithEpochDelegation {
-                account,
-                delegation,
-            } = serde_json::from_slice(&value)?;
-            if StakeQueryInput::matches_staking_account(
-                query.as_ref(),
-                &account,
-                &ledger_hash,
-                epoch,
-            ) {
-                let account = StakesLedgerAccountWithMeta::new(
-                    db,
-                    account,
-                    &delegation,
-                    epoch,
-                    ledger_hash.clone(),
-                    total_currency,
-                );
-                if StakeQueryInput::matches(query.as_ref(), &account) {
-                    accounts.push(account);
-                }
-            }
-        }
-        Ok(accounts)
-    }
 }
 
 #[derive(SimpleObject, Default)]
@@ -226,8 +113,11 @@ pub struct StakesLedgerAccountWithMeta {
 
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
-    /// Value chainId
+    /// Value chain id
     pub chain_id: String,
+
+    /// Value genesis state hash
+    pub genesis_state_hash: String,
 
     /// Value balance
     pub balance: f64,
@@ -322,54 +212,173 @@ pub struct StakesDelegationTotals {
     pub delegates: Vec<String>,
 }
 
+#[derive(Default)]
+pub struct StakesQueryRoot;
+
+#[Object]
+impl StakesQueryRoot {
+    // Cache for 1 day
+    #[graphql(cache_control(max_age = 86400))]
+    async fn stakes<'ctx>(
+        &self,
+        ctx: &Context<'ctx>,
+        query: Option<StakesQueryInput>,
+        sort_by: Option<StakesSortByInput>,
+        #[graphql(default = 100)] limit: usize,
+    ) -> Result<Vec<StakesLedgerAccountWithMeta>> {
+        let db = db(ctx);
+
+        // default to current epoch
+        let curr_epoch = db.get_current_epoch()?;
+        let epoch = match query {
+            Some(ref query) => query.epoch.unwrap_or(curr_epoch),
+            None => curr_epoch,
+        };
+
+        // short-circuited epoch number query
+        if limit == 0 {
+            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
+                return match db.get_epoch(&ledger_hash.clone().into())? {
+                    Some(epoch) => Ok(vec![StakesLedgerAccountWithMeta {
+                        epoch,
+                        ledger_hash,
+                        ..Default::default()
+                    }]),
+                    None => Ok(vec![]),
+                };
+            }
+        }
+
+        // if ledger hash is provided as a query input, use it for the ledger
+        // otherwise, use the provided or current epoch number
+        let (ledger_hash, epoch) = match query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch)) {
+            Some((Some(ledger_hash), Some(query_epoch))) => (ledger_hash, query_epoch),
+            Some((Some(ledger_hash), None)) => (
+                ledger_hash.clone(),
+                db.get_epoch(&ledger_hash.clone().into())?
+                    .unwrap_or_default(),
+            ),
+            Some((None, Some(query_epoch))) => (
+                db.get_staking_ledger_hash_by_epoch(query_epoch, None)?
+                    .unwrap_or_default()
+                    .0,
+                query_epoch,
+            ),
+            Some((None, None)) | None => (
+                db.get_staking_ledger_hash_by_epoch(epoch, None)?
+                    .unwrap_or_default()
+                    .0,
+                epoch,
+            ),
+        };
+        let total_currency = db
+            .get_total_currency(&ledger_hash.clone().into())?
+            .unwrap_or_default();
+
+        use StakesSortByInput::*;
+
+        // balance/stake-sorted queries
+        let mut accounts = Vec::with_capacity(limit);
+        let iter = match sort_by {
+            Some(StakeDesc) | None => {
+                db.staking_ledger_account_stake_iterator(epoch, Direction::Reverse)
+            }
+            Some(StakeAsc) => db.staking_ledger_account_stake_iterator(epoch, Direction::Forward),
+            Some(BalanceDesc) => {
+                db.staking_ledger_account_balance_iterator(epoch, Direction::Reverse)
+            }
+            Some(BalanceAsc) => {
+                db.staking_ledger_account_balance_iterator(epoch, Direction::Forward)
+            }
+        };
+
+        for (key, value) in iter.flatten() {
+            if key[..U32_LEN] != epoch.to_be_bytes() || accounts.len() >= limit {
+                // no longer the desired staking ledger
+                break;
+            }
+
+            let StakingAccountWithEpochDelegation {
+                account,
+                delegation,
+            } = serde_json::from_slice(&value)?;
+
+            if StakesQueryInput::matches_staking_account(
+                query.as_ref(),
+                &account,
+                &ledger_hash,
+                epoch,
+            ) {
+                let account = StakesLedgerAccountWithMeta::new(
+                    db,
+                    account,
+                    &delegation,
+                    epoch,
+                    ledger_hash.clone(),
+                    total_currency,
+                );
+
+                if StakesQueryInput::matches(query.as_ref(), &account) {
+                    accounts.push(account);
+                }
+            }
+        }
+
+        Ok(accounts)
+    }
+}
+
 #[ComplexObject]
 impl StakesDelegationTotals {
     /// Value total stake percentage
     async fn total_stake_percentage(&self) -> String {
         let total_currency_decimal = Decimal::from(self.total_currency);
         let total_delegated_decimal = Decimal::from(self.total_delegated_nanomina);
+
         let ratio = if !total_currency_decimal.is_zero() {
             (total_delegated_decimal / total_currency_decimal) * Decimal::from(100)
         } else {
             Decimal::ZERO
         };
-        let rounded_ratio = ratio.round_dp(2);
-        format!("{:.2}", rounded_ratio)
+
+        ratio.round_dp(2).to_string()
     }
 }
 
 impl
     From<(
-        StakingAccount,
-        String,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        Option<String>,
+        StakingAccount, //  0 - staking account
+        String,         //  1 - chain id
+        u32,            //  2 - pk epoch num blocks
+        u32,            //  3 - pk total num blocks
+        u32,            //  4 - pk epoch num supercharged blocks
+        u32,            //  5 - pk total num supercharged blocks
+        u32,            //  6 - pk epoch num SNARKs
+        u32,            //  7 - pk total num SNARKs
+        u32,            //  8 - pk epoch num user commands
+        u32,            //  9 - pk total num user commands
+        u32,            // 10 - pk epoch num internal commands
+        u32,            // 11 - pk total num internal commands
+        Option<String>, // 12 - username
+        String,         // 13 - genesis state hash
     )> for StakesLedgerAccount
 {
     fn from(
         acc: (
-            StakingAccount,
-            String,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            Option<String>,
+            StakingAccount, //  0 - staking account
+            String,         //  1 - chain id
+            u32,            //  2 - pk epoch num blocks
+            u32,            //  3 - pk total num blocks
+            u32,            //  4 - pk epoch num supercharged blocks
+            u32,            //  5 - pk total num supercharged blocks
+            u32,            //  6 - pk epoch num SNARKs
+            u32,            //  7 - pk total num SNARKs
+            u32,            //  8 - pk epoch num user commands
+            u32,            //  9 - pk total num user commands
+            u32,            // 10 - pk epoch num internal commands
+            u32,            // 11 - pk total num internal commands
+            Option<String>, // 12 - username
+            String,         // 13 - genesis state hash
         ),
     ) -> Self {
         let account = acc.0;
@@ -409,11 +418,12 @@ impl
             pk_epoch_num_internal_commands: acc.10,
             pk_total_num_internal_commands: acc.11,
             username: acc.12,
+            genesis_state_hash: acc.13,
         }
     }
 }
 
-impl StakeQueryInput {
+impl StakesQueryInput {
     pub fn matches(
         query: Option<&Self>,
         stakes_ledger_account: &StakesLedgerAccountWithMeta,
@@ -542,6 +552,10 @@ impl StakesLedgerAccountWithMeta {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
         };
+        let genesis_state_hash = match db.get_best_block_genesis_hash() {
+            Ok(Some(genesis_state_hash)) => genesis_state_hash.to_string(),
+            Ok(None) | Err(_) => "N/A".to_string(),
+        };
 
         Self {
             epoch,
@@ -560,6 +574,7 @@ impl StakesLedgerAccountWithMeta {
                 pk_epoch_num_internal_commands,
                 pk_total_num_internal_commands,
                 username,
+                genesis_state_hash,
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
@@ -605,7 +620,7 @@ impl StakesLedgerAccountWithMeta {
 }
 
 #[cfg(test)]
-mod web_graphql_stakes_tests {
+mod tests {
     use super::*;
 
     #[test]
@@ -618,38 +633,38 @@ mod web_graphql_stakes_tests {
             ..Default::default()
         };
 
-        let query_input_none = StakeQueryInput {
+        let query_input_none = StakesQueryInput {
             stake_lte: None,
             ..Default::default()
         };
-        assert!(StakeQueryInput::matches(
+        assert!(StakesQueryInput::matches(
             Some(&query_input_none),
             &stakes_ledger_account
         ));
 
-        let query_input_greater = StakeQueryInput {
+        let query_input_greater = StakesQueryInput {
             stake_lte: Some("600000.0".to_string()),
             ..Default::default()
         };
-        assert!(StakeQueryInput::matches(
+        assert!(StakesQueryInput::matches(
             Some(&query_input_greater),
             &stakes_ledger_account
         ));
 
-        let query_input_equal = StakeQueryInput {
+        let query_input_equal = StakesQueryInput {
             stake_lte: Some("500000.0".to_string()),
             ..Default::default()
         };
-        assert!(StakeQueryInput::matches(
+        assert!(StakesQueryInput::matches(
             Some(&query_input_equal),
             &stakes_ledger_account
         ));
 
-        let query_input_less = StakeQueryInput {
+        let query_input_less = StakesQueryInput {
             stake_lte: Some("400000.0".to_string()),
             ..Default::default()
         };
-        assert!(!StakeQueryInput::matches(
+        assert!(!StakesQueryInput::matches(
             Some(&query_input_less),
             &stakes_ledger_account
         ));
@@ -665,8 +680,8 @@ mod web_graphql_stakes_tests {
             ..Default::default()
         };
 
-        let query_input_none = StakeQueryInput::default();
-        assert!(StakeQueryInput::matches(
+        let query_input_none = StakesQueryInput::default();
+        assert!(StakesQueryInput::matches(
             Some(&query_input_none),
             &stakes_ledger_account
         ));

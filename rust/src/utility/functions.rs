@@ -90,7 +90,7 @@ where
 }
 
 #[cfg(test)]
-mod utility_function_tests {
+mod tests {
     use super::*;
     use crate::block::is_valid_block_file;
     use std::{fs::File, io::Write};

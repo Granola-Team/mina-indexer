@@ -41,8 +41,10 @@ impl StakingLedgerStore for IndexerStore {
 
             return Ok(self
                 .database
-                .get_cf(self.staking_ledger_accounts_cf(), key)?
-                .and_then(|bytes| serde_json::from_slice(&bytes).ok()));
+                .get_pinned_cf(self.staking_ledger_accounts_cf(), key)?
+                .and_then(|bytes| {
+                    serde_json::from_slice(&bytes).expect("staking ledger account")
+                }));
         }
 
         error!("Ledger hash not present for epoch {epoch}");
@@ -141,11 +143,9 @@ impl StakingLedgerStore for IndexerStore {
         trace!("Adding staking ledger {}", staking_ledger.summary());
 
         let epoch = staking_ledger.epoch;
-        let key = staking_ledger_epoch_key(
-            genesis_state_hash,
-            staking_ledger.epoch,
-            &staking_ledger.ledger_hash,
-        );
+        let ledger_hash = staking_ledger.ledger_hash.clone();
+
+        let key = staking_ledger_epoch_key(genesis_state_hash, epoch, &ledger_hash);
         let is_new = self
             .database
             .get_cf(self.staking_ledger_persisted_cf(), key)?
@@ -158,7 +158,6 @@ impl StakingLedgerStore for IndexerStore {
         }
 
         // additional indices
-        let ledger_hash = staking_ledger.ledger_hash.clone();
         self.set_staking_ledger_hash_epoch_pair(&ledger_hash, epoch, Some(genesis_state_hash))?;
         self.set_staking_ledger_hash_genesis_pair(&ledger_hash, genesis_state_hash)?;
         self.set_total_currency(&ledger_hash, staking_ledger.total_currency)?;
@@ -175,6 +174,7 @@ impl StakingLedgerStore for IndexerStore {
                 .get(&pk)
                 .cloned()
                 .expect("delegation exists");
+
             self.set_staking_account(
                 &pk,
                 epoch,
@@ -238,6 +238,7 @@ impl StakingLedgerStore for IndexerStore {
 
     fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>> {
         trace!("Getting epoch for staking ledger {ledger_hash}");
+
         Ok(self
             .database
             .get_cf(
@@ -302,6 +303,7 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         trace!("Setting genesis state hash {genesis_state_hash} for staking ledger {ledger_hash}");
+
         Ok(self.database.put_cf(
             self.staking_ledger_genesis_hash_cf(),
             ledger_hash.0.as_bytes(),
@@ -314,6 +316,7 @@ impl StakingLedgerStore for IndexerStore {
         ledger_hash: &LedgerHash,
     ) -> anyhow::Result<Option<StateHash>> {
         trace!("Getting genesis state hash for staking ledger {ledger_hash}");
+
         Ok(self
             .database
             .get_cf(
@@ -329,6 +332,7 @@ impl StakingLedgerStore for IndexerStore {
         total_currency: u64,
     ) -> anyhow::Result<()> {
         trace!("Setting total currency {total_currency} for staking ledger {ledger_hash}");
+
         Ok(self.database.put_cf(
             self.staking_ledger_total_currency_cf(),
             ledger_hash.0.as_bytes(),
@@ -338,13 +342,14 @@ impl StakingLedgerStore for IndexerStore {
 
     fn get_total_currency(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u64>> {
         trace!("Getting total currency for staking ledger {ledger_hash}");
+
         Ok(self
             .database
             .get_cf(
                 self.staking_ledger_total_currency_cf(),
                 ledger_hash.0.as_bytes(),
             )?
-            .and_then(|bytes| u64_from_be_bytes(&bytes).ok()))
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("total currency")))
     }
 
     fn get_staking_ledger_accounts_count_epoch(
@@ -353,6 +358,7 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: &StateHash,
     ) -> anyhow::Result<u32> {
         trace!("Getting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}");
+
         Ok(self
             .database
             .get_cf(
@@ -369,6 +375,7 @@ impl StakingLedgerStore for IndexerStore {
         count: u32,
     ) -> anyhow::Result<()> {
         trace!("Setting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}: {count}");
+
         Ok(self.database.put_cf(
             self.staking_ledger_accounts_count_epoch_cf(),
             staking_ledger_epoch_key_prefix(genesis_state_hash, epoch),
@@ -435,6 +442,7 @@ impl StakingLedgerStore for IndexerStore {
         genesis_state_hash: Option<&StateHash>,
     ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
         trace!("Building epoch {epoch} aggregated delegations");
+
         if let Some(ledger_hash) =
             self.get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
         {
@@ -474,6 +482,7 @@ impl StakingLedgerStore for IndexerStore {
                 }));
             }
         }
+
         Ok(None)
     }
 

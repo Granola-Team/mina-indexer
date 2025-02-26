@@ -868,7 +868,7 @@ impl<'a> TxnCsvRecord<'a> {
 }
 
 #[cfg(all(test, feature = "tier2"))]
-mod tier2_tests {
+mod tests {
     use super::*;
     use crate::block::precomputed::PcbVersion;
     use std::{env, path::Path};

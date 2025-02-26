@@ -104,7 +104,7 @@ pub fn epoch_block_num_key(
 }
 
 #[cfg(test)]
-mod block_store_impl_tests {
+mod tests {
     use super::*;
     use crate::block::precomputed::PcbVersion;
     use std::path::PathBuf;

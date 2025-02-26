@@ -246,7 +246,7 @@ fn log_progress(length_of_chain: u32, reporting_freq: u32, time: &Instant) {
 }
 
 #[cfg(test)]
-mod discovery_algorithm_tests {
+mod tests {
     use super::*;
     use std::{collections::BTreeMap, path::PathBuf};
 

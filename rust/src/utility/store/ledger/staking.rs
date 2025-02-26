@@ -118,7 +118,7 @@ pub fn staking_ledger_epoch_key_prefix(
 }
 
 #[cfg(test)]
-mod staking_ledger_store_impl_tests {
+mod tests {
     use super::*;
 
     #[test]

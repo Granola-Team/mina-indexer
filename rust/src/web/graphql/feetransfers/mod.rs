@@ -594,7 +594,7 @@ fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) ->
             .map_or(false, |lte| blockchain_length > lte)
 }
 #[cfg(test)]
-mod block_out_of_bounds_tests {
+mod tests {
     use super::*;
 
     #[test]

@@ -375,7 +375,7 @@ pub fn extract_network_height_hash(path: &Path) -> (Network, BlockchainLength, S
 }
 
 #[cfg(test)]
-mod block_tests {
+mod tests {
     use super::*;
     use precomputed::PcbVersion;
     use std::path::{Path, PathBuf};

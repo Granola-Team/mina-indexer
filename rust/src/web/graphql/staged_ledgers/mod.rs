@@ -27,6 +27,45 @@ pub enum StagedLedgerSortByInput {
     BalanceDesc,
 }
 
+#[derive(SimpleObject)]
+pub struct StagedLedgerWithMeta {
+    /// Value blockchain length
+    #[graphql(name = "blockchain_length")]
+    blockchain_length: u32,
+
+    /// Value state hash
+    state_hash: String,
+
+    /// Value ledger hash
+    ledger_hash: String,
+
+    /// Value staged ledger accounts
+    accounts: Vec<StagedLedgerAccount>,
+}
+
+#[derive(SimpleObject)]
+pub struct StagedLedgerAccount {
+    /// Value public key
+    #[graphql(name = "public_key")]
+    pub public_key: String,
+
+    /// Value delegate
+    pub delegate: String,
+
+    /// Value balance
+    pub balance: f64,
+
+    /// Value balance
+    #[graphql(name = "balance_nanomina")]
+    pub balance_nanomina: u64,
+
+    /// Value nonce
+    pub nonce: u32,
+
+    /// Value username
+    pub username: Option<String>,
+}
+
 #[derive(Default)]
 pub struct StagedLedgerQueryRoot;
 
@@ -70,6 +109,7 @@ impl StagedLedgerQueryRoot {
                         .map(|acct| vec![acct.into()]));
                 }
             }
+
             return Ok(None);
         }
 
@@ -105,60 +145,23 @@ impl StagedLedgerQueryRoot {
 
         reorder(&mut accounts, sort_by);
         accounts.truncate(limit);
+
         Ok(Some(accounts))
     }
 }
 
 fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
-    match sort_by {
-        Some(StagedLedgerSortByInput::BalanceAsc) => {
-            accts.sort_by_cached_key(|x| (x.balance_nanomina, x.nonce, x.public_key.clone()))
+    if let Some(sort_by) = sort_by {
+        match sort_by {
+            StagedLedgerSortByInput::BalanceAsc => {
+                accts.sort_by_cached_key(|x| (x.balance_nanomina, x.nonce, x.public_key.clone()))
+            }
+            StagedLedgerSortByInput::BalanceDesc => {
+                reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
+                accts.reverse();
+            }
         }
-        Some(StagedLedgerSortByInput::BalanceDesc) => {
-            reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
-            accts.reverse();
-        }
-        None => (),
     }
-}
-
-#[derive(SimpleObject)]
-pub struct StagedLedgerWithMeta {
-    /// Value blockchain length
-    #[graphql(name = "blockchain_length")]
-    blockchain_length: u32,
-
-    /// Value state hash
-    state_hash: String,
-
-    /// Value ledger hash
-    ledger_hash: String,
-
-    /// Value staged ledger accounts
-    accounts: Vec<StagedLedgerAccount>,
-}
-
-#[derive(SimpleObject)]
-pub struct StagedLedgerAccount {
-    /// Value public key
-    #[graphql(name = "public_key")]
-    pub public_key: String,
-
-    /// Value delegate
-    pub delegate: String,
-
-    /// Value balance
-    pub balance: f64,
-
-    /// Value balance
-    #[graphql(name = "balance_nanomina")]
-    pub balance_nanomina: u64,
-
-    /// Value nonce
-    pub nonce: u32,
-
-    /// Value username
-    pub username: Option<String>,
 }
 
 impl From<Account> for StagedLedgerAccount {
