@@ -2,7 +2,7 @@
 
 require "time"
 
-# Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola
+# Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola storage buckets.
 abort "Usage: #{$0} START_BLOCK END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
 
 START_BLOCK = ARGV[0].to_i
@@ -20,36 +20,50 @@ class BlockInfo
 
   def initialize(filename)
     @filename = filename
+    # First try the full format (mainnet-HEIGHT-HASH.json)
     match = filename.match(/^mainnet-(\d+)-([A-Za-z0-9]+)\.json$/)
     if match && !match[1].empty? && !match[2].empty?
       @height = match[1].to_i
       @state_hash = match[2]
+    else
+      # Try to match malformed format (mainnet-HASH.json)
+      match = filename.match(/^mainnet-([A-Za-z0-9]{50,})\.json$/)
+      if match && !match[1].empty?
+        @height = nil
+        @state_hash = match[1]
+      end
     end
   end
 
   def valid?
-    !@height.nil? && !@state_hash.nil?
+    !@state_hash.nil?  # Only require state hash to be valid
   end
 
   def in_range?(start_block, end_block)
-    valid? && @height >= start_block && @height <= end_block
+    return true if @height.nil?  # Include blocks with unknown height
+    @height >= start_block && @height <= end_block
   end
 
   def <=>(other)
     return nil unless other.is_a?(BlockInfo)
+    return @state_hash <=> other.state_hash if @height.nil? || other.height.nil?
     [@height, @state_hash] <=> [other.height, other.state_hash]
   end
 
   def eql?(other)
-    self.class == other.class && @height == other.height && @state_hash == other.state_hash
+    self.class == other.class && @state_hash == other.state_hash
   end
 
   def hash
-    [@height, @state_hash].hash
+    @state_hash.hash
   end
 
   def to_s
-    "Block #{@height} - #{@state_hash}"
+    if @height
+      "Block #{@height} - #{@state_hash}"
+    else
+      "Block (unknown height) - #{@state_hash}"
+    end
   end
 end
 
@@ -94,19 +108,21 @@ def fetch_and_sort_blocks(source, cmd, filter_prefix: nil)
   result
 end
 
-def analyze_blocks(source_name, blocks)
-  height_groups = blocks.group_by(&:height)
-  multiple_blocks = height_groups.select { |_, blocks| blocks.size > 1 }
+def find_malformed_matches(granola_blocks, o1_list)
+  # Create a map of state hash -> original filename for o1 files
+  o1_malformed = o1_list.map { |f| BlockInfo.new(f) }.select { |b| b.valid? }
+  o1_hash_map = o1_malformed.each_with_object({}) { |b, h| h[b.state_hash] = b }
 
-  if multiple_blocks.any?
-    # Only warn if there's an unusually high number of blocks for a height
-    unusual_counts = multiple_blocks.select { |_, blocks| blocks.size > 10 }
-    if unusual_counts.any?
-      warn "\nNOTE: #{source_name} has #{unusual_counts.size} heights with >10 blocks"
+  matches = []
+  granola_blocks.each do |granola_block|
+    if (o1_match = o1_hash_map[granola_block.state_hash])
+      matches << {
+        granola: granola_block,
+        o1: o1_match
+      }
     end
   end
-
-  [height_groups, multiple_blocks]
+  matches
 end
 
 # Read existing files if they exist
@@ -126,7 +142,7 @@ else
   end
 
   granola_thread = Thread.new do
-    granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
+    granola_cmd = "rclone --config #{__dir__}/rclone.conf lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
     fetch_and_sort_blocks("Granola", granola_cmd, filter_prefix: "mainnet-")
   end
 
@@ -152,17 +168,30 @@ invalid_granola = granola_list.select { |f| !BlockInfo.new(f).valid? }
 o1_blocks.select!(&:valid?)
 granola_blocks.select!(&:valid?)
 
-# Analyze blocks for multiple blocks at same height
-_o1_heights, _ = analyze_blocks("o1Labs", o1_blocks)
-_granola_heights, _ = analyze_blocks("Granola", granola_blocks)
-
-# Create sets for comparison based on both height and state hash
+# Create sets for comparison based on state hash
 o1_set = Set.new(o1_blocks)
 granola_set = Set.new(granola_blocks)
 
 # Find unique blocks in each source
 blocks_only_in_o1 = o1_set - granola_set
 blocks_only_in_granola = granola_set - o1_set
+
+# Check for malformed matches
+if !blocks_only_in_granola.empty?
+  warn "\nChecking Granola 'unique' blocks for matches in o1..."
+  matches = find_malformed_matches(blocks_only_in_granola.to_a, o1_list)
+
+  if matches.any?
+    warn "Found #{matches.size} blocks with matching state hashes:"
+    matches.each do |match|
+      warn "  Match: #{match[:granola].filename} -> #{match[:o1].filename}"
+    end
+
+    # Remove matched blocks from the unique list
+    matched_blocks = Set.new(matches.map { |m| m[:granola] })
+    blocks_only_in_granola -= matched_blocks
+  end
+end
 
 log_time("Comparison completed")
 

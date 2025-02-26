@@ -46,13 +46,17 @@ Scans a directory of Mina PCB JSON files and checks for contiguous block numbers
 
 Utility to manage the running of a production instance of Mina Indexer. See the instructions in the script.
 
+### `./diff-buckets.rb`
+
+Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola storage buckets.
+
 ### `./download-mina-blocks.rb`
 
-Downloads historical Mina PCBs in the Granola Cloudflare R2 Storage bucket by using `rclone`. See the instructions at the top of the script.
+Downloads historical Mina PCBs in the Granola storage bucket by using `rclone`. See the instructions at the top of the script.
 
 ### `./download-staking-ledgers.rb`
 
-Downloads Mina staking ledgers stored in the Granola Cloudflare R2 Storage bucket by using `rclone`. See the instructions at the top of the script.
+Downloads Mina staking ledgers stored in the Granola storage bucket by using `rclone`. See the instructions at the top of the script.
 
 ### `./format-graphql-in-hurl-files.rb`
 
@@ -120,11 +124,11 @@ Compact JSON into single line
 
 ### `./upload-mina-blocks.sh`
 
-Utility to upload PCBs to Granola's Cloudflare R2 Storage bucket. Requires appropriate credentials.
+Utility to upload PCBs to Granola's storage bucket. Requires appropriate credentials.
 
 ### `./upload-staking-ledgers.sh`
 
-Utility to upload staking ledger logs to Granola's Cloudflare R2 Storage bucket. Requires appropriate credentials.
+Utility to upload staking ledger logs to Granola's storage bucket. Requires appropriate credentials.
 
 ### `./utils.rb`
 
