@@ -121,8 +121,7 @@ def check_ledger(height)
     success = false
   end
 
-  puts "Ledger extraction complete."
-  puts "Verifying ledger at #{height} is identical to the mainnet state dump"
+  puts "Ledger extraction complete. Verifying ledger at #{height}..."
 
   idxr_norm_exe = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
   idxr_norm_ledger = "#{idxr_ledger}.norm.json"
