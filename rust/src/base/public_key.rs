@@ -150,9 +150,9 @@ impl From<PublicKey> for PubKey {
     }
 }
 
-///////////////////
-// debug/display //
-///////////////////
+/////////////
+// display //
+/////////////
 
 impl std::fmt::Display for PublicKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -161,8 +161,31 @@ impl std::fmt::Display for PublicKey {
 }
 
 #[cfg(test)]
+impl quickcheck::Arbitrary for PublicKey {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..PublicKey::LEN - PublicKey::PREFIX.len() {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(Self::PREFIX.to_string() + &chars.iter().collect::<String>())
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::PublicKey;
+    use quickcheck::{Arbitrary, Gen};
+
+    #[test]
+    fn arbitrary_pk_is_valid() {
+        let pk = PublicKey::arbitrary(&mut Gen::new(1000));
+        assert!(PublicKey::is_valid(&pk.0))
+    }
 
     #[test]
     fn fixed_pks_are_valid() {

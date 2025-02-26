@@ -42,3 +42,16 @@ impl std::fmt::Display for ActionState {
         write!(f, "{}", self.0)
     }
 }
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for ActionState {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let mut bytes = [0u8; 32];
+
+        for byte in bytes.iter_mut() {
+            *byte = u8::arbitrary(g);
+        }
+
+        Self(format!("0x{}", hex::encode(bytes)))
+    }
+}

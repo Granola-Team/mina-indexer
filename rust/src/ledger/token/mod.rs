@@ -5,6 +5,7 @@ pub mod account;
 
 // types
 mod address;
+pub mod holder;
 mod id;
 mod symbol;
 
@@ -16,10 +17,22 @@ pub type TokenAddress = address::TokenAddress;
 pub type TokenId = id::TokenId;
 pub type TokenSymbol = symbol::TokenSymbol;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Token {
-    address: TokenAddress,
-    owner: Option<PublicKey>,
-    symbol: TokenSymbol,
-    supply: Amount,
+    pub token: TokenAddress,
+    pub owner: Option<PublicKey>,
+    pub symbol: TokenSymbol,
+    pub supply: Amount,
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Token {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            token: TokenAddress::arbitrary(g),
+            owner: <Option<PublicKey>>::arbitrary(g),
+            symbol: TokenSymbol::arbitrary(g),
+            supply: Amount::arbitrary(g),
+        }
+    }
 }

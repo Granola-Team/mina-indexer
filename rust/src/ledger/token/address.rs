@@ -108,9 +108,37 @@ impl std::fmt::Display for TokenAddress {
 }
 
 #[cfg(test)]
+impl quickcheck::Arbitrary for TokenAddress {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let mut bytes = [0u8; 32];
+        for b in &mut bytes {
+            *b = u8::arbitrary(g);
+        }
+
+        Self(
+            bs58::encode(&bytes)
+                .with_check_version(TOKEN_ID_KEY)
+                .into_string(),
+        )
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::ledger::token::id::TokenId;
+    use quickcheck::{Arbitrary, Gen};
+
+    #[test]
+    fn arbitrary_token_is_valid() {
+        let token = TokenAddress::arbitrary(&mut Gen::new(1000));
+
+        assert_eq!(token.0.len(), TokenAddress::LEN);
+        assert!(bs58::decode(&token.0.as_bytes())
+            .with_check(Some(TOKEN_ID_KEY))
+            .into_vec()
+            .is_ok());
+    }
 
     #[test]
     fn roundtrip() -> anyhow::Result<()> {

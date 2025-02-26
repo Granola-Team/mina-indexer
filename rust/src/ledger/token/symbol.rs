@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize)]
 pub struct TokenSymbol(pub String);
 
+//////////
+// impl //
+//////////
+
 impl TokenSymbol {
     pub fn new<S>(symbol: S) -> Self
     where
@@ -64,5 +68,21 @@ where
 impl std::fmt::Display for TokenSymbol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for TokenSymbol {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let length = u8::arbitrary(g);
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        let mut chars = vec![];
+        for _ in 0..length {
+            let idx = usize::arbitrary(g) % alphabet.len();
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(chars.iter().collect())
     }
 }

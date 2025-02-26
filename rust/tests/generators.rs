@@ -10,6 +10,10 @@ where
 // zkapps //
 ////////////
 
+pub fn gen() -> quickcheck::Gen {
+    quickcheck::Gen::new(1000)
+}
+
 impl Arbitrary for TestGen<ActionState> {
     fn arbitrary(g: &mut Gen) -> Self {
         let mut bytes = [0u8; 32];

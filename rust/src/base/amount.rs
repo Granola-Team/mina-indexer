@@ -86,6 +86,18 @@ impl AddAssign<Amount> for Amount {
     }
 }
 
+impl AddAssign<i64> for Amount {
+    fn add_assign(&mut self, rhs: i64) {
+        let abs = rhs.unsigned_abs();
+
+        *self = if rhs < 0 {
+            Self(self.0 - abs)
+        } else {
+            Self(self.0 + abs)
+        }
+    }
+}
+
 /////////////////
 // converisons //
 /////////////////
@@ -137,6 +149,14 @@ impl<'de> Deserialize<'de> for Amount {
 impl std::fmt::Display for Amount {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", nanomina_to_mina(self.0))
+    }
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Amount {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let amt = u64::arbitrary(g);
+        amt.into()
     }
 }
 

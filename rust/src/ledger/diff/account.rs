@@ -15,7 +15,8 @@ use crate::{
         self,
         protocol_state::SupplyAdjustmentSign,
         staged_ledger_diff::{Authorization, Call, Elt, UpdateKind},
-        ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri,
+        zkapp::action_state::ActionState,
+        AppState, VerificationKey, ZkappEvent, ZkappUri,
     },
     snark_work::SnarkWorkSummary,
 };

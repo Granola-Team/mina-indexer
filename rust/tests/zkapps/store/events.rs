@@ -1,11 +1,11 @@
-use crate::{generators::TestGen, helpers::store::*};
+use crate::{generators::*, helpers::store::*};
 use mina_indexer::{
     base::public_key::PublicKey,
     ledger::token::TokenAddress,
     mina_blocks::v2::ZkappEvent,
     store::{zkapp::events::ZkappEventStore, IndexerStore},
 };
-use quickcheck::{Arbitrary, Gen};
+use quickcheck::Arbitrary;
 
 #[test]
 fn event_store_test() -> anyhow::Result<()> {
@@ -13,11 +13,11 @@ fn event_store_test() -> anyhow::Result<()> {
     let indexer_store = IndexerStore::new(store_dir.path())?;
 
     // generate arbitrary events
-    let mut gen = Gen::new(100);
+    let g = &mut gen();
     let events = vec![
-        <TestGen<ZkappEvent>>::arbitrary(&mut gen).0,
-        <TestGen<ZkappEvent>>::arbitrary(&mut gen).0,
-        <TestGen<ZkappEvent>>::arbitrary(&mut gen).0,
+        <TestGen<ZkappEvent>>::arbitrary(g).0,
+        <TestGen<ZkappEvent>>::arbitrary(g).0,
+        <TestGen<ZkappEvent>>::arbitrary(g).0,
     ];
     let events_length = events.len() as u32;
 
@@ -56,9 +56,9 @@ fn event_store_test() -> anyhow::Result<()> {
     // set event //
     ///////////////
 
-    let index: u32 = Arbitrary::arbitrary(&mut gen);
+    let index = u32::arbitrary(g);
     let index = index % events_length;
-    let set_event = <TestGen<ZkappEvent>>::arbitrary(&mut gen).0;
+    let set_event = <TestGen<ZkappEvent>>::arbitrary(g).0;
 
     indexer_store.set_event(&pk, &token, &set_event, index)?;
     assert_eq!(
@@ -70,7 +70,7 @@ fn event_store_test() -> anyhow::Result<()> {
     // remove events //
     ///////////////////
 
-    let num: u32 = Arbitrary::arbitrary(&mut gen);
+    let num = u32::arbitrary(g);
     let num = num % events_length;
 
     assert_eq!(
