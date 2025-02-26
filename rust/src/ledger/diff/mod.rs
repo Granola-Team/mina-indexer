@@ -1,4 +1,7 @@
+//! Ledger diff representation
+
 pub mod account;
+pub mod token;
 
 use self::account::{AccountDiff, AccountDiffType, FailedTransactionNonceDiff};
 use super::{coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
@@ -10,6 +13,7 @@ use crate::{
 use account::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
+use token::TokenDiff;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct LedgerDiff {
@@ -34,6 +38,9 @@ pub struct LedgerDiff {
 
     /// Account updates
     pub account_diffs: Vec<Vec<AccountDiff>>,
+
+    /// Token diffs
+    pub token_diffs: Vec<TokenDiff>,
 }
 
 impl LedgerDiff {
@@ -121,7 +128,7 @@ impl LedgerDiff {
             })
             .collect::<Vec<_>>();
 
-        // apply in order: user commands, coinbase, fees
+        // apply in order: user commands/zkapps, coinbase, fees
         account_diffs.append(&mut account_diff_txns);
 
         // replace fee_transfer with fee_transfer_via_coinbase, if any
@@ -150,8 +157,23 @@ impl LedgerDiff {
                 .insert(token, creation_fee.0);
         }
 
+        let token_diffs = account_diffs
+            .iter()
+            .flatten()
+            .flat_map(|diff| match diff {
+                AccountDiff::Zkapp(zkapp) => zkapp
+                    .payment_diffs
+                    .iter()
+                    .flat_map(|diff| <Option<TokenDiff>>::from(diff.clone()))
+                    .collect(),
+                AccountDiff::ZkappTokenSymbolDiff(diff) => vec![diff.clone().into()],
+                _ => vec![],
+            })
+            .collect();
+
         Self {
             account_diffs,
+            token_diffs,
             new_pk_balances: accounts_created.0,
             new_coinbase_receiver: accounts_created.1,
             state_hash: block.state_hash(),

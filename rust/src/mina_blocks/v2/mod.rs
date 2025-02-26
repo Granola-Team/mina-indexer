@@ -1,8 +1,9 @@
+//! V2 mina PCB representation
+
 pub mod precomputed_block;
 pub mod protocol_state;
 pub mod staged_ledger_diff;
-
-mod zkapp;
+pub mod zkapp;
 
 use crate::{
     base::{

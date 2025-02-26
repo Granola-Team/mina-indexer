@@ -557,6 +557,7 @@ mod tests {
                     token: TokenAddress::default(),
                 }),
             ]],
+            token_diffs: vec![],
         };
         let ledger = TokenLedger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
@@ -591,6 +592,7 @@ mod tests {
                 delegate: delegate.clone(),
                 nonce: prev_nonce + 1,
             })]],
+            token_diffs: vec![],
         };
         let ledger = TokenLedger { accounts }
             .apply_diff(&ledger_diff)

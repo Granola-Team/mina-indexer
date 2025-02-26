@@ -3,7 +3,7 @@
 use crate::{
     base::public_key::PublicKey,
     ledger::token::TokenAddress,
-    mina_blocks::v2::ActionState,
+    mina_blocks::v2::zkapp::action_state::ActionState,
     store::{
         column_families::ColumnFamilyHelpers, zkapp::actions::ZkappActionStore, IndexerStore,
         Result,
