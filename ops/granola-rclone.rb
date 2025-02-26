@@ -2,8 +2,8 @@
 
 CONFIG_FILE = "#{__dir__}/rclone.conf"
 
-access_key = ENV['LINODE_OBJ_ACCESS_KEY']
-secret_key = ENV['LINODE_OBJ_SECRET_KEY']
+access_key = ENV["LINODE_OBJ_ACCESS_KEY"]
+secret_key = ENV["LINODE_OBJ_SECRET_KEY"]
 
 args = [
   "rclone",
