@@ -34,4 +34,6 @@ pub trait FixedKeys {
         "total_num_failed_canonical_user_commands_key".as_bytes();
     const TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
         "total_num_canonical_user_commands_key".as_bytes();
+
+    const ZKAPP_TOKEN_COUNT: &'static [u8] = "zkapp_token_count".as_bytes();
 }

@@ -447,6 +447,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Zkapp store CFs //
     /////////////////////
 
+    /// #### CF for storing zkapp actions
+    ///
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}{num}
@@ -461,6 +463,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-actions column family exists")
     }
 
+    /// #### CF for storing a zkapp account's current action count
+    ///
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}
@@ -474,6 +478,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-actions-pk-num column family exists")
     }
 
+    /// #### CF for storing zkapp events
+    ///
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}{num}
@@ -488,6 +494,8 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-events column family exists")
     }
 
+    /// #### CF for storing a zkapp account's current event count
+    ///
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}
@@ -499,6 +507,147 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("zkapp-events-pk-num")
             .expect("zkapp-events-pk-num column family exists")
+    }
+
+    /// #### CF for storing tokens
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [Token] serde bytes
+    fn zkapp_tokens_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens")
+            .expect("zkapp-tokens column family exists")
+    }
+
+    /// #### CF for storing tokens at indexes
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [u32] BE bytes
+    /// - val: [Token] serde bytes
+    fn zkapp_tokens_at_index_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-at-index")
+            .expect("zkapp-tokens-at-index column family exists")
+    }
+
+    /// #### CF for storing token indexes
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_tokens_index_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-index")
+            .expect("zkapp-tokens-index column family exists")
+    }
+
+    /// #### CF for storing token supplies
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_tokens_supply_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-supply")
+            .expect("zkapp-tokens-supply column family exists")
+    }
+
+    /// #### CF for storing token owners
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [PublicKey] serde bytes
+    fn zkapp_tokens_owner_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-owner")
+            .expect("zkapp-tokens-owner column family exists")
+    }
+
+    /// #### CF for storing token symbols
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [TokenSymbol] serde bytes
+    fn zkapp_tokens_symbol_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-symbol")
+            .expect("zkapp-tokens-symbol column family exists")
+    }
+
+    /// #### CF for storing token holders
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{index}
+    /// - val: [Token] serde bytes
+    /// where
+    /// - token: [TokenAddress] bytes
+    /// - index: [u32] BE bytes
+    fn zkapp_tokens_holder_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-holder")
+            .expect("zkapp-tokens-holder column family exists")
+    }
+
+    /// #### CF for storing token holder counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_tokens_holder_count_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-holder-count")
+            .expect("zkapp-tokens-holder-count column family exists")
+    }
+
+    /// #### CF for storing tokens per holder
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: {pk}{index}
+    /// - val: [TokenHolder] serde bytes
+    /// where
+    /// - pk:    [PublicKey] bytes
+    /// - index: [u32] BE bytes
+    fn zkapp_tokens_pk_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-pk")
+            .expect("zkapp-tokens-pk column family exists")
+    }
+
+    /// #### CF for storing token counts per holder
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [PublicKey] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_tokens_pk_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-pk-num")
+            .expect("zkapp-tokens-pk-num column family exists")
+    }
+
+    /// #### CF for storing token indexes per holder
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{pk}
+    /// - val: [u32] BE bytes
+    /// where
+    /// - token: [TokenAdress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_tokens_pk_index_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-pk-index")
+            .expect("zkapp-tokens-pk-index column family exists")
     }
 
     ////////////////////////////////

@@ -170,14 +170,47 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing zkapp actions
     fn zkapp_actions_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing a zkapp account's current action num
+    /// CF for storing a zkapp account's current action count
     fn zkapp_actions_pk_num_cf(&self) -> &ColumnFamily;
 
     /// CF for storing zkapp events
     fn zkapp_events_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing a zkapp account's current event num
+    /// CF for storing a zkapp account's current event count
     fn zkapp_events_pk_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing tokens
+    fn zkapp_tokens_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token indexes
+    fn zkapp_tokens_index_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing tokens at their indexes
+    fn zkapp_tokens_at_index_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token supplies
+    fn zkapp_tokens_supply_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token owners
+    fn zkapp_tokens_owner_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token symbols
+    fn zkapp_tokens_symbol_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token holders
+    fn zkapp_tokens_holder_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token holder counts
+    fn zkapp_tokens_holder_count_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing tokens per holder
+    fn zkapp_tokens_pk_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token counts per holder
+    fn zkapp_tokens_pk_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing token indexes per holder
+    fn zkapp_tokens_pk_index_cf(&self) -> &ColumnFamily;
 
     ////////////////////////////////
     // Internal command store CFs //
