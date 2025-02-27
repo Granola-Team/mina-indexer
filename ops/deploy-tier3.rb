@@ -113,7 +113,7 @@ def check_ledger(height)
   puts "Attempting ledger extraction at height #{height}..."
 
   idxr_ledger = idxr_ledger(height)
-  unless bystem(
+  unless system(
     EXE,
     "--socket", SOCKET,
     "ledgers",
