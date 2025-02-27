@@ -19,6 +19,14 @@ config_log_dir
 stage_blocks BLOCKS_COUNT
 fetch_ledgers
 
+puts "Fetching snapshot."
+snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
+system(
+  "#{SRC_TOP}/ops/download-snapshot.sh",
+  snapshot_name,
+  BASE_DIR
+) || abort("Failed to download snapshot.")
+
 puts "Creating database..."
 invoke_mina_indexer(
   "database", "create",
