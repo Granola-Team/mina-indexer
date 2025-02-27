@@ -27,17 +27,12 @@ system(
   BASE_DIR
 ) || abort("Failed to download snapshot.")
 
-puts "Creating database..."
+puts "Restoring the snapshot to the database directory (#{db_dir(BLOCKS_COUNT)})."
 invoke_mina_indexer(
-  "database", "create",
-  "--log-level", "DEBUG",
-  "--ledger-cadence", "5000",
-  "--database-dir", db_dir(BLOCKS_COUNT),
-  "--blocks-dir", blocks_dir(BLOCKS_COUNT),
-  "--staking-ledgers-dir", LEDGERS_DIR,  # Comment out this line to skip staking ledger ingestion.
-  "--do-not-ingest-orphan-blocks"        # Comment out this line to ingest orphan blocks.
-) || abort("database creation failed")
-puts "Database creation succeeded."
+  "database", "restore",
+  "--snapshot-file", "#{BASE_DIR}/#{snapshot_name}",
+  "--restore-dir", db_dir(BLOCKS_COUNT)
+) || abort("Snapshot restore failed. Aborting.")
 
 # Terminate the current version, if any.
 #
@@ -85,6 +80,7 @@ else
     " --web-hostname 0.0.0.0" \
     " --web-port #{WEB_PORT}" \
     " --database-dir #{db_dir(BLOCKS_COUNT)}" \
+    " --staking-ledgers-dir #{LEDGERS_DIR}" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   puts "Command line: #{command_line}"
   pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
