@@ -3,10 +3,10 @@
 require "time"
 
 # Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola
-abort "Usage: #{$0} END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
+abort "Usage: #{$0} START_BLOCK END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
 
-START_BLOCK = 1
-END_BLOCK = ARGV[0].to_i
+START_BLOCK = ARGV[0].to_i
+END_BLOCK = ARGV[1].to_i
 RESULTS_FILE = "diff-buckets.log"
 START_TIME = Time.now
 
@@ -121,12 +121,12 @@ else
   warn "Performing fresh downloads..."
 
   o1_thread = Thread.new do
-    o1_cmd = "#{__dir__}/granola-rclone.rb lsf o1:mina_network_block_data"
+    o1_cmd = "rclone --config #{__dir__}/rclone.conf lsf o1:mina_network_block_data"
     fetch_and_sort_blocks("o1Labs", o1_cmd, filter_prefix: "mainnet-")
   end
 
   granola_thread = Thread.new do
-    granola_cmd = "#{__dir__}/granola-rclone.rb lsf cloudflare:mina-blocks"
+    granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
     fetch_and_sort_blocks("Granola", granola_cmd, filter_prefix: "mainnet-")
   end
 

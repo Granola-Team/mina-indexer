@@ -1,6 +1,8 @@
 #!/usr/bin/env -S ruby -w
 
-# Downloads historical Mina PCBs in the Granola Cloudflare R2 Storage bucket by using `rclone`.
+# Downloads historical Mina "stripped" precomputed blocks from the Granola
+# storage bucket using `rclone`.
+
 START_BLOCK = ARGV[0]
 END_BLOCK = ARGV[1]
 DEST = ARGV[2]
@@ -15,7 +17,7 @@ blocks_list = "#{DEST}/../blocks.list"
 
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
-  cmd = "#{__dir__}/granola-rclone.rb lsf cloudflare:mina-blocks"
+  cmd = "rclone --config #{__dir__}/rclone.conf lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
   warn "download-mina-blocks issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
@@ -52,16 +54,19 @@ end
 if fetch.empty?
   warn "All files already present in #{DEST}."
 else
-  # Use 'granola-rclone' to fetch the files.
   File.write("files-to-fetch.list", fetch.join("\n"))
-
-  system(
-    "#{__dir__}/granola-rclone.rb",
+  args = [
+    "rclone",
+    "--config", "#{__dir__}/rclone.conf",
+    "--buffer-size=128Mi",
+    "--log-level=INFO",
     "sync",
-    "cloudflare:mina-blocks",
-    "--files-from-raw", "files-to-fetch.list",
-    DEST
-  ) || abort("Files sync failed in download-mina-blocks.rb")
+    "linode-granola:granola-mina-stripped-blocks/mina-blocks",
+    DEST,
+    "--files-from-raw", "files-to-fetch.list"
+  ]
+  puts "Invoking: #{args}"
+  system(*args) || abort("Download of Mina blocks failed.")
 
   File.delete("files-to-fetch.list")
 end

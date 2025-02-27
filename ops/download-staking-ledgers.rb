@@ -1,9 +1,7 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
-# Downloads Mina staking ledgers stored in the Granola Cloudflare R2 Storage bucket by using `rclone`.
-# ARGV[0] = destination directory
+# Downloads Mina staking ledgers stored from the Granola cloud storage bucket
+# by using `rclone`.
 
 DEST = ARGV[0]
 
@@ -18,7 +16,7 @@ FileUtils.mkdir_p(DEST)
 ledgers_list = "#{DEST}/../staking-ledgers.list"
 unless File.exist?(ledgers_list)
   warn "#{ledgers_list} does not exist. Fetching..."
-  cmd = "#{clone_exe} lsf cloudflare:mina-staking-ledgers"
+  cmd = "#{clone_exe} lsf linode-granola:granola-mina-staking-ledgers"
   warn "download-staking-ledgers issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
@@ -51,7 +49,7 @@ else
   system(
     clone_exe,
     "sync",
-    "cloudflare:mina-staking-ledgers",
+    "linode-granola:granola-mina-staking-ledgers",
     "--files-from-raw", "ledgers-to-fetch.list",
     DEST
   ) || abort("Files sync failed in download-staking-ledgers.rb")
