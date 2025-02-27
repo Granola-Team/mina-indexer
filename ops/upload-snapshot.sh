@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # For debugging, uncomment the following line:
-set -x
+# set -x
 
 set -eu
 

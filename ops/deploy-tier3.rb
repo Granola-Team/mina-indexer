@@ -83,13 +83,17 @@ puts "Server restarted."
 #####################
 
 puts "Creating snapshot at #{snapshot_path(BLOCKS_COUNT)}..."
-config_snapshots_dir
 invoke_mina_indexer(
   "--socket", SOCKET,
   "database", "snapshot",
   "--output-path", snapshot_path(BLOCKS_COUNT)
 ) || abort("Snapshot creation failed. Aborting.")
-puts "Snapshot complete."
+puts "Snapshot complete. Uploading."
+system(
+  "#{SRC_TOP}/ops/upload-snapshot.sh",
+  File.basename(snapshot_path(BLOCKS_COUNT)),
+  {chdir: File.dirname(snapshot_path(BLOCKS_COUNT))}
+) || warn("Snapshot upload failed.")
 
 #####################
 # Ledger diff tests #
@@ -109,7 +113,7 @@ def check_ledger(height)
   puts "Attempting ledger extraction at height #{height}..."
 
   idxr_ledger = idxr_ledger(height)
-  unless system(
+  unless bystem(
     EXE,
     "--socket", SOCKET,
     "ledgers",
@@ -168,7 +172,7 @@ end
 #########################
 
 puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
-restore_path = "#{BASE_DIR}/restore-#{REV}.tmp"
+restore_path = "#{BASE_DIR}/restore-#{BLOCKS_COUNT}.#{REV}.tmp"
 unless invoke_mina_indexer(
   "database", "restore",
   "--snapshot-file", snapshot_path(BLOCKS_COUNT),

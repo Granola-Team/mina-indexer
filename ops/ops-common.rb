@@ -37,14 +37,8 @@ end
 
 # Snapshots
 
-SNAPSHOTS_DIR = "#{BASE_DIR}/snapshots"
-
-def config_snapshots_dir
-  FileUtils.mkdir_p(SNAPSHOTS_DIR)
-end
-
 def snapshot_path(block_height)
-  "#{SNAPSHOTS_DIR}/mina-#{block_height}.snapshot"
+  "#{BASE_DIR}/mina-#{block_height}.#{REV}.snapshot"
 end
 
 # Executable
