@@ -17,7 +17,7 @@ blocks_list = "#{DEST}/../blocks.list"
 
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
-  cmd = "rclone --config #{__dir__}/rclone.conf lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
+  cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
   warn "download-mina-blocks issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|

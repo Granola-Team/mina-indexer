@@ -137,12 +137,12 @@ else
   warn "Performing fresh downloads..."
 
   o1_thread = Thread.new do
-    o1_cmd = "rclone --config #{__dir__}/rclone.conf lsf o1:mina_network_block_data"
+    o1_cmd = "#{__dir__}/granola-rclone.rb lsf o1:mina_network_block_data"
     fetch_and_sort_blocks("o1Labs", o1_cmd, filter_prefix: "mainnet-")
   end
 
   granola_thread = Thread.new do
-    granola_cmd = "rclone --config #{__dir__}/rclone.conf lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
+    granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
     fetch_and_sort_blocks("Granola", granola_cmd, filter_prefix: "mainnet-")
   end
 
