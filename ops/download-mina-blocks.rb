@@ -56,10 +56,7 @@ if fetch.empty?
 else
   File.write("files-to-fetch.list", fetch.join("\n"))
   args = [
-    "rclone",
-    "--config", "#{__dir__}/rclone.conf",
-    "--buffer-size=128Mi",
-    "--log-level=INFO",
+    "#{__dir__}/granola-rclone.rb",
     "sync",
     "linode-granola:granola-mina-stripped-blocks/mina-blocks",
     DEST,
