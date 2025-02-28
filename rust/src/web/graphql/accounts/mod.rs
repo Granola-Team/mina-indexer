@@ -157,13 +157,13 @@ impl AccountQueryRoot {
         };
         let iter = match query.as_ref().and_then(|q| q.zkapp) {
             // all account types
-            None => db.best_ledger_account_balance_iterator(mode).flatten(),
+            None | Some(false) => db.best_ledger_account_balance_iterator(mode).flatten(),
             // zkapp accounts only
             Some(true) => db
                 .zkapp_best_ledger_account_balance_iterator(mode)
                 .flatten(),
             // non-zkapp account only
-            Some(false) => todo!("non-zkapp account"),
+            // Some(false) => todo!("non-zkapp account"),
         };
 
         for (_, value) in iter {
