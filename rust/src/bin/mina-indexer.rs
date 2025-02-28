@@ -263,7 +263,7 @@ impl DatabaseCommand {
                 restore_dir,
             } => {
                 info!("Restoring mina indexer database from snapshot file {snapshot_file:#?} to {restore_dir:#?}");
-                restore_snapshot(&snapshot_file, &restore_dir).unwrap_or_else(|e| error!("{e}"))
+                restore_snapshot(&snapshot_file, &restore_dir)?
             }
             Self::Create(args) => {
                 let database_dir = args.database_dir.clone();
