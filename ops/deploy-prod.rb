@@ -9,15 +9,11 @@ require "#{__dir__}/ops-common"
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
-success = true
-
 # Configure the directories as needed.
 #
 config_base_dir
 config_exe_dir
 config_log_dir
-stage_blocks BLOCKS_COUNT
-fetch_ledgers
 
 puts "Fetching snapshot."
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
@@ -26,13 +22,6 @@ system(
   snapshot_name,
   BASE_DIR
 ) || abort("Failed to download snapshot.")
-
-puts "Restoring the snapshot to the database directory (#{db_dir(BLOCKS_COUNT)})."
-invoke_mina_indexer(
-  "database", "restore",
-  "--snapshot-file", "#{BASE_DIR}/#{snapshot_name}",
-  "--restore-dir", db_dir(BLOCKS_COUNT)
-) || abort("Snapshot restore failed. Aborting.")
 
 # Terminate the current version, if any.
 #
@@ -58,6 +47,17 @@ if File.exist? CURRENT
   # second to clean up.
   sleep 1
 end
+
+puts "Restoring the snapshot to the database directory (#{db_dir(BLOCKS_COUNT)})."
+
+# The restore directory must not already exist.
+FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
+
+invoke_mina_indexer(
+  "database", "restore",
+  "--snapshot-file", "#{BASE_DIR}/#{snapshot_name}",
+  "--restore-dir", db_dir(BLOCKS_COUNT)
+) || abort("Snapshot restore failed. Aborting.")
 
 # Now, we take over.
 #
@@ -87,5 +87,3 @@ else
   Process.detach pid
   puts "Mina Indexer daemon dispatched with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
 end
-
-exit success
