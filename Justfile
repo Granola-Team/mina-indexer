@@ -108,6 +108,8 @@ format:
   cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1
   # standardrb --fix ops/*.rb
   shfmt --write ops/*.sh 2>&1 >/dev/null
+  shfmt --write tests/*.sh 2>&1 >/dev/null
+  shfmt --write tests/*.bash 2>&1 >/dev/null
   alejandra flake.nix ops/mina/mina_txn_hasher.nix > /dev/null 2>&1
 
 # Perform a fast verification of whether the source compiles.
@@ -274,7 +276,7 @@ tier2: tier2-prereqs dev-build test-unit-tier2 \
 # Run the 3rd tier of tests with Nix-built binary.
 tier3 blocks='5000': nix-build && build-image
   @echo "--- Performing tier3 regression tests with Nix-built binary"
-  time {{DEPLOY_TIER3}} nix {{blocks}}
+  time {{DEPLOY_TIER3}} {{PROD_MODE}} {{blocks}}
 
 # Run the 3rd tier of tests with dev build & no unit tests.
 tier3-dev blocks='5000': dev-build
@@ -288,7 +290,7 @@ tier3-dev blocks='5000': dev-build
 # Run a server as if in production with the Nix-built binary.
 deploy-local-prod blocks='5000' web_port='': nix-build
   @echo "--- Deploying prod indexer"
-  time {{DEPLOY_PROD}} nix {{blocks}} {{web_port}}
+  time {{DEPLOY_PROD}} {{PROD_MODE}} {{blocks}} {{web_port}}
 
 # Run a server as if in production with the dev-built binary.
 deploy-local-prod-dev blocks='5000' web_port='': dev-build
