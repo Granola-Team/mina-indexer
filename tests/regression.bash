@@ -2063,6 +2063,7 @@ for test_name in "$@"; do
         "test_snark_work") test_snark_work ;;
         "test_snapshot") test_snapshot ;;
     "test_restore_snapshot_failure_returns_proper_code") test_restore_snapshot_failure_returns_proper_code ;;
+    "test_rest_accounts_summary") test_rest_accounts_summary ;;
         "test_rest_blocks") test_rest_blocks ;;
         "test_genesis_block_creator") test_genesis_block_creator ;;
         "test_txn_nonces") test_txn_nonces ;;
