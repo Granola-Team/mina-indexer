@@ -60,7 +60,13 @@ impl Add<i64> for Amount {
     type Output = Amount;
 
     fn add(self, rhs: i64) -> Self::Output {
-        Self(self.0 + rhs as u64)
+        let abs = rhs.unsigned_abs();
+
+        if rhs < 0 {
+            Self(self.0 - abs)
+        } else {
+            Self(self.0 + abs)
+        }
     }
 }
 
@@ -76,13 +82,19 @@ impl Sub<u64> for Amount {
     type Output = Amount;
 
     fn sub(self, rhs: u64) -> Self::Output {
-        self - Self(rhs)
+        Self(self.0 - rhs)
     }
 }
 
 impl AddAssign<Amount> for Amount {
     fn add_assign(&mut self, rhs: Amount) {
-        *self = Self(self.0 + rhs.0)
+        *self += rhs.0
+    }
+}
+
+impl AddAssign<u64> for Amount {
+    fn add_assign(&mut self, rhs: u64) {
+        *self = Self(self.0 + rhs)
     }
 }
 
@@ -90,11 +102,17 @@ impl AddAssign<i64> for Amount {
     fn add_assign(&mut self, rhs: i64) {
         let abs = rhs.unsigned_abs();
 
-        *self = if rhs < 0 {
-            Self(self.0 - abs)
+        if rhs < 0 {
+            *self -= abs;
         } else {
-            Self(self.0 + abs)
+            *self += abs;
         }
+    }
+}
+
+impl SubAssign<u64> for Amount {
+    fn sub_assign(&mut self, rhs: u64) {
+        *self = Self(self.0 - rhs)
     }
 }
 
@@ -102,10 +120,10 @@ impl SubAssign<i64> for Amount {
     fn sub_assign(&mut self, rhs: i64) {
         let abs = rhs.unsigned_abs();
 
-        *self = if rhs >= 0 {
-            Self(self.0 - abs)
+        if rhs < 0 {
+            *self += abs;
         } else {
-            Self(self.0 + abs)
+            *self -= abs;
         }
     }
 }

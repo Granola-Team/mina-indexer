@@ -98,3 +98,16 @@ impl quickcheck::Arbitrary for Token {
         }
     }
 }
+
+#[cfg(test)]
+impl Token {
+    pub fn arbitrary_with_owner(g: &mut quickcheck::Gen, owner: PublicKey) -> Self {
+        use quickcheck::Arbitrary;
+        Self {
+            owner: Some(owner),
+            token: TokenAddress::arbitrary(g),
+            symbol: TokenSymbol::arbitrary(g),
+            supply: Amount::arbitrary(g),
+        }
+    }
+}

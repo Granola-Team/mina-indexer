@@ -56,9 +56,9 @@ impl TokenDiff {
 }
 
 impl TokenDiffType {
-    pub fn amount(&self) -> i64 {
+    pub fn amount(&self) -> u64 {
         match self {
-            Self::Supply(amt) => *amt,
+            Self::Supply(amt) => amt.unsigned_abs(),
             _ => 0,
         }
     }

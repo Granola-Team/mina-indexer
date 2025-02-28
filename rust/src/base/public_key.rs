@@ -177,6 +177,22 @@ impl quickcheck::Arbitrary for PublicKey {
 }
 
 #[cfg(test)]
+impl PublicKey {
+    pub fn arbitrary_not(g: &mut quickcheck::Gen, pk: &Option<PublicKey>) -> Self {
+        use quickcheck::Arbitrary;
+        let mut res = PublicKey::arbitrary(g);
+
+        if let Some(pk) = pk {
+            while res == *pk {
+                res = PublicKey::arbitrary(g);
+            }
+        }
+
+        res
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::PublicKey;
     use quickcheck::{Arbitrary, Gen};

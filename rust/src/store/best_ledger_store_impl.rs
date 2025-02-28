@@ -152,22 +152,17 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn apply_best_token_diffs(
-        &self,
-        token: &TokenAddress,
-        token_diffs: Vec<TokenDiff>,
-    ) -> Result<()> {
+    fn apply_best_token_diffs(&self, token_diffs: &[TokenDiff]) -> Result<()> {
         trace!("Applying best ledger token diffs {:#?}", token_diffs);
 
         for token_diff in token_diffs {
-            assert_eq!(*token, token_diff.token);
-            self.apply_token_diff(&token_diff)?;
+            self.apply_token_diff(token_diff)?;
         }
 
         Ok(())
     }
 
-    fn unapply_best_token_diffs(&self, token_diffs: Vec<TokenDiff>) -> Result<()> {
+    fn unapply_best_token_diffs(&self, token_diffs: &[TokenDiff]) -> Result<()> {
         trace!("Unapplying best ledger token diffs {:#?}", token_diffs);
 
         for token_diff in token_diffs {
@@ -302,7 +297,7 @@ impl BestLedgerStore for IndexerStore {
             }
 
             // unapply token diffs
-            self.unapply_best_token_diffs(token_diffs)?;
+            self.unapply_best_token_diffs(&token_diffs)?;
 
             // remove accounts
             for (pk, token) in new_accounts.iter() {
@@ -363,8 +358,8 @@ impl BestLedgerStore for IndexerStore {
             }
 
             // apply token diffs
-            for (token, diffs) in aggregate_token_diffs(token_diffs) {
-                self.apply_best_token_diffs(&token, diffs)?;
+            for diffs in aggregate_token_diffs(token_diffs).values() {
+                self.apply_best_token_diffs(diffs)?;
             }
         }
 
@@ -536,6 +531,7 @@ fn aggregate_token_diffs(token_diffs: Vec<TokenDiff>) -> HashMap<TokenAddress, V
 
         if let Some(mut diffs) = acc.remove(&token) {
             diffs.push(diff);
+
             acc.insert(token, diffs);
         } else {
             acc.insert(token, vec![diff]);
