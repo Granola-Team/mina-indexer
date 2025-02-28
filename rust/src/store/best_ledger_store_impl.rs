@@ -4,16 +4,16 @@ use crate::{
     block::store::{BlockStore, BlockUpdate, DbBlockUpdate},
     ledger::{
         account::Account,
-        diff::account::AccountDiff,
+        diff::{account::AccountDiff, token::TokenDiff},
         store::{
-            best::{BestLedgerStore, DbAccountUpdate},
+            best::{AccountUpdate, BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
         },
-        token::{account::TokenAccount, TokenAddress},
+        token::{account::TokenAccount, Token, TokenAddress},
         Ledger, TokenLedger,
     },
     store::{
-        zkapp::{actions::ZkappActionStore, events::ZkappEventStore},
+        zkapp::{actions::ZkappActionStore, events::ZkappEventStore, tokens::ZkappTokenStore},
         Result,
     },
     utility::store::{
@@ -152,6 +152,50 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
+    fn apply_best_token_diffs(
+        &self,
+        token: &TokenAddress,
+        token_diffs: Vec<TokenDiff>,
+    ) -> Result<()> {
+        trace!("Applying best ledger token diffs {:#?}", token_diffs);
+
+        for token_diff in token_diffs {
+            assert_eq!(*token, token_diff.token);
+            self.apply_token_diff(&token_diff)?;
+        }
+
+        Ok(())
+    }
+
+    fn unapply_best_token_diffs(&self, token_diffs: Vec<TokenDiff>) -> Result<()> {
+        trace!("Unapplying best ledger token diffs {:#?}", token_diffs);
+
+        for token_diff in token_diffs {
+            let mut token = self
+                .get_token(&token_diff.token)?
+                .unwrap_or_else(|| Token::new(token_diff.token.to_owned()));
+
+            let num = self
+                .get_token_diff_num(&token_diff.token)?
+                .unwrap_or_default();
+
+            if num < 1 {
+                unreachable!(
+                    "Tokens should not have a diff unapplied if there aren't any applied diffs"
+                )
+            }
+
+            if let Some(token_diff) = self.get_token_diff(&token.token, num - 1)? {
+                trace!("Unapplying best ledger token diff {:?}", token_diff);
+
+                token.unapply(token_diff);
+                self.set_token(&token)?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn update_block_best_accounts(
         &self,
         state_hash: &StateHash,
@@ -163,11 +207,10 @@ impl BestLedgerStore for IndexerStore {
                 .iter()
                 .flat_map(|BlockUpdate { state_hash: a, .. }| {
                     let diff = self.get_block_ledger_diff(a).unwrap();
-                    diff.map(|d| {
-                        (
-                            d.account_diffs.into_iter().flatten().collect(),
-                            update_token_accounts(d.new_pk_balances),
-                        )
+                    diff.map(|d| AccountUpdate {
+                        account_diffs: d.account_diffs.into_iter().flatten().collect(),
+                        token_diffs: d.token_diffs.into_iter().collect(),
+                        new_accounts: update_token_accounts(d.new_pk_balances),
                     })
                 })
                 .collect(),
@@ -176,11 +219,10 @@ impl BestLedgerStore for IndexerStore {
                 .iter()
                 .flat_map(|BlockUpdate { state_hash: u, .. }| {
                     let diff = self.get_block_ledger_diff(u).unwrap();
-                    diff.map(|d| {
-                        (
-                            d.account_diffs.into_iter().flatten().collect(),
-                            update_token_accounts(d.new_pk_balances),
-                        )
+                    diff.map(|d| AccountUpdate {
+                        account_diffs: d.account_diffs.into_iter().flatten().collect(),
+                        token_diffs: d.token_diffs.into_iter().collect(),
+                        new_accounts: update_token_accounts(d.new_pk_balances),
                     })
                 })
                 .collect(),
@@ -197,18 +239,21 @@ impl BestLedgerStore for IndexerStore {
         let apply_acc = updates
             .apply
             .iter()
-            .fold(0, |acc, update| acc + update.1.len() as i32);
-        let adjust = updates
-            .unapply
-            .iter()
-            .fold(apply_acc, |acc, update| acc - update.1.len() as i32);
+            .fold(0, |acc, update| acc + update.new_accounts.len() as i32);
+        let adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
+            acc - update.new_accounts.len() as i32
+        });
 
         self.update_num_accounts(adjust)?;
 
-        // update accounts
-        // unapply
-        for (unapply_block_diffs, remove_pks) in updates.unapply {
-            let token_account_diffs = aggregate_token_account_diffs(unapply_block_diffs);
+        // unapply account & token diffs, remove accounts
+        for AccountUpdate {
+            account_diffs,
+            token_diffs,
+            new_accounts,
+        } in updates.unapply
+        {
+            let token_account_diffs = aggregate_token_account_diffs(account_diffs);
 
             for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
@@ -256,16 +301,25 @@ impl BestLedgerStore for IndexerStore {
                 self.update_best_account(&pk, &token, before_values, Some(after))?;
             }
 
+            // unapply token diffs
+            self.unapply_best_token_diffs(token_diffs)?;
+
             // remove accounts
-            for (pk, token) in remove_pks.iter() {
+            for (pk, token) in new_accounts.iter() {
                 self.update_best_account(pk, token, None, None)?;
             }
         }
 
-        // apply
-        for (block_apply_diffs, _) in updates.apply.into_iter() {
-            let token_account_diffs = aggregate_token_account_diffs(block_apply_diffs);
+        // apply account & token diffs
+        for AccountUpdate {
+            account_diffs,
+            token_diffs,
+            ..
+        } in updates.apply.into_iter()
+        {
+            let token_account_diffs = aggregate_token_account_diffs(account_diffs);
 
+            // apply account diffs
             for ((pk, token), diffs) in token_account_diffs {
                 let before = self.get_best_account(&pk, &token)?;
                 let (before_values, mut after) = (
@@ -300,11 +354,17 @@ impl BestLedgerStore for IndexerStore {
                             self.add_events(&diff.public_key, &diff.token, &diff.events)?;
                             after
                         }
+                        // zkapp account diffs should be expanded
                         Zkapp(_) => unreachable!(),
                     };
                 }
 
                 self.update_best_account(&pk, &token, before_values, Some(after))?;
+            }
+
+            // apply token diffs
+            for (token, diffs) in aggregate_token_diffs(token_diffs) {
+                self.apply_best_token_diffs(&token, diffs)?;
             }
         }
 
@@ -355,6 +415,7 @@ impl BestLedgerStore for IndexerStore {
 
     fn remove_pk_delegate(&self, pk: PublicKey) -> Result<()> {
         trace!("Removing pk {pk} delegate");
+
         let idx = self.get_num_pk_delegations(&pk)?;
         if idx > 0 {
             // update num delegations
@@ -375,17 +436,20 @@ impl BestLedgerStore for IndexerStore {
 
     fn update_num_accounts(&self, adjust: i32) -> Result<()> {
         use std::cmp::Ordering::*;
+
         match adjust.cmp(&0) {
             Equal => (),
             Greater => {
-                let old = self.get_num_accounts().ok().flatten().unwrap_or(0);
+                // add to num accounts
+                let old = self.get_num_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
                     old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
-                let old = self.get_num_accounts().ok().flatten().unwrap_or(0);
+                // sub from num accounts
+                let old = self.get_num_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
                     old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
@@ -461,6 +525,24 @@ fn aggregate_token_account_diffs(
     }
 
     token_account_diffs
+}
+
+/// Aggregate token diffs per token
+fn aggregate_token_diffs(token_diffs: Vec<TokenDiff>) -> HashMap<TokenAddress, Vec<TokenDiff>> {
+    let mut acc = <HashMap<TokenAddress, Vec<TokenDiff>>>::with_capacity(token_diffs.len());
+
+    for diff in token_diffs {
+        let token = diff.token.to_owned();
+
+        if let Some(mut diffs) = acc.remove(&token) {
+            diffs.push(diff);
+            acc.insert(token, diffs);
+        } else {
+            acc.insert(token, vec![diff]);
+        }
+    }
+
+    acc
 }
 
 use std::collections::BTreeMap;
