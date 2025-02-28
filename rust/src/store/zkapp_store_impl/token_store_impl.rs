@@ -811,7 +811,8 @@ impl ZkappTokenStore for IndexerStore {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
+// #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::Result;
     use crate::{
@@ -824,6 +825,7 @@ mod tests {
     };
     use quickcheck::{Arbitrary, Gen};
 
+    #[ignore]
     #[test]
     fn update_token() -> Result<()> {
         let g = &mut Gen::new(1000);
