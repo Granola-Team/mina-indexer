@@ -327,7 +327,7 @@ impl BlockStore for IndexerStore {
         let mut a_prev = block_parent(self, &a)?;
         let mut b_prev = block_parent(self, &b)?;
 
-        while a != b && !is_genesis_hash(&a) {
+        while a != b && !is_genesis_hash(&b) {
             // add blocks to appropriate collection
             let a_length = block_height(self, &a)?;
             let b_length = block_height(self, &b)?;
