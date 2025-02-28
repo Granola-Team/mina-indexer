@@ -23,7 +23,7 @@ use crate::{
             StakingLedger,
         },
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
-        token::TokenAddress,
+        token::{Token, TokenAddress},
         username::Username,
         Ledger, LedgerHash,
     },
@@ -319,6 +319,10 @@ impl IndexerState {
             &genesis_block.previous_state_hash(),
             &genesis_ledger,
             config.version.genesis.blockchain_lenth,
+            Some(&Token {
+                supply: genesis_block.total_currency().into(),
+                ..Default::default()
+            }),
         )?;
         info!("Genesis ledger added to indexer store");
 

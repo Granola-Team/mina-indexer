@@ -2,7 +2,12 @@
 
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
-    ledger::{account::Account, diff::LedgerDiff, token::TokenAddress, Ledger, LedgerHash},
+    ledger::{
+        account::Account,
+        diff::LedgerDiff,
+        token::{Token, TokenAddress},
+        Ledger, LedgerHash,
+    },
 };
 use speedb::{DBIterator, Direction, WriteBatch};
 
@@ -110,6 +115,7 @@ pub trait StagedLedgerStore {
         state_hash: &StateHash,
         genesis_ledger: &Ledger,
         block_height: u32,
+        genesis_token: Option<&Token>,
     ) -> anyhow::Result<()>;
 
     /// Index the block's ledger diff

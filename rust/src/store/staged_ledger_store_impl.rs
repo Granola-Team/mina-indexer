@@ -9,9 +9,10 @@ use crate::{
         account::Account,
         diff::LedgerDiff,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
-        token::TokenAddress,
+        token::{Token, TokenAddress},
         Ledger, LedgerHash,
     },
+    store::zkapp::tokens::ZkappTokenStore,
     utility::store::{common::from_be_bytes, ledger::staged::*},
 };
 use anyhow::{bail, Context};
@@ -298,6 +299,7 @@ impl StagedLedgerStore for IndexerStore {
         state_hash: &StateHash,
         genesis_ledger: &Ledger,
         height: u32,
+        genesis_token: Option<&Token>,
     ) -> anyhow::Result<()> {
         trace!("Adding genesis ledger to the store");
 
@@ -317,6 +319,11 @@ impl StagedLedgerStore for IndexerStore {
             for (pk, acct) in token_ledger.accounts.iter() {
                 self.update_best_account(pk, token, None, Some(acct.clone()))?;
             }
+        }
+
+        // initialize genesis token
+        if let Some(token) = genesis_token {
+            self.set_token(token)?;
         }
 
         self.add_staged_ledger_at_state_hash(state_hash, genesis_ledger, height)?;
