@@ -25,7 +25,9 @@ use std::{
 };
 use stderrlog::{ColorChoice, Timestamp};
 use tempfile::TempDir;
-use tokio_graceful_shutdown::{SubsystemBuilder, SubsystemHandle, Toplevel};
+use tokio_graceful_shutdown::{
+    errors::SubsystemError, SubsystemBuilder, SubsystemHandle, Toplevel,
+};
 
 #[derive(Parser, Debug)]
 #[command(name = "mina-indexer", author, version = VERSION, about, long_about = Some("Mina Indexer\n\n\
@@ -111,7 +113,8 @@ enum DatabaseCommand {
 pub async fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
     let domain_socket_path = args.socket;
-    Toplevel::new(|s| async move {
+
+    let result = Toplevel::new(|s| async move {
         s.start(SubsystemBuilder::new("Main", |s| async move {
             match args.command {
                 IndexerCommand::Client(cli) => cli.run(domain_socket_path).await,
@@ -125,8 +128,28 @@ pub async fn main() -> anyhow::Result<()> {
     })
     .catch_signals()
     .handle_shutdown_requests(Duration::from_millis(1000))
-    .await
-    .map_err(anyhow::Error::from)
+    .await;
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(shutdown_error) => {
+            // Extract and log the specific error details
+            let subsystem_errors = shutdown_error.get_subsystem_errors();
+
+            if !subsystem_errors.is_empty() {
+                let first_error = subsystem_errors.iter().next().unwrap();
+
+                match first_error {
+                    SubsystemError::Failed(_, error) => Err(anyhow::anyhow!("{}", error)),
+                    SubsystemError::Panicked(name) => {
+                        Err(anyhow::anyhow!("Subsystem '{}' panicked", name))
+                    }
+                }
+            } else {
+                Err(anyhow::anyhow!("{}", shutdown_error))
+            }
+        }
+    }
 }
 
 impl ServerCommand {
