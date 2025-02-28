@@ -151,7 +151,7 @@
             buildInputs = runtimeDependencies;
 
             # This is equivalent to `git rev-parse --short=8 HEAD`
-            gitCommitHash = builtins.substring 0 8 (self.rev or "dev");
+            gitCommitHash = builtins.substring 0 8 (self.rev or (abort "Nix build requires a clean Git repo."));
 
             postPatch = ''ln -s "${./rust/Cargo.lock}" Cargo.lock'';
             preBuild = ''
