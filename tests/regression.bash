@@ -1134,6 +1134,23 @@ test_snapshot() {
     rm -rf ./snapshot ./restore-path
 }
 
+# Restart from a bogus snapshot to ensure it properly returns a failure
+test_restore_snapshot_failure_returns_proper_code() {
+    stage_mainnet_blocks 13 ./blocks
+
+    # Run the command directly without capturing output
+    # The command should fail with a non-zero exit code
+    if ! idxr database restore --snapshot-file ./snapshot.bogus --restore-dir ./restore-path; then
+        # Command failed as expected
+        echo "Test passed: Command failed as expected when using a bogus snapshot file"
+        return 0
+    else
+        # Command succeeded unexpectedly
+        echo "Test failed: Command succeeded unexpectedly with a bogus snapshot file"
+        return 1
+    fi
+}
+
 test_rest_accounts_summary() {
     stage_mainnet_blocks 100 ./blocks
 
@@ -2045,7 +2062,7 @@ for test_name in "$@"; do
         "test_transactions_csv") test_transactions_csv ;;
         "test_snark_work") test_snark_work ;;
         "test_snapshot") test_snapshot ;;
-        "test_rest_accounts_summary") test_rest_accounts_summary ;;
+    "test_restore_snapshot_failure_returns_proper_code") test_restore_snapshot_failure_returns_proper_code ;;
         "test_rest_blocks") test_rest_blocks ;;
         "test_genesis_block_creator") test_genesis_block_creator ;;
         "test_txn_nonces") test_txn_nonces ;;
