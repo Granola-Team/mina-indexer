@@ -118,36 +118,35 @@ impl BestLedgerStore for IndexerStore {
         let account_key = best_account_key(token, pk);
         let sort_key = best_account_sort_key(token, balance, pk);
 
-        // store the new account
+        // store new account
         self.database.put_cf(
             self.best_ledger_accounts_cf(),
             account_key,
             serde_json::to_vec(&after)?,
         )?;
 
-        // balance-sort the new account
+        // balance-sort new account
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
             sort_key,
             serde_json::to_vec(&after)?,
         )?;
 
+        // zkapp account
         if after.is_zkapp_account() {
-            // store
+            // store new zkapp account
             self.database.put_cf(
                 self.zkapp_best_ledger_accounts_cf(),
                 account_key,
                 serde_json::to_vec(&after)?,
             )?;
 
-            // balance-sort
+            // balance-sort new zkapp account
             self.database.put_cf(
                 self.zkapp_best_ledger_accounts_balance_sort_cf(),
                 sort_key,
                 serde_json::to_vec(&after)?,
             )?;
-
-            // populate index for best_ledger_tokens_balance_sort_cf
         }
 
         Ok(())
