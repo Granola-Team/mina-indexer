@@ -137,8 +137,12 @@ build-image:
   time nom build .#dockerImage
   time docker load < ./result
   docker run --rm -it {{IMAGE}} mina-indexer server start --help
-  docker image rm {{IMAGE}}
   rm result
+
+# Delete OCI image.
+delete-image:
+  @echo "--- Deleting OCI image {{IMAGE}}"
+  docker image rm {{IMAGE}}
 
 #
 # Show
@@ -274,7 +278,7 @@ tier2: tier2-prereqs dev-build test-unit-tier2 \
 #
 
 # Run the 3rd tier of tests with Nix-built binary.
-tier3 blocks='5000': nix-build && build-image
+tier3 blocks='5000': nix-build && build-image delete-image
   @echo "--- Performing tier3 regression tests with Nix-built binary"
   time {{DEPLOY_TIER3}} {{PROD_MODE}} {{blocks}}
 
