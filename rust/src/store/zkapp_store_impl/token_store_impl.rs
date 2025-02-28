@@ -12,7 +12,10 @@ use crate::{
     base::{amount::Amount, public_key::PublicKey},
     ledger::{
         diff::token::TokenDiff,
-        token::{holder::TokenHolder, Token, TokenAddress, TokenSymbol},
+        token::{
+            holder::{TokenHolder, TokenHolderKind},
+            Token, TokenAddress, TokenSymbol,
+        },
     },
     store::{
         column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys,
@@ -60,6 +63,7 @@ impl ZkappTokenStore for IndexerStore {
                     balance: token.supply,
                     token: token.token.to_owned(),
                     public_key: owner.to_owned(),
+                    kind: TokenHolderKind::Credit,
                 };
 
                 self.database
@@ -819,7 +823,10 @@ mod tests {
         base::public_key::PublicKey,
         ledger::{
             diff::token::{TokenDiff, TokenDiffType},
-            token::{holder::TokenHolder, Token},
+            token::{
+                holder::{TokenHolder, TokenHolderKind},
+                Token,
+            },
         },
         store::{zkapp::tokens::ZkappTokenStore, IndexerStore},
     };
@@ -838,12 +845,8 @@ mod tests {
         assert_eq!(store.get_num_tokens()?, 0);
 
         // set an arbitrary token with an owner
-        let token0 = {
-            let mut token = Token::arbitrary(g);
-            token.owner = Some(PublicKey::arbitrary(g));
-
-            token
-        };
+        let owner0 = PublicKey::arbitrary(g);
+        let token0 = Token::arbitrary_with_owner(g, owner0);
         let index0 = store.set_token(&token0)?;
 
         // check num tokens
@@ -881,6 +884,7 @@ mod tests {
                 public_key: token0.owner.to_owned().unwrap(),
                 token: token0.token.to_owned(),
                 balance: token0.supply,
+                kind: TokenHolderKind::Credit,
             }]
         );
         assert_eq!(
@@ -889,18 +893,9 @@ mod tests {
         );
 
         // set an arbitrary token with another owner
-        let token1 = {
-            let mut token = Token::arbitrary(g);
-
-            while token.token == token0.token || token.owner.is_none() {
-                token = Token::arbitrary(g);
-            }
-
-            token
-        };
-
+        let owner1 = PublicKey::arbitrary_not(g, &token0.owner);
+        let token1 = Token::arbitrary_with_owner(g, owner1.to_owned());
         let index1 = store.set_token(&token1)?;
-        let owner1 = token1.owner.to_owned().unwrap();
 
         // check num tokens & token1
         assert_eq!(index1, 1);
@@ -939,6 +934,7 @@ mod tests {
                 public_key: owner1.to_owned(),
                 token: token1.token.to_owned(),
                 balance: token1.supply,
+                kind: TokenHolderKind::Credit,
             }]
         );
         assert_eq!(
@@ -1003,11 +999,16 @@ mod tests {
                     public_key: token0.owner.to_owned().unwrap(),
                     token: token0.token.to_owned(),
                     balance: token0.supply,
+                    kind: TokenHolderKind::Credit,
                 },
                 TokenHolder {
                     public_key: owner1.to_owned(),
                     token: token0.token.to_owned(),
-                    balance: new_token0.supply - token0.supply,
+                    balance: token_diff.diff.amount().into(),
+                    kind: match token_diff.diff {
+                        TokenDiffType::Supply(amt) if amt < 0 => TokenHolderKind::Debit,
+                        _ => TokenHolderKind::Credit,
+                    },
                 }
             ]
         );
