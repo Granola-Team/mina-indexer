@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 156] = [
+    const COLUMN_FAMILIES: [&'static str; 145] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -130,21 +130,10 @@ impl IndexerStore {
         "zkapp-tokens-owner",
         "zkapp-tokens-symbol",
         "zkapp-tokens-holder",
-        "zkapp-tokens-holder-index",
         "zkapp-tokens-holder-count",
         "zkapp-tokens-pk",
         "zkapp-tokens-pk-num",
         "zkapp-tokens-pk-index",
-        "zkapp-tokens-historical-diffs",
-        "zkapp-tokens-historical-diffs-num",
-        "zkapp-tokens-historical-pk-diffs",
-        "zkapp-tokens-historical-pk-diffs-num",
-        "zkapp-tokens-historical-owners",
-        "zkapp-tokens-historical-owners-num",
-        "zkapp-tokens-historical-symbol",
-        "zkapp-tokens-historical-symbol-num",
-        "zkapp-tokens-historical-supply",
-        "zkapp-tokens-historical-supply-num",
         ////////////////////////////////
         // Internal command store CFs //
         ////////////////////////////////

@@ -586,7 +586,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {token}{index}
-    /// - val: [TokenHolder] serde bytes
+    /// - val: [Token] serde bytes
     /// where
     /// - token: [TokenAddress] bytes
     /// - index: [u32] BE bytes
@@ -606,21 +606,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("zkapp-tokens-holder-count")
             .expect("zkapp-tokens-holder-count column family exists")
-    }
-
-    /// #### CF for storing token holder indexes
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{pk}
-    /// - val: [u32] BE bytes
-    /// where
-    /// - token: [TokenAddress] bytes
-    /// - pk:    [PublicKey] bytes
-    fn zkapp_tokens_holder_index_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-holder-index")
-            .expect("zkapp-tokens-holder-index column family exists")
     }
 
     /// #### CF for storing tokens per holder
@@ -663,144 +648,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("zkapp-tokens-pk-index")
             .expect("zkapp-tokens-pk-index column family exists")
-    }
-
-    /// #### CF for storing historical token diffs
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{index}
-    /// - val: [TokenDiff] serde bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_diffs_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-diffs")
-            .expect("zkapp-tokens-historical-diffs column family exists")
-    }
-
-    /// #### CF for storing the count of historical token diffs
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{index}
-    /// - val: [TokenDiff] serde bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_diffs_num_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-diffs-num")
-            .expect("zkapp-tokens-historical-diffs-num column family exists")
-    }
-
-    /// #### CF for storing historical token owners
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{index}
-    /// - val: [PublicKey] bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_owners_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-owners")
-            .expect("zkapp-tokens-historical-owners column family exists")
-    }
-
-    /// #### CF for storing the count of historical token owners
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: [TokenAdress] bytes
-    /// - val: [u32] BE bytes
-    fn zkapp_tokens_historical_owners_num_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-owners-num")
-            .expect("zkapp-tokens-historical-owners-num column family exists")
-    }
-
-    /// #### CF for storing historical token symbols
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{index}
-    /// - val: [TokenSymbol] serde bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_symbols_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-symbols")
-            .expect("zkapp-tokens-historical-symbols column family exists")
-    }
-
-    /// #### CF for storing the count of historical token symbols
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: [TokenAdress] bytes
-    /// - val: [u32] BE bytes
-    fn zkapp_tokens_historical_symbols_num_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-symbols-num")
-            .expect("zkapp-tokens-historical-symbols-num column family exists")
-    }
-
-    /// #### CF for storing historical token supplies
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{index}
-    /// - val: [Amount] serde bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_supplies_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-supplies")
-            .expect("zkapp-tokens-historical-supplies column family exists")
-    }
-
-    /// #### CF for storing the count of historical token supplies
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: [TokenAdress] bytes
-    /// - val: [u32] BE bytes
-    fn zkapp_tokens_historical_supplies_num_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-supplies-num")
-            .expect("zkapp-tokens-historical-supplies-num column family exists")
-    }
-
-    /// #### CF for storing historical pk token diffs
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: {pk}{index}
-    /// - val: [TokenDiff] serde bytes
-    /// where
-    /// - pk:    [PublicKey] bytes
-    /// - index: [u32] BE bytes
-    fn zkapp_tokens_historical_pk_diffs_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-pk-diffs")
-            .expect("zkapp-tokens-historical-pk-diffs column family exists")
-    }
-
-    /// #### CF for storing the count of historical pk token token diffs
-    ///
-    /// Key-value pairs
-    /// ```
-    /// - key: [PublicKey] bytes
-    /// - val: [u32] BE bytes
-    fn zkapp_tokens_historical_pk_diffs_num_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-tokens-historical-pk-diffs-num")
-            .expect("zkapp-tokens-historical-pk-diffs-num column family exists")
     }
 
     ////////////////////////////////
