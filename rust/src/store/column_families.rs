@@ -200,6 +200,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing token holders
     fn zkapp_tokens_holder_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing token holder indexes
+    fn zkapp_tokens_holder_index_cf(&self) -> &ColumnFamily;
+
     /// CF for storing token holder counts
     fn zkapp_tokens_holder_count_cf(&self) -> &ColumnFamily;
 
@@ -211,6 +214,36 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for storing token indexes per holder
     fn zkapp_tokens_pk_index_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing historical token diffs
+    fn zkapp_tokens_historical_diffs_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing the count of historical token diffs
+    fn zkapp_tokens_historical_diffs_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing a public key's historical token diffs
+    fn zkapp_tokens_historical_pk_diffs_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing the count of a public key's historical token diffs
+    fn zkapp_tokens_historical_pk_diffs_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing historical token owners
+    fn zkapp_tokens_historical_owners_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing the count of historical token owners
+    fn zkapp_tokens_historical_owners_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing historical token symbols
+    fn zkapp_tokens_historical_symbols_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing the count of historical token symbols
+    fn zkapp_tokens_historical_symbols_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing historical token supplies
+    fn zkapp_tokens_historical_supplies_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing the count of historical token supplies
+    fn zkapp_tokens_historical_supplies_num_cf(&self) -> &ColumnFamily;
 
     ////////////////////////////////
     // Internal command store CFs //
