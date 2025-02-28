@@ -7,7 +7,7 @@ use crate::{
 use anyhow::anyhow;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::ops::{Add, AddAssign, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default, Hash)]
 pub struct Amount(pub u64);
@@ -91,6 +91,18 @@ impl AddAssign<i64> for Amount {
         let abs = rhs.unsigned_abs();
 
         *self = if rhs < 0 {
+            Self(self.0 - abs)
+        } else {
+            Self(self.0 + abs)
+        }
+    }
+}
+
+impl SubAssign<i64> for Amount {
+    fn sub_assign(&mut self, rhs: i64) {
+        let abs = rhs.unsigned_abs();
+
+        *self = if rhs >= 0 {
             Self(self.0 - abs)
         } else {
             Self(self.0 + abs)

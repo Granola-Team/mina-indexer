@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize)]
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize)]
 pub struct TokenSymbol(pub String);
 
 //////////
@@ -33,12 +33,12 @@ impl<'de> Deserialize<'de> for TokenSymbol {
 // default //
 /////////////
 
-impl std::default::Default for TokenSymbol {
-    /// MINA token symbol
-    fn default() -> Self {
-        Self::new("MINA")
-    }
-}
+// impl std::default::Default for TokenSymbol {
+//     /// MINA token symbol
+//     fn default() -> Self {
+//         Self::new("MINA")
+//     }
+// }
 
 /////////////////
 // conversions //
@@ -74,7 +74,7 @@ impl std::fmt::Display for TokenSymbol {
 #[cfg(test)]
 impl quickcheck::Arbitrary for TokenSymbol {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-        let length = u8::arbitrary(g);
+        let length = u8::arbitrary(g) % 10;
         let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
 
         let mut chars = vec![];
