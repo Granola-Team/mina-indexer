@@ -3,7 +3,12 @@
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::store::DbBlockUpdate,
-    ledger::{account::Account, diff::account::AccountDiff, token::TokenAddress, Ledger},
+    ledger::{
+        account::Account,
+        diff::{account::AccountDiff, token::TokenDiff},
+        token::TokenAddress,
+        Ledger,
+    },
     store::{DbUpdate, Result},
 };
 use speedb::{DBIterator, IteratorMode};
@@ -35,7 +40,17 @@ pub trait BestLedgerStore {
     /// Update the best ledger token accounts
     fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()>;
 
-    /// Update the best ledger token accounts due to block updates
+    /// Update the best ledger tokens
+    fn apply_best_token_diffs(
+        &self,
+        token: &TokenAddress,
+        token_diffs: Vec<TokenDiff>,
+    ) -> Result<()>;
+
+    /// Update the best ledger token
+    fn unapply_best_token_diffs(&self, token_diffs: Vec<TokenDiff>) -> Result<()>;
+
+    /// Update the best ledger token accounts & tokens due to a block update
     fn update_block_best_accounts(
         &self,
         state_hash: &StateHash,
@@ -89,8 +104,13 @@ pub trait BestLedgerStore {
     fn zkapp_best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 }
 
-/// Applied & unapplied block account diffs & new block accounts
-type AccountUpdate = (Vec<AccountDiff>, HashSet<(PublicKey, TokenAddress)>);
+#[derive(Debug, Clone)]
+pub struct AccountUpdate {
+    pub account_diffs: Vec<AccountDiff>,
+    pub token_diffs: Vec<TokenDiff>,
+    pub new_accounts: HashSet<(PublicKey, TokenAddress)>,
+}
+
 pub type DbAccountUpdate = DbUpdate<AccountUpdate>;
 
 impl DbAccountUpdate {
