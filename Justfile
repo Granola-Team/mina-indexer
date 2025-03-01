@@ -217,17 +217,17 @@ dev-continue subtest='': dev-build
 # Unit tests
 #
 
-# Run unit tests
+# Run unit tests.
 test-unit-tier1 test='':
   @echo "--- Invoking 'rspec ops/spec'"
   rspec ops/spec/*_spec.rb
   @echo "--- Performing tier 1 unit test(s)"
   cd rust && time cargo nextest run {{test}}
 
-# Run all release feature unit test(s).
+# Run all feature unit test(s).
 test-unit-tier2 test='':
-  @echo "--- Performing all release feature unit test(s)"
-  cd rust && time cargo nextest run --release --all-features {{test}}
+  @echo "--- Performing all feature unit test(s)"
+  cd rust && time cargo nextest run --all-features {{test}}
 
 # Run all feature unit tests (debug build).
 test-unit:
@@ -256,20 +256,15 @@ tier1: tier1-prereqs lint test-unit-tier1
 # Tier 2 tests
 #
 
-# Run tier 2 load test
-tier2-load-test:
-  @echo "--- Performing a simple load test with dev-built binary"
-  time {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v1 \
-  && {{REGRESSION_TEST}} {{BUILD_TYPE}} load_v2
-
 # Run regression test(s), either all of them or one named specific test.
 regression-test subtest='':
   @echo "--- Performing regression tests {{subtest}}"
   time {{REGRESSION_TEST}} {{BUILD_TYPE}} {{subtest}}
 
 # Run tier 2 tests.
-tier2: tier2-prereqs dev-build test-unit-tier2 \
-  tier2-load-test \
+tier2: tier2-prereqs test-unit-tier2 dev-build \
+  (regression-test "load_v1") \
+  (regression-test "load_v2") \
   (regression-test "best_chain_many_blocks") \
   regression-test
 
