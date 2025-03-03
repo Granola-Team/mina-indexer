@@ -363,6 +363,11 @@ impl BestLedgerStore for IndexerStore {
             }
         }
 
+        // adjust MINA token supply
+        if let Some(supply) = self.get_block_total_currency(state_hash)? {
+            self.set_token(&Token::mina_with_supply(supply))?;
+        }
+
         Ok(())
     }
 
