@@ -1646,3 +1646,39 @@ fn display_direction(direction: Direction) -> String {
         Direction::Reverse => "Reverse".to_string(),
     }
 }
+
+#[cfg(all(test, feature = "tier2"))]
+mod tests {
+    use crate::{
+        block::{
+            precomputed::{PcbVersion, PrecomputedBlock},
+            store::BlockStore,
+        },
+        store::{IndexerStore, Result},
+    };
+    use std::{env, path::PathBuf};
+    use tempfile::TempDir;
+
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn mina_token() -> Result<()> {
+        let store = create_indexer_store()?;
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        store.add_block(&pcb, path.metadata().unwrap().len())?;
+
+        assert_eq!(pcb.total_currency(), 910017532840039233);
+        assert_eq!(
+            store.get_block_total_currency(&pcb.state_hash())?.unwrap(),
+            pcb.total_currency()
+        );
+
+        Ok(())
+    }
+}
