@@ -48,6 +48,14 @@ impl Token {
         }
     }
 
+    pub fn mina_with_supply(supply: u64) -> Self {
+        Self {
+            supply: supply.into(),
+            symbol: TokenSymbol::mina(),
+            ..Default::default()
+        }
+    }
+
     /// Apply a token diff to the token
     pub fn apply(&mut self, diff: TokenDiff) {
         use TokenDiffType::*;

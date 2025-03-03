@@ -14,6 +14,11 @@ impl TokenSymbol {
     {
         Self(symbol.into())
     }
+
+    /// `MINA` token symbol
+    pub fn mina() -> Self {
+        Self("MINA".to_string())
+    }
 }
 
 ///////////
@@ -28,17 +33,6 @@ impl<'de> Deserialize<'de> for TokenSymbol {
         crate::utility::serde::from_str(deserializer)
     }
 }
-
-/////////////
-// default //
-/////////////
-
-// impl std::default::Default for TokenSymbol {
-//     /// MINA token symbol
-//     fn default() -> Self {
-//         Self::new("MINA")
-//     }
-// }
 
 /////////////////
 // conversions //
