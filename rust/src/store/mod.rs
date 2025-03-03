@@ -480,16 +480,3 @@ impl IndexerStore {
             .unwrap()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{IndexerStore, Result};
-    use std::env;
-    use tempfile::TempDir;
-
-    pub fn create_indexer_store() -> Result<IndexerStore> {
-        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
-        let store = IndexerStore::new(temp_dir.path())?;
-        Ok(store)
-    }
-}

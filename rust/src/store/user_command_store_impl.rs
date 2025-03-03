@@ -1133,8 +1133,15 @@ impl<'a> TxnCsvRecord<'a> {
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::*;
-    use crate::{block::precomputed::PcbVersion, store::tests::create_indexer_store};
-    use std::path::Path;
+    use crate::block::precomputed::PcbVersion;
+    use std::{env, path::Path};
+    use tempfile::TempDir;
+
+    fn create_indexer_store() -> Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
 
     #[test]
     fn increment_non_zkapp_commands_counts() -> Result<()> {
