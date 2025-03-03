@@ -103,11 +103,11 @@ pub trait UserCommandStore {
     /// Iterator for user commands by receiver via global slot
     fn txn_to_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator for zkapp user commands via global slot
-    fn zkapp_user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    /// Iterator for zkapp commands via global slot
+    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator for zkapp user commands via blockchain length
-    fn zkapp_user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    /// Iterator for zkapp commands via blockchain length
+    fn zkapp_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /////////////////////////
     // User command counts //
@@ -119,26 +119,50 @@ pub trait UserCommandStore {
     /// Increment user commands per epoch count
     fn increment_user_commands_epoch_count(&self, epoch: u32) -> Result<()>;
 
+    /// Increment zkapp commands per epoch count
+    fn increment_zkapp_commands_epoch_count(&self, epoch: u32) -> Result<()>;
+
     /// Get user commands per epoch count
     fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+
+    /// Get zkapp commands per epoch count
+    fn get_zkapp_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
 
     /// Increment user commands total count
     fn increment_user_commands_total_count(&self) -> Result<()>;
 
+    /// Increment zkapp commands total count
+    fn increment_zkapp_commands_total_count(&self) -> Result<()>;
+
     /// Get user commands total count
     fn get_user_commands_total_count(&self) -> Result<u32>;
+
+    /// Get zkapp commands total count
+    fn get_zkapp_commands_total_count(&self) -> Result<u32>;
 
     /// Increment user commands per epoch per account count
     fn increment_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()>;
 
+    /// Increment zkapp commands per epoch per account count
+    fn increment_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()>;
+
     /// Get user commands per epoch per account count
     fn get_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32>;
+
+    /// Get zkapp commands per epoch per account count
+    fn get_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32>;
 
     /// Increment user commands per account total
     fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()>;
 
+    /// Increment zkapp commands per account total
+    fn increment_zkapp_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()>;
+
     /// Get user commands per account total
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<u32>;
+
+    /// Get zkapp commands per account total
+    fn get_zkapp_commands_pk_total_count(&self, pk: &PublicKey) -> Result<u32>;
 
     /// Increment user commands per block
     fn set_block_user_commands_count_batch(
@@ -148,8 +172,19 @@ pub trait UserCommandStore {
         batch: &mut WriteBatch,
     ) -> Result<()>;
 
+    /// Increment zkapp commands per block
+    fn set_block_zkapp_commands_count_batch(
+        &self,
+        state_hash: &StateHash,
+        count: u32,
+        batch: &mut WriteBatch,
+    ) -> Result<()>;
+
     /// Get user commands per block
     fn get_block_user_commands_count(&self, state_hash: &StateHash) -> Result<Option<u32>>;
+
+    /// Get zkapp commands per block
+    fn get_block_zkapp_commands_count(&self, state_hash: &StateHash) -> Result<Option<u32>>;
 
     /// Increment user commands counts given `command` in `epoch`
     fn increment_user_commands_counts(
@@ -158,51 +193,103 @@ pub trait UserCommandStore {
         epoch: u32,
     ) -> Result<()>;
 
+    /// Increment zkapp commands counts given `command` in `epoch`
+    fn increment_zkapp_commands_counts(
+        &self,
+        command: &UserCommandWithStatus,
+        epoch: u32,
+    ) -> Result<()>;
+
     /// Get applied user commands count
     fn get_applied_user_commands_count(&self) -> Result<u32>;
+
+    /// Get applied zkapp commands count
+    fn get_applied_zkapp_commands_count(&self) -> Result<u32>;
 
     /// Get failed user commands count
     fn get_failed_user_commands_count(&self) -> Result<u32>;
 
-    /// Increment applied user commands count
-    fn increment_applied_user_commands_count(&self, incr: u32) -> Result<()>;
+    /// Get failed zkapp commands count
+    fn get_failed_zkapp_commands_count(&self) -> Result<u32>;
 
     /// Increment applied user commands count
-    fn increment_failed_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn increment_applied_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment applied zkapp commands count
+    fn increment_applied_zkapp_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment applied user commands count
+    fn increment_failed_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment applied zkapp commands count
+    fn increment_failed_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Decrement failed user commands count
-    fn decrement_failed_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn decrement_failed_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Decrement failed zkapp commands count
+    fn decrement_failed_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Decrement applied user commands count
-    fn decrement_applied_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn decrement_applied_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Decrement applied zkapp commands count
+    fn decrement_applied_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Get canonical user commands count
     fn get_canonical_user_commands_count(&self) -> Result<u32>;
 
+    /// Get canonical zkapp commands count
+    fn get_canonical_zkapp_commands_count(&self) -> Result<u32>;
+
     /// Increment canonical user commands count
-    fn increment_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn increment_canonical_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment canonical zkapp commands count
+    fn increment_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Decrement canonical user commands count
-    fn decrement_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn decrement_canonical_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Decrement canonical zkapp commands count
+    fn decrement_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Get applied canonical user commands count
     fn get_applied_canonical_user_commands_count(&self) -> Result<u32>;
 
+    /// Get applied canonical zkapp commands count
+    fn get_applied_canonical_zkapp_commands_count(&self) -> Result<u32>;
+
     /// Increment canonical user commands count
-    fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn increment_applied_canonical_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment canonical zkapp commands count
+    fn increment_applied_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Decrement canonical user commands count
-    fn decrement_applied_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn decrement_applied_canonical_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Decrement canonical zkapp commands count
+    fn decrement_applied_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// Get failed canonical user commands count
     fn get_failed_canonical_user_commands_count(&self) -> Result<u32>;
 
+    /// Get failed canonical zkapp commands count
+    fn get_failed_canonical_zkapp_commands_count(&self) -> Result<u32>;
+
     /// Increment canonical user commands count
-    fn increment_failed_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn increment_failed_canonical_user_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Increment canonical zkapp commands count
+    fn increment_failed_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
 
     /// decrement canonical user commands count
-    fn decrement_failed_canonical_user_commands_count(&self, incr: u32) -> Result<()>;
+    fn decrement_failed_canonical_user_commands_count(&self, num: u32) -> Result<()>;
 
-    /// Update user commands from DbBlockUpdate
+    /// decrement canonical zkapp commands count
+    fn decrement_failed_canonical_zkapp_commands_count(&self, num: u32) -> Result<()>;
+
+    /// Update user command counts from `DbBlockUpdate`
     fn update_user_commands(&self, block: &DbBlockUpdate) -> Result<()>;
 }
