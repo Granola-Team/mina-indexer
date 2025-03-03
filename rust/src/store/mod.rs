@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 156] = [
+    const COLUMN_FAMILIES: [&'static str; 160] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -107,12 +107,12 @@ impl IndexerStore {
         "txn-from-height-sort",
         "txn-to-slot-sort",
         "txn-to-height-sort",
-        // zkapp user commands
-        "zkapp-user-commands",
-        "zkapp-user-commands-pk",
-        "zkapp-user-commands-pk-num",
-        "zkapp-user-commands-slot-sort",
-        "zkapp-user-commands-height-sort",
+        // zkapp commands
+        "zkapp-commands",
+        "zkapp-commands-pk",
+        "zkapp-commands-pk-num",
+        "zkapp-commands-slot-sort",
+        "zkapp-commands-height-sort",
         /////////////////////
         // Zkapp store CFs //
         /////////////////////
@@ -240,6 +240,7 @@ impl IndexerStore {
         "block-production-supercharged-epoch",
         "block-snark-counts",
         "block-user-command-counts",
+        "block-zkapp-command-counts",
         "block-internal-command-counts",
         // slot counts
         "block-epoch-slots-produced-count",
@@ -249,6 +250,9 @@ impl IndexerStore {
         "user-commands-epoch",
         "user-commands-pk-epoch",
         "user-commands-pk-total",
+        "zkapp-commands-epoch",
+        "zkapp-commands-pk-epoch",
+        "zkapp-commands-pk-total",
         // internal command counts
         "internal-commands-epoch",
         "internal-commands-pk-epoch",

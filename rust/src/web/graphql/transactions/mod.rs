@@ -158,7 +158,7 @@ impl TransactionsQueryRoot {
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
@@ -166,25 +166,23 @@ impl TransactionsQueryRoot {
                     &max.to_be_bytes(),
                     Direction::Reverse,
                 )),
-                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
                 (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
-                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
-                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
-                        &max.to_be_bytes(),
-                        Direction::Reverse,
-                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db.zkapp_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
                 (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
@@ -263,7 +261,7 @@ impl TransactionsQueryRoot {
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
@@ -271,25 +269,23 @@ impl TransactionsQueryRoot {
                     &max.to_be_bytes(),
                     Direction::Reverse,
                 )),
-                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
                 (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
-                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
-                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
-                        &max.to_be_bytes(),
-                        Direction::Reverse,
-                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db.zkapp_commands_slot_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
                 (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
@@ -422,7 +418,7 @@ impl TransactionsQueryRoot {
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
@@ -430,25 +426,23 @@ impl TransactionsQueryRoot {
                     &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
-                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
                 (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
-                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
-                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
-                        &max.saturating_add(1).to_be_bytes(),
-                        Direction::Reverse,
-                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db.zkapp_commands_slot_iterator(
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
+                ),
                 (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
@@ -536,7 +530,7 @@ impl TransactionsQueryRoot {
                     &min.to_be_bytes(),
                     Direction::Forward,
                 )),
-                (BlockHeightAsc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
@@ -544,25 +538,23 @@ impl TransactionsQueryRoot {
                     &max.saturating_add(1).to_be_bytes(),
                     Direction::Reverse,
                 )),
-                (BlockHeightDesc, Some(true)) => db.zkapp_user_commands_height_iterator(
+                (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
                 (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_user_commands_slot_iterator(
+                (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
                 (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
                 (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
                     IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
                 ),
-                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db
-                    .zkapp_user_commands_slot_iterator(IteratorMode::From(
-                        &max.saturating_add(1).to_be_bytes(),
-                        Direction::Reverse,
-                    )),
+                (GlobalSlotDesc | DateTimeDesc, Some(true)) => db.zkapp_commands_slot_iterator(
+                    IteratorMode::From(&max.saturating_add(1).to_be_bytes(), Direction::Reverse),
+                ),
                 (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
@@ -602,27 +594,23 @@ impl TransactionsQueryRoot {
 
         let iter = match (sort_by, query.as_ref().and_then(|q| q.zkapp)) {
             (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::Start),
-            (BlockHeightAsc, Some(true)) => {
-                db.zkapp_user_commands_height_iterator(IteratorMode::Start)
-            }
+            (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(IteratorMode::Start),
             (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
             (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::End),
-            (BlockHeightDesc, Some(true)) => {
-                db.zkapp_user_commands_height_iterator(IteratorMode::End)
-            }
+            (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(IteratorMode::End),
             (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
             (GlobalSlotAsc | DateTimeAsc, None) => {
                 db.user_commands_slot_iterator(IteratorMode::Start)
             }
             (GlobalSlotAsc | DateTimeAsc, Some(true)) => {
-                db.zkapp_user_commands_slot_iterator(IteratorMode::Start)
+                db.zkapp_commands_slot_iterator(IteratorMode::Start)
             }
             (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
             (GlobalSlotDesc | DateTimeDesc, None) => {
                 db.user_commands_slot_iterator(IteratorMode::End)
             }
             (GlobalSlotDesc | DateTimeDesc, Some(true)) => {
-                db.zkapp_user_commands_slot_iterator(IteratorMode::End)
+                db.zkapp_commands_slot_iterator(IteratorMode::End)
             }
             (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
         };

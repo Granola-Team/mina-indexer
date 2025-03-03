@@ -23,6 +23,8 @@ pub trait FixedKeys {
         "total_num_canonical_fee_transfers_key".as_bytes();
     const TOTAL_NUM_NON_CANONICAL_FEE_TRANSFERS_KEY: &'static [u8] =
         "total_num_non_canonical_fee_transfers_key".as_bytes();
+
+    // all user commands (non-zkapp & zkapp)
     const TOTAL_NUM_USER_COMMANDS_KEY: &'static [u8] = "total_num_user_commands".as_bytes();
     const TOTAL_NUM_APPLIED_USER_COMMANDS_KEY: &'static [u8] =
         "total_num_applied_user_commands_key".as_bytes();
@@ -34,6 +36,19 @@ pub trait FixedKeys {
         "total_num_failed_canonical_user_commands_key".as_bytes();
     const TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY: &'static [u8] =
         "total_num_canonical_user_commands_key".as_bytes();
+
+    // zkapp user commands
+    const TOTAL_NUM_ZKAPP_COMMANDS_KEY: &'static [u8] = "total_num_zkapp_commands".as_bytes();
+    const TOTAL_NUM_APPLIED_ZKAPP_COMMANDS_KEY: &'static [u8] =
+        "total_num_applied_zkapp_commands_key".as_bytes();
+    const TOTAL_NUM_FAILED_ZKAPP_COMMANDS_KEY: &'static [u8] =
+        "total_num_failed_zkapp_commands_key".as_bytes();
+    const TOTAL_NUM_APPLIED_CANONICAL_ZKAPP_COMMANDS_KEY: &'static [u8] =
+        "total_num_applied_canonical_zkapp_commands_key".as_bytes();
+    const TOTAL_NUM_FAILED_CANONICAL_ZKAPP_COMMANDS_KEY: &'static [u8] =
+        "total_num_failed_canonical_zkapp_commands_key".as_bytes();
+    const TOTAL_NUM_CANONICAL_ZKAPP_COMMANDS_KEY: &'static [u8] =
+        "total_num_canonical_zkapp_commands_key".as_bytes();
 
     const ZKAPP_TOKEN_COUNT: &'static [u8] = "zkapp_token_count".as_bytes();
 }

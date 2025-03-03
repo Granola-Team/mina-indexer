@@ -397,22 +397,22 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (v2 is right-padded)
     /// - state_hash: [StateHash] bytes
-    fn zkapp_user_commands_cf(&self) -> &ColumnFamily {
+    fn zkapp_commands_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("zkapp-user-commands")
-            .expect("zkapp-user-commands column family exists")
+            .cf_handle("zkapp-commands")
+            .expect("zkapp-commands column family exists")
     }
 
-    fn zkapp_user_commands_pk_cf(&self) -> &ColumnFamily {
+    fn zkapp_commands_pk_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("user-commands-pk")
-            .expect("user-commands-pk column family exists")
+            .cf_handle("zkapp-commands-pk")
+            .expect("zkapp-commands-pk column family exists")
     }
 
-    fn zkapp_user_commands_pk_num_cf(&self) -> &ColumnFamily {
+    fn zkapp_commands_pk_num_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("user-commands-pk-num")
-            .expect("user-commands-pk-num column family exists")
+            .cf_handle("zkapp-commands-pk-num")
+            .expect("zkapp-commands-pk-num column family exists")
     }
 
     /// Key-value pairs
@@ -423,10 +423,10 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - height:     [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
     /// - state_hash: [StateHash] bytes
-    fn zkapp_user_commands_height_sort_cf(&self) -> &ColumnFamily {
+    fn zkapp_commands_height_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("zkapp-user-commands-height-sort")
-            .expect("zkapp-user-commands-height-sort column family exists")
+            .cf_handle("zkapp-commands-height-sort")
+            .expect("zkapp-commands-height-sort column family exists")
     }
 
     /// Key-value pairs
@@ -437,10 +437,10 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - slot:       [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
     /// - state_hash: [StateHash] bytes
-    fn zkapp_user_commands_slot_sort_cf(&self) -> &ColumnFamily {
+    fn zkapp_commands_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("zkapp-user-commands-slot-sort")
-            .expect("zkapp-user-commands-slot-sort column family exists")
+            .cf_handle("zkapp-commands-slot-sort")
+            .expect("zkapp-commands-slot-sort column family exists")
     }
 
     /////////////////////
@@ -1671,10 +1671,20 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-user-command-counts column family exists")
     }
 
+    /// CF for stoing per block zkapp command counts
+    /// ```
+    /// - key: [StateHash] bytes
+    /// - val: [u32] BE bytes
+    fn block_zkapp_command_counts_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("block-zkapp-command-counts")
+            .expect("block-zkapp-command-counts column family exists")
+    }
+
     /// CF for storing per block internal command counts
     /// ```
-    /// - key: state hash
-    /// - value: number of internal commands in block
+    /// - key: [StateHash] bytes
+    /// - val: [u32] BE bytes
     fn block_internal_command_counts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-internal-command-counts")
@@ -1683,8 +1693,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch slots produced counts
     /// ```
-    /// key: epoch ([u32] BE bytes)
-    /// val: number of slots produced in epoch ([u32] BE bytes)
+    /// key: [u32] BE bytes
+    /// val: [u32] BE bytes
     fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-epoch-slots-produced-count")
@@ -1724,12 +1734,28 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch per account user commands
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of pk user commands in epoch
+    /// - key: {epoch}{pk}
+    /// - val: [u32] BE bytes
+    /// where
+    /// - epoch: [u32] BE bytes
+    /// - pk: [PublicKey] bytes
     fn user_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk-epoch")
             .expect("user-commands-pk-epoch column family exists")
+    }
+
+    /// CF for storing per epoch per account zkapp commands
+    /// ```
+    /// - key: {epoch}{pk}
+    /// - val: [u32] BE bytes
+    /// where
+    /// - epoch: [u32] BE bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_commands_pk_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-commands-pk-epoch")
+            .expect("zkapp-commands-pk-epoch column family exists")
     }
 
     /// CF for storing per account total user commands
@@ -1742,20 +1768,43 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("user-commands-pk-total column family exists")
     }
 
+    /// CF for storing per account total zkapp commands
+    /// ```
+    /// - key: [PublicKey] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_commands_pk_total_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-commands-pk-total")
+            .expect("zkapp-commands-pk-total column family exists")
+    }
+
     /// CF for per epoch total user commands
     /// ```
-    /// - key: epoch
-    /// - value: number of user commands in epoch
+    /// - key: [u32] BE bytes
+    /// - val: [u32] BE bytes
     fn user_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-epoch")
             .expect("user-commands-epoch column family exists")
     }
 
+    /// CF for per epoch total zkapp commands
+    /// ```
+    /// - key: [u32] BE bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_commands_epoch_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-commands-epoch")
+            .expect("zkapp-commands-epoch column family exists")
+    }
+
     /// CF for storing per epoch per account internal commands
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of pk internal commands in epoch
+    /// - key: {epoch}{pk}
+    /// - val: [u32] BE bytes
+    /// where
+    /// - epoch: [u32] BE bytes
+    /// - pk:    [PublicKey] bytes
     fn internal_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-epoch")

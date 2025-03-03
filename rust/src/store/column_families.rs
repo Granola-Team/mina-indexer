@@ -146,22 +146,22 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting user commands by sender public key
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily;
 
-    // zkapp user commands
+    // zkapp commands
 
-    /// CF for storing zkapp user commands
-    fn zkapp_user_commands_cf(&self) -> &ColumnFamily;
+    /// CF for storing zkapp commands
+    fn zkapp_commands_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing zkapp user commands by public key
-    fn zkapp_user_commands_pk_cf(&self) -> &ColumnFamily;
+    /// CF for storing zkapp commands by public key
+    fn zkapp_commands_pk_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing number of zkapp user commands by public key
-    fn zkapp_user_commands_pk_num_cf(&self) -> &ColumnFamily;
+    /// CF for storing number of zkapp commands by public key
+    fn zkapp_commands_pk_num_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting zkapp user commands by blockchain length
-    fn zkapp_user_commands_height_sort_cf(&self) -> &ColumnFamily;
+    /// CF for sorting zkapp commands by blockchain length
+    fn zkapp_commands_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting zkapp user commands by global slot
-    fn zkapp_user_commands_slot_sort_cf(&self) -> &ColumnFamily;
+    /// CF for sorting zkapp commands by global slot
+    fn zkapp_commands_slot_sort_cf(&self) -> &ColumnFamily;
 
     /////////////////////
     // Zkapp store CFs //
@@ -477,6 +477,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for per block user command counts
     fn block_user_command_counts_cf(&self) -> &ColumnFamily;
 
+    /// CF for per block zkapp command counts
+    fn block_zkapp_command_counts_cf(&self) -> &ColumnFamily;
+
     /// CF for per block internal command counts
     fn block_internal_command_counts_cf(&self) -> &ColumnFamily;
 
@@ -492,11 +495,20 @@ pub trait ColumnFamilyHelpers {
     /// CF for per epoch user command totals
     fn user_commands_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for per epoch zkapp command totals
+    fn zkapp_commands_epoch_cf(&self) -> &ColumnFamily;
+
     /// CF for per epoch per acccount user command totals
     fn user_commands_pk_epoch_cf(&self) -> &ColumnFamily;
 
+    /// CF for per epoch per acccount zkapp command totals
+    fn zkapp_commands_pk_epoch_cf(&self) -> &ColumnFamily;
+
     /// CF for per acccount user command totals
     fn user_commands_pk_total_cf(&self) -> &ColumnFamily;
+
+    /// CF for per acccount zkapp command totals
+    fn zkapp_commands_pk_total_cf(&self) -> &ColumnFamily;
 
     /// CF for per epoch internal command totals
     fn internal_commands_epoch_cf(&self) -> &ColumnFamily;

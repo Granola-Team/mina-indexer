@@ -25,7 +25,7 @@ async fn zkapp_command_iterator() -> anyhow::Result<()> {
     // block height sorted
     let mut height_count = 0;
     for (key, value) in store
-        .zkapp_user_commands_height_iterator(IteratorMode::End)
+        .zkapp_commands_height_iterator(IteratorMode::End)
         .flatten()
     {
         // from value
@@ -49,7 +49,7 @@ async fn zkapp_command_iterator() -> anyhow::Result<()> {
     // global slot sorted
     let mut slot_count = 0;
     for (key, value) in store
-        .zkapp_user_commands_slot_iterator(IteratorMode::End)
+        .zkapp_commands_slot_iterator(IteratorMode::End)
         .flatten()
     {
         // from value
