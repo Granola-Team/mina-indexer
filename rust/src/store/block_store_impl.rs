@@ -1,6 +1,6 @@
 use super::{
     column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, username::UsernameStore, DbUpdate,
-    IndexerStore,
+    IndexerStore, Result,
 };
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
@@ -34,11 +34,7 @@ use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 
 impl BlockStore for IndexerStore {
     /// Add the given block at its indices and record a db event
-    fn add_block(
-        &self,
-        block: &PrecomputedBlock,
-        num_block_bytes: u64,
-    ) -> anyhow::Result<Option<DbEvent>> {
+    fn add_block(&self, block: &PrecomputedBlock, num_block_bytes: u64) -> Result<Option<DbEvent>> {
         trace!("Adding block {}", block.summary());
 
         // add block to db - prefix with num bytes (u64) BE bytes
@@ -105,6 +101,8 @@ impl BlockStore for IndexerStore {
             let genesis_state_hash = block.genesis_state_hash();
             self.set_block_genesis_state_hash_batch(&state_hash, &genesis_state_hash, &mut batch)?;
         }
+
+        self.set_block_total_supply_batch(&state_hash, block.total_currency(), &mut batch)?;
 
         // add block height/global slot index
         self.set_block_height_global_slot_pair_batch(
@@ -185,7 +183,7 @@ impl BlockStore for IndexerStore {
         Ok(Some(db_event))
     }
 
-    fn get_block(&self, state_hash: &StateHash) -> anyhow::Result<Option<(PrecomputedBlock, u64)>> {
+    fn get_block(&self, state_hash: &StateHash) -> Result<Option<(PrecomputedBlock, u64)>> {
         trace!("Getting block {state_hash}");
         Ok(self
             .database
@@ -207,7 +205,7 @@ impl BlockStore for IndexerStore {
     // Best block functions //
     //////////////////////////
 
-    fn get_best_block(&self) -> anyhow::Result<Option<PrecomputedBlock>> {
+    fn get_best_block(&self) -> Result<Option<PrecomputedBlock>> {
         trace!("Getting best block");
         match self.get_best_block_hash()? {
             None => Ok(None),
@@ -215,7 +213,7 @@ impl BlockStore for IndexerStore {
         }
     }
 
-    fn get_best_block_version(&self) -> anyhow::Result<Option<PcbVersion>> {
+    fn get_best_block_version(&self) -> Result<Option<PcbVersion>> {
         trace!("Getting best block version");
         match self.get_best_block_hash()? {
             None => Ok(None),
@@ -223,7 +221,7 @@ impl BlockStore for IndexerStore {
         }
     }
 
-    fn get_best_block_hash(&self) -> anyhow::Result<Option<StateHash>> {
+    fn get_best_block_hash(&self) -> Result<Option<StateHash>> {
         trace!("Getting best block state hash");
         Ok(self
             .database
@@ -231,21 +229,21 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
-    fn get_best_block_height(&self) -> anyhow::Result<Option<u32>> {
+    fn get_best_block_height(&self) -> Result<Option<u32>> {
         trace!("Getting best block height");
         Ok(self
             .get_best_block_hash()?
             .and_then(|state_hash| self.get_block_height(&state_hash).ok().flatten()))
     }
 
-    fn get_best_block_global_slot(&self) -> anyhow::Result<Option<u32>> {
+    fn get_best_block_global_slot(&self) -> Result<Option<u32>> {
         trace!("Getting best block global slot");
         Ok(self
             .get_best_block_hash()?
             .and_then(|state_hash| self.get_block_global_slot(&state_hash).ok().flatten()))
     }
 
-    fn get_best_block_genesis_hash(&self) -> anyhow::Result<Option<StateHash>> {
+    fn get_best_block_genesis_hash(&self) -> Result<Option<StateHash>> {
         trace!("Getting best block genesis state hash");
         Ok(self.get_best_block_hash()?.and_then(|state_hash| {
             self.get_block_genesis_state_hash(&state_hash)
@@ -254,7 +252,7 @@ impl BlockStore for IndexerStore {
         }))
     }
 
-    fn set_best_block(&self, state_hash: &StateHash) -> anyhow::Result<()> {
+    fn set_best_block(&self, state_hash: &StateHash) -> Result<()> {
         trace!("Setting best block {state_hash}");
         if let Some(old) = self.get_best_block_hash()? {
             if old == *state_hash {
@@ -294,7 +292,7 @@ impl BlockStore for IndexerStore {
         &self,
         old_best_tip: &StateHash,
         new_best_tip: &StateHash,
-    ) -> anyhow::Result<DbBlockUpdate> {
+    ) -> Result<DbBlockUpdate> {
         trace!(
             "Getting common ancestor block updates:\n  old: {}\n  new: {}",
             old_best_tip,
@@ -361,7 +359,7 @@ impl BlockStore for IndexerStore {
         Ok(DbUpdate { apply, unapply })
     }
 
-    fn get_current_epoch(&self) -> anyhow::Result<u32> {
+    fn get_current_epoch(&self) -> Result<u32> {
         Ok(self
             .get_best_block_hash()?
             .and_then(|state_hash| self.get_block_epoch(&state_hash).ok().flatten())
@@ -372,17 +370,14 @@ impl BlockStore for IndexerStore {
     // General block functions //
     /////////////////////////////
 
-    fn get_block_account_diffs(
-        &self,
-        state_hash: &StateHash,
-    ) -> anyhow::Result<Option<Vec<AccountDiff>>> {
+    fn get_block_account_diffs(&self, state_hash: &StateHash) -> Result<Option<Vec<AccountDiff>>> {
         trace!("Getting block account diffs for {state_hash}");
         Ok(self
             .get_block_ledger_diff(state_hash)?
             .map(|diff| diff.account_diffs.into_iter().flatten().collect::<Vec<_>>()))
     }
 
-    fn get_block_ledger_diff(&self, state_hash: &StateHash) -> anyhow::Result<Option<LedgerDiff>> {
+    fn get_block_ledger_diff(&self, state_hash: &StateHash) -> Result<Option<LedgerDiff>> {
         trace!("Getting block ledger diff {state_hash}");
         Ok(self
             .database
@@ -390,7 +385,7 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn get_block_parent_hash(&self, state_hash: &StateHash) -> anyhow::Result<Option<StateHash>> {
+    fn get_block_parent_hash(&self, state_hash: &StateHash) -> Result<Option<StateHash>> {
         trace!("Getting block's parent hash {state_hash}");
         Ok(self
             .database
@@ -403,7 +398,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         previous_state_hash: &StateHash,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block parent hash {state_hash}: {previous_state_hash}");
         batch.put_cf(
             self.block_parent_hash_cf(),
@@ -413,7 +408,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_date_time(&self, state_hash: &StateHash) -> anyhow::Result<Option<i64>> {
+    fn get_block_date_time(&self, state_hash: &StateHash) -> Result<Option<i64>> {
         trace!("Getting block date time {state_hash}");
         Ok(self
             .database
@@ -426,7 +421,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         date_time: i64,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block date time {state_hash}");
         batch.put_cf(
             self.block_date_time_cf(),
@@ -436,7 +431,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_height(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_height(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block height {state_hash}");
 
         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
@@ -458,7 +453,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         blockchain_length: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block height {state_hash}: {blockchain_length}");
         batch.put_cf(
             self.block_height_cf(),
@@ -468,7 +463,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_global_slot(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_global_slot(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block global slot {state_hash}");
         Ok(self
             .database
@@ -481,7 +476,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         global_slot: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block global slot {state_hash}: {global_slot}");
         batch.put_cf(
             self.block_global_slot_cf(),
@@ -491,7 +486,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_creator(&self, state_hash: &StateHash) -> anyhow::Result<Option<PublicKey>> {
+    fn get_block_creator(&self, state_hash: &StateHash) -> Result<Option<PublicKey>> {
         trace!("Getting block creator {state_hash}");
         Ok(self
             .database
@@ -503,7 +498,7 @@ impl BlockStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let state_hash = block.state_hash();
         let block_creator = block.block_creator();
         trace!("Setting block creator: {state_hash} -> {block_creator}");
@@ -535,7 +530,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_coinbase_receiver(&self, state_hash: &StateHash) -> anyhow::Result<Option<PublicKey>> {
+    fn get_coinbase_receiver(&self, state_hash: &StateHash) -> Result<Option<PublicKey>> {
         trace!("Getting coinbase receiver for {state_hash}");
         Ok(self
             .database
@@ -547,7 +542,7 @@ impl BlockStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let state_hash = block.state_hash();
         let coinbase_receiver = block.coinbase_receiver();
         trace!("Setting coinbase receiver: {state_hash} -> {coinbase_receiver}");
@@ -579,7 +574,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_num_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<u32> {
+    fn get_num_blocks_at_height(&self, blockchain_length: u32) -> Result<u32> {
         trace!("Getting number of blocks at height {blockchain_length}");
         Ok(self
             .database
@@ -592,7 +587,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         blockchain_length: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Adding block {state_hash} at height {blockchain_length}");
 
         // increment num blocks at height
@@ -612,7 +607,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_height(&self, blockchain_length: u32) -> anyhow::Result<Vec<StateHash>> {
+    fn get_blocks_at_height(&self, blockchain_length: u32) -> Result<Vec<StateHash>> {
         let num_blocks_at_height = self.get_num_blocks_at_height(blockchain_length)?;
         let mut blocks = vec![];
 
@@ -629,7 +624,7 @@ impl BlockStore for IndexerStore {
         Ok(blocks)
     }
 
-    fn get_num_blocks_at_slot(&self, slot: u32) -> anyhow::Result<u32> {
+    fn get_num_blocks_at_slot(&self, slot: u32) -> Result<u32> {
         trace!("Getting number of blocks at slot {slot}");
         Ok(self
             .database
@@ -642,7 +637,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         slot: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Adding block {state_hash} at slot {slot}");
 
         // increment num blocks at slot
@@ -662,7 +657,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_slot(&self, slot: u32) -> anyhow::Result<Vec<StateHash>> {
+    fn get_blocks_at_slot(&self, slot: u32) -> Result<Vec<StateHash>> {
         trace!("Getting blocks at slot {slot}");
         let mut blocks = vec![];
 
@@ -680,7 +675,7 @@ impl BlockStore for IndexerStore {
         Ok(blocks)
     }
 
-    fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_num_blocks_at_public_key(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting number of blocks at public key {pk}");
         Ok(self
             .database
@@ -693,7 +688,7 @@ impl BlockStore for IndexerStore {
         pk: &PublicKey,
         state_hash: &StateHash,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Adding block {state_hash} at public key {pk}");
 
         // increment num blocks at public key
@@ -713,7 +708,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> anyhow::Result<Vec<StateHash>> {
+    fn get_blocks_at_public_key(&self, pk: &PublicKey) -> Result<Vec<StateHash>> {
         trace!("Getting blocks at public key {pk}");
         let mut blocks = vec![];
 
@@ -731,7 +726,7 @@ impl BlockStore for IndexerStore {
         Ok(blocks)
     }
 
-    fn get_block_children(&self, state_hash: &StateHash) -> anyhow::Result<Vec<StateHash>> {
+    fn get_block_children(&self, state_hash: &StateHash) -> Result<Vec<StateHash>> {
         trace!("Getting children of block {state_hash}");
         if let Some(height) = self.get_block_height(state_hash)? {
             let blocks_at_next_height = self.get_blocks_at_height(height + 1)?;
@@ -747,7 +742,7 @@ impl BlockStore for IndexerStore {
         bail!("Block missing from store {state_hash}")
     }
 
-    fn get_block_version(&self, state_hash: &StateHash) -> anyhow::Result<Option<PcbVersion>> {
+    fn get_block_version(&self, state_hash: &StateHash) -> Result<Option<PcbVersion>> {
         trace!("Getting block version {state_hash}");
         let key = state_hash.0.as_bytes();
         Ok(self
@@ -761,7 +756,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         version: PcbVersion,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block {state_hash} version to {version}");
         batch.put_cf(
             self.block_version_cf(),
@@ -776,7 +771,7 @@ impl BlockStore for IndexerStore {
         blockchain_length: u32,
         global_slot: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block height {blockchain_length} <-> slot {global_slot}");
 
         // add height to slot's "height collection"
@@ -812,7 +807,7 @@ impl BlockStore for IndexerStore {
     fn get_block_global_slots_from_height(
         &self,
         blockchain_length: u32,
-    ) -> anyhow::Result<Option<Vec<u32>>> {
+    ) -> Result<Option<Vec<u32>>> {
         trace!("Getting global slot for height {blockchain_length}");
         Ok(self
             .database
@@ -823,10 +818,7 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
-    fn get_block_heights_from_global_slot(
-        &self,
-        global_slot: u32,
-    ) -> anyhow::Result<Option<Vec<u32>>> {
+    fn get_block_heights_from_global_slot(&self, global_slot: u32) -> Result<Option<Vec<u32>>> {
         trace!("Getting height for global slot {global_slot}");
         Ok(self
             .database
@@ -842,7 +834,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         epoch: u32,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block epoch {epoch}: {state_hash}");
         batch.put_cf(
             self.block_epoch_cf(),
@@ -852,7 +844,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_epoch(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_epoch(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block epoch {state_hash}");
         Ok(self
             .database
@@ -865,7 +857,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         genesis_state_hash: &StateHash,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block genesis state hash {state_hash}: {genesis_state_hash}");
 
         batch.put_cf(
@@ -877,10 +869,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_block_genesis_state_hash(
-        &self,
-        state_hash: &StateHash,
-    ) -> anyhow::Result<Option<StateHash>> {
+    fn get_block_genesis_state_hash(&self, state_hash: &StateHash) -> Result<Option<StateHash>> {
         trace!("Getting block genesis state hash {state_hash}");
 
         Ok(self
@@ -889,12 +878,33 @@ impl BlockStore for IndexerStore {
             .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
-    fn add_epoch_slots_produced(
+    fn set_block_total_supply_batch(
         &self,
-        epoch: u32,
-        epoch_slot: u32,
-        pk: &PublicKey,
-    ) -> anyhow::Result<()> {
+        state_hash: &StateHash,
+        supply: u64,
+        batch: &mut WriteBatch,
+    ) -> Result<()> {
+        trace!("Setting block total currency {state_hash}: {supply}");
+
+        batch.put_cf(
+            self.block_total_supply_cf(),
+            state_hash.0.as_bytes(),
+            supply.to_be_bytes(),
+        );
+
+        Ok(())
+    }
+
+    fn get_block_total_currency(&self, state_hash: &StateHash) -> Result<Option<u64>> {
+        trace!("Getting block total currency {state_hash}");
+
+        Ok(self
+            .database
+            .get_pinned_cf(self.block_total_supply_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| u64_from_be_bytes(&bytes).expect("block total currency")))
+    }
+
+    fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32, pk: &PublicKey) -> Result<()> {
         trace!("Adding epoch {epoch} slot {epoch_slot} produced");
 
         // add to total
@@ -939,7 +949,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn get_next_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<Option<u32>> {
+    fn get_next_global_slot_produced(&self, global_slot: u32) -> Result<Option<u32>> {
         trace!("Getting next slot produced at or above {global_slot}");
         let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
         let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
@@ -960,7 +970,7 @@ impl BlockStore for IndexerStore {
         Ok(None)
     }
 
-    fn get_prev_global_slot_produced(&self, global_slot: u32) -> anyhow::Result<u32> {
+    fn get_prev_global_slot_produced(&self, global_slot: u32) -> Result<u32> {
         trace!("Getting previous slot produced at or below {global_slot}");
         let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
         let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
@@ -1051,7 +1061,7 @@ impl BlockStore for IndexerStore {
         &self,
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Incrementing block production count {}", block.summary());
         let creator = block.block_creator();
         let epoch = block.epoch_count();
@@ -1126,7 +1136,7 @@ impl BlockStore for IndexerStore {
         state_hash: &StateHash,
         creator: &PublicKey,
         supercharged: bool,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Incrementing block production count {state_hash}");
 
         // increment pk epoch count
@@ -1194,10 +1204,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn increment_block_canonical_production_count(
-        &self,
-        state_hash: &StateHash,
-    ) -> anyhow::Result<()> {
+    fn increment_block_canonical_production_count(&self, state_hash: &StateHash) -> Result<()> {
         trace!("Incrementing canonical block production count {state_hash}");
         let creator = self.get_block_creator(state_hash)?.expect("block creator");
         let epoch = self.get_block_epoch(state_hash)?.expect("block epoch");
@@ -1234,7 +1241,7 @@ impl BlockStore for IndexerStore {
         epoch: u32,
         num: u32,
         pk: &PublicKey,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!(
             "Incrementing epoch {epoch} pk {pk} canonical block sort: {num} -> {}",
             num + 1
@@ -1251,10 +1258,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn decrement_block_canonical_production_count(
-        &self,
-        state_hash: &StateHash,
-    ) -> anyhow::Result<()> {
+    fn decrement_block_canonical_production_count(&self, state_hash: &StateHash) -> Result<()> {
         trace!("Decrementing canonical block production count {state_hash}");
         let creator = self.get_block_creator(state_hash)?.expect("block creator");
         let epoch = self.get_block_epoch(state_hash)?.expect("block epoch");
@@ -1294,7 +1298,7 @@ impl BlockStore for IndexerStore {
         epoch: u32,
         num: u32,
         pk: &PublicKey,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         assert!(num > 0);
         trace!(
             "Decrementing epoch {epoch} pk {pk} canonical block sort: {num} -> {}",
@@ -1316,7 +1320,7 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting pk epoch {epoch} block production count {pk}");
         Ok(self
@@ -1332,7 +1336,7 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting pk epoch {epoch} canonical block production count {pk}");
         Ok(self
@@ -1348,7 +1352,7 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting pk epoch {epoch} supercharged block production count {pk}");
         Ok(self
@@ -1360,7 +1364,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_block_production_pk_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total block production count {pk}");
         Ok(self
             .database
@@ -1368,7 +1372,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_pk_canonical_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_block_production_pk_canonical_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total canonical block production count {pk}");
         Ok(self
             .database
@@ -1379,10 +1383,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_pk_supercharged_total_count(
-        &self,
-        pk: &PublicKey,
-    ) -> anyhow::Result<u32> {
+    fn get_block_production_pk_supercharged_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total supercharged block production count {pk}");
         Ok(self
             .database
@@ -1393,7 +1394,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+    fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch block production count {epoch}");
         Ok(self
@@ -1402,10 +1403,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_canonical_epoch_count(
-        &self,
-        epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    fn get_block_production_canonical_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch canonical block production count {epoch}");
         Ok(self
@@ -1417,10 +1415,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_supercharged_epoch_count(
-        &self,
-        epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    fn get_block_production_supercharged_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch supercharged block production count {epoch}");
         Ok(self
@@ -1432,7 +1427,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_total_count(&self) -> anyhow::Result<u32> {
+    fn get_block_production_total_count(&self) -> Result<u32> {
         trace!("Getting total block production count");
         Ok(self
             .database
@@ -1440,13 +1435,13 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_block_production_canonical_total_count(&self) -> anyhow::Result<u32> {
+    fn get_block_production_canonical_total_count(&self) -> Result<u32> {
         trace!("Getting total canonical block production count");
         self.get_best_block_height()
             .map(|res| res.unwrap_or_default())
     }
 
-    fn get_block_production_supercharged_total_count(&self) -> anyhow::Result<u32> {
+    fn get_block_production_supercharged_total_count(&self) -> Result<u32> {
         trace!("Getting total supercharged block production count");
         Ok(self
             .database
@@ -1454,11 +1449,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_pk_epoch_slots_produced_count(
-        &self,
-        pk: &PublicKey,
-        epoch: Option<u32>,
-    ) -> anyhow::Result<u32> {
+    fn get_pk_epoch_slots_produced_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch {epoch} pk {pk} slots produced count");
         Ok(self
@@ -1470,7 +1461,7 @@ impl BlockStore for IndexerStore {
             .map_or(0, from_be_bytes))
     }
 
-    fn get_epoch_slots_produced_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+    fn get_epoch_slots_produced_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
         trace!("Getting epoch {epoch} slots produced count");
         Ok(self
@@ -1486,7 +1477,7 @@ impl BlockStore for IndexerStore {
         &self,
         state_hash: &StateHash,
         comparison: &BlockComparison,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting block comparison {state_hash}");
         Ok(self.database.put_cf(
             self.block_comparison_cf(),
@@ -1495,10 +1486,7 @@ impl BlockStore for IndexerStore {
         )?)
     }
 
-    fn get_block_comparison(
-        &self,
-        state_hash: &StateHash,
-    ) -> anyhow::Result<Option<BlockComparison>> {
+    fn get_block_comparison(&self, state_hash: &StateHash) -> Result<Option<BlockComparison>> {
         trace!("Getting block comparison {state_hash}");
         Ok(self
             .database
@@ -1510,7 +1498,7 @@ impl BlockStore for IndexerStore {
         &self,
         block: &StateHash,
         other: &StateHash,
-    ) -> anyhow::Result<Option<std::cmp::Ordering>> {
+    ) -> Result<Option<std::cmp::Ordering>> {
         // get stored block comparisons
         let res1 = self
             .database
@@ -1528,7 +1516,7 @@ impl BlockStore for IndexerStore {
         Ok(None)
     }
 
-    fn dump_blocks_via_height(&self, path: &std::path::Path) -> anyhow::Result<()> {
+    fn dump_blocks_via_height(&self, path: &std::path::Path) -> Result<()> {
         use std::{fs::File, io::Write};
         trace!("Dumping blocks via height to {}", path.display());
         let mut file = File::create(path)?;
@@ -1551,7 +1539,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn blocks_via_height(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>> {
+    fn blocks_via_height(&self, mode: IteratorMode) -> Result<Vec<PrecomputedBlock>> {
         let mut blocks = vec![];
         trace!("Getting blocks via height (mode: {})", display_mode(mode));
         for (key, _) in self.blocks_height_iterator(mode).flatten() {
@@ -1561,7 +1549,7 @@ impl BlockStore for IndexerStore {
         Ok(blocks)
     }
 
-    fn dump_blocks_via_global_slot(&self, path: &std::path::Path) -> anyhow::Result<()> {
+    fn dump_blocks_via_global_slot(&self, path: &std::path::Path) -> Result<()> {
         use std::{fs::File, io::Write};
         trace!("Dumping blocks via global slot to {}", path.display());
         let mut file = File::create(path)?;
@@ -1584,7 +1572,7 @@ impl BlockStore for IndexerStore {
         Ok(())
     }
 
-    fn blocks_via_global_slot(&self, mode: IteratorMode) -> anyhow::Result<Vec<PrecomputedBlock>> {
+    fn blocks_via_global_slot(&self, mode: IteratorMode) -> Result<Vec<PrecomputedBlock>> {
         let mut blocks = vec![];
         trace!(
             "Getting blocks via global slot (mode: {})",
@@ -1602,21 +1590,21 @@ impl BlockStore for IndexerStore {
 // helpers //
 /////////////
 
-fn block_height(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<u32> {
+fn block_height(db: &IndexerStore, state_hash: &StateHash) -> Result<u32> {
     Ok(db
         .get_block_height(state_hash)?
         .with_context(|| format!("{state_hash}"))
         .expect("block height"))
 }
 
-fn block_slot(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<u32> {
+fn block_slot(db: &IndexerStore, state_hash: &StateHash) -> Result<u32> {
     Ok(db
         .get_block_global_slot(state_hash)?
         .with_context(|| format!("{state_hash}"))
         .expect("global slot"))
 }
 
-fn block_parent(db: &IndexerStore, state_hash: &StateHash) -> anyhow::Result<StateHash> {
+fn block_parent(db: &IndexerStore, state_hash: &StateHash) -> Result<StateHash> {
     Ok(db
         .get_block_parent_hash(state_hash)?
         .with_context(|| format!("{state_hash}"))

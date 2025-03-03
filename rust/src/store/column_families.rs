@@ -31,6 +31,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing block genesis state hashes
     fn block_genesis_state_hash_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing block total supplies
+    fn block_total_supply_cf(&self) -> &ColumnFamily;
+
     /// CF for storing block creators
     fn block_creator_cf(&self) -> &ColumnFamily;
 

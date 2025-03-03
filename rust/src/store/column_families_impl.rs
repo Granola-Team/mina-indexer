@@ -110,6 +110,12 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("blocks-genesis-hash column family exists")
     }
 
+    fn block_total_supply_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-total-supply")
+            .expect("blocks-total-supply column family exists")
+    }
+
     fn block_creator_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-creator")
