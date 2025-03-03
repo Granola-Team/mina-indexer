@@ -208,10 +208,19 @@ impl PrecomputedBlock {
     // Staged ledger diff //
     ////////////////////////
 
+    /// User commands for application to the staged ledger
     pub fn commands(&self) -> Vec<UserCommandWithStatus> {
         let mut commands = self.commands_pre_diff();
         commands.append(&mut self.commands_post_diff());
         commands
+    }
+
+    /// Zkapp user commands for application to the staged ledger
+    pub fn zkapp_commands(&self) -> Vec<UserCommandWithStatus> {
+        self.commands()
+            .into_iter()
+            .filter(|cmd| cmd.is_zkapp_command())
+            .collect()
     }
 
     pub fn commands_pre_diff(&self) -> Vec<UserCommandWithStatus> {
