@@ -1133,35 +1133,41 @@ impl<'a> TxnCsvRecord<'a> {
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::*;
-    use crate::block::precomputed::PcbVersion;
-    use std::{env, path::Path};
-    use tempfile::TempDir;
+    use crate::{block::precomputed::PcbVersion, store::tests::create_indexer_store};
+    use std::path::Path;
 
-    fn create_indexer_store() -> Result<IndexerStore> {
-        let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
-        let store = IndexerStore::new(temp_dir.path())?;
-        Ok(store)
+    #[test]
+    fn increment_non_zkapp_commands_counts() -> Result<()> {
+        let indexer = create_indexer_store()?;
+
+        let epoch = 1;
+        let path = Path::new("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
+        let pcb = PrecomputedBlock::parse_file(path, PcbVersion::V1)?;
+
+        for (num, cmd) in pcb.zkapp_commands().iter().enumerate() {
+            indexer.increment_user_commands_counts(cmd, epoch)?;
+
+            assert_eq!(indexer.get_applied_user_commands_count()?, num as u32 + 1);
+            assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+        }
+
+        Ok(())
     }
 
     #[test]
-    fn test_increment_user_commands_counts() -> Result<()> {
+    fn increment_zkapp_commands_counts() -> Result<()> {
         let indexer = create_indexer_store()?;
 
-        let applied_commands_path = Path::new("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
-        let applied_commands_pcb =
-            PrecomputedBlock::parse_file(applied_commands_path, PcbVersion::V1)?;
-        let epoch = 1;
+        let epoch = 0;
+        let path = Path::new("./tests/data/hardfork/mainnet-359617-3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW.json");
+        let pcb = PrecomputedBlock::parse_file(path, PcbVersion::V2)?;
 
-        let binding = applied_commands_pcb.commands();
-        let applied_command = binding.first().unwrap();
+        for (num, zkapp_cmd) in pcb.zkapp_commands().iter().enumerate() {
+            indexer.increment_zkapp_commands_counts(zkapp_cmd, epoch)?;
 
-        // Test with the applied user command
-        indexer.increment_user_commands_counts(applied_command, epoch)?;
-        assert_eq!(indexer.get_applied_user_commands_count()?, 1);
-        assert_eq!(indexer.get_failed_user_commands_count()?, 0);
-
-        // Clean up: reset counts by decrementing them back to zero
-        indexer.decrement_applied_user_commands_count(1)?;
+            assert_eq!(indexer.get_applied_zkapp_commands_count()?, num as u32 + 1);
+            assert_eq!(indexer.get_failed_zkapp_commands_count()?, 0);
+        }
 
         Ok(())
     }
