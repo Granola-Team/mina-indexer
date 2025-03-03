@@ -109,7 +109,7 @@ impl UserCommandStore for IndexerStore {
             self.increment_user_commands_counts(command, epoch)?;
 
             if command.is_zkapp_command() {
-                // TODO increment zkapp txn count
+                self.increment_zkapp_commands_counts(command, epoch)?;
             }
 
             // add: `txn_hash -> global_slot`
