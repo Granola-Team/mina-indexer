@@ -7,12 +7,71 @@ GET {{url}}
 HTTP 200
 [Asserts]
 
-# total data count
+jsonpath "$.blockchainLength" == 359617
+
+# accounts
+jsonpath "$.totalNumAccounts" == 228353
+jsonpath "$.totalNumZkappAccounts" == 6
+
+# blocks
+jsonpath "$.epochNumBlocks" == 24
+jsonpath "$.totalNumBlocks" == 38
+
+# canonical blocks
+jsonpath "$.epochNumCanonicalBlocks" == 13
+jsonpath "$.totalNumCanonicalBlocks" == 359617
+
+# canonical snarks
 jsonpath "$.totalNumCanonicalSnarks" == 0
+
+# snarks
+jsonpath "$.epochNumSnarks" == 0
+jsonpath "$.totalNumSnarks" == 0
+
+# canonical snarks
+jsonpath "$.totalNumCanonicalSnarks" == 0
+
+# internal commands
+jsonpath "$.epochNumInternalCommands" == 22
 jsonpath "$.totalNumInternalCommands" == 45
+
+# canonical internal commands
 jsonpath "$.totalNumCanonicalInternalCommands" == 23
+
+# user commands
+jsonpath "$.epochNumUserCommands" == 155
+jsonpath "$.totalNumUserCommands" == 155
+
+# canonical user commands
 jsonpath "$.totalNumCanonicalUserCommands" == 97
+
+# applied user commands
 jsonpath "$.totalNumAppliedUserCommands" == 155
+
+# applied canonical user commands
 jsonpath "$.totalNumAppliedCanonicalUserCommands" == 97
+
+# failed user commands
 jsonpath "$.totalNumFailedUserCommands" == 0
+
+# failed canonical user commands
 jsonpath "$.totalNumFailedCanonicalUserCommands" == 0
+
+# zkapp commands
+jsonpath "$.epochNumZkappCommands" == 80
+jsonpath "$.totalNumZkappCommands" == 80
+
+# canonical zkapp commands
+jsonpath "$.totalNumCanonicalZkappCommands" == 74
+
+# applied zkapp commands
+jsonpath "$.totalNumAppliedZkappCommands" == 80
+
+# applied canonical zkapp commands
+jsonpath "$.totalNumAppliedCanonicalZkappCommands" == 74
+
+# failed zkapp commands
+jsonpath "$.totalNumFailedZkappCommands" == 0
+
+# failed canonical zkapp commands
+jsonpath "$.totalNumFailedCanonicalZkappCommands" == 0

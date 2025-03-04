@@ -303,3 +303,38 @@ jsonpath "$.data.accounts[1].is_genesis_account" == false
 jsonpath "$.data.accounts[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 
 duration < 100
+
+#
+# Data counts
+#
+
+POST {{url}}
+```graphql
+{
+  accounts(
+    query: {
+      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+      publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P"
+    }
+  ) {
+    pk_epoch_num_user_commands
+    pk_total_num_user_commands
+    pk_epoch_num_zkapp_commands
+    pk_total_num_zkapp_commands
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# only datum
+jsonpath "$.data.accounts[0].pk_epoch_num_user_commands" == 1
+jsonpath "$.data.accounts[0].pk_total_num_user_commands" == 1
+
+jsonpath "$.data.accounts[0].pk_epoch_num_zkapp_commands" == 1
+jsonpath "$.data.accounts[0].pk_total_num_zkapp_commands" == 1
+
+duration < 100

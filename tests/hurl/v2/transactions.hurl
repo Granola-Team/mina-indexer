@@ -77,3 +77,36 @@ jsonpath "$.data.transactions[24].canonical" == true
 jsonpath "$.data.transactions[24].hash" == "5Jtef4ue1udQiniSy2co1LZK3wvoQCAZV6595VSXt4znqq57djpz"
 
 duration < 100
+
+
+#
+# Transaction data
+#
+
+POST {{url}}
+```graphql
+{
+  transactions(limit: 1) {
+    blockHeight
+    canonical
+    hash
+    epoch_num_user_commands
+    total_num_user_commands
+    epoch_num_zkapp_commands
+    total_num_zkapp_commands
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# only datum
+jsonpath "$.data.transactions[0].blockHeight" == 359617
+jsonpath "$.data.transactions[0].canonical" == true
+jsonpath "$.data.transactions[0].hash" == "5JvJ6fA7cL6SoVjKYg6T1W5f6PKWbt9tevpeuVbWBBuKktaL8aJM"
+jsonpath "$.data.transactions[0].epoch_num_user_commands" == 155
+jsonpath "$.data.transactions[0].total_num_user_commands" == 155
+jsonpath "$.data.transactions[0].epoch_num_zkapp_commands" == 80
+jsonpath "$.data.transactions[0].total_num_zkapp_commands" == 80
+
+duration < 100
