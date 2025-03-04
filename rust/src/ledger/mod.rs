@@ -61,7 +61,9 @@ impl Ledger {
     }
 
     pub fn len(&self) -> usize {
-        self.tokens.len()
+        self.tokens.iter().fold(0, |acc, (_, token_ledger)| {
+            acc + token_ledger.accounts.len()
+        })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -558,6 +560,7 @@ mod tests {
                 }),
             ]],
             token_diffs: vec![],
+            accounts_created: vec![],
         };
         let ledger = TokenLedger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
@@ -593,6 +596,7 @@ mod tests {
                 nonce: prev_nonce + 1,
             })]],
             token_diffs: vec![],
+            accounts_created: vec![],
         };
         let ledger = TokenLedger { accounts }
             .apply_diff(&ledger_diff)

@@ -38,10 +38,12 @@ impl UserCommandStore for IndexerStore {
         let epoch = block.epoch_count();
         let state_hash = block.state_hash();
         let user_commands = block.commands();
+        let zkapp_commands = block.zkapp_commands();
 
         // per block
         self.set_block_user_commands_batch(block, batch)?;
         self.set_block_user_commands_count_batch(&state_hash, user_commands.len() as u32, batch)?;
+        self.set_block_zkapp_commands_count_batch(&state_hash, zkapp_commands.len() as u32, batch)?;
         self.set_block_username_updates_batch(&state_hash, &block.username_updates(), batch)?;
 
         // per command
@@ -1083,6 +1085,19 @@ impl UserCommandStore for IndexerStore {
                 self.increment_canonical_user_commands_count(user_commands.len() as u32)?;
                 self.increment_applied_canonical_user_commands_count(applied_uc.len() as u32)?;
                 self.increment_failed_canonical_user_commands_count(failed_uc.len() as u32)?;
+
+                let zkapp_commands: Vec<_> = user_commands
+                    .iter()
+                    .filter(|uc| uc.is_zkapp_command())
+                    .collect();
+                let (applied_zkapp, failed_zkapp): (
+                    Vec<&UserCommandWithStatus>,
+                    Vec<&UserCommandWithStatus>,
+                ) = zkapp_commands.iter().partition(|uc| uc.is_applied());
+
+                self.increment_canonical_zkapp_commands_count(zkapp_commands.len() as u32)?;
+                self.increment_applied_canonical_zkapp_commands_count(applied_zkapp.len() as u32)?;
+                self.increment_failed_canonical_zkapp_commands_count(failed_zkapp.len() as u32)?;
             }
         }
 

@@ -1,7 +1,10 @@
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
-    block::store::{BlockStore, BlockUpdate, DbBlockUpdate},
+    block::{
+        store::{BlockStore, BlockUpdate, DbBlockUpdate},
+        AccountCreated,
+    },
     ledger::{
         account::Account,
         diff::{account::AccountDiff, token::TokenDiff},
@@ -77,17 +80,23 @@ impl BestLedgerStore for IndexerStore {
                 let account_key = best_account_key(token, pk);
                 let sort_key = best_account_sort_key(token, before.1, pk);
 
+                // decrement count
+                self.decrement_num_accounts()?;
+
+                // delete account
                 self.database
                     .delete_cf(self.best_ledger_accounts_cf(), account_key)?;
-
                 self.database
                     .delete_cf(self.best_ledger_accounts_balance_sort_cf(), sort_key)?;
 
                 // zkapp account
                 if before.0 {
+                    // decrement count
+                    self.decrement_num_zkapp_accounts()?;
+
+                    // delete
                     self.database
                         .delete_cf(self.zkapp_best_ledger_accounts_cf(), account_key)?;
-
                     self.database
                         .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
                 }
@@ -118,6 +127,9 @@ impl BestLedgerStore for IndexerStore {
         let account_key = best_account_key(token, pk);
         let sort_key = best_account_sort_key(token, balance, pk);
 
+        // increment count
+        self.increment_num_accounts()?;
+
         // store new account
         self.database.put_cf(
             self.best_ledger_accounts_cf(),
@@ -134,6 +146,9 @@ impl BestLedgerStore for IndexerStore {
 
         // zkapp account
         if after.is_zkapp_account() {
+            // increment count
+            self.increment_num_zkapp_accounts()?;
+
             // store new zkapp account
             self.database.put_cf(
                 self.zkapp_best_ledger_accounts_cf(),
@@ -202,10 +217,17 @@ impl BestLedgerStore for IndexerStore {
                 .iter()
                 .flat_map(|BlockUpdate { state_hash: a, .. }| {
                     let diff = self.get_block_ledger_diff(a).unwrap();
-                    diff.map(|d| AccountUpdate {
-                        account_diffs: d.account_diffs.into_iter().flatten().collect(),
-                        token_diffs: d.token_diffs.into_iter().collect(),
-                        new_accounts: update_token_accounts(d.new_pk_balances),
+
+                    diff.map(|d| {
+                        let (new_accounts, new_zkapp_accounts) =
+                            update_token_accounts(self, d.new_pk_balances, d.accounts_created);
+
+                        AccountUpdate {
+                            account_diffs: d.account_diffs.into_iter().flatten().collect(),
+                            token_diffs: d.token_diffs.into_iter().collect(),
+                            new_accounts,
+                            new_zkapp_accounts,
+                        }
                     })
                 })
                 .collect(),
@@ -214,10 +236,17 @@ impl BestLedgerStore for IndexerStore {
                 .iter()
                 .flat_map(|BlockUpdate { state_hash: u, .. }| {
                     let diff = self.get_block_ledger_diff(u).unwrap();
-                    diff.map(|d| AccountUpdate {
-                        account_diffs: d.account_diffs.into_iter().flatten().collect(),
-                        token_diffs: d.token_diffs.into_iter().collect(),
-                        new_accounts: update_token_accounts(d.new_pk_balances),
+
+                    diff.map(|d| {
+                        let (new_accounts, new_zkapp_accounts) =
+                            update_token_accounts(self, d.new_pk_balances, d.accounts_created);
+
+                        AccountUpdate {
+                            account_diffs: d.account_diffs.into_iter().flatten().collect(),
+                            token_diffs: d.token_diffs.into_iter().collect(),
+                            new_accounts,
+                            new_zkapp_accounts,
+                        }
                     })
                 })
                 .collect(),
@@ -231,6 +260,8 @@ impl BestLedgerStore for IndexerStore {
         trace!("Updating best ledger accounts for block {state_hash}");
 
         // count newly applied & unapplied accounts
+
+        // all accounts
         let apply_acc = updates
             .apply
             .iter()
@@ -241,11 +272,21 @@ impl BestLedgerStore for IndexerStore {
 
         self.update_num_accounts(adjust)?;
 
+        // zkapp accounts
+        let apply_acc = updates.apply.iter().fold(0, |acc, update| {
+            acc + update.new_zkapp_accounts.len() as i32
+        });
+        let adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
+            acc - update.new_zkapp_accounts.len() as i32
+        });
+        self.update_num_zkapp_accounts(adjust)?;
+
         // unapply account & token diffs, remove accounts
         for AccountUpdate {
             account_diffs,
             token_diffs,
             new_accounts,
+            ..
         } in updates.unapply
         {
             let token_account_diffs = aggregate_token_account_diffs(account_diffs);
@@ -302,6 +343,11 @@ impl BestLedgerStore for IndexerStore {
             // remove accounts
             for (pk, token) in new_accounts.iter() {
                 self.update_best_account(pk, token, None, None)?;
+            }
+
+            // adjust MINA token supply
+            if let Some(supply) = self.get_block_total_currency(state_hash)? {
+                self.set_token(&Token::mina_with_supply(supply))?;
             }
         }
 
@@ -460,15 +506,110 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
+    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()> {
+        use std::cmp::Ordering::*;
+
+        match adjust.cmp(&0) {
+            Equal => (),
+            Greater => {
+                // add to num accounts
+                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+            Less => {
+                // sub from num accounts
+                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn get_num_accounts(&self) -> Result<Option<u32>> {
+        trace!("Getting count of all accounts");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ACCOUNTS_KEY)?
             .map(from_be_bytes))
     }
 
+    fn set_num_accounts(&self, num: u32) -> Result<()> {
+        trace!("Setting count of all accounts to {}", num);
+
+        Ok(self
+            .database
+            .put(Self::TOTAL_NUM_ACCOUNTS_KEY, num.to_be_bytes())?)
+    }
+
+    fn decrement_num_accounts(&self) -> Result<()> {
+        trace!("Decrementing count of all accounts");
+
+        let old = self.get_num_accounts()?.unwrap_or_default();
+        assert!(old >= 1);
+
+        self.set_num_accounts(old - 1)
+    }
+
+    fn increment_num_accounts(&self) -> Result<()> {
+        trace!("Incrementing count of all accounts");
+
+        let old = self.get_num_accounts()?.unwrap_or_default();
+        self.set_num_accounts(old + 1)
+    }
+
+    fn get_num_zkapp_accounts(&self) -> Result<Option<u32>> {
+        trace!("Getting count of zkapp accounts");
+
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY)?
+            .map(from_be_bytes))
+    }
+
+    fn set_num_zkapp_accounts(&self, num: u32) -> Result<()> {
+        trace!("Setting count of zkapp accounts to {}", num);
+
+        Ok(self
+            .database
+            .put(Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY, num.to_be_bytes())?)
+    }
+
+    fn decrement_num_zkapp_accounts(&self) -> Result<()> {
+        trace!("Decrementing count of zkapp accounts");
+
+        let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+        assert!(old >= 1);
+
+        self.set_num_zkapp_accounts(old - 1)
+    }
+
+    fn increment_num_zkapp_accounts(&self) -> Result<()> {
+        trace!("Incrementing count of zkapp accounts");
+
+        let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+        self.set_num_zkapp_accounts(old + 1)
+    }
+
+    fn is_zkapp_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<bool>> {
+        trace!("Checking if ({}, {}) is a zkapp account", pk, token);
+
+        Ok(self
+            .get_best_account(pk, token)?
+            .as_ref()
+            .map(|a| a.zkapp.is_some()))
+    }
+
     fn build_best_ledger(&self) -> Result<Option<Ledger>> {
         trace!("Building best ledger");
+
         if let (Some(best_block_height), Some(best_block_hash)) =
             (self.get_best_block_height()?, self.get_best_block_hash()?)
         {
@@ -548,16 +689,39 @@ fn aggregate_token_diffs(token_diffs: Vec<TokenDiff>) -> HashMap<TokenAddress, V
 
 use std::collections::BTreeMap;
 
+type AllAndZkappAccounts = (
+    HashSet<(PublicKey, TokenAddress)>, // all accounts
+    HashSet<(PublicKey, TokenAddress)>, // zkapp accounts
+);
+
 fn update_token_accounts(
+    db: &IndexerStore,
     new_pk_balances: BTreeMap<PublicKey, BTreeMap<TokenAddress, u64>>,
-) -> HashSet<(PublicKey, TokenAddress)> {
-    new_pk_balances
-        .into_iter()
-        .flat_map(|(pk, tokens)| {
-            tokens
-                .into_keys()
-                .map(|token| (pk.to_owned(), token))
-                .collect::<HashSet<_>>()
-        })
-        .collect()
+    accounts_created: Vec<AccountCreated>,
+) -> AllAndZkappAccounts {
+    (
+        new_pk_balances
+            .iter()
+            .flat_map(|(pk, tokens)| {
+                tokens
+                    .keys()
+                    .map(|token| (pk.to_owned(), token.to_owned()))
+                    .collect::<HashSet<_>>()
+            })
+            .collect(),
+        accounts_created
+            .iter()
+            .filter_map(
+                |AccountCreated {
+                     public_key, token, ..
+                 }| {
+                    if let Ok(Some(true)) = db.is_zkapp_account(public_key, token) {
+                        Some((public_key.to_owned(), token.to_owned()))
+                    } else {
+                        None
+                    }
+                },
+            )
+            .collect(),
+    )
 }

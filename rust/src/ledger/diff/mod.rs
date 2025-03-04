@@ -36,6 +36,9 @@ pub struct LedgerDiff {
     /// Map of new pk -> balance (after coinbase, before fee transfers)
     pub new_pk_balances: BTreeMap<PublicKey, BTreeMap<TokenAddress, u64>>,
 
+    /// Accounts created
+    pub accounts_created: Vec<AccountCreated>,
+
     /// Account updates
     pub account_diffs: Vec<Vec<AccountDiff>>,
 
@@ -174,12 +177,13 @@ impl LedgerDiff {
         Self {
             account_diffs,
             token_diffs,
-            new_pk_balances: accounts_created.0,
-            new_coinbase_receiver: accounts_created.1,
             state_hash: block.state_hash(),
             blockchain_length: block.blockchain_length(),
             staged_ledger_hash: block.staged_ledger_hash(),
             public_keys_seen: block.active_public_keys(),
+            accounts_created: block.accounts_created_v2(),
+            new_pk_balances: accounts_created.0,
+            new_coinbase_receiver: accounts_created.1,
         }
     }
 

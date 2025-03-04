@@ -68,8 +68,35 @@ pub trait BestLedgerStore {
     /// Update the count of best ledger accounts
     fn update_num_accounts(&self, adjust: i32) -> Result<()>;
 
+    /// Update the count of zkapp best ledger accounts
+    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()>;
+
     /// Get the count of best ledger accounts
     fn get_num_accounts(&self) -> Result<Option<u32>>;
+
+    /// Set the count of best ledger accounts
+    fn set_num_accounts(&self, num: u32) -> Result<()>;
+
+    /// Increment the count of all best ledger accounts
+    fn increment_num_accounts(&self) -> Result<()>;
+
+    /// Decrement the count of all best ledger accounts
+    fn decrement_num_accounts(&self) -> Result<()>;
+
+    /// Get the count of best ledger zkapp accounts
+    fn get_num_zkapp_accounts(&self) -> Result<Option<u32>>;
+
+    /// Set the count of best ledger zkapp accounts
+    fn set_num_zkapp_accounts(&self, num: u32) -> Result<()>;
+
+    /// Increment the count of best ledger zkapp accounts
+    fn increment_num_zkapp_accounts(&self) -> Result<()>;
+
+    /// Decrement the count of best ledger zkapp accounts
+    fn decrement_num_zkapp_accounts(&self) -> Result<()>;
+
+    /// Check whether a a token account is a zkapp account
+    fn is_zkapp_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<bool>>;
 
     /// Build the best ledger from the CF representation
     fn build_best_ledger(&self) -> Result<Option<Ledger>>;
@@ -105,6 +132,7 @@ pub struct AccountUpdate {
     pub account_diffs: Vec<AccountDiff>,
     pub token_diffs: Vec<TokenDiff>,
     pub new_accounts: HashSet<(PublicKey, TokenAddress)>,
+    pub new_zkapp_accounts: HashSet<(PublicKey, TokenAddress)>,
 }
 
 pub type DbAccountUpdate = DbUpdate<AccountUpdate>;
