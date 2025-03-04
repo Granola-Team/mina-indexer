@@ -2,14 +2,11 @@
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
   "properties": {
-    "blockchainLength": {
-      "type": "integer"
-    },
     "chainId": {
       "type": "string"
     },
-    "circulatingSupply": {
-      "type": "string"
+    "blockchainLength": {
+      "type": "integer"
     },
     "dateTime": {
       "type": "string"
@@ -17,23 +14,17 @@
     "epoch": {
       "type": "integer"
     },
-    "globalSlot": {
+    "slot": {
       "type": "integer"
     },
-    "lockedSupply": {
-      "type": "string"
+    "globalSlot": {
+      "type": "integer"
     },
     "minWindowDensity": {
       "type": "integer"
     },
     "nextEpochLedgerHash": {
       "type": "string"
-    },
-    "previousStateHash": {
-      "type": "string"
-    },
-    "slot": {
-      "type": "integer"
     },
     "snarkedLedgerHash": {
       "type": "string"
@@ -47,13 +38,34 @@
     "stateHash": {
       "type": "string"
     },
+    "previousStateHash": {
+      "type": "string"
+    },
     "totalCurrency": {
       "type": "string"
+    },
+    "lockedSupply": {
+      "type": "string"
+    },
+    "circulatingSupply": {
+      "type": "string"
+    },
+    "totalNumAccounts": {
+      "type": "integer"
+    },
+    "totalNumZkappAccounts": {
+      "type": "integer"
     },
     "epochNumBlocks": {
       "type": "integer"
     },
     "totalNumBlocks": {
+      "type": "integer"
+    },
+    "epochNumCanonicalBlocks": {
+      "type": "integer"
+    },
+    "totalNumCanonicalBlocks": {
       "type": "integer"
     },
     "epochNumSnarks": {
@@ -86,6 +98,27 @@
     "totalNumFailedCanonicalUserCommands": {
       "type": "integer"
     },
+    "epochNumZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumAppliedZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumFailedZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumCanonicalZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumAppliedCanonicalZkappCommands": {
+      "type": "integer"
+    },
+    "totalNumFailedCanonicalZkappCommands": {
+      "type": "integer"
+    },
     "epochNumInternalCommands": {
       "type": "integer"
     },
@@ -95,29 +128,36 @@
     "totalNumCanonicalInternalCommands": {
       "type": "integer"
     },
-    "totalNumAccounts": {
-      "type": "integer"
+    "dbVersion": {
+      "type": "string"
+    },
+    "indexerVersion": {
+      "type": "string"
     }
   },
   "required": [
-    "blockchainLength",
     "chainId",
-    "circulatingSupply",
+    "blockchainLength",
     "dateTime",
     "epoch",
+    "slot",
     "globalSlot",
-    "lockedSupply",
     "minWindowDensity",
     "nextEpochLedgerHash",
-    "previousStateHash",
-    "slot",
     "snarkedLedgerHash",
     "stagedLedgerHash",
     "stakingEpochLedgerHash",
     "stateHash",
+    "previousStateHash",
     "totalCurrency",
+    "lockedSupply",
+    "circulatingSupply",
+    "totalNumAccounts",
+    "totalNumZkappAccounts",
     "epochNumBlocks",
     "totalNumBlocks",
+    "epochNumCanonicalBlocks",
+    "totalNumCanonicalBlocks",
     "epochNumSnarks",
     "totalNumSnarks",
     "totalNumCanonicalSnarks",
@@ -128,9 +168,15 @@
     "totalNumCanonicalUserCommands",
     "totalNumAppliedCanonicalUserCommands",
     "totalNumFailedCanonicalUserCommands",
+    "epochNumZkappCommands",
+    "totalNumZkappCommands",
+    "totalNumAppliedZkappCommands",
+    "totalNumFailedZkappCommands",
+    "totalNumCanonicalZkappCommands",
+    "totalNumAppliedCanonicalZkappCommands",
+    "totalNumFailedCanonicalZkappCommands",
     "epochNumInternalCommands",
     "totalNumInternalCommands",
-    "totalNumCanonicalInternalCommands",
-    "totalNumAccounts"
+    "totalNumCanonicalInternalCommands"
   ]
 }
