@@ -79,6 +79,15 @@ pub struct TransactionWithoutBlock {
     /// Total number of user commands
     #[graphql(name = "total_num_user_commands")]
     total_num_user_commands: u32,
+
+    /// Total number of zkapp commands in the given epoch
+    /// (default: current epoch)
+    #[graphql(name = "epoch_num_zkapp_commands")]
+    epoch_num_zkapp_commands: u32,
+
+    /// Total number of zkapp commands
+    #[graphql(name = "total_num_zkapp_commands")]
+    total_num_zkapp_commands: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject)]
@@ -98,16 +107,29 @@ impl TransactionsQueryRoot {
         query: TransactionQueryInput,
     ) -> Result<Option<Transaction>> {
         let db = db(ctx);
+
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
+
+        let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None)?;
+        let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
+
         if let Some(hash) = query.hash {
             let hash = TxnHash::from(hash);
             if hash.is_valid() {
                 return Ok(db.get_user_command(&hash, 0)?.map(|cmd| {
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands)
+                    Transaction::new(
+                        cmd,
+                        db,
+                        epoch_num_user_commands,
+                        total_num_user_commands,
+                        epoch_num_zkapp_commands,
+                        total_num_zkapp_commands,
+                    )
                 }));
             }
         }
+
         Ok(None)
     }
 
@@ -120,10 +142,14 @@ impl TransactionsQueryRoot {
         sort_by: Option<TransactionSortByInput>,
     ) -> Result<Vec<Transaction>> {
         use TransactionSortByInput::*;
-
         let db = db(ctx);
+
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
+
+        let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None)?;
+        let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
+
         let sort_by = sort_by.unwrap_or(TransactionSortByInput::BlockHeightDesc);
         let mut transactions = vec![];
 
@@ -154,36 +180,34 @@ impl TransactionsQueryRoot {
                 }
             };
             let iter = match (sort_by, query.zkapp) {
-                (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::From(
-                    &min.to_be_bytes(),
-                    Direction::Forward,
-                )),
+                (BlockHeightAsc, None | Some(false)) => db.user_commands_height_iterator(
+                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+                ),
                 (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
-                (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::From(
-                    &max.to_be_bytes(),
-                    Direction::Reverse,
-                )),
+                (BlockHeightDesc, None | Some(false)) => db.user_commands_height_iterator(
+                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+                ),
                 (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
-                (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
-                (GlobalSlotAsc | DateTimeAsc, None) => db.user_commands_slot_iterator(
-                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
-                ),
+                (GlobalSlotAsc | DateTimeAsc, None | Some(false)) => db
+                    .user_commands_slot_iterator(IteratorMode::From(
+                        &min.to_be_bytes(),
+                        Direction::Forward,
+                    )),
                 (GlobalSlotAsc | DateTimeAsc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
                 ),
-                (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
-                (GlobalSlotDesc | DateTimeDesc, None) => db.user_commands_slot_iterator(
-                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
-                ),
+                (GlobalSlotDesc | DateTimeDesc, None | Some(false)) => db
+                    .user_commands_slot_iterator(IteratorMode::From(
+                        &max.to_be_bytes(),
+                        Direction::Reverse,
+                    )),
                 (GlobalSlotDesc | DateTimeDesc, Some(true)) => db.zkapp_commands_slot_iterator(
                     IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
                 ),
-                (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
             };
 
             for (key, _) in iter.flatten() {
@@ -196,11 +220,19 @@ impl TransactionsQueryRoot {
 
                 let txn_hash = user_commands_iterator_txn_hash(&key)?;
                 let state_hash = state_hash_suffix(&key)?;
+
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                let txn = Transaction::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
+                );
+
                 if query.matches(&txn) {
                     transactions.push(txn);
 
@@ -224,6 +256,8 @@ impl TransactionsQueryRoot {
                             db,
                             epoch_num_user_commands,
                             total_num_user_commands,
+                            epoch_num_zkapp_commands,
+                            total_num_zkapp_commands,
                         );
                         if query.matches(&txn) {
                             transactions.push(txn);
@@ -307,8 +341,14 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                let txn = Transaction::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
+                );
                 if query.matches(&txn) {
                     transactions.push(txn);
 
@@ -362,8 +402,14 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("command at txn hash and state hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                let txn = Transaction::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
+                );
 
                 // include matching txns
                 if query.matches(&txn) {
@@ -466,8 +512,14 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                let txn = Transaction::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
+                );
 
                 if query.matches(&txn) {
                     transactions.push(txn);
@@ -578,8 +630,14 @@ impl TransactionsQueryRoot {
                 let cmd = db
                     .get_user_command_state_hash(&txn_hash, &state_hash)?
                     .expect("txn at hash");
-                let txn =
-                    Transaction::new(cmd, db, epoch_num_user_commands, total_num_user_commands);
+                let txn = Transaction::new(
+                    cmd,
+                    db,
+                    epoch_num_user_commands,
+                    total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
+                );
 
                 if query.matches(&txn) {
                     transactions.push(txn);
@@ -593,26 +651,26 @@ impl TransactionsQueryRoot {
         }
 
         let iter = match (sort_by, query.as_ref().and_then(|q| q.zkapp)) {
-            (BlockHeightAsc, None) => db.user_commands_height_iterator(IteratorMode::Start),
+            (BlockHeightAsc, None | Some(false)) => {
+                db.user_commands_height_iterator(IteratorMode::Start)
+            }
             (BlockHeightAsc, Some(true)) => db.zkapp_commands_height_iterator(IteratorMode::Start),
-            (BlockHeightAsc, Some(false)) => todo!("non-zkapp transactions"),
-            (BlockHeightDesc, None) => db.user_commands_height_iterator(IteratorMode::End),
+            (BlockHeightDesc, None | Some(false)) => {
+                db.user_commands_height_iterator(IteratorMode::End)
+            }
             (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(IteratorMode::End),
-            (BlockHeightDesc, Some(false)) => todo!("non-zkapp transactions"),
-            (GlobalSlotAsc | DateTimeAsc, None) => {
+            (GlobalSlotAsc | DateTimeAsc, None | Some(false)) => {
                 db.user_commands_slot_iterator(IteratorMode::Start)
             }
             (GlobalSlotAsc | DateTimeAsc, Some(true)) => {
                 db.zkapp_commands_slot_iterator(IteratorMode::Start)
             }
-            (GlobalSlotAsc | DateTimeAsc, Some(false)) => todo!("non-zkapp transactions"),
-            (GlobalSlotDesc | DateTimeDesc, None) => {
+            (GlobalSlotDesc | DateTimeDesc, None | Some(false)) => {
                 db.user_commands_slot_iterator(IteratorMode::End)
             }
             (GlobalSlotDesc | DateTimeDesc, Some(true)) => {
                 db.zkapp_commands_slot_iterator(IteratorMode::End)
             }
-            (GlobalSlotDesc | DateTimeDesc, Some(false)) => todo!("non-zkapp transactions"),
         };
 
         for (key, _) in iter.flatten() {
@@ -643,6 +701,8 @@ impl TransactionsQueryRoot {
                 db,
                 epoch_num_user_commands,
                 total_num_user_commands,
+                epoch_num_zkapp_commands,
+                total_num_zkapp_commands,
             );
 
             if query.as_ref().map_or(true, |q| q.matches(&txn)) {
@@ -739,6 +799,8 @@ impl Transaction {
         db: &Arc<IndexerStore>,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
+        epoch_num_zkapp_commands: u32,
+        total_num_zkapp_commands: u32,
     ) -> Transaction {
         let block_state_hash = cmd.state_hash.to_owned();
         let block_date_time = date_time_to_scalar(cmd.date_time as i64);
@@ -748,6 +810,8 @@ impl Transaction {
                 get_block_canonicity(db, &block_state_hash),
                 epoch_num_user_commands,
                 total_num_user_commands,
+                epoch_num_zkapp_commands,
+                total_num_zkapp_commands,
             ),
             block: TransactionBlock {
                 date_time: block_date_time,
@@ -763,9 +827,12 @@ impl TransactionWithoutBlock {
         canonical: bool,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
+        epoch_num_zkapp_commands: u32,
+        total_num_zkapp_commands: u32,
     ) -> Self {
         let zkapp = cmd.is_zkapp_command();
         let receiver = cmd.command.receiver_pk();
+
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
             CommandStatusData::Failed(failed_types, _) => {
@@ -795,6 +862,8 @@ impl TransactionWithoutBlock {
             token: cmd.command.fee_token().map(|t| t.0),
             epoch_num_user_commands,
             total_num_user_commands,
+            epoch_num_zkapp_commands,
+            total_num_zkapp_commands,
         }
     }
 }
