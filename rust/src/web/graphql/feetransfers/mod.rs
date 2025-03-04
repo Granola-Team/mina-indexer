@@ -65,15 +65,23 @@ impl FeetransferWithMeta {
 
     async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
         let db = db(ctx);
+
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
+        let total_num_blocks = db.get_block_production_total_count()?;
+
         let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
+        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
+
         let epoch_num_supercharged_blocks =
             db.get_block_production_supercharged_epoch_count(None)?;
-        let total_num_blocks = db.get_block_production_total_count()?;
-        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
         let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
+
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
+
+        let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None)?;
+        let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
+
         let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
         if let Some(block) = self.block.clone() {
@@ -82,6 +90,9 @@ impl FeetransferWithMeta {
                 .unwrap_or_default();
             let block_num_user_commands = db
                 .get_block_user_commands_count(&block.state_hash())?
+                .unwrap_or_default();
+            let block_num_zkapp_commands = db
+                .get_block_zkapp_commands_count(&block.state_hash())?
                 .unwrap_or_default();
             let block_num_internal_commands = db
                 .get_block_internal_commands_count(&block.state_hash())?
@@ -92,6 +103,8 @@ impl FeetransferWithMeta {
                     self.canonical,
                     epoch_num_user_commands,
                     total_num_user_commands,
+                    epoch_num_zkapp_commands,
+                    total_num_zkapp_commands,
                 ),
                 canonical: self.canonical,
                 epoch_num_blocks,
@@ -102,6 +115,7 @@ impl FeetransferWithMeta {
                 total_num_supercharged_blocks,
                 block_num_snarks,
                 block_num_user_commands,
+                block_num_zkapp_commands,
                 block_num_internal_commands,
                 epoch_num_slots_produced,
                 num_unique_block_producers_last_n_blocks: None,
