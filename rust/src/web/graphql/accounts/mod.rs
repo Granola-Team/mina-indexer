@@ -75,6 +75,12 @@ pub struct Account {
     #[graphql(name = "pk_total_num_user_commands")]
     pk_total_num_user_commands: u32,
 
+    #[graphql(name = "pk_epoch_num_zkapp_commands")]
+    pk_epoch_num_zkapp_commands: u32,
+
+    #[graphql(name = "pk_total_num_zkapp_commands")]
+    pk_total_num_zkapp_commands: u32,
+
     #[graphql(name = "pk_epoch_num_internal_commands")]
     pk_epoch_num_internal_commands: u32,
 
@@ -121,8 +127,9 @@ impl AccountQueryRoot {
                         Ok(None) | Err(_) => None,
                         Ok(Some(username)) => Some(username.0),
                     };
+
                     if query.as_ref().unwrap().matches(acct, username.as_ref()) {
-                        Some(Account::from((
+                        return Some(Account::from((
                             acct.clone(),
                             db.get_block_production_pk_epoch_count(&pk, None)
                                 .expect("pk epoch block count"),
@@ -136,15 +143,19 @@ impl AccountQueryRoot {
                                 .expect("pk epoch user command count"),
                             db.get_user_commands_pk_total_count(&pk)
                                 .expect("pk total user command count"),
+                            db.get_zkapp_commands_pk_epoch_count(&pk, None)
+                                .expect("pk epoch zkapp command count"),
+                            db.get_zkapp_commands_pk_total_count(&pk)
+                                .expect("pk total zkapp command count"),
                             db.get_internal_commands_pk_epoch_count(&pk, None)
                                 .expect("pk epoch internal command count"),
                             db.get_internal_commands_pk_total_count(&pk)
                                 .expect("pk total internal command count"),
                             username,
-                        )))
-                    } else {
-                        None
+                        )));
                     }
+
+                    None
                 })
                 .collect());
         }
@@ -192,6 +203,10 @@ impl AccountQueryRoot {
                         .expect("pk epoch user command count"),
                     db.get_user_commands_pk_total_count(&pk)
                         .expect("pk total user command count"),
+                    db.get_zkapp_commands_pk_epoch_count(&pk, None)
+                        .expect("pk epoch zkapp command count"),
+                    db.get_zkapp_commands_pk_total_count(&pk)
+                        .expect("pk total zkapp command count"),
                     db.get_internal_commands_pk_epoch_count(&pk, None)
                         .expect("pk epoch internal command count"),
                     db.get_internal_commands_pk_total_count(&pk)
@@ -302,28 +317,32 @@ impl AccountQueryInput {
 impl
     From<(
         account::Account,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
-        u32,
+        u32, // pk epoch num blocks
+        u32, // pk total num blocks
+        u32, // pk epoch num snarks
+        u32, // pk total num snarks
+        u32, // pk epoch num user commands
+        u32, // pk total num user commands
+        u32, // pk epoch num zkapp commands
+        u32, // pk total num zkapp commands
+        u32, // pk epoch num internal commands
+        u32, // pk total num internal commands
         Option<String>,
     )> for Account
 {
     fn from(
         account: (
             account::Account,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
-            u32,
+            u32, // pk epoch num blocks
+            u32, // pk total num blocks
+            u32, // pk epoch num snarks
+            u32, // pk total num snarks
+            u32, // pk epoch num user commands
+            u32, // pk total num user commands
+            u32, // pk epoch num zkapp commands
+            u32, // pk total num zkapp commands
+            u32, // pk epoch num internal commands
+            u32, // pk total num internal commands
             Option<String>,
         ),
     ) -> Self {
@@ -346,9 +365,11 @@ impl
             pk_total_num_snarks: account.4,
             pk_epoch_num_user_commands: account.5,
             pk_total_num_user_commands: account.6,
-            pk_epoch_num_internal_commands: account.7,
-            pk_total_num_internal_commands: account.8,
-            username: account.9.or(Some("Unknown".to_string())),
+            pk_epoch_num_zkapp_commands: account.7,
+            pk_total_num_zkapp_commands: account.8,
+            pk_epoch_num_internal_commands: account.9,
+            pk_total_num_internal_commands: account.10,
+            username: account.11.or(Some("Unknown".to_string())),
         }
     }
 }

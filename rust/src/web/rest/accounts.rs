@@ -20,12 +20,28 @@ use std::sync::Arc;
 struct Account {
     #[serde(flatten)]
     account: account::Account,
+
+    // accounts
+    total_num_accounts: u32,
+    total_num_zkapp_accounts: u32,
+
+    // blocks
     epoch_num_blocks: u32,
     total_num_blocks: u32,
+
+    // SNARKs
     epoch_num_snarks: u32,
     total_num_snarks: u32,
+
+    // all user commands
     epoch_num_user_commands: u32,
     total_num_user_commands: u32,
+
+    // zkapp user commands
+    epoch_num_zkapp_commands: u32,
+    total_num_zkapp_commands: u32,
+
+    // internal commands
     epoch_num_internal_commands: u32,
     total_num_internal_commands: u32,
 }
@@ -42,19 +58,45 @@ pub async fn get_account(
         debug!("Found account in ledger: {account}");
 
         let account = Account {
-            account: account.clone(),
+            account,
+
+            // accounts
+            total_num_accounts: db
+                .get_num_accounts()
+                .expect("num accounts")
+                .unwrap_or_default(),
+            total_num_zkapp_accounts: db
+                .get_num_zkapp_accounts()
+                .expect("num zkapp accounts")
+                .unwrap_or_default(),
+
+            // blocks
             epoch_num_blocks: db
                 .get_block_production_pk_epoch_count(&pk, None)
                 .unwrap_or_default(),
             total_num_blocks: db
                 .get_block_production_pk_total_count(&pk)
                 .unwrap_or_default(),
+
+            // SNARKs
             epoch_num_snarks: db.get_snarks_pk_epoch_count(&pk, None).unwrap_or_default(),
             total_num_snarks: db.get_snarks_pk_total_count(&pk).unwrap_or_default(),
+
+            // all user commands
             epoch_num_user_commands: db
                 .get_user_commands_pk_epoch_count(&pk, None)
                 .unwrap_or_default(),
             total_num_user_commands: db.get_user_commands_pk_total_count(&pk).unwrap_or_default(),
+
+            // zkapp user commands
+            epoch_num_zkapp_commands: db
+                .get_zkapp_commands_pk_epoch_count(&pk, None)
+                .unwrap_or_default(),
+            total_num_zkapp_commands: db
+                .get_zkapp_commands_pk_total_count(&pk)
+                .unwrap_or_default(),
+
+            // internal commands
             epoch_num_internal_commands: db
                 .get_internal_commands_pk_epoch_count(&pk, None)
                 .unwrap_or_default(),
