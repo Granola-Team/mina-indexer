@@ -52,6 +52,10 @@ pub struct Block {
     #[graphql(name = "block_num_user_commands")]
     pub block_num_user_commands: u32,
 
+    /// Value block num zkapp commands
+    #[graphql(name = "block_num_zkapp_commands")]
+    pub block_num_zkapp_commands: u32,
+
     /// Value block num internal commands
     #[graphql(name = "block_num_internal_commands")]
     pub block_num_internal_commands: u32,
@@ -297,31 +301,48 @@ impl Block {
     pub fn from_precomputed(
         db: &std::sync::Arc<IndexerStore>,
         block: &PrecomputedBlock,
-        counts: [u32; 13],
+        counts: [u32; 15],
     ) -> Self {
         let state_hash = block.state_hash();
+        let canonical = get_block_canonicity(db, &state_hash);
+
         let epoch_num_blocks = counts[0];
         let epoch_num_canonical_blocks = counts[1];
         let epoch_num_supercharged_blocks = counts[2];
+
         let total_num_blocks = counts[3];
         let total_num_canonical_blocks = counts[4];
         let total_num_supercharged_blocks = counts[5];
+
         let epoch_num_user_commands = counts[8];
         let total_num_user_commands = counts[9];
-        let canonical = get_block_canonicity(db, &state_hash);
+
         let block_num_snarks = db
             .get_block_snarks_count(&state_hash)
             .expect("snark counts")
             .unwrap_or_default();
+
         let block_num_user_commands = db
             .get_block_user_commands_count(&state_hash)
             .expect("user command counts")
             .unwrap_or_default();
+
+        let block_num_zkapp_commands = db
+            .get_block_zkapp_commands_count(&state_hash)
+            .expect("zkapp command counts")
+            .unwrap_or_default();
+
         let block_num_internal_commands = db
             .get_block_internal_commands_count(&state_hash)
             .expect("internal command counts")
             .unwrap_or_default();
+
         let epoch_num_slots_produced = counts[12];
+
+        // zkapp command counts
+        let epoch_num_zkapp_commands = counts[13];
+        let total_num_zkapp_commands = counts[14];
+
         Self {
             canonical,
             epoch_num_blocks,
@@ -332,12 +353,15 @@ impl Block {
             total_num_supercharged_blocks,
             block_num_snarks,
             block_num_user_commands,
+            block_num_zkapp_commands,
             block_num_internal_commands,
             block: BlockWithoutCanonicity::new(
                 block,
                 canonical,
                 epoch_num_user_commands,
                 total_num_user_commands,
+                epoch_num_zkapp_commands,
+                total_num_zkapp_commands,
             ),
             epoch_num_slots_produced,
             num_unique_block_producers_last_n_blocks: None,
@@ -351,6 +375,8 @@ impl BlockWithoutCanonicity {
         canonical: bool,
         epoch_num_user_commands: u32,
         total_num_user_commands: u32,
+        epoch_num_zkapp_commands: u32,
+        total_num_zkapp_commands: u32,
     ) -> Self {
         let winner_account = block.block_creator().0;
         let date_time = millis_to_iso_date_string(block.timestamp() as i64);
@@ -425,6 +451,8 @@ impl BlockWithoutCanonicity {
                         canonical,
                         epoch_num_user_commands,
                         total_num_user_commands,
+                        epoch_num_zkapp_commands,
+                        total_num_zkapp_commands,
                     )
                 })
                 .collect();

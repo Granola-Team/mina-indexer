@@ -463,7 +463,6 @@ impl BlocksQueryRoot {
             if let Some(block_with_canonicity) = precomputed_matches_query(db, &query, &pcb, counts)
             {
                 blocks.push(block_with_canonicity);
-
                 if blocks.len() >= limit {
                     break;
                 }
@@ -723,7 +722,7 @@ fn precomputed_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<BlockQueryInput>,
     block: &PrecomputedBlock,
-    counts: [u32; 13],
+    counts: [u32; 15],
 ) -> Option<Block> {
     let block_with_canonicity = Block::from_precomputed(db, block, counts);
     if query
@@ -736,27 +735,40 @@ fn precomputed_matches_query(
     }
 }
 
-pub async fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 13]> {
+pub async fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
     let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
-    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
-    let epoch_num_supercharged_blocks = db.get_block_production_supercharged_epoch_count(None)?;
     let total_num_blocks = db.get_block_production_total_count()?;
+
+    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
     let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
+
+    let epoch_num_supercharged_blocks = db.get_block_production_supercharged_epoch_count(None)?;
     let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
+
     let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
     let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
+
     let epoch_num_user_commands = db
         .get_user_commands_epoch_count(None)
         .expect("epoch user command count");
     let total_num_user_commands = db
         .get_user_commands_total_count()
         .expect("total user command count");
+
+    let epoch_num_zkapp_commands = db
+        .get_zkapp_commands_epoch_count(None)
+        .expect("epoch zkapp command count");
+    let total_num_zkapp_commands = db
+        .get_zkapp_commands_total_count()
+        .expect("total zkapp command count");
+
     let epoch_num_internal_commands = db
         .get_internal_commands_epoch_count(None)
         .expect("epoch internal command count");
     let total_num_internal_commands = db
         .get_internal_commands_total_count()
         .expect("total internal command count");
+
     let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
     Ok([
@@ -773,5 +785,7 @@ pub async fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 13]> {
         epoch_num_internal_commands,
         total_num_internal_commands,
         epoch_num_slots_produced,
+        epoch_num_zkapp_commands,
+        total_num_zkapp_commands,
     ])
 }
