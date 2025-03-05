@@ -1,2 +1,0 @@
-ops/mina/mina_txn_hasher.exe filter=lfs diff=lfs merge=lfs -text
-rust/data/genesis_ledgers/hardfork.json.gz filter=lfs diff=lfs merge=lfs -text
