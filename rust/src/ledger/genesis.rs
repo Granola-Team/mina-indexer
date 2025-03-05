@@ -172,9 +172,15 @@ impl GenesisLedger {
     /// Hardfork genesis ledger
     pub fn new_v2() -> anyhow::Result<Self> {
         let bytes = include_bytes!("../../data/genesis_ledgers/hardfork.json.gz");
-        let root = decompress_gzip(bytes)?;
-        let root: GenesisRoot = serde_json::from_slice(&root)?;
-        Ok(root.into())
+        if let Ok(root) = decompress_gzip(bytes) {
+            if let Ok(root) = serde_json::from_slice::<GenesisRoot>(&root) {
+                Ok(root.into())
+            } else {
+                Err(anyhow::anyhow!("Failed to deserialize genesis ledger"))
+            }
+        } else {
+            Err(anyhow::anyhow!("Failed to decompress genesis ledger"))
+        }
     }
 
     /// This is the only way to construct a genesis ledger
