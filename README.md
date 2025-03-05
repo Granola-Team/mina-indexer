@@ -65,6 +65,7 @@ optimized for the Mina ecosystem.
 
 1. Install Nix (with Flakes) using [The Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer#the-determinate-nix-installer).
 1. Install and configure [Direnv](https://direnv.net).
+1. Enable git LFS and download files `git lfs install`, `git lfs pull`
 
 ### Execution Environment
 
