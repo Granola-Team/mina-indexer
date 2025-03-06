@@ -1811,6 +1811,7 @@ test_hurl_v2() {
 	# Create an array of v2 test files and their corresponding URLs
 	test_file_url_pairs=(
 		"$SRC/tests/hurl/v2/*.hurl" "http://localhost:$port/graphql"
+		"$SRC/tests/hurl/v2/tokens/*.hurl" "http://localhost:$port/graphql"
 		"$SRC/tests/hurl/v2/rest/summary.hurl" "http://localhost:$port/summary"
 	)
 
