@@ -110,7 +110,8 @@ pub trait BestLedgerStore {
 
     /// Iterator for balance-sorted best ledger accounts
     /// ```
-    /// {token}{balance}{pk} -> _
+    /// key: {token}{balance}{pk}
+    /// val: [Account] serde bytes
     /// where
     /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes
@@ -119,7 +120,8 @@ pub trait BestLedgerStore {
 
     /// Iterator for balance-sorted best ledger zkapp accounts
     /// ```
-    /// {token}{balance}{pk} -> _
+    /// key: {token}{balance}{pk}
+    /// val: [Account] serde bytes
     /// where
     /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes

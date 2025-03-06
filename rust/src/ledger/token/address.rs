@@ -67,10 +67,6 @@ impl std::str::FromStr for TokenAddress {
     }
 }
 
-/////////////////
-// conversions //
-/////////////////
-
 impl From<TokenId> for TokenAddress {
     fn from(value: TokenId) -> Self {
         let mut big_int = [0; 32];

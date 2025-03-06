@@ -321,8 +321,10 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
 
-        // initialize account counts
-        self.set_num_accounts(genesis_ledger.len() as u32)?;
+        // initialize account/token counts
+        let count = genesis_ledger.len() as u32;
+        self.set_num_accounts(count)?;
+        self.set_mina_token_holders_num(count)?;
 
         // initialize genesis token
         if let Some(token) = genesis_token {

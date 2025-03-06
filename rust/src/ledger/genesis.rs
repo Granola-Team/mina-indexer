@@ -350,13 +350,19 @@ mod tests {
 
     #[test]
     fn parse_v1() -> anyhow::Result<()> {
-        GenesisLedger::new_v1()?;
+        let v1 = GenesisLedger::new_v1()?;
+        let v1: Ledger = v1.into();
+
+        assert_eq!(v1.len(), 1676);
         Ok(())
     }
 
     #[test]
     fn parse_v2() -> anyhow::Result<()> {
-        GenesisLedger::new_v2()?;
+        let v2 = GenesisLedger::new_v2()?;
+        let v2: Ledger = v2.into();
+
+        assert_eq!(v2.len(), 228174);
         Ok(())
     }
 
