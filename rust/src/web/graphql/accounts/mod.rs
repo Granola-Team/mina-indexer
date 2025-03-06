@@ -10,7 +10,7 @@ use crate::{
     constants::MINA_TOKEN_ADDRESS,
     ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
-    store::username::UsernameStore,
+    store::{username::UsernameStore, IndexerStore},
     web::graphql::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -111,7 +111,7 @@ impl AccountQueryRoot {
         let db = db(ctx);
         let token = query
             .as_ref()
-            .map_or(TokenAddress::default(), |q| match q.token.to_owned() {
+            .map_or(TokenAddress::default(), |q| match q.token.as_ref() {
                 Some(token) => TokenAddress::new(token).expect("valid token address"),
                 None => TokenAddress::default(),
             });
@@ -129,30 +129,9 @@ impl AccountQueryRoot {
                     };
 
                     if query.as_ref().unwrap().matches(acct, username.as_ref()) {
-                        return Some(Account::from((
-                            acct.clone(),
-                            db.get_block_production_pk_epoch_count(&pk, None)
-                                .expect("pk epoch block count"),
-                            db.get_block_production_pk_total_count(&pk)
-                                .expect("pk total block count"),
-                            db.get_snarks_pk_epoch_count(&pk, None)
-                                .expect("pk epoch snark count"),
-                            db.get_snarks_pk_total_count(&pk)
-                                .expect("pk total snark count"),
-                            db.get_user_commands_pk_epoch_count(&pk, None)
-                                .expect("pk epoch user command count"),
-                            db.get_user_commands_pk_total_count(&pk)
-                                .expect("pk total user command count"),
-                            db.get_zkapp_commands_pk_epoch_count(&pk, None)
-                                .expect("pk epoch zkapp command count"),
-                            db.get_zkapp_commands_pk_total_count(&pk)
-                                .expect("pk total zkapp command count"),
-                            db.get_internal_commands_pk_epoch_count(&pk, None)
-                                .expect("pk epoch internal command count"),
-                            db.get_internal_commands_pk_total_count(&pk)
-                                .expect("pk total internal command count"),
-                            username,
-                        )));
+                        let account = Account::with_meta(db, acct.to_owned());
+
+                        return Some(account);
                     }
 
                     None
@@ -161,7 +140,6 @@ impl AccountQueryRoot {
         }
 
         // default query handler use balance-sorted accounts
-        let mut accounts = Vec::with_capacity(limit);
         let mode = match sort_by {
             Some(BalanceAsc) => IteratorMode::Start,
             Some(BalanceDesc) | None => IteratorMode::End,
@@ -176,6 +154,7 @@ impl AccountQueryRoot {
             // non-zkapp account only
             // Some(false) => todo!("non-zkapp account"),
         };
+        let mut accounts = Vec::with_capacity(limit);
 
         for (_, value) in iter {
             let account = serde_json::from_slice::<account::Account>(&value)?.display();
@@ -189,32 +168,42 @@ impl AccountQueryRoot {
                 .as_ref()
                 .map_or(true, |q| q.matches(&account, username.as_ref()))
             {
-                let account = Account::from((
+                let account_with_meta = AccountWithMeta {
                     account,
-                    db.get_block_production_pk_epoch_count(&pk, None)
+                    pk_epoch_num_blocks: db
+                        .get_block_production_pk_epoch_count(&pk, None)
                         .expect("pk epoch block count"),
-                    db.get_block_production_pk_total_count(&pk)
+                    pk_total_num_blocks: db
+                        .get_block_production_pk_total_count(&pk)
                         .expect("pk total block count"),
-                    db.get_snarks_pk_epoch_count(&pk, None)
+                    pk_epoch_num_snarks: db
+                        .get_snarks_pk_epoch_count(&pk, None)
                         .expect("pk epoch snark count"),
-                    db.get_snarks_pk_total_count(&pk)
+                    pk_total_num_snarks: db
+                        .get_snarks_pk_total_count(&pk)
                         .expect("pk total snark count"),
-                    db.get_user_commands_pk_epoch_count(&pk, None)
+                    pk_epoch_num_user_commands: db
+                        .get_user_commands_pk_epoch_count(&pk, None)
                         .expect("pk epoch user command count"),
-                    db.get_user_commands_pk_total_count(&pk)
+                    pk_total_num_user_commands: db
+                        .get_user_commands_pk_total_count(&pk)
                         .expect("pk total user command count"),
-                    db.get_zkapp_commands_pk_epoch_count(&pk, None)
+                    pk_epoch_num_zkapp_commands: db
+                        .get_zkapp_commands_pk_epoch_count(&pk, None)
                         .expect("pk epoch zkapp command count"),
-                    db.get_zkapp_commands_pk_total_count(&pk)
+                    pk_total_num_zkapp_commands: db
+                        .get_zkapp_commands_pk_total_count(&pk)
                         .expect("pk total zkapp command count"),
-                    db.get_internal_commands_pk_epoch_count(&pk, None)
+                    pk_epoch_num_internal_commands: db
+                        .get_internal_commands_pk_epoch_count(&pk, None)
                         .expect("pk epoch internal command count"),
-                    db.get_internal_commands_pk_total_count(&pk)
+                    pk_total_num_internal_commands: db
+                        .get_internal_commands_pk_total_count(&pk)
                         .expect("pk total internal command count"),
                     username,
-                ));
+                };
+                accounts.push(account_with_meta.into());
 
-                accounts.push(account);
                 if accounts.len() >= limit {
                     break;
                 }
@@ -314,62 +303,88 @@ impl AccountQueryInput {
     }
 }
 
-impl
-    From<(
-        account::Account,
-        u32, // pk epoch num blocks
-        u32, // pk total num blocks
-        u32, // pk epoch num snarks
-        u32, // pk total num snarks
-        u32, // pk epoch num user commands
-        u32, // pk total num user commands
-        u32, // pk epoch num zkapp commands
-        u32, // pk total num zkapp commands
-        u32, // pk epoch num internal commands
-        u32, // pk total num internal commands
-        Option<String>,
-    )> for Account
-{
-    fn from(
-        account: (
-            account::Account,
-            u32, // pk epoch num blocks
-            u32, // pk total num blocks
-            u32, // pk epoch num snarks
-            u32, // pk total num snarks
-            u32, // pk epoch num user commands
-            u32, // pk total num user commands
-            u32, // pk epoch num zkapp commands
-            u32, // pk total num zkapp commands
-            u32, // pk epoch num internal commands
-            u32, // pk total num internal commands
-            Option<String>,
-        ),
-    ) -> Self {
+pub struct AccountWithMeta {
+    pub account: account::Account,
+    pub pk_epoch_num_blocks: u32,
+    pub pk_total_num_blocks: u32,
+    pub pk_epoch_num_snarks: u32,
+    pub pk_total_num_snarks: u32,
+    pub pk_epoch_num_user_commands: u32,
+    pub pk_total_num_user_commands: u32,
+    pub pk_epoch_num_zkapp_commands: u32,
+    pub pk_total_num_zkapp_commands: u32,
+    pub pk_epoch_num_internal_commands: u32,
+    pub pk_total_num_internal_commands: u32,
+    pub username: Option<String>,
+}
+
+impl Account {
+    pub fn with_meta(db: &std::sync::Arc<IndexerStore>, account: account::Account) -> Self {
+        let pk = &account.public_key;
+        AccountWithMeta {
+            username: account.username.as_ref().map(ToString::to_string),
+            pk_epoch_num_blocks: db
+                .get_block_production_pk_epoch_count(pk, None)
+                .expect("pk epoch block count"),
+            pk_total_num_blocks: db
+                .get_block_production_pk_total_count(pk)
+                .expect("pk total block count"),
+            pk_epoch_num_snarks: db
+                .get_snarks_pk_epoch_count(pk, None)
+                .expect("pk epoch snark count"),
+            pk_total_num_snarks: db
+                .get_snarks_pk_total_count(pk)
+                .expect("pk total snark count"),
+            pk_epoch_num_user_commands: db
+                .get_user_commands_pk_epoch_count(pk, None)
+                .expect("pk epoch user command count"),
+            pk_total_num_user_commands: db
+                .get_user_commands_pk_total_count(pk)
+                .expect("pk total user command count"),
+            pk_epoch_num_zkapp_commands: db
+                .get_zkapp_commands_pk_epoch_count(pk, None)
+                .expect("pk epoch zkapp command count"),
+            pk_total_num_zkapp_commands: db
+                .get_zkapp_commands_pk_total_count(pk)
+                .expect("pk total zkapp command count"),
+            pk_epoch_num_internal_commands: db
+                .get_internal_commands_pk_epoch_count(pk, None)
+                .expect("pk epoch internal command count"),
+            pk_total_num_internal_commands: db
+                .get_internal_commands_pk_total_count(pk)
+                .expect("pk total internal command count"),
+            account,
+        }
+        .into()
+    }
+}
+
+impl From<AccountWithMeta> for Account {
+    fn from(account: AccountWithMeta) -> Self {
         Self {
-            public_key: account.0.public_key.0,
-            delegate: account.0.delegate.0,
-            nonce: account.0.nonce.map_or(0, |n| n.0),
-            balance: account.0.balance.0,
-            time_locked: account.0.timing.is_some(),
-            timing: account.0.timing.map(Into::into),
-            is_genesis_account: account.0.genesis_account,
+            public_key: account.account.public_key.0,
+            delegate: account.account.delegate.0,
+            nonce: account.account.nonce.map_or(0, |n| n.0),
+            balance: account.account.balance.0,
+            time_locked: account.account.timing.is_some(),
+            timing: account.account.timing.map(Into::into),
+            is_genesis_account: account.account.genesis_account,
             token: account
-                .0
+                .account
                 .token
                 .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
-            zkapp: account.0.zkapp.map(Into::into),
-            pk_epoch_num_blocks: account.1,
-            pk_total_num_blocks: account.2,
-            pk_epoch_num_snarks: account.3,
-            pk_total_num_snarks: account.4,
-            pk_epoch_num_user_commands: account.5,
-            pk_total_num_user_commands: account.6,
-            pk_epoch_num_zkapp_commands: account.7,
-            pk_total_num_zkapp_commands: account.8,
-            pk_epoch_num_internal_commands: account.9,
-            pk_total_num_internal_commands: account.10,
-            username: account.11.or(Some("Unknown".to_string())),
+            zkapp: account.account.zkapp.map(Into::into),
+            pk_epoch_num_blocks: account.pk_epoch_num_blocks,
+            pk_total_num_blocks: account.pk_total_num_blocks,
+            pk_epoch_num_snarks: account.pk_epoch_num_snarks,
+            pk_total_num_snarks: account.pk_total_num_snarks,
+            pk_epoch_num_user_commands: account.pk_epoch_num_user_commands,
+            pk_total_num_user_commands: account.pk_total_num_user_commands,
+            pk_epoch_num_zkapp_commands: account.pk_epoch_num_zkapp_commands,
+            pk_total_num_zkapp_commands: account.pk_total_num_zkapp_commands,
+            pk_epoch_num_internal_commands: account.pk_epoch_num_internal_commands,
+            pk_total_num_internal_commands: account.pk_total_num_internal_commands,
+            username: account.username.or(Some("Unknown".to_string())),
         }
     }
 }
