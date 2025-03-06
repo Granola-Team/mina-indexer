@@ -527,6 +527,21 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-tokens column family exists")
     }
 
+    /// #### CF for sorting tokens by supply
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{supply}
+    /// - val: [Token] serde bytes
+    /// where
+    /// - token:  [TokenAddress] bytes
+    /// - supply: [u64] BE bytes
+    fn zkapp_tokens_supply_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-supply-sort")
+            .expect("zkapp-tokens-supply-sort column family exists")
+    }
+
     /// #### CF for storing tokens at indexes
     ///
     /// Key-value pairs
@@ -587,12 +602,12 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-tokens-symbol column family exists")
     }
 
-    /// #### CF for storing token holders
+    /// #### CF for storing holders per token
     ///
     /// Key-value pairs
     /// ```
     /// - key: {token}{index}
-    /// - val: [TokenHolder] serde bytes
+    /// - val: [Account] serde bytes
     /// where
     /// - token: [TokenAddress] bytes
     /// - index: [u32] BE bytes
@@ -634,7 +649,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {pk}{index}
-    /// - val: [TokenHolder] serde bytes
+    /// - val: [Account] serde bytes
     /// where
     /// - pk:    [PublicKey] bytes
     /// - index: [u32] BE bytes
@@ -955,11 +970,13 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for sorting best ledger accounts by balance
     /// ```
     /// key: {token}{balance}{pk}
-    /// val: b""
+    /// val: [Account] serde bytes
     /// where
     /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use []
     fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("best-ledger-account-balance-sort")
@@ -982,7 +999,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for sorting zkapp best ledger accounts by balance
     /// ```
     /// key: {token}{balance}{pk}
-    /// val: b""
+    /// val: [Account] serde bytes
     /// where
     /// - token:   [TokenAddress] bytes
     /// - balance: [u64] BE bytes

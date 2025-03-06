@@ -185,6 +185,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing tokens
     fn zkapp_tokens_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting tokens by supply
+    fn zkapp_tokens_supply_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for storing token indexes
     fn zkapp_tokens_index_cf(&self) -> &ColumnFamily;
 

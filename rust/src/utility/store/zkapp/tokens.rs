@@ -1,7 +1,9 @@
 //! Zkapp tokens store key helpers
 
 use crate::{
-    base::public_key::PublicKey, ledger::token::TokenAddress, utility::store::common::U32_LEN,
+    base::public_key::PublicKey,
+    ledger::token::TokenAddress,
+    utility::store::common::{U32_LEN, U64_LEN},
 };
 
 /// Use with [zkapp_tokens_holder_cf]
@@ -86,6 +88,25 @@ pub fn zkapp_tokens_historical_pk_diffs_key(
     index: u32,
 ) -> [u8; PublicKey::LEN + U32_LEN] {
     zkapp_tokens_pk_key(pk, index)
+}
+
+/// Use with [zkapp_tokens_supply_sort_cf]
+pub fn zkapp_tokens_supply_sort_key(
+    supply: u64,
+    token: &TokenAddress,
+) -> [u8; U64_LEN + TokenAddress::LEN] {
+    let mut key = [0; U64_LEN + TokenAddress::LEN];
+
+    key[..U64_LEN].copy_from_slice(&supply.to_be_bytes());
+    key[U64_LEN..].copy_from_slice(token.0.as_bytes());
+
+    key
+}
+
+/// Use with [zkapp_tokens_supply_sort_cf]
+pub fn zkapp_tokens_supply_sort_key_token(bytes: &[u8]) -> TokenAddress {
+    TokenAddress::from_bytes(bytes[U64_LEN..].to_vec())
+        .expect("token address from zkapp_tokens_supply_sort_key")
 }
 
 #[cfg(test)]
