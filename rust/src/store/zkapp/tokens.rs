@@ -3,11 +3,13 @@
 use crate::{
     base::{amount::Amount, public_key::PublicKey},
     ledger::{
+        account::Account,
         diff::token::TokenDiff,
-        token::{holder::TokenHolder, Token, TokenAddress, TokenSymbol},
+        token::{Token, TokenAddress, TokenSymbol},
     },
     store::Result,
 };
+use speedb::{DBIterator, Direction};
 
 pub trait ZkappTokenStore {
     /// Set a token
@@ -55,20 +57,23 @@ pub trait ZkappTokenStore {
     // Token holder info //
     ///////////////////////
 
-    /// Get the number of token holders
+    /// Set the count of MINA token holders
+    fn set_mina_token_holders_num(&self, num: u32) -> Result<()>;
+
+    /// Get the count of token holders
     fn get_token_holders_num(&self, token: &TokenAddress) -> Result<Option<u32>>;
 
     /// Get the token holder at `index`
-    fn get_token_holder(&self, token: &TokenAddress, index: u32) -> Result<Option<TokenHolder>>;
+    fn get_token_holder(&self, token: &TokenAddress, index: u32) -> Result<Option<Account>>;
 
     /// Get the token holder's index
     fn get_token_holder_index(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>>;
 
     /// Get the list of all token holders for the specified token
-    fn get_token_holders(&self, token: &TokenAddress) -> Result<Option<Vec<TokenHolder>>>;
+    fn get_token_holders(&self, token: &TokenAddress) -> Result<Option<Vec<Account>>>;
 
-    /// Get the list of tokens held by `pk`
-    fn get_tokens_held(&self, pk: &PublicKey) -> Result<Vec<TokenHolder>>;
+    /// Get the list of token accounts held by `pk`
+    fn get_tokens_held(&self, pk: &PublicKey) -> Result<Vec<Account>>;
 
     ///////////////////////////
     // Historical token info //
@@ -126,11 +131,39 @@ pub trait ZkappTokenStore {
     fn get_token_pk_index(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<u32>>;
 
     /// Get the token held by `pk` at `index`
-    fn get_token_pk(&self, pk: &PublicKey, index: u32) -> Result<Option<TokenHolder>>;
+    fn get_token_pk(&self, pk: &PublicKey, index: u32) -> Result<Option<Account>>;
 
     /// Remove & return last applied token diff: `Some(count, token diff)`
     fn remove_last_token_diff(&self, token: &TokenAddress) -> Result<Option<(u32, TokenDiff)>>;
 
     /// Remove & return last applied pk token diff: `Some(count, token diff)`
     fn remove_last_pk_token_diff(&self, pk: &PublicKey) -> Result<Option<(u32, TokenDiff)>>;
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    /// Iterator for all tokens
+    /// ```
+    /// key: [u32] BE bytes
+    /// val: [Token] serde bytes
+    fn token_iterator(&self) -> DBIterator<'_>;
+
+    /// Iterator for supply-sorted tokens
+    /// ```
+    /// key: {supply}{token}
+    /// val: [Token] serde bytes
+    /// where
+    /// - supply: [u64] BE bytes
+    /// - token:  [TokenAddress] bytes
+    fn token_supply_iterator(&self, supply: Option<u64>, direction: Direction) -> DBIterator<'_>;
+
+    /// Iterator for holder-specific token accounts
+    /// ```
+    /// key: {pk}{index}
+    /// val: [Account] serde bytes
+    /// where
+    /// - supply: [u64] BE bytes
+    /// - token:  [TokenAddress] bytes
+    fn tokens_pk_iterator(&self, pk: &PublicKey) -> DBIterator<'_>;
 }
