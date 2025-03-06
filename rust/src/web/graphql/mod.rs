@@ -12,6 +12,7 @@ pub mod gen;
 pub mod snarks;
 pub mod staged_ledgers;
 pub mod stakes;
+pub mod tokens;
 pub mod top_snarkers;
 pub mod top_stakers;
 pub mod transactions;
@@ -44,6 +45,7 @@ pub struct Root(
     feetransfers::FeetransferQueryRoot,
     snarks::SnarkQueryRoot,
     staged_ledgers::StagedLedgerQueryRoot,
+    tokens::TokensQueryRoot,
     top_stakers::TopStakersQueryRoot,
     top_snarkers::TopSnarkersQueryRoot,
     version::VersionQueryRoot,
