@@ -24,7 +24,8 @@ alias bt := dev
 alias btc := dev-continue
 
 # Test
-alias tu := test-unit
+alias test-unit := test-unit-tier2
+alias tu := test-unit-tier2
 alias t1 := tier1
 alias t2 := tier2
 alias t3 := tier3-dev
@@ -226,15 +227,10 @@ test-unit-tier1 test='':
   @echo "--- Performing tier 1 unit test(s)"
   cd rust && time cargo nextest run {{test}}
 
-# Run all feature unit test(s).
+# Run all feature unit tests (debug build).
 test-unit-tier2 test='':
   @echo "--- Performing all feature unit test(s)"
   cd rust && time cargo nextest run --all-features {{test}}
-
-# Run all feature unit tests (debug build).
-test-unit:
-  @echo "--- Performing all feature unit tests"
-  cd rust && time cargo nextest run --all-features
 
 #
 # Tier 1 tests
