@@ -73,6 +73,7 @@
           biome
           cargo-audit
           cargo-machete
+          cargo-nextest
           curl
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
