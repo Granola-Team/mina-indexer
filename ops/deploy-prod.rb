@@ -27,8 +27,7 @@ system(
 #
 if File.exist? CURRENT
 
-  # The version expected to be currently running is the one given in the fille
-  # CURRENT.
+  # The version expected to be currently running is the one given in CURRENT
   #
   current = File.read(CURRENT)
 

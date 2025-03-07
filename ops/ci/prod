@@ -2,4 +2,5 @@
 # (Buildkite) 'command' for production deployment.
 
 git lfs pull
+# The argument to "just deploy-local-prod" is the number of blocks to use.
 nix develop --command just deploy-local-prod 430399
