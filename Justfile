@@ -125,7 +125,10 @@ check:
 #
 
 # Perform a nix (release) build
-nix-build:
+nix-build: clippy test-unit-tier2 nix-build-no-checks
+
+# Perform a nix (release) build with no checks
+nix-build-no-checks:
   @echo "--- Performing Nix build"
   nom build
 

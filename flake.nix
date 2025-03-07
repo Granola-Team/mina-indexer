@@ -158,11 +158,7 @@
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
             '';
-            checkPhase = ''
-              set -ex
-              cargo clippy --all-targets --all-features -- -D warnings
-              cargo nextest run --release --all-features
-            '';
+            checkPhase = false;
             preInstall = "mkdir -p $out/var/log/mina-indexer";
           };
 
