@@ -47,7 +47,6 @@
 
       buildDependencies = with pkgs;
         [
-          cargo-nextest
           clang
           libclang.lib
           pkg-config
@@ -158,7 +157,7 @@
               export GIT_COMMIT_HASH=${gitCommitHash}
               cd rust
             '';
-            checkPhase = false;
+            doCheck = false;
             preInstall = "mkdir -p $out/var/log/mina-indexer";
           };
 
