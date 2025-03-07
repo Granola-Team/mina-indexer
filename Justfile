@@ -77,13 +77,17 @@ audit:
   @echo "--- Performing Cargo audit"
   cd rust && time cargo audit
 
-lint:
+lint: clippy
   @echo "--- Linting ops scripts"
   ruby -cw ops/*.rb
   standardrb --no-fix ops/*.rb
   shellcheck tests/regression.bash
   @echo "--- Linting Nix configs"
   alejandra --check flake.nix ops/mina/mina_txn_hasher.nix
+  @echo "--- Linting Cargo dependencies"
+  cd rust && cargo machete
+
+clippy:
   @echo "--- Linting Rust code"
   cd rust && time cargo clippy --all-targets --all-features \
     -- \
@@ -101,8 +105,6 @@ lint:
   # -Dclippy::cargo_common_metadata
   # -Dclippy::pedantic
   # -Dclippy::wildcard_imports
-  @echo "--- Linting Cargo dependencies"
-  cd rust && cargo machete
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1
