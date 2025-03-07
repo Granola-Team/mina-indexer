@@ -3,6 +3,7 @@
 BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
 BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
 WEB_PORT = ARGV[2] || 8080  # optional web port for server
+SKIP_RETRY = ARGV[3] == "no-retry" # Flag to prevent retry loops, defaults to false
 
 DEPLOY_TYPE = "prod"
 require "#{__dir__}/ops-common"
@@ -17,11 +18,39 @@ config_log_dir
 
 puts "Fetching snapshot."
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
-system(
+
+snapshot_exists = system(
   "#{SRC_TOP}/ops/download-snapshot.sh",
   snapshot_name,
   BASE_DIR
-) || abort("Failed to download snapshot.")
+)
+
+if !snapshot_exists
+  puts "Snapshot download failed. Falling back to deploy-tier3.rb..."
+
+  # Call deploy-tier3.rb with the same arguments
+  tier3_result = system(
+    "#{__dir__}/deploy-tier3.rb",
+    BUILD_TYPE,
+    BLOCKS_COUNT.to_s,
+    WEB_PORT.to_s
+  )
+
+  if tier3_result
+    puts "deploy-tier3.rb completed successfully."
+
+    if !SKIP_RETRY
+      puts "Restarting deploy-prod.rb to use the newly created snapshot..."
+      # Restart deploy-prod with no-retry flag to prevent infinite loops
+      exec(__FILE__, BUILD_TYPE, BLOCKS_COUNT.to_s, WEB_PORT.to_s, "no-retry")
+    else
+      puts "Skipping deploy-prod restart as requested."
+      exit 0
+    end
+  else
+    abort("deploy-tier3.rb failed. Aborting deployment.")
+  end
+end
 
 # Terminate the current version, if any.
 #
