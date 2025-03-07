@@ -1,7 +1,7 @@
 #!/usr/bin/env -S ruby -w
 
 BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
-BLOCKS_COUNT = ARGV[1]      # number of blocks to deploy
+BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
 WEB_PORT = ARGV[2] || 8080  # optional web port for server
 
 DEPLOY_TYPE = "prod"
