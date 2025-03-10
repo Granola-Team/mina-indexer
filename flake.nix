@@ -78,7 +78,6 @@
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
           git-lfs
-          google-cloud-sdk # Required only to use O1's bucket.
           hurl
           jq
           just

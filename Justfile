@@ -203,13 +203,13 @@ clean-test:
 # Dev
 #
 
-# Download a mainnet PCB from the mina_network_block_data Google bucket
+# Download a specific mainnet PCB (based on height and state hash) from o1Labs' bucket
 download-mina-block height state_hash dir='.':
-  gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-{{state_hash}}.json" {{dir}}
+  ./ops/o1labs/download-mina-blocks.rb block {{height}} {{state_hash}} --dir {{dir}}
 
-# Download mainnet PCBs from the mina_network_block_data Google bucket
+# Download all mainnet PCBs (at a specific height) from o1Labs' bucket
 download-mina-blocks height dir='.':
-  gsutil -m cp -n "gs://mina_network_block_data/mainnet-{{height}}-*.json" {{dir}}
+  ./ops/o1labs/download-mina-blocks.rb blocks {{height}} --dir {{dir}}
 
 # Debug build and run regression tests
 dev subtest='': dev-build

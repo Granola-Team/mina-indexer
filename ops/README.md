@@ -90,9 +90,9 @@ Utility to download historical staking ledgers from MinaExplorer.com's Google Cl
 
 JSON list of known staking ledgers available. See [MinaExplorer docs](https://docs.minaexplorer.com/minaexplorer/data-archive).
 
-### `./o1-labs/download-mina-blocks.sh`
+### `./o1-labs/download-mina-blocks.rb`
 
-Downloads historical Mina PCBs from the O1Labs' [Google Cloud Storage bucket](https://storage.googleapis.com/storage/v1/b/mina_network_block_data/o?prefix=mainnet) using [gsutil](https://cloud.google.com/storage/docs/gsutil).
+Downloads historical Mina PCBs from o1Labs' [Google Cloud Storage bucket](https://storage.googleapis.com/storage/v1/b/mina_network_block_data/o?prefix=mainnet).
 
 ### `./rclone.conf`
 
