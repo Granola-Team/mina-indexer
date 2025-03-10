@@ -166,7 +166,11 @@ impl quickcheck::Arbitrary for TokenDiff {
 
 #[cfg(test)]
 impl TokenDiff {
-    fn arbitrary_with_pk(g: &mut quickcheck::Gen, pk: PublicKey) -> Self {
+    fn arbitrary_with_pk_max_supply(
+        g: &mut quickcheck::Gen,
+        pk: PublicKey,
+        amount: crate::base::amount::Amount,
+    ) -> Self {
         use quickcheck::Arbitrary;
 
         Self {
@@ -175,7 +179,20 @@ impl TokenDiff {
             diff: {
                 match u8::arbitrary(g) % 3 {
                     0 => TokenDiffType::Owner(pk),
-                    1 => TokenDiffType::Supply(i8::arbitrary(g) as i64),
+                    1 => {
+                        let supply_u8 = u8::arbitrary(g);
+
+                        let supply = if supply_u8 as u64 <= amount.0 {
+                            if bool::arbitrary(g) {
+                                -(supply_u8 as i64)
+                            } else {
+                                supply_u8 as i64
+                            }
+                        } else {
+                            supply_u8 as i64
+                        };
+                        TokenDiffType::Supply(supply)
+                    }
                     2 => TokenDiffType::Symbol(TokenSymbol::arbitrary(g)),
                     _ => unreachable!(),
                 }
@@ -183,12 +200,13 @@ impl TokenDiff {
         }
     }
 
-    pub fn arbitrary_with_address_pk(
+    pub fn arbitrary_with_address_pk_max_supply(
         g: &mut quickcheck::Gen,
         token: TokenAddress,
         pk: PublicKey,
+        amount: crate::base::amount::Amount,
     ) -> Self {
-        let mut diff = Self::arbitrary_with_pk(g, pk);
+        let mut diff = Self::arbitrary_with_pk_max_supply(g, pk, amount);
         diff.token = token;
 
         diff

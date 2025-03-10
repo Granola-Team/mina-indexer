@@ -1082,8 +1082,12 @@ mod tests {
         );
 
         // update with token0 diff for owner1
-        let token_diff =
-            TokenDiff::arbitrary_with_address_pk(g, token0.token.to_owned(), owner1.to_owned());
+        let token_diff = TokenDiff::arbitrary_with_address_pk_max_supply(
+            g,
+            token0.token.to_owned(),
+            owner1.to_owned(),
+            token0.supply,
+        );
 
         let new_token0 = store.apply_token_diff(&token_diff)?.unwrap();
         assert_eq!(new_token0.token, token0.token);
@@ -1133,8 +1137,16 @@ mod tests {
         assert_eq!(store.get_token_holders_num(&token0.token)?.unwrap(), 2);
         assert_eq!(
             vec![
-                (owner0.to_owned(), token0.token.to_owned(), token0.supply),
-                (owner1.to_owned(), token0.token.to_owned(), token0.supply,)
+                (
+                    owner0.to_owned(),
+                    token0.token.to_owned(),
+                    new_token0.supply
+                ),
+                (
+                    owner1.to_owned(),
+                    token0.token.to_owned(),
+                    new_token0.supply,
+                )
             ],
             store
                 .get_token_holders(&token0.token)?
