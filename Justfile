@@ -81,7 +81,7 @@ audit:
 lint: clippy
   @echo "--- Linting ops scripts"
   ruby -cw ops/*.rb
-  standardrb --no-fix ops/*.rb
+  standardrb --no-fix "ops/**/*.rb"
   shellcheck tests/regression.bash
   @echo "--- Linting Nix configs"
   alejandra --check flake.nix ops/mina/mina_txn_hasher.nix
@@ -109,7 +109,7 @@ clippy:
 
 format:
   cd rust && cargo {{nightly_if_required}} fmt --all > /dev/null 2>&1
-  # standardrb --fix ops/*.rb
+  standardrb --fix "ops/**/*.rb"
   shfmt --write ops/*.sh 2>&1 >/dev/null
   shfmt --write tests/*.sh 2>&1 >/dev/null
   shfmt --write tests/*.bash 2>&1 >/dev/null
