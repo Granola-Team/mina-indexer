@@ -3,6 +3,7 @@
 # -*- mode: ruby -*-
 
 require "json"
+require "fileutils"
 require "find"
 require "etc"
 
@@ -17,8 +18,8 @@ def remove_proofs(obj)
   end
 end
 
-# Process a single JSON file
-def process_file(path)
+# Process a single JSON file to remove proofs
+def process_json_file(path)
   json_data = JSON.parse(File.read(path))
 
   # Remove all occurrences of "proofs"
@@ -27,37 +28,80 @@ def process_file(path)
   # Overwrite the original file with compact JSON (single line)
   File.write(path, JSON.generate(json_data))
 
-  puts "Successfully removed 'proofs' from #{path}"
-rescue Errno::ENOENT
-  puts "File not found: #{path}"
+  if __FILE__ == $0
+    puts "Successfully removed 'proofs' from #{path}"
+  end
 rescue JSON::ParserError
   puts "Invalid JSON file: #{path}"
+rescue => e
+  puts "Error processing JSON file #{path}: #{e.message}"
 end
 
-# Process all JSON files in a directory
-def process_directory(directory)
-  thread_queue = Queue.new
-  threads = Array.new(Etc.nprocessors * 4) do
-    Thread.new do
-      while (path = thread_queue.pop)
-        process_file(path)
+# Process all JSON files in a directory (and its subdirectories)
+def process_directory(dir)
+  puts "Processing JSON files in #{dir}..."
+
+  # Find all JSON files in the directory and its subdirectories
+  json_files = []
+  Find.find(dir) do |path|
+    if FileTest.file?(path) && path.end_with?(".json")
+      json_files << path
+    end
+  end
+
+  if json_files.empty?
+    puts "No JSON files found in #{dir}"
+    return
+  end
+
+  puts "Found #{json_files.size} JSON files"
+
+  # Determine the number of worker threads based on CPU count
+  num_workers = Etc.nprocessors * 4
+  puts "Using #{num_workers} worker threads"
+
+  # Create a thread-safe queue for files to process
+  queue = Queue.new
+  json_files.each { |file| queue << file }
+
+  # Create worker threads to process files in parallel
+  threads = []
+  num_workers.times do
+    threads << Thread.new do
+      until queue.empty?
+        begin
+          file = queue.pop(true)
+          process_json_file(file)
+        rescue ThreadError
+          # Queue is empty
+          break
+        end
       end
     end
   end
 
-  # Feed files to queue as we find them
-  Find.find(directory) do |path|
-    thread_queue << path if path.end_with?(".json")
-  end
-
-  # Signal threads to finish
-  threads.size.times { thread_queue << nil }
-
   # Wait for all threads to complete
   threads.each(&:join)
+
+  puts "Finished processing all JSON files"
 end
 
-# Usage: ./remove_proofs_from_json_directory_compact.rb <directory>
-abort "Usage: #{$PROGRAM_NAME} <directory>" if ARGV.length != 1
+def main_remove_proofs_from_pcbs
+  if ARGV.empty?
+    puts "Usage: #{$0} DIRECTORY_OR_FILE [DIRECTORY_OR_FILE ...]"
+    exit 1
+  end
 
-process_directory(ARGV[0])
+  ARGV.each do |path|
+    if File.directory?(path)
+      process_directory(path)
+    elsif File.file?(path) && path.end_with?(".json")
+      process_json_file(path)
+    else
+      puts "Skipping #{path}: Not a JSON file or directory"
+    end
+  end
+end
+
+# Only execute main when this script is run directly, not when required
+main_remove_proofs_from_pcbs if __FILE__ == $0
