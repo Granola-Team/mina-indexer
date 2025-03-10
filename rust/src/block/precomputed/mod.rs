@@ -815,7 +815,10 @@ impl PrecomputedBlock {
                     .t
                     .supercharge_coinbase
             }
-            Self::V2(v2) => v2.protocol_state.body.consensus_state.supercharge_coinbase,
+            Self::V2(_) => {
+                // no supercharge rewards after hardfork
+                false
+            }
         }
     }
 

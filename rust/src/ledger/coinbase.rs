@@ -317,6 +317,18 @@ mod tests {
         };
 
         assert_eq!(Coinbase::from_precomputed(&block), expect);
+
+        let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-419989-3NKhZKc1HrEexmpvcbx4eqAtrsbwmfLXcjukF9CJ8Y2y7FEjFWg5.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let expect = Coinbase {
+            kind: CoinbaseKind::One(None),
+            receiver: PublicKey::from("B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw"),
+            supercharge: false,
+            is_new_account: false,
+            receiver_balance: None,
+        };
+
+        assert_eq!(Coinbase::from_precomputed(&block), expect);
         Ok(())
     }
 }
