@@ -8,7 +8,7 @@ use crate::{
     base::public_key::PublicKey,
     ledger::{
         diff::account::{PaymentDiff, UpdateType},
-        token::{Token, TokenSymbol},
+        token::TokenSymbol,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -30,30 +30,6 @@ pub enum TokenDiffType {
 //////////
 // impl //
 //////////
-
-impl TokenDiff {
-    pub fn aggregate(token: Token, diffs: &[&Self]) -> Token {
-        let mut token = token;
-
-        for TokenDiff {
-            public_key, diff, ..
-        } in diffs
-        {
-            if token.token != TokenAddress::default() {
-                token.owner = Some(public_key.to_owned());
-            }
-
-            use TokenDiffType::*;
-            match diff {
-                Supply(amt) => token.supply += *amt,
-                Owner(owner) => token.owner = Some(owner.to_owned()),
-                Symbol(symbol) => token.symbol = symbol.to_owned(),
-            }
-        }
-
-        token
-    }
-}
 
 impl TokenDiffType {
     pub fn amount(&self) -> u64 {
