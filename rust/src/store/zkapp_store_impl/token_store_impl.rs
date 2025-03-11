@@ -941,6 +941,54 @@ impl ZkappTokenStore for IndexerStore {
     }
 }
 
+#[cfg(test)]
+mod token_store_tests {
+    use crate::{
+        block::precomputed::PrecomputedBlock,
+        command::{UserCommandWithStatus, UserCommandWithStatusT},
+    };
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_token_symbol_parsed() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-359630-3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL.json");
+
+        let block: PrecomputedBlock = PrecomputedBlock::from_path(&path)?;
+        let commands = block.zkapp_commands();
+
+        // assert_eq!(commands.len(), 1);
+        let zkapp_command: &UserCommandWithStatus = commands.get(3).unwrap();
+
+        assert!(zkapp_command.is_zkapp_command());
+
+        match zkapp_command.clone() {
+            UserCommandWithStatus::V2(zkapp_command) => {
+                match zkapp_command.data.1.to_owned() {
+                    crate::mina_blocks::v2::staged_ledger_diff::UserCommandData::SignedCommandData(_) =>
+                        panic!("Unexpected command type"),
+                    crate::mina_blocks::v2::staged_ledger_diff::UserCommandData::ZkappCommandData(data) => {
+                        if let Some(account_update) = data.account_updates.first() {
+                            let token_symbol: crate::mina_blocks::v2::staged_ledger_diff::UpdateKind =
+                                account_update.clone().elt.account_update.body.update.token_symbol;
+                            match token_symbol {
+                                crate::mina_blocks::v2::staged_ledger_diff::UpdateKind::Keep(_) =>
+                                    panic!("Should have been Set"),
+                                crate::mina_blocks::v2::staged_ledger_diff::UpdateKind::Set((_, token_symbol)) => {
+                                    assert_eq!(token_symbol, "MINU");
+                                    Ok(()) // Return Ok(()) instead of just Ok(())
+                                },
+                            }
+                        } else {
+                            Err(anyhow::anyhow!("No account updates found")) // Add error return for empty case
+                        }
+                    },
+                }
+            }
+            _ => panic!("Unexpected command type"),
+        }
+    }
+}
+
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::Result;
