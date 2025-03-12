@@ -69,7 +69,7 @@ pub struct TransactionWithoutBlock {
     nonce: u32,
     receiver: PK,
     to: String,
-    token: Option<u64>,
+    tokens: Vec<u64>,
 
     /// Total number of user commands in the given epoch
     /// (default: current epoch)
@@ -859,7 +859,7 @@ impl TransactionWithoutBlock {
                 public_key: receiver.first().expect("receiver").0.to_owned(),
             },
             to: receiver.first().expect("receiver").0.to_owned(),
-            token: cmd.command.fee_token().map(|t| t.0),
+            tokens: cmd.command.token_ids(),
             epoch_num_user_commands,
             total_num_user_commands,
             epoch_num_zkapp_commands,
@@ -883,7 +883,7 @@ impl TransactionQueryInput {
             fee_gte,
             fee_lt,
             fee_lte,
-            fee_token,
+            fee_token: _,
             amount,
             amount_gt,
             amount_gte,
@@ -920,7 +920,7 @@ impl TransactionQueryInput {
             from_account: _,
             receiver: _,
             to_account: _,
-            token: _,
+            token,
             is_delegation: _,
         } = self;
         if let Some(state_hash) = block.as_ref().and_then(|b| b.state_hash.as_ref()) {
@@ -971,8 +971,8 @@ impl TransactionQueryInput {
             }
         }
 
-        if let Some(fee_token) = fee_token {
-            if transaction.transaction.token != Some(*fee_token) {
+        if let Some(token) = token {
+            if !transaction.transaction.tokens.contains(token) {
                 return false;
             }
         }

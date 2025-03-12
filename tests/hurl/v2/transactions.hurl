@@ -110,3 +110,34 @@ jsonpath "$.data.transactions[0].epoch_num_zkapp_commands" == 80
 jsonpath "$.data.transactions[0].total_num_zkapp_commands" == 80
 
 duration < 100
+
+#
+# Filter based on token ID
+#
+
+POST {{url}}
+```graphql
+{
+  transactions(
+    limit: 1
+    sortBy: BLOCKHEIGHT_DESC
+    query: {
+      canonical: true,
+      zkapp: false,
+      token: 1
+    }
+  ) {
+    tokens
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 1
+
+jsonpath "$.data.transactions[0].tokens" isCollection
+jsonpath "$.data.transactions[0].tokens[0]" == 1
+
+duration < 100

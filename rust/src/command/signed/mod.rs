@@ -218,18 +218,19 @@ impl SignedCommand {
         }
     }
 
-    pub fn token_id(&self) -> Option<u64> {
+    pub fn token_ids(&self) -> Vec<u64> {
         match self {
             Self::V1(v1) => {
                 use mina_rs::SignedCommandPayloadBody1::*;
                 match &v1.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(v1) => Some(v1.t.t.token_id.t.t.t),
-                    StakeDelegation(_v1) => None,
+                    PaymentPayload(v1) => vec![v1.t.t.token_id.t.t.t],
+                    StakeDelegation(_v1) => vec![],
                 }
             }
             Self::V2(v2) => match v2 {
-                UserCommandData::SignedCommandData(_) => Some(1), // MINA token
-                UserCommandData::ZkappCommandData(_) => None,
+                UserCommandData::SignedCommandData(_) => vec![1], // MINA token
+                UserCommandData::ZkappCommandData(_) => vec![],   /* TODO: find the tokens in
+                                                                    * the zkapp command data */
             },
         }
     }
