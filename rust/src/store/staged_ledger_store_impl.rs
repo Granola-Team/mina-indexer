@@ -9,7 +9,7 @@ use crate::{
         account::Account,
         diff::LedgerDiff,
         store::{best::BestLedgerStore, staged::StagedLedgerStore},
-        token::{Token, TokenAddress},
+        token::{Token, TokenAddress, TokenSymbol},
         Ledger, LedgerHash,
     },
     store::zkapp::tokens::ZkappTokenStore,
@@ -328,6 +328,11 @@ impl StagedLedgerStore for IndexerStore {
 
         // initialize genesis token
         if let Some(token) = genesis_token {
+            self.database.put_cf(
+                self.zkapp_tokens_symbol_cf(),
+                token.token.0.as_bytes(),
+                serde_json::to_vec(&TokenSymbol::mina())?,
+            )?;
             self.set_token(token)?;
         }
 

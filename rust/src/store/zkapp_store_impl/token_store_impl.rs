@@ -166,11 +166,13 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // set the token's symbol
-        self.database.put_cf(
-            self.zkapp_tokens_symbol_cf(),
-            token.token.0.as_bytes(),
-            serde_json::to_vec(&token.symbol)?,
-        )?;
+        if token.token.0 != MINA_TOKEN_ADDRESS {
+            self.database.put_cf(
+                self.zkapp_tokens_symbol_cf(),
+                token.token.0.as_bytes(),
+                serde_json::to_vec(&token.symbol)?,
+            )?;
+        }
 
         // sort the token by supply
         self.database.put_cf(
@@ -273,7 +275,7 @@ impl ZkappTokenStore for IndexerStore {
         let diff_num = self.get_token_pk_diff_num(diff_pk)?.unwrap_or_default();
         self.database.put_cf(
             self.zkapp_tokens_historical_pk_diffs_num_cf(),
-            diff_token.0.as_bytes(),
+            diff_pk.0.as_bytes(),
             (diff_num + 1).to_be_bytes(),
         )?;
 
@@ -321,7 +323,7 @@ impl ZkappTokenStore for IndexerStore {
     }
 
     fn unapply_token_diff(&self, token: &TokenAddress) -> Result<Option<Token>> {
-        trace!("Unapplying the last token diff");
+        trace!("Unapplying the last token diff for {}", token);
 
         if let Some((_, diff)) = self.remove_last_token_diff(token)? {
             let diff_pk = &diff.public_key;
@@ -358,9 +360,6 @@ impl ZkappTokenStore for IndexerStore {
                 zkapp_tokens_holder_key(diff_token, index),
                 serde_json::to_vec(&account)?,
             )?;
-
-            // update pk info
-            self.remove_last_pk_token_diff(diff_pk)?;
 
             // unapply & set token
             token.unapply(diff.to_owned());
@@ -399,6 +398,19 @@ impl ZkappTokenStore for IndexerStore {
                     .with_context(|| format!("token diff index {} for {}", index, token))
                     .expect("token diff index")
             }))
+    }
+
+    fn get_last_token_diff(&self, token: &TokenAddress) -> Result<Option<TokenDiff>> {
+        trace!("Getting the last token diff for {}", token);
+
+        let num = self.get_token_diff_num(token)?.unwrap_or_default();
+        if num < 1 {
+            unreachable!(
+                "Tokens should not have a diff unapplied if there aren't any applied diffs"
+            )
+        }
+
+        self.get_token_diff(token, num - 1)
     }
 
     fn get_token_diff_num(&self, token: &TokenAddress) -> Result<Option<u32>> {
@@ -444,7 +456,7 @@ impl ZkappTokenStore for IndexerStore {
 
         self.database.put_cf(
             self.zkapp_tokens_historical_pk_diffs_num_cf(),
-            token_diff.token.0.as_bytes(),
+            token_diff.public_key.0.as_bytes(),
             (pk_num + 1).to_be_bytes(),
         )?;
 
@@ -480,9 +492,7 @@ impl ZkappTokenStore for IndexerStore {
     }
 
     fn remove_last_token_diff(&self, token: &TokenAddress) -> Result<Option<(u32, TokenDiff)>> {
-        let num = self
-            .get_token_historical_owner_num(token)?
-            .unwrap_or_default();
+        let num = self.get_token_diff_num(token)?.unwrap();
         trace!("Removing last token diff of {} for {}", num, token);
 
         if num < 1 {
@@ -517,8 +527,8 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // remove pk last token diff
-        if let Some(pk) = diff.as_ref().map(|x: &TokenDiff| x.public_key.to_owned()) {
-            self.remove_last_pk_token_diff(&pk)?;
+        if let Some(pk) = diff.as_ref().map(|x: &TokenDiff| &x.public_key) {
+            self.remove_last_pk_token_diff(pk)?;
         }
 
         Ok(diff.map(|diff| (index, diff)))

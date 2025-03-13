@@ -115,6 +115,9 @@ pub trait ZkappTokenStore {
     /// Get the count of token diffs applied to the token
     fn get_token_diff_num(&self, token: &TokenAddress) -> Result<Option<u32>>;
 
+    /// Get the last applied token diff
+    fn get_last_token_diff(&self, token: &TokenAddress) -> Result<Option<TokenDiff>>;
+
     /// Updates token diffs & pk token diffs
     fn update_token_diffs(&self, token_diff: &TokenDiff) -> Result<()>;
 
