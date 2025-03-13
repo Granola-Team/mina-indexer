@@ -221,6 +221,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing token indexes per holder
     fn zkapp_tokens_pk_index_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing token transaction counts per token
+    fn zkapp_tokens_txns_num_cf(&self) -> &ColumnFamily;
+
     /// CF for storing historical token diffs
     fn zkapp_tokens_historical_diffs_cf(&self) -> &ColumnFamily;
 

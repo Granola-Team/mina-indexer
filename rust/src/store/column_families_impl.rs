@@ -686,6 +686,18 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("zkapp-tokens-pk-index column family exists")
     }
 
+    /// #### CF for storing token transaction counts per token
+    ///
+    /// Key-value pairs
+    /// ```
+    /// - key: [TokenAddress] bytes
+    /// - val: [u32] BE bytes
+    fn zkapp_tokens_txns_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-tokens-txns-num")
+            .expect("zkapp-tokens-txns-num column family exists")
+    }
+
     /// #### CF for storing historical token diffs
     ///
     /// Key-value pairs
