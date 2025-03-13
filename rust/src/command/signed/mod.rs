@@ -367,6 +367,69 @@ impl SignedCommandWithData {
         matches!(self.command.kind(), CommandType::Zkapp)
     }
 
+    /// Only called on zkapp commands
+    pub fn accounts_updated(&self) -> Vec<(PublicKey, TokenAddress)> {
+        let mut updated = vec![];
+
+        if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = &self.command {
+            for update in &data.account_updates {
+                let pk = update.elt.account_update.body.public_key.to_owned();
+                let token = update.elt.account_update.body.token_id.to_owned();
+
+                updated.push((pk, token));
+                recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
+            }
+        }
+
+        updated
+    }
+
+    /// Only called on zkapp commands
+    pub fn actions(&self) -> Vec<String> {
+        let mut actions = vec![];
+
+        if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = &self.command {
+            for update in &data.account_updates {
+                let mut update_actions: Vec<_> = update
+                    .elt
+                    .account_update
+                    .body
+                    .actions
+                    .iter()
+                    .flat_map(|actions| actions.0.to_owned())
+                    .collect();
+
+                actions.append(&mut update_actions);
+                recurse_calls_actions(&mut actions, update.elt.calls.iter());
+            }
+        }
+
+        actions
+    }
+
+    /// Only called on zkapp commands
+    pub fn events(&self) -> Vec<String> {
+        let mut events = vec![];
+
+        if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = &self.command {
+            for update in &data.account_updates {
+                let mut update_events: Vec<_> = update
+                    .elt
+                    .account_update
+                    .body
+                    .events
+                    .iter()
+                    .flat_map(|events| events.0.to_owned())
+                    .collect();
+
+                events.append(&mut update_events);
+                recurse_calls_events(&mut events, update.elt.calls.iter());
+            }
+        }
+
+        events
+    }
+
     pub fn from(
         user_cmd: &UserCommandWithStatus,
         state_hash: &str,
@@ -824,9 +887,62 @@ impl From<String> for TxnHash {
     }
 }
 
+/////////////
+// display //
+/////////////
+
 impl std::fmt::Display for TxnHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.ref_inner())
+    }
+}
+
+/////////////
+// helpers //
+/////////////
+
+fn recurse_calls_accounts_updated<'a>(
+    accounts: &mut Vec<(PublicKey, TokenAddress)>,
+    calls: impl Iterator<Item = &'a Call>,
+) {
+    for update in calls {
+        let pk = update.elt.account_update.body.public_key.to_owned();
+        let token = update.elt.account_update.body.token_id.to_owned();
+
+        accounts.push((pk, token));
+        recurse_calls_accounts_updated(accounts, update.elt.calls.iter());
+    }
+}
+
+fn recurse_calls_actions<'a>(actions: &mut Vec<String>, calls: impl Iterator<Item = &'a Call>) {
+    for update in calls {
+        let mut update_actions: Vec<_> = update
+            .elt
+            .account_update
+            .body
+            .actions
+            .iter()
+            .flat_map(|actions| actions.0.to_owned())
+            .collect();
+
+        actions.append(&mut update_actions);
+        recurse_calls_actions(actions, update.elt.calls.iter());
+    }
+}
+
+fn recurse_calls_events<'a>(events: &mut Vec<String>, calls: impl Iterator<Item = &'a Call>) {
+    for update in calls {
+        let mut update_events: Vec<_> = update
+            .elt
+            .account_update
+            .body
+            .events
+            .iter()
+            .flat_map(|events| events.0.to_owned())
+            .collect();
+
+        events.append(&mut update_events);
+        recurse_calls_events(events, update.elt.calls.iter());
     }
 }
 
