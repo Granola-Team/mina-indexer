@@ -3,10 +3,7 @@ mod txn_hash;
 use crate::{
     command::*,
     ledger::token::{TokenAddress, TokenId},
-    mina_blocks::v2::{
-        self,
-        staged_ledger_diff::{Call, UserCommandData},
-    },
+    mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
@@ -226,16 +223,7 @@ impl SignedCommand {
         let mut tokens = vec![];
 
         if let Self::V2(UserCommandData::ZkappCommandData(data)) = self {
-            data.account_updates.iter().for_each(|update| {
-                let token = &update.elt.account_update.body.token_id;
-
-                if !tokens.contains(token) {
-                    tokens.push(token.to_owned())
-                }
-
-                recurse_calls(&mut tokens, update.elt.calls.iter());
-            });
-
+            zkapp_tokens(data, &mut tokens);
             tokens
         } else {
             vec![TokenAddress::default()]
@@ -415,18 +403,6 @@ impl SignedCommandWithData {
                 )
             })
             .collect()
-    }
-}
-
-fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item = &'a Call>) {
-    for update in calls {
-        let token = &update.elt.account_update.body.token_id;
-
-        if !tokens.contains(token) {
-            tokens.push(token.to_owned());
-        }
-
-        recurse_calls(tokens, update.elt.calls.iter());
     }
 }
 

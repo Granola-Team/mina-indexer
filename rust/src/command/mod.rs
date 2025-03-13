@@ -7,10 +7,11 @@ use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
     command::signed::SignedCommand,
+    ledger::token::TokenAddress,
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{
-            SignedCommandPayloadBody, StakeDelegationPayload, Status, UserCommandData,
+            Call, SignedCommandPayloadBody, StakeDelegationPayload, Status, UserCommandData,
             ZkappCommandData,
         },
     },
@@ -204,6 +205,8 @@ pub trait UserCommandWithStatusT {
 
     fn is_zkapp_command(&self) -> bool;
 
+    fn tokens(&self) -> Vec<TokenAddress>;
+
     fn status_data(&self) -> CommandStatusData;
 
     fn contains_public_key(&self, pk: &PublicKey) -> bool;
@@ -242,6 +245,22 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 ..
             })
         )
+    }
+
+    fn tokens(&self) -> Vec<TokenAddress> {
+        match self {
+            Self::V1(_) => vec![TokenAddress::default()],
+            Self::V2(v2) => match &v2.data.1 {
+                v2::staged_ledger_diff::UserCommandData::SignedCommandData(_) => {
+                    vec![TokenAddress::default()]
+                }
+                v2::staged_ledger_diff::UserCommandData::ZkappCommandData(zkapp) => {
+                    let mut tokens = vec![];
+                    zkapp_tokens(zkapp, &mut tokens);
+                    tokens
+                }
+            },
+        }
     }
 
     fn receiver_account_creation_fee_paid(&self) -> bool {
@@ -1097,6 +1116,30 @@ pub fn to_mina_format(json: Value) -> Value {
 
 pub fn to_mina_json(json: Value) -> Value {
     to_mina_format(convert(false, fee_convert(json)))
+}
+
+fn zkapp_tokens(zkapp: &ZkappCommandData, tokens: &mut Vec<TokenAddress>) {
+    zkapp.account_updates.iter().for_each(|update| {
+        let token = &update.elt.account_update.body.token_id;
+
+        if !tokens.contains(token) {
+            tokens.push(token.to_owned())
+        }
+
+        recurse_calls(tokens, update.elt.calls.iter());
+    });
+}
+
+fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item = &'a Call>) {
+    for update in calls {
+        let token = &update.elt.account_update.body.token_id;
+
+        if !tokens.contains(token) {
+            tokens.push(token.to_owned());
+        }
+
+        recurse_calls(tokens, update.elt.calls.iter());
+    }
 }
 
 #[cfg(test)]
