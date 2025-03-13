@@ -2,8 +2,11 @@ mod txn_hash;
 
 use crate::{
     command::*,
-    ledger::token::TokenId,
-    mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
+    ledger::token::{TokenAddress, TokenId},
+    mina_blocks::v2::{
+        self,
+        staged_ledger_diff::{Call, UserCommandData},
+    },
     proof_systems::signer::signature::Signature,
     protocol::{
         bin_prot,
@@ -218,20 +221,24 @@ impl SignedCommand {
         }
     }
 
-    pub fn token_ids(&self) -> Vec<u64> {
-        match self {
-            Self::V1(v1) => {
-                use mina_rs::SignedCommandPayloadBody1::*;
-                match &v1.t.t.payload.t.t.body.t.t {
-                    PaymentPayload(v1) => vec![v1.t.t.token_id.t.t.t],
-                    StakeDelegation(_v1) => vec![],
+    /// All tokens involved in the transaction
+    pub fn tokens(&self) -> Vec<TokenAddress> {
+        let mut tokens = vec![];
+
+        if let Self::V2(UserCommandData::ZkappCommandData(data)) = self {
+            data.account_updates.iter().for_each(|update| {
+                let token = &update.elt.account_update.body.token_id;
+
+                if !tokens.contains(token) {
+                    tokens.push(token.to_owned())
                 }
-            }
-            Self::V2(v2) => match v2 {
-                UserCommandData::SignedCommandData(_) => vec![1], // MINA token
-                UserCommandData::ZkappCommandData(_) => vec![],   /* TODO: find the tokens in
-                                                                    * the zkapp command data */
-            },
+
+                recurse_calls(&mut tokens, update.elt.calls.iter());
+            });
+
+            tokens
+        } else {
+            vec![TokenAddress::default()]
         }
     }
 
@@ -408,6 +415,18 @@ impl SignedCommandWithData {
                 )
             })
             .collect()
+    }
+}
+
+fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item = &'a Call>) {
+    for update in calls {
+        let token = &update.elt.account_update.body.token_id;
+
+        if !tokens.contains(token) {
+            tokens.push(token.to_owned());
+        }
+
+        recurse_calls(tokens, update.elt.calls.iter());
     }
 }
 
@@ -907,7 +926,7 @@ mod tests {
     #[test]
     fn signed_command_json_v1() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1)?;
         let signed_cmds = precomputed_block
             .commands()
             .into_iter()
@@ -964,7 +983,7 @@ mod tests {
     #[test]
     fn signed_command_json_v2() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2)?;
         let signed_cmds = precomputed_block
             .commands()
             .into_iter()
@@ -995,6 +1014,38 @@ mod tests {
 }"#;
 
         assert_eq!(signed_cmds, vec![expect0]);
+        Ok(())
+    }
+
+    #[test]
+    fn tokens() -> Result<()> {
+        let path = PathBuf::from("./tests/data/hardfork/mainnet-359617-3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        assert_eq!(block.zkapp_commands().len(), 7);
+
+        assert_eq!(
+            block
+                .zkapp_commands()
+                .into_iter()
+                .map(SignedCommand::from)
+                .map(|cmd| cmd.tokens())
+                .collect::<Vec<_>>(),
+            vec![
+                vec![TokenAddress::default()],
+                vec![TokenAddress::default()],
+                vec![TokenAddress::default()],
+                vec![TokenAddress::default()],
+                vec![TokenAddress::default()],
+                vec![TokenAddress::default()],
+                vec![
+                    TokenAddress::default(),
+                    TokenAddress::new("wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd")
+                        .unwrap()
+                ]
+            ]
+        );
+
         Ok(())
     }
 }
