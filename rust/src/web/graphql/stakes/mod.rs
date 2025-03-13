@@ -26,6 +26,7 @@ pub struct StakesQueryInput {
     epoch: Option<u32>,
     delegate: Option<String>,
     ledger_hash: Option<String>,
+    genesis_state_hash: Option<String>,
 
     #[graphql(validator(regex = "^\\d+(\\.\\d{1,9})?$"), name = "stake_lte")]
     stake_lte: Option<String>,
@@ -55,6 +56,9 @@ pub struct StakesLedgerAccountWithMeta {
 
     /// Value current ledger hash
     ledger_hash: String,
+
+    /// Value genesis state hash
+    genesis_state_hash: String,
 
     /// Value delegation totals
     delegation_totals: StakesDelegationTotals,
@@ -303,10 +307,16 @@ impl StakesQueryRoot {
                 delegation,
             } = serde_json::from_slice(&value)?;
 
+            let genesis_state_hash = db
+                .get_best_block_genesis_hash()?
+                .expect("genesis state hash")
+                .to_string();
+
             if StakesQueryInput::matches_staking_account(
                 query.as_ref(),
                 &account,
                 &ledger_hash,
+                &genesis_state_hash,
                 epoch,
             ) {
                 let account = StakesLedgerAccountWithMeta::new(
@@ -441,7 +451,8 @@ impl StakesQueryInput {
     pub fn matches_staking_account(
         query: Option<&Self>,
         account: &StakingAccount,
-        ledger_hash: &String,
+        ledger_hash: &str,
+        genesis_state_hash: &str,
         epoch: u32,
     ) -> bool {
         if let Some(query) = query {
@@ -450,14 +461,17 @@ impl StakesQueryInput {
                 public_key,
                 epoch: query_epoch,
                 ledger_hash: query_ledger_hash,
+                genesis_state_hash: query_genesis_state_hash,
                 username,
                 stake_lte: _,
             } = query;
+
             if let Some(public_key) = public_key {
                 if *public_key != account.pk.0 {
                     return false;
                 }
             }
+
             if let Some(username) = username {
                 if let Some(acct_username) = account.username.as_ref() {
                     if *username != *acct_username {
@@ -467,22 +481,32 @@ impl StakesQueryInput {
                     return false;
                 }
             }
+
             if let Some(delegate) = delegate {
                 if *delegate != account.delegate.0 {
                     return false;
                 }
             }
+
             if let Some(query_ledger_hash) = query_ledger_hash {
                 if query_ledger_hash != ledger_hash {
                     return false;
                 }
             }
+
+            if let Some(query_genesis_state_hash) = query_genesis_state_hash {
+                if *query_genesis_state_hash != genesis_state_hash {
+                    return false;
+                }
+            }
+
             if let Some(query_epoch) = query_epoch {
                 if *query_epoch != epoch {
                     return false;
                 }
             }
         }
+
         true
     }
 }
@@ -552,14 +576,16 @@ impl StakesLedgerAccountWithMeta {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
         };
-        let genesis_state_hash = match db.get_best_block_genesis_hash() {
-            Ok(Some(genesis_state_hash)) => genesis_state_hash.to_string(),
-            Ok(None) | Err(_) => "N/A".to_string(),
-        };
+        let genesis_state_hash = db
+            .get_best_block_genesis_hash()
+            .unwrap()
+            .expect("genesis state hash")
+            .to_string();
 
         Self {
             epoch,
             ledger_hash,
+            genesis_state_hash: genesis_state_hash.to_owned(),
             account: StakesLedgerAccount::from((
                 account,
                 chain_id,
