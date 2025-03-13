@@ -92,7 +92,7 @@ JSON list of known staking ledgers available. See [MinaExplorer docs](https://do
 
 ### `./o1-labs/download-mina-blocks.rb`
 
-Downloads historical Mina PCBs from o1Labs' [Google Cloud Storage bucket](https://storage.googleapis.com/storage/v1/b/mina_network_block_data/o?prefix=mainnet).
+Downloads historical Mina PCBs from o1Labs' [Google Cloud Storage bucket](https://storage.googleapis.com/storage/v1/b/mina_network_block_data/o?prefix=mainnet-).
 
 ### `./rclone.conf`
 

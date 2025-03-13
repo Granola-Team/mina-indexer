@@ -10,7 +10,7 @@ set -eu
 
 RESULT='Failure.'
 exit_handler() {
-    echo "${RESULT} Exiting." >&2
+	echo "${RESULT} Exiting." >&2
 }
 trap exit_handler EXIT
 
