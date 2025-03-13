@@ -10,12 +10,12 @@ set -eu
 
 RESULT='Failure.'
 exit_handler() {
-	echo "${RESULT} Exiting." >&2
+    echo "${RESULT} Exiting." >&2
 }
 trap exit_handler EXIT
 
 MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
 
 # Perform the download.
-"$MY_DIR"/granola-rclone.rb sync "$1" linode-granola-mina-stripped-blocks:mina-blocks
+"$MY_DIR"/granola-rclone.rb sync "$1" linode-granola:granola-mina-stripped-blocks/mina-blocks
 RESULT='Blocks uploaded.'
