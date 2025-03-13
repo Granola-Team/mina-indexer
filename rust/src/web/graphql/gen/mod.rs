@@ -801,7 +801,7 @@ pub struct TransactionQueryInput {
     pub canonical: Option<bool>,
     pub kind: Option<String>,
     pub memo: Option<String>,
-    pub token: Option<u64>,
+    pub token: Option<String>,
     pub is_delegation: Option<bool>,
     pub zkapp: Option<bool>,
 

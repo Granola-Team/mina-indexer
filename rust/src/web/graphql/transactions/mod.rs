@@ -69,7 +69,7 @@ pub struct TransactionWithoutBlock {
     nonce: u32,
     receiver: PK,
     to: String,
-    tokens: Vec<u64>,
+    tokens: Vec<String>,
 
     /// Total number of user commands in the given epoch
     /// (default: current epoch)
@@ -831,7 +831,9 @@ impl TransactionWithoutBlock {
         total_num_zkapp_commands: u32,
     ) -> Self {
         let zkapp = cmd.is_zkapp_command();
+
         let receiver = cmd.command.receiver_pk();
+        let receiver = receiver.first().expect("receiver").0.to_owned();
 
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
@@ -856,10 +858,10 @@ impl TransactionWithoutBlock {
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,
             receiver: PK {
-                public_key: receiver.first().expect("receiver").0.to_owned(),
+                public_key: receiver.to_owned(),
             },
-            to: receiver.first().expect("receiver").0.to_owned(),
-            tokens: cmd.command.token_ids(),
+            to: receiver,
+            tokens: cmd.command.tokens().into_iter().map(|t| t.0).collect(),
             epoch_num_user_commands,
             total_num_user_commands,
             epoch_num_zkapp_commands,
