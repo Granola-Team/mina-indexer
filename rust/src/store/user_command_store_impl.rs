@@ -17,6 +17,7 @@ use crate::{
         UserCommandWithStatus, UserCommandWithStatusT,
     },
     constants::millis_to_iso_date_string,
+    store::zkapp::tokens::ZkappTokenStore,
     utility::store::{
         command::user::*,
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key},
@@ -1064,6 +1065,13 @@ impl UserCommandStore for IndexerStore {
                 .ok()
                 .flatten()
             {
+                // decrement token transaction counts
+                for command in &user_commands {
+                    for token in command.tokens() {
+                        self.decrement_token_txns_num(&token)?;
+                    }
+                }
+
                 let (applied_uc, failed_uc): (Vec<_>, Vec<_>) =
                     user_commands.iter().partition(|uc| uc.is_applied());
 
@@ -1079,6 +1087,13 @@ impl UserCommandStore for IndexerStore {
                 .ok()
                 .flatten()
             {
+                // increment token transaction counts
+                for command in &user_commands {
+                    for token in command.tokens() {
+                        self.increment_token_txns_num(&token)?;
+                    }
+                }
+
                 let (applied_uc, failed_uc): (Vec<_>, Vec<_>) =
                     user_commands.iter().partition(|uc| uc.is_applied());
 
