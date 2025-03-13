@@ -3,10 +3,10 @@
 require "time"
 
 # Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola storage buckets.
-abort "Usage: #{$0} START_BLOCK END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
+abort "Usage: #{$0} END_BLOCK" if ARGV[0].nil? || ARGV[0].to_i <= 0
 
-START_BLOCK = ARGV[0].to_i
-END_BLOCK = ARGV[1].to_i
+START_BLOCK = 1
+END_BLOCK = ARGV[0].to_i
 RESULTS_FILE = "diff-buckets.log"
 START_TIME = Time.now
 
@@ -20,14 +20,17 @@ class BlockInfo
 
   def initialize(filename)
     @filename = filename
+    # Strip any folder path to get just the filename
+    basename = File.basename(filename)
+
     # First try the full format (mainnet-HEIGHT-HASH.json)
-    match = filename.match(/^mainnet-(\d+)-([A-Za-z0-9]+)\.json$/)
+    match = basename.match(/^mainnet-(\d+)-([A-Za-z0-9]{52,})\.json$/)
     if match && !match[1].empty? && !match[2].empty?
       @height = match[1].to_i
       @state_hash = match[2]
     else
       # Try to match malformed format (mainnet-HASH.json)
-      match = filename.match(/^mainnet-([A-Za-z0-9]{50,})\.json$/)
+      match = basename.match(/^mainnet-([A-Za-z0-9]{52,})\.json$/)
       if match && !match[1].empty?
         @height = nil
         @state_hash = match[1]
@@ -81,7 +84,7 @@ def write_list_file(filename, list)
   File.write(filename, list.join("\n"))
 end
 
-def fetch_and_sort_blocks(source, cmd, filter_prefix: nil)
+def fetch_and_sort_blocks(source, cmd)
   warn "Creating block list for #{source}, issuing: #{cmd}"
   contents = `#{cmd}`
 
@@ -95,9 +98,7 @@ def fetch_and_sort_blocks(source, cmd, filter_prefix: nil)
   initial_list = contents.lines(chomp: true)
   warn "Initial line count for #{source}: #{initial_list.size}"
 
-  if filter_prefix
-    initial_list.select! { |f| f.start_with?(filter_prefix) }
-  end
+  initial_list.select! { |f| f.start_with?("mainnet-") }
 
   blocks = initial_list.map { |f| BlockInfo.new(f) }
   valid_blocks = blocks.select(&:valid?)
@@ -137,13 +138,13 @@ else
   warn "Performing fresh downloads..."
 
   o1_thread = Thread.new do
-    o1_cmd = "#{__dir__}/granola-rclone.rb lsf o1:mina_network_block_data"
-    fetch_and_sort_blocks("o1Labs", o1_cmd, filter_prefix: "mainnet-")
+    o1_cmd = "rclone --config #{__dir__}/rclone.conf lsf o1:mina_network_block_data"
+    fetch_and_sort_blocks("o1Labs", o1_cmd)
   end
 
   granola_thread = Thread.new do
     granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
-    fetch_and_sort_blocks("Granola", granola_cmd, filter_prefix: "mainnet-")
+    fetch_and_sort_blocks("Granola", granola_cmd)
   end
 
   warn "Waiting for threads to complete..."
