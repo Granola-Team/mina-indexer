@@ -33,7 +33,7 @@ jsonpath "$.data.tokenHolders" count == 1
 jsonpath "$.data.tokenHolders[0].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokenHolders[0].supply" == 100000000000000
 jsonpath "$.data.tokenHolders[0].owner" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.tokenHolders[0].symbol" ==  ""
+jsonpath "$.data.tokenHolders[0].symbol" ==  "MINU"
 
 # account data
 jsonpath "$.data.tokenHolders[0].account.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
@@ -79,7 +79,7 @@ jsonpath "$.data.tokenHolders" count == 1
 jsonpath "$.data.tokenHolders[0].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokenHolders[0].supply" == 100000000000000
 jsonpath "$.data.tokenHolders[0].owner" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.tokenHolders[0].symbol" ==  ""
+jsonpath "$.data.tokenHolders[0].symbol" ==  "MINU"
 
 # account data
 jsonpath "$.data.tokenHolders[0].account.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
