@@ -1140,4 +1140,107 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn account_updates() -> Result<()> {
+        let path = PathBuf::from("./tests/data/hardfork/mainnet-359617-3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        assert_eq!(
+            block
+                .zkapp_commands()
+                .first()
+                .map(|cmd| SignedCommandWithData::from(
+                    cmd,
+                    "3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW",
+                    359617,
+                    1717548852749,
+                    564498
+                ))
+                .map(|cmd| cmd.accounts_updated()),
+            Some(vec![
+                (
+                    "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
+                    TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                        .unwrap()
+                ),
+                (
+                    "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
+                    TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                        .unwrap()
+                ),
+            ])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn actions() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-412598-3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        assert_eq!(
+            block
+                .zkapp_commands()
+                .iter()
+                .map(|cmd| SignedCommandWithData::from(
+                    cmd,
+                    "3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x",
+                    412598,
+                    1734508101031,
+                    658716
+                ))
+                .flat_map(|cmd| cmd.actions())
+                .collect::<Vec<_>>(),
+            vec![
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "0x0000000000000000000000000000000000000000000000000000000000000003",
+                "0x0000000000000000000000000000000000000000000000000000000000000006",
+                "0x0000000000000000000000000000000000000000000000000000000000000006",
+                "0x0000000000000000000000000000000000000000000000000000000000000003",
+                "0x0000000000000000000000000000000000000000000000000000000000000005",
+                "0x1CA565AB7F42B8B8BC414FA7D9C58050F394BDCF0B12E29F537787264CC7BF42",
+                "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn events() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-412598-3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        assert_eq!(
+            block
+                .zkapp_commands()
+                .iter()
+                .map(|cmd| SignedCommandWithData::from(
+                    cmd,
+                    "3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x",
+                    412598,
+                    1734508101031,
+                    658716
+                ))
+                .flat_map(|cmd| cmd.events())
+                .collect::<Vec<_>>(),
+            vec![
+                "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "0x0000000000000000000000000000000000000000000000000000000000000001",
+                "0x0000000000000000000000000000000000000000000000000000000000000003",
+                "0x0000000000000000000000000000000000000000000000000000000000000006",
+                "0x0000000000000000000000000000000000000000000000000000000000000006",
+                "0x0000000000000000000000000000000000000000000000000000000000000003",
+                "0x0000000000000000000000000000000000000000000000000000000000000005",
+                "0x1CA565AB7F42B8B8BC414FA7D9C58050F394BDCF0B12E29F537787264CC7BF42",
+                "0x0000000000000000000000000000000000000000000000000000000000000000",
+                "0x0000000000000000000000000000000000000000000000000000000000000001"
+            ]
+        );
+
+        Ok(())
+    }
 }
