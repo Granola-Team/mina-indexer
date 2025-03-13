@@ -859,6 +859,39 @@ impl ZkappTokenStore for IndexerStore {
         Ok(tokens)
     }
 
+    fn get_token_txns_num(&self, token: &TokenAddress) -> Result<Option<u32>> {
+        trace!("Getting token transactions count for {}", token);
+
+        Ok(self
+            .database
+            .get_cf(self.zkapp_tokens_txns_num_cf(), token.0.as_bytes())?
+            .map(from_be_bytes))
+    }
+
+    fn increment_token_txns_num(&self, token: &TokenAddress) -> Result<()> {
+        trace!("Incrementing token txn count for {}", token);
+
+        let num = self.get_token_txns_num(token)?.unwrap_or_default();
+        Ok(self.database.put_cf(
+            self.zkapp_tokens_txns_num_cf(),
+            token.0.as_bytes(),
+            (num + 1).to_be_bytes(),
+        )?)
+    }
+
+    fn decrement_token_txns_num(&self, token: &TokenAddress) -> Result<()> {
+        trace!("Decrementing token txn count for {}", token);
+
+        let num = self.get_token_txns_num(token)?.unwrap_or_default();
+        assert!(num >= 1);
+
+        Ok(self.database.put_cf(
+            self.zkapp_tokens_txns_num_cf(),
+            token.0.as_bytes(),
+            (num - 1).to_be_bytes(),
+        )?)
+    }
+
     fn get_token_pk_num(&self, pk: &PublicKey) -> Result<Option<u32>> {
         trace!("Getting held token count for {}", pk);
 

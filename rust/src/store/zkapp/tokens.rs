@@ -75,6 +75,19 @@ pub trait ZkappTokenStore {
     /// Get the list of token accounts held by `pk`
     fn get_tokens_held(&self, pk: &PublicKey) -> Result<Vec<Account>>;
 
+    ////////////////////////////
+    // Token transaction info //
+    ////////////////////////////
+
+    /// Get the count of a token's transactions
+    fn get_token_txns_num(&self, token: &TokenAddress) -> Result<Option<u32>>;
+
+    /// Increment the count of a token's transactions
+    fn increment_token_txns_num(&self, token: &TokenAddress) -> Result<()>;
+
+    /// Decrement the count of a token's transactions
+    fn decrement_token_txns_num(&self, token: &TokenAddress) -> Result<()>;
+
     ///////////////////////////
     // Historical token info //
     ///////////////////////////
