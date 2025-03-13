@@ -10,6 +10,7 @@ use crate::{
         CommandStatusData,
     },
     constants::millis_to_global_slot,
+    ledger::token::TokenAddress,
     store::IndexerStore,
     utility::store::{
         command::user::{
@@ -60,7 +61,7 @@ pub struct TransactionWithoutBlock {
     canonical: bool,
     failure_reason: Option<String>,
     is_applied: bool,
-    zkapp: bool,
+    zkapp: Option<TransactionZkapp>,
     fee: u64,
     from: String,
     hash: String,
@@ -94,6 +95,28 @@ pub struct TransactionWithoutBlock {
 struct TransactionBlock {
     date_time: DateTime,
     state_hash: String,
+}
+
+#[derive(Clone, Debug, PartialEq, SimpleObject, Serialize)]
+struct TokenAccount {
+    /// Public key
+    pk: String,
+
+    /// Token address
+    token: String,
+}
+
+#[derive(Clone, Debug, PartialEq, SimpleObject, Serialize)]
+struct TransactionZkapp {
+    /// Accounts updated
+    #[graphql(name = "accounts_updated")]
+    accounts_updated: Vec<TokenAccount>,
+
+    /// Actions
+    actions: Vec<String>,
+
+    /// Events
+    events: Vec<String>,
 }
 
 #[derive(Default)]
@@ -830,7 +853,19 @@ impl TransactionWithoutBlock {
         epoch_num_zkapp_commands: u32,
         total_num_zkapp_commands: u32,
     ) -> Self {
-        let zkapp = cmd.is_zkapp_command();
+        let zkapp = if cmd.is_zkapp_command() {
+            Some(TransactionZkapp {
+                accounts_updated: cmd
+                    .accounts_updated()
+                    .into_iter()
+                    .map(TokenAccount::from)
+                    .collect(),
+                actions: cmd.actions(),
+                events: cmd.events(),
+            })
+        } else {
+            None
+        };
 
         let receiver = cmd.command.receiver_pk();
         let receiver = receiver.first().expect("receiver").0.to_owned();
@@ -866,6 +901,15 @@ impl TransactionWithoutBlock {
             total_num_user_commands,
             epoch_num_zkapp_commands,
             total_num_zkapp_commands,
+        }
+    }
+}
+
+impl From<(PublicKey, TokenAddress)> for TokenAccount {
+    fn from(value: (PublicKey, TokenAddress)) -> Self {
+        Self {
+            pk: value.0.to_string(),
+            token: value.1.to_string(),
         }
     }
 }
@@ -938,7 +982,7 @@ impl TransactionQueryInput {
         }
 
         if let Some(zkapp) = zkapp {
-            if transaction.transaction.zkapp != *zkapp {
+            if transaction.transaction.zkapp.is_some() != *zkapp {
                 return false;
             }
         }

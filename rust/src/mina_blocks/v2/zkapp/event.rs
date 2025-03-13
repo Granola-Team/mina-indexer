@@ -34,6 +34,16 @@ where
     }
 }
 
+/////////////
+// display //
+/////////////
+
+impl std::fmt::Display for ZkappEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[cfg(test)]
 impl quickcheck::Arbitrary for ZkappEvent {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
