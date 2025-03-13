@@ -145,3 +145,48 @@ jsonpath "$.data.transactions[0].tokens[0]" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx
 jsonpath "$.data.transactions[0].tokens[1]" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 
 duration < 100
+
+#
+# Filter based on token ID
+#
+
+POST {{url}}
+```graphql
+{
+  transactions(
+    limit: 1
+    query: {
+      canonical: true,
+      zkapp: true
+    }
+  ) {
+    zkapp {
+      accounts_updated {
+        pk
+        token
+      }
+      actions
+      events
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.transactions" count == 1
+
+# only datum
+jsonpath "$.data.transactions[0].zkapp.actions" count == 0
+jsonpath "$.data.transactions[0].zkapp.events" count == 0
+jsonpath "$.data.transactions[0].zkapp.accounts_updated" count == 2
+
+# account updates
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+
+duration < 100
