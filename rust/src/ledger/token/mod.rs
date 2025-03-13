@@ -79,6 +79,10 @@ impl Token {
     }
 }
 
+////////////////
+// operations //
+////////////////
+
 impl std::ops::AddAssign<TokenDiff> for Token {
     fn add_assign(&mut self, rhs: TokenDiff) {
         assert_eq!(
@@ -94,6 +98,10 @@ impl std::ops::AddAssign<TokenDiff> for Token {
         }
     }
 }
+
+///////////
+// tests //
+///////////
 
 #[cfg(test)]
 impl quickcheck::Arbitrary for Token {
@@ -117,5 +125,17 @@ impl Token {
             symbol: TokenSymbol::arbitrary(g),
             supply: Amount::arbitrary(g),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TokenAddress;
+
+    #[test]
+    fn valid_token() -> anyhow::Result<()> {
+        // see: https://minaexplorer.com/token/weihj2SSP7Z96acs56ygP64Te6wauzvWWfAPHKb1gzqem9J4Ne
+        TokenAddress::new("weihj2SSP7Z96acs56ygP64Te6wauzvWWfAPHKb1gzqem9J4Ne").unwrap();
+        Ok(())
     }
 }
