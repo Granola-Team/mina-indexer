@@ -160,16 +160,37 @@ impl LedgerDiff {
                 .insert(token, creation_fee.0);
         }
 
+        let tokens_used = block.tokens_used();
         let token_diffs = account_diffs
             .iter()
             .flatten()
             .flat_map(|diff| match diff {
-                AccountDiff::Zkapp(zkapp) => zkapp
-                    .payment_diffs
-                    .iter()
-                    .flat_map(|diff| <Option<TokenDiff>>::from(diff.clone()))
-                    .collect(),
-                AccountDiff::ZkappTokenSymbolDiff(diff) => vec![diff.clone().into()],
+                AccountDiff::Zkapp(zkapp) => {
+                    let mut diffs: Vec<TokenDiff> = zkapp
+                        .payment_diffs
+                        .iter()
+                        .flat_map(|diff| <Option<TokenDiff>>::from(diff.clone()))
+                        .collect();
+
+                    let pk = zkapp.public_key.to_owned();
+                    let token = zkapp.token.to_owned();
+                    let (pk, token) = tokens_used
+                        .get(&(pk.to_owned(), token.to_owned()))
+                        .map_or_else(
+                            || (pk.to_owned(), token),
+                            |token| (pk.to_owned(), token.to_owned()),
+                        );
+
+                    if let Some(symbol) = zkapp.token_symbol.as_ref() {
+                        diffs.push(TokenDiff {
+                            token,
+                            public_key: pk,
+                            diff: token::TokenDiffType::Symbol(symbol.to_owned()),
+                        });
+                    }
+
+                    diffs
+                }
                 _ => vec![],
             })
             .collect();
