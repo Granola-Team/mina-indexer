@@ -100,6 +100,9 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
+# total data count
+jsonpath "$.data.transactions" count == 1
+
 # only datum
 jsonpath "$.data.transactions[0].blockHeight" == 359617
 jsonpath "$.data.transactions[0].canonical" == true
@@ -120,11 +123,10 @@ POST {{url}}
 {
   transactions(
     limit: 1
-    sortBy: BLOCKHEIGHT_DESC
     query: {
       canonical: true,
-      zkapp: false,
-      token: 1
+      zkapp: true,
+      token: "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
     }
   ) {
     tokens
@@ -137,7 +139,9 @@ HTTP 200
 # total data count
 jsonpath "$.data.transactions" count == 1
 
-jsonpath "$.data.transactions[0].tokens" isCollection
-jsonpath "$.data.transactions[0].tokens[0]" == 1
+# only datum
+jsonpath "$.data.transactions[0].tokens" count == 2
+jsonpath "$.data.transactions[0].tokens[0]" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+jsonpath "$.data.transactions[0].tokens[1]" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 
 duration < 100
