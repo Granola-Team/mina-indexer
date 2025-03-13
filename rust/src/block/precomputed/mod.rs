@@ -192,15 +192,24 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn tokens_used(&self) -> Vec<TokenUsed> {
+    pub fn tokens_used(&self) -> HashMap<(PublicKey, TokenAddress), TokenAddress> {
         match self {
-            Self::V1(_v1) => vec![],
-            Self::V2(v2) => v2
-                .tokens_used
-                .iter()
-                .cloned()
-                .map(TokenUsed::from)
-                .collect(),
+            Self::V1(_v1) => HashMap::new(),
+            Self::V2(v2) => {
+                let mut used = HashMap::new();
+
+                v2.tokens_used
+                    .iter()
+                    .cloned()
+                    .map(TokenUsed::from)
+                    .for_each(|tu| {
+                        if let (Some(pk), Some(t)) = (tu.token_owner, tu.payment_token) {
+                            used.insert((pk, t), tu.used_token);
+                        }
+                    });
+
+                used
+            }
         }
     }
 
