@@ -17,9 +17,6 @@ pub struct TokensQueryInput {
     owner: Option<String>,
     symbol: Option<String>,
     supply: Option<u64>,
-
-    #[graphql(name = "fetch_all_holders")]
-    fetch_all_holders: Option<bool>,
 }
 
 #[derive(SimpleObject)]
@@ -31,8 +28,13 @@ pub struct Token {
     #[graphql(name = "num_holders")]
     num_holders: u32,
 
-    /// Value list of holders (only filled if `fetch_all_holders == true`)
-    holders: Option<Vec<String>>,
+    /// Value total count of token transactions
+    #[graphql(name = "total_num_txns")]
+    total_num_txns: u32,
+
+    /// Value total count of locked tokens
+    #[graphql(name = "total_num_locked")]
+    total_num_locked: u64,
 
     /// Value total count of tokens
     #[graphql(name = "total_num_tokens")]
@@ -103,7 +105,8 @@ pub enum TokenHoldersSortByInput {
 struct TokenWithMeta {
     token: ledger::token::Token,
     num_holders: u32,
-    holders: Option<Vec<PublicKey>>,
+    total_num_txns: u32,
+    total_num_locked: u64,
     total_num_tokens: u32,
 }
 
@@ -129,7 +132,7 @@ impl TokensQueryRoot {
                 .unwrap_or_default()
         }) {
             if let Some(token) = db.get_token(&token)? {
-                let token = TokenWithMeta::new(db, token, query.as_ref()).expect("token with meta");
+                let token = TokenWithMeta::new(db, token).expect("token with meta");
 
                 return Ok(vec![token.into()]);
             }
@@ -143,7 +146,7 @@ impl TokensQueryRoot {
             let token = serde_json::from_slice(&value)?;
 
             if TokensQueryInput::matches(query.as_ref(), &token) {
-                tokens.push(TokenWithMeta::new(db, token, query.as_ref())?.into());
+                tokens.push(TokenWithMeta::new(db, token)?.into());
             }
 
             if tokens.len() >= limit {
@@ -258,7 +261,6 @@ impl TokensQueryInput {
                 owner,
                 symbol,
                 supply,
-                ..
             } = query;
 
             // token
@@ -326,20 +328,12 @@ impl TokenHoldersQueryInput {
 }
 
 impl TokenWithMeta {
-    fn new(
-        db: &std::sync::Arc<IndexerStore>,
-        token: ledger::token::Token,
-        query: Option<&TokensQueryInput>,
-    ) -> Result<Self> {
+    fn new(db: &std::sync::Arc<IndexerStore>, token: ledger::token::Token) -> Result<Self> {
         Ok(Self {
-            holders: if fetch_all_holders(query) {
-                db.get_token_holders(&token.token)?
-                    .map(|t| t.iter().map(|h| h.public_key.to_owned()).collect())
-            } else {
-                None
-            },
             num_holders: db.get_token_holders_num(&token.token)?.unwrap_or_default(),
+            total_num_txns: db.get_token_txns_num(&token.token)?.unwrap_or_default(),
             total_num_tokens: db.get_num_tokens()?,
+            total_num_locked: 0,
             token,
         })
     }
@@ -351,14 +345,11 @@ impl TokenWithMeta {
 
 impl From<TokenWithMeta> for Token {
     fn from(value: TokenWithMeta) -> Self {
-        let holders = value
-            .holders
-            .map(|holders| holders.iter().map(PublicKey::to_string).collect());
-
         Self {
             token: value.token.into(),
             num_holders: value.num_holders,
-            holders,
+            total_num_txns: value.total_num_txns,
+            total_num_locked: value.total_num_locked,
             total_num_tokens: value.total_num_tokens,
         }
     }
@@ -390,12 +381,4 @@ impl From<TokenAccount> for TokenHolder {
             symbol: Some(value.token.symbol.to_string()),
         }
     }
-}
-
-/////////////
-// helpers //
-/////////////
-
-fn fetch_all_holders(query: Option<&TokensQueryInput>) -> bool {
-    query.and_then(|q| q.fetch_all_holders).unwrap_or_default()
 }
