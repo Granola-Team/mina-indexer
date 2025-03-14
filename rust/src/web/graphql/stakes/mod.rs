@@ -4,12 +4,12 @@ use super::db;
 use crate::{
     base::amount::Amount,
     block::store::BlockStore,
+    chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
+    constants::MAINNET_GENESIS_HASH,
     ledger::{
         staking::{EpochStakeDelegation, StakingAccount},
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
-        LedgerHash,
     },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
@@ -301,10 +301,16 @@ impl StakesQueryRoot {
                 delegation,
             } = serde_json::from_slice(&value)?;
 
+            let genesis_state_hash = db
+                .get_best_block_genesis_hash()?
+                .expect("genesis state hash")
+                .to_string();
+
             if StakesQueryInput::matches_staking_account(
                 query.as_ref(),
                 &account,
                 &ledger_hash,
+                &genesis_state_hash,
                 epoch,
             ) {
                 let account = StakesLedgerAccountWithMeta::new(
@@ -312,7 +318,7 @@ impl StakesQueryRoot {
                     account,
                     &delegation,
                     epoch,
-                    &LedgerHash::new_or_panic(ledger_hash.clone()),
+                    ledger_hash.clone(),
                     total_currency,
                 );
 
@@ -434,6 +440,7 @@ impl StakesQueryInput {
         query: Option<&Self>,
         account: &StakingAccount,
         ledger_hash: &str,
+        genesis_state_hash: &str,
         epoch: u32,
     ) -> bool {
         if let Some(query) = query {
@@ -476,9 +483,7 @@ impl StakesQueryInput {
             }
 
             if let Some(query_genesis_state_hash) = query_genesis_state_hash {
-                if ![MAINNET_GENESIS_HASH, HARDFORK_GENESIS_HASH]
-                    .contains(&query_genesis_state_hash.as_str())
-                {
+                if *query_genesis_state_hash != genesis_state_hash {
                     return false;
                 }
             }
@@ -500,7 +505,7 @@ impl StakesLedgerAccountWithMeta {
         account: StakingAccount,
         delegations: &EpochStakeDelegation,
         epoch: u32,
-        ledger_hash: &LedgerHash,
+        ledger_hash: String,
         total_currency: u64,
     ) -> Self {
         let pk = account.pk.clone();
@@ -558,17 +563,16 @@ impl StakesLedgerAccountWithMeta {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
         };
-
         let genesis_state_hash = db
-            .get_genesis_state_hash(ledger_hash)
-            .expect("Genesis state hash for ledger should exist")
+            .get_best_block_genesis_hash()
             .unwrap()
-            .0;
+            .expect("genesis state hash")
+            .to_string();
 
         Self {
             epoch,
-            ledger_hash: ledger_hash.to_string(),
-            genesis_state_hash,
+            ledger_hash,
+            genesis_state_hash: genesis_state_hash.to_owned(),
             account: StakesLedgerAccount::from((
                 account,
                 pk_epoch_num_blocks,
