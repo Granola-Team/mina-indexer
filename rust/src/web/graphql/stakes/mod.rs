@@ -117,12 +117,6 @@ pub struct StakesLedgerAccountWithMeta {
 
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
-    /// Value chain id
-    pub chain_id: String,
-
-    /// Value genesis state hash
-    pub genesis_state_hash: String,
-
     /// Value balance
     pub balance: f64,
 
@@ -352,37 +346,33 @@ impl StakesDelegationTotals {
 impl
     From<(
         StakingAccount, //  0 - staking account
-        String,         //  1 - chain id
-        u32,            //  2 - pk epoch num blocks
-        u32,            //  3 - pk total num blocks
-        u32,            //  4 - pk epoch num supercharged blocks
-        u32,            //  5 - pk total num supercharged blocks
-        u32,            //  6 - pk epoch num SNARKs
-        u32,            //  7 - pk total num SNARKs
-        u32,            //  8 - pk epoch num user commands
-        u32,            //  9 - pk total num user commands
-        u32,            // 10 - pk epoch num internal commands
-        u32,            // 11 - pk total num internal commands
-        Option<String>, // 12 - username
-        String,         // 13 - genesis state hash
+        u32,            //  1 - pk epoch num blocks
+        u32,            //  2 - pk total num blocks
+        u32,            //  3 - pk epoch num supercharged blocks
+        u32,            //  4 - pk total num supercharged blocks
+        u32,            //  5 - pk epoch num SNARKs
+        u32,            //  6 - pk total num SNARKs
+        u32,            //  7 - pk epoch num user commands
+        u32,            //  8 - pk total num user commands
+        u32,            //  9 - pk epoch num internal commands
+        u32,            // 10 - pk total num internal commands
+        Option<String>, // 11 - username
     )> for StakesLedgerAccount
 {
     fn from(
         acc: (
             StakingAccount, //  0 - staking account
-            String,         //  1 - chain id
-            u32,            //  2 - pk epoch num blocks
-            u32,            //  3 - pk total num blocks
-            u32,            //  4 - pk epoch num supercharged blocks
-            u32,            //  5 - pk total num supercharged blocks
-            u32,            //  6 - pk epoch num SNARKs
-            u32,            //  7 - pk total num SNARKs
-            u32,            //  8 - pk epoch num user commands
-            u32,            //  9 - pk total num user commands
-            u32,            // 10 - pk epoch num internal commands
-            u32,            // 11 - pk total num internal commands
-            Option<String>, // 12 - username
-            String,         // 13 - genesis state hash
+            u32,            //  1 - pk epoch num blocks
+            u32,            //  2 - pk total num blocks
+            u32,            //  3 - pk epoch num supercharged blocks
+            u32,            //  4 - pk total num supercharged blocks
+            u32,            //  5 - pk epoch num SNARKs
+            u32,            //  6 - pk total num SNARKs
+            u32,            //  7 - pk epoch num user commands
+            u32,            //  8 - pk total num user commands
+            u32,            //  9 - pk epoch num internal commands
+            u32,            // 10 - pk total num internal commands
+            Option<String>, // 11 - username
         ),
     ) -> Self {
         let account = acc.0;
@@ -401,7 +391,6 @@ impl
         let voting_for = account.voting_for.0;
 
         Self {
-            chain_id: acc.1,
             balance,
             nonce,
             delegate,
@@ -411,18 +400,17 @@ impl
             receipt_chain_hash,
             voting_for,
             balance_nanomina,
-            pk_epoch_num_blocks: acc.2,
-            pk_total_num_blocks: acc.3,
-            pk_epoch_num_supercharged_blocks: acc.4,
-            pk_total_num_supercharged_blocks: acc.5,
-            pk_epoch_num_snarks: acc.6,
-            pk_total_num_snarks: acc.7,
-            pk_epoch_num_user_commands: acc.8,
-            pk_total_num_user_commands: acc.9,
-            pk_epoch_num_internal_commands: acc.10,
-            pk_total_num_internal_commands: acc.11,
-            username: acc.12,
-            genesis_state_hash: acc.13,
+            pk_epoch_num_blocks: acc.1,
+            pk_total_num_blocks: acc.2,
+            pk_epoch_num_supercharged_blocks: acc.3,
+            pk_total_num_supercharged_blocks: acc.4,
+            pk_epoch_num_snarks: acc.5,
+            pk_total_num_snarks: acc.6,
+            pk_epoch_num_user_commands: acc.7,
+            pk_total_num_user_commands: acc.8,
+            pk_epoch_num_internal_commands: acc.9,
+            pk_total_num_internal_commands: acc.10,
+            username: acc.11,
         }
     }
 }
@@ -534,7 +522,6 @@ impl StakesLedgerAccountWithMeta {
             vesting_increment: Some(timing.vesting_increment.0),
             vesting_period: Some(timing.vesting_period.0),
         });
-        let chain_id = db.get_chain_id().expect("chain id").0;
 
         // pk data counts
         let pk_epoch_num_blocks = db
@@ -584,7 +571,6 @@ impl StakesLedgerAccountWithMeta {
             genesis_state_hash,
             account: StakesLedgerAccount::from((
                 account,
-                chain_id,
                 pk_epoch_num_blocks,
                 pk_total_num_blocks,
                 pk_epoch_num_supercharged_blocks,
@@ -596,7 +582,6 @@ impl StakesLedgerAccountWithMeta {
                 pk_epoch_num_internal_commands,
                 pk_total_num_internal_commands,
                 username,
-                genesis_state_hash,
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
