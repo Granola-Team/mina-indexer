@@ -4,7 +4,6 @@ use super::db;
 use crate::{
     base::amount::Amount,
     block::store::BlockStore,
-    chain::store::ChainStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::MAINNET_GENESIS_HASH,
     ledger::{
