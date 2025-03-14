@@ -68,8 +68,8 @@ pub struct TransactionWithoutBlock {
     kind: String,
     memo: String,
     nonce: u32,
-    receiver: PK,
-    to: String,
+    receiver: Option<PK>,
+    to: Option<String>,
     tokens: Vec<String>,
 
     /// Total number of user commands in the given epoch
@@ -868,7 +868,7 @@ impl TransactionWithoutBlock {
         };
 
         let receiver = cmd.command.receiver_pk();
-        let receiver = receiver.first().expect("receiver").0.to_owned();
+        let receiver = receiver.first().map(PublicKey::to_string);
 
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
@@ -892,9 +892,7 @@ impl TransactionWithoutBlock {
             kind: cmd.command.kind().to_string(),
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,
-            receiver: PK {
-                public_key: receiver.to_owned(),
-            },
+            receiver: receiver.to_owned().map(|pk| PK { public_key: pk }),
             to: receiver,
             tokens: cmd.command.tokens().into_iter().map(|t| t.0).collect(),
             epoch_num_user_commands,
@@ -1006,8 +1004,10 @@ impl TransactionQueryInput {
         }
 
         if let Some(to) = to {
-            if transaction.transaction.to != *to {
-                return false;
+            if let Some(txn_to) = transaction.transaction.to.as_ref() {
+                if txn_to != to {
+                    return false;
+                }
             }
         }
 
