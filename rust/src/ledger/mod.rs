@@ -13,7 +13,7 @@ pub mod username;
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey},
     block::precomputed::PrecomputedBlock,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
     ledger::{
         account::Account,
         diff::{account::AccountDiff, LedgerDiff},
@@ -457,9 +457,22 @@ impl Eq for TokenLedger {}
 impl std::fmt::Display for TokenLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut accounts = HashMap::new();
+
         for (pk, acct) in self.accounts.iter() {
-            accounts.insert(pk.to_address(), acct.clone().display());
+            let acct = if acct
+                .token
+                .as_ref()
+                .filter(|t| t.0 != MINA_TOKEN_ADDRESS)
+                .is_none()
+            {
+                // only subtract account creation fee from MINA accounts
+                acct.clone().display()
+            } else {
+                acct.clone()
+            };
+            accounts.insert(pk.to_address(), acct);
         }
+
         write!(f, "{}", serde_json::to_string(&accounts).unwrap())
     }
 }
@@ -469,6 +482,7 @@ impl std::fmt::Debug for TokenLedger {
         for (pk, acct) in &self.accounts {
             writeln!(f, "{pk} -> {}", acct.clone().display().balance.0)?;
         }
+
         writeln!(f)?;
         Ok(())
     }
