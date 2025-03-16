@@ -125,10 +125,7 @@ check:
 #
 
 # Perform a nix (release) build
-nix-build: clippy test-unit-tier2 nix-build-no-checks
-
-# Perform a nix (release) build with no checks
-nix-build-no-checks:
+nix-build:
     @echo "--- Performing Nix build"
     nom build
 
@@ -284,7 +281,7 @@ tier3-dev blocks='5000': dev-build
 #
 
 # Run a server as if in production with the Nix-built binary.
-deploy-local-prod blocks='5000' web_port='': nix-build-no-checks
+deploy-local-prod blocks='5000' web_port='': nix-build
     @echo "--- Deploying prod indexer"
     time {{ DEPLOY_PROD }} {{ PROD_MODE }} {{ blocks }} {{ web_port }}
 
