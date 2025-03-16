@@ -149,7 +149,7 @@ def check_ledger(height)
     out: idxr_ledger_diff
   ) && `cat #{idxr_ledger_diff}`.empty?
     warn("Regression introduced to ledger calculations. Inspect diff file: #{idxr_ledger_diff}")
-    return false
+    false
   end
 end
 
