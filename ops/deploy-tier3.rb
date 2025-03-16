@@ -103,10 +103,6 @@ def idxr_ledger(height)
 end
 
 def check_ledger(height)
-  success = true
-
-  abort("Height must be 359604 or 427023") unless height == 359604 || height == 427023
-
   # Compare the indexer ledger at height #{height} with the corresponding Mina ledger
   #
   puts "Attempting ledger extraction at height #{height}..."
@@ -121,7 +117,7 @@ def check_ledger(height)
     "--path", idxr_ledger
   )
     warn("Ledger extraction failed.")
-    success = false
+    return false
   end
 
   puts "Ledger extraction complete. Verifying ledger at #{height}..."
@@ -144,7 +140,7 @@ def check_ledger(height)
     out: idxr_norm_ledger
   )
     warn("Normalizing indexer ledger at height #{height} failed.")
-    success = false
+    return false
   end
 
   # check normalized ledgers match
@@ -153,17 +149,16 @@ def check_ledger(height)
     out: idxr_ledger_diff
   ) && `cat #{idxr_ledger_diff}`.empty?
     warn("Regression introduced to ledger calculations. Inspect diff file: #{idxr_ledger_diff}")
-    success = height == 427023 # do not fail for 427023 yet
+    return false
   end
-
-  success
 end
 
-# capture success of diff(s)
-success = if BLOCKS_COUNT >= 427023
-  check_ledger(359604) && check_ledger(427023)
-elsif BLOCKS_COUNT >= 359604
-  check_ledger(359604)
+if BLOCKS_COUNT >= 359604
+  check_ledger(359604) || abort("Incorrect ledger at height 359604.")
+end
+
+if BLOCKS_COUNT >= 427023
+  check_ledger(427023)
 end
 
 #########################
@@ -172,14 +167,11 @@ end
 
 puts "Testing snapshot restore of #{snapshot_path(BLOCKS_COUNT)}..."
 restore_path = "#{BASE_DIR}/restore-#{BLOCKS_COUNT}.#{REV}.tmp"
-unless invoke_mina_indexer(
+invoke_mina_indexer(
   "database", "restore",
   "--snapshot-file", snapshot_path(BLOCKS_COUNT),
   "--restore-dir", restore_path
-)
-  warn("Snapshot restore failed.")
-  success = false
-end
+) || abort("Snapshot restore failed.")
 puts "Snapshot restore complete."
 
 ############
@@ -187,13 +179,10 @@ puts "Snapshot restore complete."
 ############
 
 puts "Initiating shutdown..."
-unless invoke_mina_indexer(
+invoke_mina_indexer(
   "--socket", SOCKET,
   "shutdown"
-)
-  warn("Shutdown failed after snapshot.")
-  success = false
-end
+) || abort("Shutdown failed after snapshot.")
 
 Process.wait(pid)
 puts "Shutdown complete."
@@ -225,6 +214,3 @@ FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
 #             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
 # wait_for_socket(10)
 # puts 'Self-check complete.'
-
-success ||= true
-exit success
