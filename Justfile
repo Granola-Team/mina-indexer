@@ -3,8 +3,6 @@
 # The command 'just' will give usage information.
 # See https://github.com/casey/just for more.
 
-mod stage-blocks
-
 export TOPLEVEL := `pwd`
 export CARGO_HOME := TOPLEVEL + "/.cargo"
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
