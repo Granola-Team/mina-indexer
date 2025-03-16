@@ -25,14 +25,6 @@ alias ct := clean-test
 alias bt := dev
 alias btc := dev-continue
 
-# Test
-
-alias test-unit := test-unit-tier2
-alias tu := test-unit-tier2
-alias t1 := tier1
-alias t2 := tier2
-alias t3 := tier3-dev
-
 # Prod
 
 alias dlp := deploy-local-prod-dev
