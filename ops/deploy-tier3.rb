@@ -92,7 +92,7 @@ system(
   "#{SRC_TOP}/ops/upload-snapshot.sh",
   File.basename(snapshot_path(BLOCKS_COUNT)),
   {chdir: File.dirname(snapshot_path(BLOCKS_COUNT))}
-) || warn("Snapshot upload failed.")
+) || abort("Snapshot upload failed. Aborting.")
 
 #####################
 # Ledger diff tests #
