@@ -130,7 +130,6 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
         if height.between?(start_height, end_height)
           # Hard link the correct block files into the destination directory.
           target = "#{dest}/#{File.basename(block_file)}"
-          File.link(block_file, target)
           unless File.exist?(target)
             File.link(block_file, target)
           end
