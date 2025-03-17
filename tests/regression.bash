@@ -33,9 +33,7 @@ cd "$BASE_DIR"
 ###########
 
 MAINNET_GENESIS_STATE_HASH=3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
-
 HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
-HARDFORK_GENESIS_BLOCK_HEIGHT=359605
 
 # Indexer helpers
 #
@@ -168,47 +166,8 @@ idxr_server_start_standard_v2() {
 		"$@"
 }
 
-# Stage pre-hardfork blocks
-#
-stage_mainnet_blocks() {
-	"$SRC"/ops/stage-blocks.rb 2 "$1" mainnet "$2"
-}
-
-stage_mainnet_single() {
-	"$SRC"/ops/stage-blocks.rb "$1" "$1" mainnet "$2"
-}
-
-stage_mainnet_range() {
-	"$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
-}
-
-check_height() {
-	if (("$1" <= "$HARDFORK_GENESIS_BLOCK_HEIGHT")); then
-		echo "Hardfork block heights should be >= $HARDFORK_GENESIS_BLOCK_HEIGHT"
-		exit 1
-	fi
-}
-
-# Stage post-hardfork blocks
-#
-stage_hardfork_blocks() {
-	# must go to a block after the hardfork genesis
-	check_height "$1"
-
-	# block height after hardfork genesis
-	start="$((HARDFORK_GENESIS_BLOCK_HEIGHT + 1))"
-	"$SRC"/ops/stage-blocks.rb "$start" "$1" mainnet "$2"
-}
-
-stage_hardfork_single() {
-	check_height "$1"
-	"$SRC"/ops/stage-blocks.rb "$1" "$1" mainnet "$2"
-}
-
-stage_hardfork_range() {
-	check_height "$1"
-	check_height "$2"
-	"$SRC"/ops/stage-blocks.rb "$1" "$2" mainnet "$3"
+stage_blocks() {
+	just -f "$SRC"/stage-blocks.just "$@"
 }
 
 # Assert helpers
@@ -376,7 +335,7 @@ test_server_startup_v2() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-	stage_mainnet_blocks 100 ./blocks
+	stage_blocks v1 100 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -420,7 +379,7 @@ test_account_public_key_json() {
 
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
-	stage_mainnet_blocks 15 ./blocks
+	stage_blocks v1 15 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -436,7 +395,7 @@ test_canonical_root() {
 test_canonical_threshold() {
 	num_seq_blocks=15
 	canonical_threshold=2
-	stage_mainnet_blocks $num_seq_blocks ./blocks
+	stage_blocks v1 $num_seq_blocks ./blocks
 
 	idxr_server_start_standard_v1 --canonical-threshold $canonical_threshold
 	wait_for_socket
@@ -450,7 +409,7 @@ test_canonical_threshold() {
 
 # Indexer server returns the correct v1 best tip
 test_best_tip_v1() {
-	stage_mainnet_blocks 15 ./blocks
+	stage_blocks v1 15 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -473,7 +432,7 @@ test_best_tip_v1() {
 
 # Indexer server returns the correct v2 best tip
 test_best_tip_v2() {
-	stage_hardfork_blocks 359617 ./blocks
+	stage_blocks v2 359617 ./blocks
 
 	idxr_server_start_standard_v2
 	wait_for_socket
@@ -496,7 +455,7 @@ test_best_tip_v2() {
 
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -600,7 +559,7 @@ test_blocks() {
 
 # Indexer handles copied blocks correctly
 test_block_copy() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -617,7 +576,7 @@ test_block_copy() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add block 11
-	stage_mainnet_single 11 ./blocks
+	stage_blocks v1-single 11 ./blocks
 	sleep 1
 
 	# check
@@ -634,9 +593,9 @@ test_block_copy() {
 
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
-	stage_mainnet_blocks 10 ./blocks
-	stage_mainnet_range 12 20 ./blocks # missing 11
-	stage_mainnet_range 22 30 ./blocks # missing 21
+	stage_blocks v1 10 ./blocks
+	stage_blocks v1-range 12 20 ./blocks # missing 11
+	stage_blocks v1-range 22 30 ./blocks # missing 21
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -655,7 +614,7 @@ test_missing_blocks() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add missing block which connects the dangling branches
-	stage_mainnet_single 21 ./blocks
+	stage_blocks v1-single 21 ./blocks
 	sleep 1
 
 	# dangling branches combine
@@ -673,7 +632,7 @@ test_missing_blocks() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add remaining missing block
-	stage_mainnet_single 11 ./blocks
+	stage_blocks v1-single 11 ./blocks
 	sleep 1
 
 	# dangling branches move into the root branch
@@ -692,7 +651,7 @@ test_missing_blocks() {
 
 # Indexer server returns the correct v1 best chain
 test_best_chain_v1() {
-	stage_mainnet_blocks 12 ./blocks
+	stage_blocks v1 12 ./blocks
 	mkdir -p best_chain
 
 	idxr_server_start_standard_v1
@@ -739,7 +698,7 @@ test_best_chain_v1() {
 
 # Indexer server returns the correct v2 best chain
 test_best_chain_v2() {
-	stage_hardfork_blocks 359617 ./blocks
+	stage_blocks v2 359617 ./blocks
 	mkdir -p best_chain
 
 	idxr_server_start_standard_v2
@@ -780,7 +739,7 @@ test_best_chain_v2() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
-	stage_mainnet_blocks 15 ./blocks
+	stage_blocks v1 15 ./blocks
 	mkdir -p ledgers
 
 	idxr_server_start_standard_v1
@@ -851,7 +810,7 @@ test_ledgers() {
 
 # Indexer server syncs with existing Speedb
 test_sync() {
-	stage_mainnet_blocks 15 ./blocks
+	stage_blocks v1 15 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -861,7 +820,7 @@ test_sync() {
 	shutdown_idxr
 
 	# add more blocks to the watch dir while not indexing
-	stage_mainnet_range 16 20 ./blocks
+	stage_blocks v1-range 16 20 ./blocks
 
 	# sync from previous indexer db
 	idxr_server_start \
@@ -881,7 +840,7 @@ test_sync() {
 
 # Indexer server replays events
 test_replay() {
-	stage_mainnet_blocks 15 ./blocks
+	stage_blocks v1 15 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -890,7 +849,7 @@ test_replay() {
 	shutdown_idxr
 
 	# add 8 more blocks to the watch dir while not indexing
-	stage_mainnet_range 16 20 ./blocks
+	stage_blocks v1-range 16 20 ./blocks
 
 	# replay events from previous indexer db + new blocks
 	idxr_server_start \
@@ -912,7 +871,7 @@ test_replay() {
 
 # Indexer server returns correct transactions
 test_transactions() {
-	stage_mainnet_blocks 13 ./blocks
+	stage_blocks v1 13 ./blocks
 	mkdir -p transactions
 
 	idxr_server_start_standard_v1
@@ -1005,7 +964,7 @@ test_transactions() {
 
 # Indexer correctly exports user commands CSV
 test_transactions_csv() {
-	stage_mainnet_blocks 5 ./blocks
+	stage_blocks v1 5 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1032,7 +991,7 @@ test_transactions_csv() {
 
 # Indexer server returns correct SNARK work
 test_snark_work() {
-	stage_mainnet_blocks 120 ./blocks
+	stage_blocks v1 120 ./blocks
 	mkdir -p snark_work
 
 	idxr_server_start_standard_v1 --canonical-threshold 5
@@ -1086,7 +1045,7 @@ test_snark_work() {
 
 # Restart from a snapshot of a running indexer database
 test_snapshot() {
-	stage_mainnet_blocks 13 ./blocks
+	stage_blocks v1 13 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1136,7 +1095,7 @@ test_snapshot() {
 
 # Restart from a bogus snapshot to ensure it properly returns a failure
 test_restore_snapshot_failure_returns_proper_code() {
-	stage_mainnet_blocks 13 ./blocks
+	stage_blocks v1 13 ./blocks
 
 	# Run the command directly without capturing output
 	# The command should fail with a non-zero exit code
@@ -1152,7 +1111,7 @@ test_restore_snapshot_failure_returns_proper_code() {
 }
 
 test_rest_accounts_summary() {
-	stage_mainnet_blocks 100 ./blocks
+	stage_blocks v1 100 ./blocks
 
 	port=$(ephemeral_port)
 	idxr_database_create
@@ -1244,7 +1203,7 @@ test_rest_accounts_summary() {
 }
 
 test_rest_blocks() {
-	stage_mainnet_blocks 100 ./blocks
+	stage_blocks v1 100 ./blocks
 
 	port=$(ephemeral_port)
 	idxr_database_create
@@ -1270,7 +1229,7 @@ test_rest_blocks() {
 }
 
 test_best_chain_many_blocks() {
-	stage_mainnet_blocks 5000 ./blocks
+	stage_blocks v1 5000 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_forever_for_socket
@@ -1386,7 +1345,7 @@ test_genesis_block_creator() {
 }
 
 test_txn_nonces() {
-	stage_mainnet_blocks 100 ./blocks
+	stage_blocks v1 100 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1554,7 +1513,7 @@ test_staking_delegations() {
 }
 
 test_internal_commands() {
-	stage_mainnet_blocks 11 ./blocks
+	stage_blocks v1 11 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1612,7 +1571,7 @@ test_internal_commands() {
 
 # Indexer correctly exports internal commands CSV
 test_internal_commands_csv() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1674,7 +1633,7 @@ test_clean_kill() {
 }
 
 test_block_children() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1717,7 +1676,7 @@ test_load_v2() {
 
 # Test v1 GQL functionality
 test_hurl_v1() {
-	stage_mainnet_blocks 120 ./blocks
+	stage_blocks v1 120 ./blocks
 
 	port=$(ephemeral_port)
 	idxr database create \
@@ -1777,7 +1736,7 @@ test_hurl_v1() {
 
 # Test v2 GQL functionality
 test_hurl_v2() {
-	stage_hardfork_blocks 359617 ./blocks
+	stage_blocks v2 359617 ./blocks
 
 	port=$(ephemeral_port)
 	idxr database create \
@@ -1845,7 +1804,7 @@ test_version_file() {
 }
 
 test_fetch_new_blocks() {
-	stage_mainnet_blocks 9 ./blocks
+	stage_blocks v1 9 ./blocks
 
 	# start the indexer using the block fetching exe on path "$SRC"/tests/recovery.sh
 	# wait for 3s in between recovery attempts
@@ -1873,7 +1832,7 @@ test_fetch_new_blocks() {
 }
 
 test_missing_block_recovery() {
-	stage_mainnet_blocks 5 ./blocks
+	stage_blocks v1 5 ./blocks
 
 	# start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
 	# wait for 3s in between recovery attempts
@@ -1889,10 +1848,10 @@ test_missing_block_recovery() {
 	wait_for_socket
 
 	# miss blocks at heights 6, 8, 11-16, 18-20
-	stage_mainnet_single 7 ./blocks
-	stage_mainnet_range 9 10 ./blocks
-	stage_mainnet_single 17 ./blocks
-	stage_mainnet_single 21 ./blocks
+	stage_blocks v1-single 7 ./blocks
+	stage_blocks v1-range 9 10 ./blocks
+	stage_blocks v1-single 17 ./blocks
+	stage_blocks v1-single 21 ./blocks
 
 	# after blocks are added, check dangling branches
 	sleep 3
@@ -1910,7 +1869,7 @@ test_missing_block_recovery() {
 
 # Create an indexer database & start indexing
 test_database_create() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket
@@ -1930,7 +1889,7 @@ test_database_create() {
 # Create an indexer database snapshot from a db directory without a running indexer.
 # Restore the database from the snapshot & start indexing
 test_snapshot_database_dir() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	idxr_database_create
 
@@ -1962,7 +1921,7 @@ test_snapshot_database_dir() {
 
 # Indexer databases can be reused & expanded
 test_reuse_databases() {
-	stage_mainnet_blocks 10 ./blocks
+	stage_blocks v1 10 ./blocks
 
 	# create initial db
 	idxr_server_start_standard_v1
@@ -1972,7 +1931,7 @@ test_reuse_databases() {
 	shutdown_idxr
 
 	# add more blocks to the watch dir while not indexing
-	stage_mainnet_range 11 12 ./blocks
+	stage_blocks v1-range 11 12 ./blocks
 
 	# sync from previous indexer db
 	idxr_server_start_standard_v1
@@ -1984,7 +1943,7 @@ test_reuse_databases() {
 
 # Indexer doesn't ingest orphan blocks
 test_do_not_ingest_orphan_blocks() {
-	stage_mainnet_blocks 20 ./blocks
+	stage_blocks v1 20 ./blocks
 
 	idxr_server_start_standard_v1 --do-not-ingest-orphan-blocks
 	wait_for_socket
@@ -2014,7 +1973,7 @@ test_do_not_ingest_orphan_blocks() {
 	shutdown_idxr
 
 	# start a "normal" indexer to compare the best ledger
-	stage_mainnet_blocks 20 ./blocks
+	stage_blocks v1 20 ./blocks
 
 	idxr_server_start_standard_v1
 	wait_for_socket

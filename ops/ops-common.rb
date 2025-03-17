@@ -101,6 +101,7 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
   start_height = start_height.to_i
 
   dest = blocks_dir(end_height) if dest == ""
+  dest = File.expand_path(dest)
 
   # If start_height is not 1, then we assume that even if the destination
   # exists, then it does not contain all 1..end_height contiguous blocks.
@@ -119,18 +120,20 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
 
     FileUtils.mkdir_p(dest)
 
-    print "Staging #{network} blocks #{start_height} to #{end_height} into #{dest}... "
+    print "Staging #{network} blocks #{start_height} to #{end_height} into #{dest}... from #{MASTER_BLOCKS_DIR}"
 
     # Format of file is: "#{MASTER_BLOCKS_DIR}/#{network}-#{block_height}-#{hash}.json"
     #
     Dir["#{MASTER_BLOCKS_DIR}/#{network}-*.json"].each do |block_file|
-      /#{MASTER_BLOCKS_DIR}\/#{network}-(.*)-.*\.json/ =~ block_file
-      height = $1.to_i
-      if height.between?(start_height, end_height)
-        # Hard link the correct block files into the destination directory.
-        target = "#{dest}/#{File.basename(block_file)}"
-        unless File.exist?(target)
+      if block_file =~ /#{Regexp.escape(network)}-(\d+)-/
+        height = $1.to_i
+        if height.between?(start_height, end_height)
+          # Hard link the correct block files into the destination directory.
+          target = "#{dest}/#{File.basename(block_file)}"
           File.link(block_file, target)
+          unless File.exist?(target)
+            File.link(block_file, target)
+          end
         end
       end
     end
