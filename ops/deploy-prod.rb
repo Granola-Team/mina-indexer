@@ -58,6 +58,10 @@ invoke_mina_indexer(
   "--restore-dir", db_dir(BLOCKS_COUNT)
 ) || abort("Snapshot restore failed. Aborting.")
 
+# The snapshot restore succeeded, so we may delete the snapshot.
+#
+FileUtils.rm_rf(snapshot_path(BLOCKS_COUNT))
+
 # Now, we take over.
 #
 File.write(CURRENT, REV)
