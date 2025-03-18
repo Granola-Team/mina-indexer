@@ -6,11 +6,7 @@ use crate::{
     chain::{ChainId, Network},
     cli::server::ServerArgsJson,
     constants::*,
-    ledger::{
-        genesis::GenesisLedger,
-        staking::{self, StakingLedger},
-        store::staking::StakingLedgerStore,
-    },
+    ledger::{genesis::GenesisLedger, staking::StakingLedger, store::staking::StakingLedgerStore},
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
@@ -478,12 +474,9 @@ async fn run_indexer<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn retry_parse_staking_ledger(
-    path: &Path,
-    genesis_state_hash: StateHash,
-) -> anyhow::Result<StakingLedger> {
+async fn retry_parse_staking_ledger(path: &Path) -> anyhow::Result<StakingLedger> {
     for attempt in 1..=5 {
-        match StakingLedger::parse_file(path, genesis_state_hash.clone()).await {
+        match StakingLedger::parse_file(path).await {
             Ok(ledger) => return Ok(ledger),
             Err(e) if attempt < 5 => {
                 warn!("Attempt {attempt} failed: {e}. Retrying in 1 second...");
@@ -540,14 +533,12 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                     }
                     Err(e) => error!("Error parsing precomputed block: {e}"),
                 }
-            } else if staking::is_valid_ledger_file(&path) {
+            } else if StakingLedger::is_valid(&path) {
                 // acquire state write lock
-                let version = state.read().await.version.clone();
                 let state = state.write().await;
+
                 if let Some(store) = state.indexer_store.as_ref() {
-                    match retry_parse_staking_ledger(&path, version.genesis.state_hash.clone())
-                        .await
-                    {
+                    match retry_parse_staking_ledger(&path).await {
                         Ok(staking_ledger) => {
                             let epoch = staking_ledger.epoch;
                             let ledger_hash = staking_ledger.ledger_hash.clone();
@@ -562,6 +553,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                                 .unwrap_or_else(|e| {
                                     error!("Error adding staking ledger {ledger_summary} {e}")
                                 });
+
                             let mut staking_ledgers = state.staking_ledgers.lock().unwrap();
                             staking_ledgers.insert(epoch, ledger_hash);
                         }

@@ -56,37 +56,50 @@ pub fn nanomina_to_mina(nanomina: u64) -> String {
 /// Calculate the total size of the file paths
 pub fn calculate_total_size(paths: &[PathBuf]) -> u64 {
     paths.iter().fold(0, |acc, p| {
-        match p.metadata() {
-            Ok(metadata) => acc + metadata.len(),
-            Err(_) => acc, // Skip files that can't be read
-        }
+        p.metadata().map_or(acc, |metadata| acc + metadata.len())
     })
 }
 
 pub fn is_valid_file_name<P>(path: P, hash_validator: &dyn Fn(&str) -> bool) -> bool
 where
     P: AsRef<Path>,
+    P: Into<PathBuf>,
 {
+    let mut file_stem = path.as_ref().file_stem().and_then(|stem| stem.to_str());
+
+    // check extension
     if let Some(ext) = path.as_ref().extension().and_then(|ext| ext.to_str()) {
-        if ext != "json" {
+        if ext == "gz" {
+            // gzip compressed json
+            if let Some((stem, ext)) = file_stem.as_ref().map(|file| {
+                let mut parts = file.split('.');
+                (parts.next().unwrap(), parts.next().unwrap())
+            }) {
+                if ext != "json" {
+                    return false;
+                }
+
+                file_stem = Some(stem);
+            }
+        } else if ext != "json" {
+            // uncompressed
             return false;
         }
     } else {
         return false;
     }
 
-    if let Some(file_stem) = path.as_ref().file_stem().and_then(|stem| stem.to_str()) {
-        let parts: Vec<&str> = file_stem.split('-').collect();
+    // check validity of file stem
+    file_stem.map_or(false, |stem| {
+        let parts: Vec<&str> = stem.split('-').collect();
 
-        match parts.as_slice() {
-            // mainnet-<number>-<hash>.json
-            [_, epoch_str, hash] => epoch_str.parse::<u32>().is_ok() && hash_validator(hash),
-
-            _ => false,
+        // mainnet-<number>-<hash>.json
+        if let [_, epoch_str, hash] = parts.as_slice() {
+            epoch_str.parse::<u32>().is_ok() && hash_validator(hash)
+        } else {
+            false
         }
-    } else {
-        false
-    }
+    })
 }
 
 #[cfg(test)]

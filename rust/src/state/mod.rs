@@ -1094,16 +1094,10 @@ impl IndexerState {
                 .ledger_paths
                 .map(|path| {
                     let staking_ledgers = self.staking_ledgers.clone();
-                    let genesis_state_hash = self.version.genesis.state_hash.clone();
                     let indexer_store = indexer_store.clone();
+
                     tokio::task::spawn(async move {
-                        Self::process_staking_ledger(
-                            &path,
-                            &indexer_store,
-                            &staking_ledgers,
-                            &genesis_state_hash,
-                        )
-                        .await
+                        Self::process_staking_ledger(&path, &indexer_store, &staking_ledgers).await
                     })
                 })
                 .collect();
@@ -1120,17 +1114,18 @@ impl IndexerState {
         path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
-        genesis_state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         let (epoch, hash) = extract_epoch_hash(path);
         if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
-            let staking_ledger =
-                StakingLedger::parse_file(path, genesis_state_hash.clone()).await?;
+            let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
-            let mut staking_ledgers = staking_ledgers.lock().unwrap();
 
+            let mut staking_ledgers = staking_ledgers.lock().unwrap();
             staking_ledgers.insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
-            store.add_staking_ledger(staking_ledger, genesis_state_hash)?;
+
+            let genesis_state_hash = staking_ledger.genesis_state_hash.to_owned();
+            store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
+
             info!("Added staking ledger {summary}");
         }
 

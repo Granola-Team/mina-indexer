@@ -1,7 +1,6 @@
-use super::{is_valid_ledger_file, StakingLedger};
+use super::StakingLedger;
 use crate::{
     block::extract_height_and_hash,
-    constants::MAINNET_GENESIS_HASH,
     ledger::{store::staking::StakingLedgerStore, LedgerHash},
     store::IndexerStore,
 };
@@ -18,13 +17,22 @@ pub struct StakingLedgerParser {
 
 /// Staking ledgers have this format:
 ///  <network_name>-<epoch_number>-<ledger_hash>.json
+/// or
+///  <network_name>-<epoch_number>-<ledger_hash>.json.gz
 
 impl StakingLedgerParser {
     pub fn new(ledgers_dir: &Path) -> anyhow::Result<Self> {
-        let ledger_paths: Vec<PathBuf> = glob(&format!("{}/*-*-*.json", ledgers_dir.display()))?
+        let gzipped_paths = glob(&format!("{}/*-*-*.json.gz", ledgers_dir.display()))?
             .filter_map(|path| path.ok())
-            .filter(|path| is_valid_ledger_file(path))
+            .filter(|path| StakingLedger::is_valid(path));
+        let ledger_paths: Vec<PathBuf> = gzipped_paths
+            .chain(
+                glob(&format!("{}/*-*-*.json", ledgers_dir.display()))?
+                    .filter_map(|path| path.ok())
+                    .filter(|path| StakingLedger::is_valid(path)),
+            )
             .collect();
+
         Ok(Self {
             ledgers_dir: ledgers_dir.to_path_buf(),
             ledger_paths: ledger_paths.into_iter(),
@@ -40,21 +48,19 @@ impl StakingLedgerParser {
             if let Some(store) = store {
                 // extract epoch and ledger hash to check if it's in the db
                 let (epoch, hash) = extract_epoch_hash(&next_path);
+
                 if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
                     // add the missing staking ledger
-                    return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
-                        .await
-                        .map(Some);
+                    return StakingLedger::parse_file(&next_path).await.map(Some);
                 } else {
                     continue;
                 }
             }
 
             // parse all staking ledgers if no store
-            return StakingLedger::parse_file(&next_path, MAINNET_GENESIS_HASH.into())
-                .await
-                .map(Some);
+            return StakingLedger::parse_file(&next_path).await.map(Some);
         }
+
         Ok(None)
     }
 }

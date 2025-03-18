@@ -21,7 +21,10 @@ use crate::{
 };
 use precomputed::PcbVersion;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, path::Path};
+use std::{
+    cmp::Ordering,
+    path::{Path, PathBuf},
+};
 
 // re-export types
 pub type AccountCreated = post_hardfork::account_created::AccountCreated;
@@ -301,6 +304,7 @@ impl std::fmt::Display for StateHash {
 pub fn is_valid_block_file<P>(path: P) -> bool
 where
     P: AsRef<Path>,
+    P: Into<PathBuf>,
 {
     is_valid_file_name(path, &StateHash::is_valid)
 }

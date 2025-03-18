@@ -19,8 +19,8 @@ impl FromStr for TokenId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let blockchain_length = s.parse()?;
-        Ok(Self(blockchain_length))
+        let token_id = s.parse()?;
+        Ok(Self(token_id))
     }
 }
 

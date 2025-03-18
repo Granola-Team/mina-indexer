@@ -1,16 +1,18 @@
 pub mod parser;
 pub mod permissions;
 
+use super::token::TokenAddress;
 use crate::{
     base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::{extract_height_and_hash, extract_network},
     chain::Network,
-    constants::MINA_SCALE_DEC,
+    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH, MINA_SCALE_DEC},
     ledger::{
         account::{ReceiptChainHash, Timing},
         LedgerHash,
     },
     mina_blocks::v2::ZkappAccount,
+    utility::compression::decompress_gzip,
 };
 use anyhow::Context;
 use log::trace;
@@ -19,7 +21,7 @@ use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,7 +40,7 @@ pub struct StakingAccount {
     pub balance: u64,
     pub delegate: PublicKey,
     pub username: Option<String>,
-    pub token: Option<u64>,
+    pub token: Option<TokenAddress>,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: StateHash,
@@ -101,7 +103,20 @@ pub struct AggregatedEpochStakeDelegation {
 
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
-        let token = Some(value.token.parse().expect("token is u32"));
+        let token = if let Ok(token_id) = value.token.parse::<u64>() {
+            assert_eq!(token_id, 1);
+
+            Some(TokenAddress::default())
+        } else if let Ok(token) = value
+            .token
+            .parse::<TokenAddress>()
+            .with_context(|| value.token)
+        {
+            Some(token)
+        } else {
+            panic!("Invalid staking account token");
+        };
+
         let nonce = value.nonce.map(Into::into);
         let balance = match value.balance.parse::<Decimal>() {
             Ok(amt) => (amt * MINA_SCALE_DEC)
@@ -128,6 +143,7 @@ impl From<StakingAccountJson> for StakingAccount {
                 Err(e) => panic!("Unable to parse vesting_increment: {e}"),
             },
         });
+
         Self {
             nonce,
             token,
@@ -235,30 +251,50 @@ impl StakingLedger {
         crate::utility::functions::is_valid_file_name(path, &LedgerHash::is_valid)
     }
 
-pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
-    let (height, hash) = extract_height_and_hash(path);
-    let network = extract_network(path);
-    (network, height, LedgerHash::new_or_panic(hash.to_string()))
-}
+    pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
+        let (height, hash) = extract_height_and_hash(path);
+        let network = extract_network(path);
+        (network, height, LedgerHash::new_or_panic(hash.to_string()))
+    }
 
-impl StakingLedger {
-    pub async fn parse_file(
-        path: &Path,
-        genesis_state_hash: StateHash,
-    ) -> anyhow::Result<StakingLedger> {
-        trace!(
-            "Parsing staking ledger {:?}",
-            path.file_stem().unwrap().to_str().unwrap_or_default()
-        );
-        let bytes = std::fs::read(path)?;
+    /// Parse a valid (compressed) ledger file
+    pub async fn parse_file(path: &Path) -> anyhow::Result<Self> {
+        let mut bytes = std::fs::read(path)?;
+        let is_compressed = path.extension().map_or(false, |ext| ext == "gz");
+
+        // decompress if needed
+        if is_compressed {
+            bytes = decompress_gzip(&bytes[..])?;
+        }
+
+        let file_name = path.file_stem().unwrap().to_str().map(|stem| {
+            let stem = PathBuf::from(stem);
+
+            if is_compressed {
+                return stem
+                    .file_stem()
+                    .expect("valid ledger file")
+                    .to_str()
+                    .unwrap()
+                    .into();
+            }
+
+            stem
+        });
+        trace!("Parsing staking ledger {:?}", file_name);
+
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)
             .with_context(|| format!("Failed reading staking ledger {}", path.display()))?;
+
         let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
             .map(|acct| (acct.pk.clone(), acct.into()))
             .collect();
-        let (network, epoch, ledger_hash) = split_ledger_path(path);
+
+        let (network, epoch, ledger_hash) = Self::split_ledger_path(path);
         let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
+        let genesis_state_hash = Self::genesis_state_hash(&ledger_hash);
+
         Ok(Self {
             epoch,
             network,
@@ -267,6 +303,14 @@ impl StakingLedger {
             staking_ledger,
             genesis_state_hash,
         })
+    }
+
+    pub fn genesis_state_hash(ledger_hash: &LedgerHash) -> StateHash {
+        if Self::V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str)) {
+            MAINNET_GENESIS_HASH.into()
+        } else {
+            HARDFORK_GENESIS_HASH.into()
+        }
     }
 
     /// Aggregate each public key's staking delegations and total delegations
@@ -327,6 +371,7 @@ impl StakingLedger {
             .into_iter()
             .map(|(pk, del)| (pk, del.unwrap_or_default()))
             .collect();
+
         Ok(AggregatedEpochStakeDelegations {
             delegations,
             total_delegations,
@@ -341,6 +386,10 @@ impl StakingLedger {
         format!("{}-{}-{}", self.network, self.epoch, self.ledger_hash)
     }
 }
+
+/////////////////
+// conversions //
+/////////////////
 
 impl From<String> for LedgerHash {
     fn from(value: String) -> Self {
@@ -368,7 +417,7 @@ mod tests {
     #[tokio::test]
     async fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into()).await?;
+        let staking_ledger = StakingLedger::parse_file(&path).await?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, Network::Mainnet);
@@ -384,7 +433,7 @@ mod tests {
         use crate::base::public_key::PublicKey;
 
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path, MAINNET_GENESIS_HASH.into()).await?;
+        let staking_ledger = StakingLedger::parse_file(&path).await?;
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
