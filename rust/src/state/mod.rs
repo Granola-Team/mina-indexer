@@ -48,7 +48,7 @@ use anyhow::bail;
 use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::Path,
     str::FromStr,
     sync::{Arc, Mutex},
@@ -87,7 +87,7 @@ pub struct IndexerState {
     pub indexer_store: Option<Arc<IndexerStore>>,
 
     /// Staking ledger epochs and ledger hashes
-    pub staking_ledgers: Arc<Mutex<HashMap<u32, LedgerHash>>>,
+    pub staking_ledgers: Arc<Mutex<HashSet<(u32, LedgerHash)>>>,
 
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
@@ -360,7 +360,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
+            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
             chain_data: ChainData::default(),
         })
     }
@@ -398,7 +398,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
+            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
             chain_data: ChainData::default(),
         })
     }
@@ -464,7 +464,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
-            staking_ledgers: Arc::new(Mutex::new(HashMap::new())),
+            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
             version: IndexerVersion::default(),
             chain_data: ChainData::default(),
         })
@@ -1113,15 +1113,20 @@ impl IndexerState {
     pub async fn process_staking_ledger(
         path: &Path,
         store: &Arc<IndexerStore>,
-        staking_ledgers: &Arc<Mutex<HashMap<u32, LedgerHash>>>,
+        staking_ledgers: &Arc<Mutex<HashSet<(u32, LedgerHash)>>>,
     ) -> anyhow::Result<()> {
         let (epoch, hash) = extract_epoch_hash(path);
-        if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
+
+        if store.get_staking_ledger_hash_by_epoch(
+            epoch,
+            Some(&StakingLedger::genesis_state_hash(&hash)),
+        )? != Some(hash)
+        {
             let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
 
             let mut staking_ledgers = staking_ledgers.lock().unwrap();
-            staking_ledgers.insert(staking_ledger.epoch, staking_ledger.ledger_hash.clone());
+            staking_ledgers.insert((staking_ledger.epoch, staking_ledger.ledger_hash.to_owned()));
 
             let genesis_state_hash = staking_ledger.genesis_state_hash.to_owned();
             store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
@@ -1187,7 +1192,7 @@ impl IndexerState {
     pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut witness_tree_blocks = vec![];
-        let mut staking_ledgers = HashMap::new();
+        let mut staking_ledgers = HashSet::new();
 
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             debug!("Looking for witness tree root block");
@@ -1274,7 +1279,7 @@ impl IndexerState {
                         if genesis_state_hash.0 == MAINNET_GENESIS_HASH
                             || genesis_state_hash.0 == HARDFORK_GENESIS_HASH
                         {
-                            staking_ledgers.insert(epoch, ledger_hash);
+                            staking_ledgers.insert((epoch, ledger_hash));
                         } else {
                             error!("Unrecognized genesis state hash");
                         }
@@ -1433,7 +1438,7 @@ impl IndexerState {
                     ledger_hash,
                 }) => {
                     let mut staking_ledgers = self.staking_ledgers.lock().unwrap();
-                    staking_ledgers.insert(*epoch, ledger_hash.clone());
+                    staking_ledgers.insert((*epoch, ledger_hash.to_owned()));
                     self.replay_staking_ledger(epoch, ledger_hash)
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
@@ -1662,17 +1667,22 @@ impl IndexerState {
             max_dangling_length,
         };
         let staking_ledgers = self.staking_ledgers.lock().unwrap();
-        let max_staking_ledger_epoch = staking_ledgers.keys().max().cloned();
+        let (max_staking_ledger_epoch, max_staking_ledger_hash) = {
+            let epoch_hash = staking_ledgers
+                .iter()
+                .max_by(|(epoch0, _), (epoch1, _)| epoch0.cmp(epoch1));
+            (
+                epoch_hash.map(|(e, _)| *e),
+                epoch_hash.map(|(_, h)| h.0.to_owned()),
+            )
+        };
 
         SummaryShort {
             witness_tree,
             max_staking_ledger_epoch,
+            max_staking_ledger_hash,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            max_staking_ledger_hash: staking_ledgers
-                .get(&max_staking_ledger_epoch.unwrap_or(0))
-                .cloned()
-                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }
@@ -1711,17 +1721,22 @@ impl IndexerState {
             witness_tree: format!("{self}"),
         };
         let staking_ledgers = self.staking_ledgers.lock().unwrap();
-        let max_staking_ledger_epoch = staking_ledgers.keys().max().cloned();
+        let (max_staking_ledger_epoch, max_staking_ledger_hash) = {
+            let epoch_hash = staking_ledgers
+                .iter()
+                .max_by(|(epoch0, _), (epoch1, _)| epoch0.cmp(epoch1));
+            (
+                epoch_hash.map(|(e, _)| *e),
+                epoch_hash.map(|(_, h)| h.0.to_owned()),
+            )
+        };
 
         SummaryVerbose {
             witness_tree,
             max_staking_ledger_epoch,
+            max_staking_ledger_hash,
             uptime: Instant::now() - self.init_time,
             blocks_processed: self.blocks_processed,
-            max_staking_ledger_hash: staking_ledgers
-                .get(&max_staking_ledger_epoch.unwrap_or(0))
-                .cloned()
-                .map(|h| h.0),
             db_stats: db_stats_str.map(|s| DbStats::from_str(&format!("{mem}\n{s}")).unwrap()),
         }
     }

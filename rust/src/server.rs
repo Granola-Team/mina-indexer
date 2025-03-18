@@ -555,7 +555,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                                 });
 
                             let mut staking_ledgers = state.staking_ledgers.lock().unwrap();
-                            staking_ledgers.insert(epoch, ledger_hash);
+                            staking_ledgers.insert((epoch, ledger_hash));
                         }
                         Err(e) => {
                             error!("Error parsing staking ledger: {e}")
