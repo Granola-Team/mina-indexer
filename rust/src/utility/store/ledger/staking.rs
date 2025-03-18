@@ -20,13 +20,16 @@ pub fn split_staking_ledger_epoch_key(key: &[u8]) -> anyhow::Result<(StateHash, 
 }
 
 /// Split [staking_ledger_sort_key] into constituent parts
-pub fn split_staking_ledger_sort_key(key: &[u8]) -> anyhow::Result<(u32, u64, PublicKey)> {
-    if key.len() == U32_LEN + U64_LEN + PublicKey::LEN {
-        let epoch = u32_from_be_bytes(&key[..U32_LEN])?;
-        let balance_or_stake = balance_key_prefix(&key[U32_LEN..]);
-        let pk = pk_key_prefix(&key[U32_LEN..][U64_LEN..]);
+pub fn split_staking_ledger_sort_key(
+    key: &[u8],
+) -> anyhow::Result<(StateHash, u32, u64, PublicKey)> {
+    if key.len() == StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN {
+        let genesis = StateHash::from_bytes(&key[..StateHash::LEN])?;
+        let epoch = u32_from_be_bytes(&key[StateHash::LEN..][..U32_LEN])?;
+        let balance_or_stake = balance_key_prefix(&key[StateHash::LEN..][U32_LEN..]);
+        let pk = pk_key_prefix(&key[StateHash::LEN..][U32_LEN..][U64_LEN..]);
 
-        return Ok((epoch, balance_or_stake, pk));
+        return Ok((genesis, epoch, balance_or_stake, pk));
     }
 
     bail!("Invlid staking_ledger_sort_key length")
@@ -34,21 +37,24 @@ pub fn split_staking_ledger_sort_key(key: &[u8]) -> anyhow::Result<(u32, u64, Pu
 
 /// Staking ledger amount sort key
 /// ```
-/// {epoch}{amount}{pk}
+/// {genesis}{epoch}{amount}{pk}
 /// where
-/// - epoch:  [u32] BE bytes
-/// - amount: [u64] BE bytes
-/// - pk:     [PublicKey] bytes
+/// - genesis: [StateHash] bytes
+/// - epoch:   [u32] BE bytes
+/// - amount:  [u64] BE bytes
+/// - pk:      [PublicKey] bytes
 pub fn staking_ledger_sort_key(
+    genesis_state_hash: &StateHash,
     epoch: u32,
     amount: u64,
     pk: &PublicKey,
-) -> [u8; U32_LEN + U64_LEN + PublicKey::LEN] {
-    let mut key = [0; U32_LEN + U64_LEN + PublicKey::LEN];
+) -> [u8; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN];
 
-    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
-    key[U32_LEN..][..U64_LEN].copy_from_slice(&amount.to_be_bytes());
-    key[U32_LEN..][U64_LEN..].copy_from_slice(pk.0.as_bytes());
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][..U64_LEN].copy_from_slice(&amount.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][U64_LEN..].copy_from_slice(pk.0.as_bytes());
 
     key
 }

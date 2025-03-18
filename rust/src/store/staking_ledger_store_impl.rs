@@ -79,13 +79,19 @@ impl StakingLedgerStore for IndexerStore {
         let account_serde_bytes = serde_json::to_vec(&staking_account_with_delegation)?;
         self.database.put_cf(
             self.staking_ledger_balance_sort_cf(),
-            staking_ledger_sort_key(epoch, staking_account_with_delegation.account.balance, pk),
+            staking_ledger_sort_key(
+                genesis_state_hash,
+                epoch,
+                staking_account_with_delegation.account.balance,
+                pk,
+            ),
             &account_serde_bytes,
         )?;
 
         self.database.put_cf(
             self.staking_ledger_stake_sort_cf(),
             staking_ledger_sort_key(
+                genesis_state_hash,
                 epoch,
                 staking_account_with_delegation
                     .delegation
@@ -405,18 +411,28 @@ impl StakingLedgerStore for IndexerStore {
 
                 let mut staking_ledger = HashMap::new();
                 for (key, _) in self
-                    .staking_ledger_account_balance_iterator(epoch, Direction::Reverse)
+                    .staking_ledger_account_balance_iterator(
+                        epoch,
+                        &genesis_hash,
+                        Direction::Reverse,
+                    )
                     .flatten()
                 {
-                    let (key_epoch, balance, pk) = split_staking_ledger_sort_key(&key)?;
-                    if key_epoch != epoch {
+                    let (key_genesis, key_epoch, balance, pk) =
+                        split_staking_ledger_sort_key(&key)?;
+                    if key_genesis != genesis_hash || key_epoch != epoch {
                         // no longer the ledger of interest
                         break;
                     }
 
                     let account = self
                         .get_staking_account(&pk, epoch, genesis_state_hash)?
-                        .with_context(|| format!("epoch {epoch}, account {pk}"))
+                        .with_context(|| {
+                            format!(
+                                "staking account: epoch {} pk {} genesis {:?}",
+                                epoch, pk, genesis_state_hash
+                            )
+                        })
                         .expect("staking account exists");
                     assert_eq!(account.balance, balance);
                     staking_ledger.insert(pk, account);
@@ -454,11 +470,15 @@ impl StakingLedgerStore for IndexerStore {
                 let mut delegations = HashMap::new();
                 let mut total_delegations = 0;
                 for (key, _value) in self
-                    .staking_ledger_account_stake_iterator(epoch, Direction::Reverse)
+                    .staking_ledger_account_stake_iterator(
+                        epoch,
+                        &genesis_state_hash,
+                        Direction::Reverse,
+                    )
                     .flatten()
                 {
-                    let (key_epoch, stake, pk) = split_staking_ledger_sort_key(&key)?;
-                    if key_epoch != epoch {
+                    let (key_genesis, key_epoch, stake, pk) = split_staking_ledger_sort_key(&key)?;
+                    if key_genesis != genesis_state_hash || key_epoch != epoch {
                         // no longer the staking ledger of interest
                         break;
                     }
@@ -493,14 +513,23 @@ impl StakingLedgerStore for IndexerStore {
     fn staking_ledger_account_balance_iterator(
         &self,
         epoch: u32,
+        genesis_state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let fstart = staking_ledger_sort_key(epoch, 0, &PublicKey::lower_bound());
-        let rstart = staking_ledger_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
+        let fstart =
+            staking_ledger_sort_key(genesis_state_hash, epoch, 0, &PublicKey::lower_bound());
+        let rstart = staking_ledger_sort_key(
+            genesis_state_hash,
+            epoch,
+            u64::MAX,
+            &PublicKey::upper_bound(),
+        );
+
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&fstart, Direction::Forward),
             Direction::Reverse => IteratorMode::From(&rstart, Direction::Reverse),
         };
+
         self.database
             .iterator_cf(self.staking_ledger_balance_sort_cf(), mode)
     }
@@ -508,10 +537,17 @@ impl StakingLedgerStore for IndexerStore {
     fn staking_ledger_account_stake_iterator(
         &self,
         epoch: u32,
+        genesis_state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_> {
-        let fstart = staking_ledger_sort_key(epoch, 0, &PublicKey::lower_bound());
-        let rstart = staking_ledger_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
+        let fstart =
+            staking_ledger_sort_key(genesis_state_hash, epoch, 0, &PublicKey::lower_bound());
+        let rstart = staking_ledger_sort_key(
+            genesis_state_hash,
+            epoch,
+            u64::MAX,
+            &PublicKey::upper_bound(),
+        );
         let mode = match direction {
             Direction::Forward => IteratorMode::From(&fstart, Direction::Forward),
             Direction::Reverse => IteratorMode::From(&rstart, Direction::Reverse),

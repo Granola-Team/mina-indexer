@@ -135,6 +135,7 @@ pub trait StakingLedgerStore {
     fn staking_ledger_account_balance_iterator(
         &self,
         epoch: u32,
+        genesis_state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_>;
 
@@ -145,6 +146,7 @@ pub trait StakingLedgerStore {
     fn staking_ledger_account_stake_iterator(
         &self,
         epoch: u32,
+        genesis_state_hash: &StateHash,
         direction: Direction,
     ) -> DBIterator<'_>;
 

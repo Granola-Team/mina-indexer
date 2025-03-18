@@ -1,7 +1,7 @@
 use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
-    ledger::store::staking::StakingLedgerStore,
+    constants::MAINNET_GENESIS_HASH, ledger::store::staking::StakingLedgerStore,
     utility::store::ledger::staking::split_staking_ledger_sort_key,
 };
 use std::path::PathBuf;
@@ -13,6 +13,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
 
     let mut state = mainnet_genesis_state(store_dir.as_ref())?;
     let epoch = 0;
+    let genesis_state_hash = MAINNET_GENESIS_HASH.into();
 
     // ingest the blocks
     state
@@ -23,15 +24,22 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
 
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
-    let staking_ledger = store.build_staking_ledger(epoch, None)?.unwrap();
+    let staking_ledger = store
+        .build_staking_ledger(epoch, Some(&genesis_state_hash))?
+        .unwrap();
+
     for (n, (key, _)) in store
-        .staking_ledger_account_balance_iterator(epoch, speedb::Direction::Reverse)
+        .staking_ledger_account_balance_iterator(
+            epoch,
+            &genesis_state_hash,
+            speedb::Direction::Reverse,
+        )
         .flatten()
         .enumerate()
     {
-        let (key_epoch, balance, pk) = split_staking_ledger_sort_key(&key)?;
-        if key_epoch != epoch {
-            panic!("Only epoch 0 staking ledger present");
+        let (key_genesis, key_epoch, balance, pk) = split_staking_ledger_sort_key(&key)?;
+        if key_genesis != genesis_state_hash || key_epoch != epoch {
+            break;
         }
 
         let pk_store_account = store.get_staking_account(&pk, epoch, None)?.unwrap();

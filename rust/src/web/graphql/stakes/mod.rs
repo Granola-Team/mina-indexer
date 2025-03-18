@@ -293,16 +293,26 @@ impl StakesQueryRoot {
         // balance/stake-sorted queries
         let mut accounts = Vec::with_capacity(limit);
         let iter = match sort_by {
-            Some(StakeDesc) | None => {
-                db.staking_ledger_account_stake_iterator(epoch, Direction::Reverse)
-            }
-            Some(StakeAsc) => db.staking_ledger_account_stake_iterator(epoch, Direction::Forward),
-            Some(BalanceDesc) => {
-                db.staking_ledger_account_balance_iterator(epoch, Direction::Reverse)
-            }
-            Some(BalanceAsc) => {
-                db.staking_ledger_account_balance_iterator(epoch, Direction::Forward)
-            }
+            Some(StakeDesc) | None => db.staking_ledger_account_stake_iterator(
+                epoch,
+                &genesis_state_hash,
+                Direction::Reverse,
+            ),
+            Some(StakeAsc) => db.staking_ledger_account_stake_iterator(
+                epoch,
+                &genesis_state_hash,
+                Direction::Forward,
+            ),
+            Some(BalanceDesc) => db.staking_ledger_account_balance_iterator(
+                epoch,
+                &genesis_state_hash,
+                Direction::Reverse,
+            ),
+            Some(BalanceAsc) => db.staking_ledger_account_balance_iterator(
+                epoch,
+                &genesis_state_hash,
+                Direction::Forward,
+            ),
         };
 
         for (key, value) in iter.flatten() {
