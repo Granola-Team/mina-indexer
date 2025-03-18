@@ -1386,12 +1386,12 @@ test_startup_staking_ledgers() {
 	receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
 	assert 0 $(cat ./epoch_0_ledger.json | jq -r .epoch)
-	assert 1 $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
 	assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
 	assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
 	assert '1000' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
 	assert $epoch0 $(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
 	assert 'mainnet' $(cat ./epoch_0_ledger.json | jq -r .network)
+	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
@@ -1426,13 +1426,13 @@ test_watch_staking_ledgers() {
 	voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
 	receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
-	assert '1' $token
 	assert '0' $epoch
 	assert $pk $delegate
 	assert $pk $public_key
 	assert '1000' $balance
 	assert 'mainnet' $network
 	assert $epoch0 $ledger_hash
+	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $token
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
@@ -1457,13 +1457,13 @@ test_watch_staking_ledgers() {
 	voting_for=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
 	receipt_chain_hash=$(cat ./epoch_42_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 
-	assert '1' $token
 	assert '42' $epoch
 	assert $pk $delegate
 	assert $pk $public_key
 	assert '1000' $balance
 	assert 'mainnet' $network
 	assert $epoch42 $ledger_hash
+	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $token
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 }
