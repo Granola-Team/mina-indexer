@@ -2,12 +2,12 @@
 
 use super::db;
 use crate::{
-    base::amount::Amount,
+    base::{amount::Amount, state_hash::StateHash},
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::MAINNET_GENESIS_HASH,
+    constants::MINA_TOKEN_ID,
     ledger::{
-        staking::{EpochStakeDelegation, StakingAccount},
+        staking::{EpochStakeDelegation, StakingAccount, StakingLedger},
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
     },
     snark_work::store::SnarkStore,
@@ -109,9 +109,13 @@ pub struct StakesLedgerAccountWithMeta {
     #[graphql(name = "total_num_internal_commands")]
     total_num_internal_commands: u32,
 
-    /// Value total num accounts
+    /// Value epoch num accounts
     #[graphql(name = "epoch_num_accounts")]
     epoch_num_accounts: u32,
+
+    /// Value num accounts
+    #[graphql(name = "num_accounts")]
+    num_accounts: u32,
 }
 
 #[derive(SimpleObject, Default)]
@@ -135,8 +139,11 @@ pub struct StakesLedgerAccount {
     #[graphql(name = "public_key")]
     pub public_key: String,
 
-    /// Value token
+    /// Value token id
     pub token: u64,
+
+    /// Value token address
+    pub token_address: String,
 
     /// Value receipt chain hash
     #[graphql(name = "receipt_chain_hash")]
@@ -226,16 +233,15 @@ impl StakesQueryRoot {
         let db = db(ctx);
 
         // default to current epoch
-        let curr_epoch = db.get_current_epoch()?;
-        let epoch = match query {
-            Some(ref query) => query.epoch.unwrap_or(curr_epoch),
-            None => curr_epoch,
-        };
+        let epoch = query
+            .as_ref()
+            .and_then(|q| q.epoch)
+            .unwrap_or_else(|| db.get_current_epoch().expect("epoch"));
 
         // short-circuited epoch number query
         if limit == 0 {
-            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-                return match db.get_epoch(&ledger_hash.clone().into())? {
+            if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.to_owned()) {
+                return match db.get_epoch(&ledger_hash.to_owned().into())? {
                     Some(epoch) => Ok(vec![StakesLedgerAccountWithMeta {
                         epoch,
                         ledger_hash,
@@ -246,6 +252,18 @@ impl StakesQueryRoot {
             }
         }
 
+        // default to best block genesis state hash
+        let genesis_state_hash = query
+            .as_ref()
+            .and_then(|q| q.genesis_state_hash.to_owned())
+            .map(StateHash::from)
+            .unwrap_or_else(|| {
+                db.get_best_block_genesis_hash()
+                    .ok()
+                    .flatten()
+                    .expect("genesis state hash")
+            });
+
         // if ledger hash is provided as a query input, use it for the ledger
         // otherwise, use the provided or current epoch number
         let (ledger_hash, epoch) = match query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch)) {
@@ -255,16 +273,14 @@ impl StakesQueryRoot {
                 db.get_epoch(&ledger_hash.clone().into())?
                     .unwrap_or_default(),
             ),
-            Some((None, Some(query_epoch))) => (
-                db.get_staking_ledger_hash_by_epoch(query_epoch, None)?
-                    .unwrap_or_default()
-                    .0,
-                query_epoch,
-            ),
-            Some((None, None)) | None => (
-                db.get_staking_ledger_hash_by_epoch(epoch, None)?
-                    .unwrap_or_default()
-                    .0,
+            _ => (
+                if let Some(ledger_hash) =
+                    db.get_staking_ledger_hash_by_epoch(epoch, Some(&genesis_state_hash))?
+                {
+                    ledger_hash.0
+                } else {
+                    return Ok(vec![]);
+                },
                 epoch,
             ),
         };
@@ -299,11 +315,6 @@ impl StakesQueryRoot {
                 account,
                 delegation,
             } = serde_json::from_slice(&value)?;
-
-            let genesis_state_hash = db
-                .get_best_block_genesis_hash()?
-                .expect("genesis state hash")
-                .to_string();
 
             if StakesQueryInput::matches_staking_account(
                 query.as_ref(),
@@ -391,7 +402,7 @@ impl
         let delegate = account.delegate.0;
 
         let nonce = account.nonce.unwrap_or_default().0;
-        let token = account.token.unwrap_or_default();
+        let token = account.token.unwrap_or_default().0;
         let receipt_chain_hash = account.receipt_chain_hash.0;
         let voting_for = account.voting_for.0;
 
@@ -401,7 +412,8 @@ impl
             delegate,
             pk,
             public_key,
-            token,
+            token: MINA_TOKEN_ID,
+            token_address: token,
             receipt_chain_hash,
             voting_for,
             balance_nanomina,
@@ -439,7 +451,7 @@ impl StakesQueryInput {
         query: Option<&Self>,
         account: &StakingAccount,
         ledger_hash: &str,
-        genesis_state_hash: &str,
+        genesis_state_hash: &StateHash,
         epoch: u32,
     ) -> bool {
         if let Some(query) = query {
@@ -482,7 +494,7 @@ impl StakesQueryInput {
             }
 
             if let Some(query_genesis_state_hash) = query_genesis_state_hash {
-                if *query_genesis_state_hash != genesis_state_hash {
+                if *query_genesis_state_hash != genesis_state_hash.0 {
                     return false;
                 }
             }
@@ -510,6 +522,7 @@ impl StakesLedgerAccountWithMeta {
         let pk = account.pk.clone();
         let total_delegated_nanomina = delegations.total_delegated.unwrap_or_default();
         let count_delegates = delegations.count_delegates.unwrap_or_default();
+
         let delegates: Vec<String> = delegations
             .delegates
             .iter()
@@ -562,16 +575,16 @@ impl StakesLedgerAccountWithMeta {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
         };
-        let genesis_state_hash = db
-            .get_best_block_genesis_hash()
-            .unwrap()
-            .expect("genesis state hash")
-            .to_string();
+
+        let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash.to_owned().into());
+        let num_accounts = db
+            .get_staking_ledger_accounts_count_epoch(epoch, &genesis_state_hash)
+            .expect("epoch staking account count");
 
         Self {
             epoch,
             ledger_hash,
-            genesis_state_hash: genesis_state_hash.to_owned(),
+            genesis_state_hash: genesis_state_hash.to_string(),
             account: StakesLedgerAccount::from((
                 account,
                 pk_epoch_num_blocks,
@@ -622,9 +635,8 @@ impl StakesLedgerAccountWithMeta {
             total_num_internal_commands: db
                 .get_internal_commands_total_count()
                 .expect("total internal command count"),
-            epoch_num_accounts: db
-                .get_staking_ledger_accounts_count_epoch(epoch, &MAINNET_GENESIS_HASH.into())
-                .expect("total internal command count"),
+            epoch_num_accounts: num_accounts,
+            num_accounts,
         }
     }
 }
