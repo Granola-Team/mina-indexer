@@ -1117,10 +1117,12 @@ impl IndexerState {
     ) -> anyhow::Result<()> {
         let (epoch, hash) = extract_epoch_hash(path);
 
-        if store.get_staking_ledger_hash_by_epoch(
-            epoch,
-            Some(&StakingLedger::genesis_state_hash(&hash)),
-        )? != Some(hash)
+        if store
+            .get_staking_ledger_hash_by_epoch(
+                epoch,
+                Some(&StakingLedger::genesis_state_hash(&hash)),
+            )?
+            .is_none()
         {
             let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
@@ -1132,6 +1134,11 @@ impl IndexerState {
             store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
 
             info!("Added staking ledger {summary}");
+        } else {
+            debug!(
+                "Skipping staking ledger mainnet-{}-{}. Already present in store.",
+                epoch, hash
+            )
         }
 
         Ok(())
