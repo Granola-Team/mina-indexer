@@ -12,7 +12,9 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
-    utility::store::common::U32_LEN,
+    utility::store::ledger::staking::{
+        staking_ledger_sort_key_epoch, staking_ledger_sort_key_genesis,
+    },
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -316,7 +318,10 @@ impl StakesQueryRoot {
         };
 
         for (key, value) in iter.flatten() {
-            if key[..U32_LEN] != epoch.to_be_bytes() || accounts.len() >= limit {
+            if staking_ledger_sort_key_genesis(&key) != genesis_state_hash
+                || staking_ledger_sort_key_epoch(&key) != epoch
+                || accounts.len() >= limit
+            {
                 // no longer the desired staking ledger
                 break;
             }
