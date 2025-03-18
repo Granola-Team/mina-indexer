@@ -1742,6 +1742,7 @@ test_hurl_v2() {
 	idxr database create \
 		--blocks-dir ./blocks \
 		--database-dir ./database \
+		--staking-ledgers-dir $STAKING_LEDGERS \
 		--genesis-hash $HARDFORK_GENESIS_STATE_HASH
 	idxr_server start \
 		--web-port "$port" \

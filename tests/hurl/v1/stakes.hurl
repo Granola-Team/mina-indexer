@@ -22,6 +22,7 @@ POST {{url}}
     pk
     public_key
     token
+    tokenAddress
     voting_for
     delegationTotals {
       countDelegates
@@ -47,10 +48,12 @@ jsonpath "$.data.stakes[0].nonce" == 0
 jsonpath "$.data.stakes[0].pk" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].public_key" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].token" == 1
+jsonpath "$.data.stakes[0].tokenAddress" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.stakes[0].voting_for" == "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x"
 jsonpath "$.data.stakes[0].delegationTotals.countDelegates" == 1
 jsonpath "$.data.stakes[0].delegationTotals.totalDelegated" == 2498323.273015384
 
+# delegates
 jsonpath "$.data.stakes[0].delegationTotals.delegates" count == 1
 jsonpath "$.data.stakes[0].delegationTotals.delegates[0]" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 
@@ -399,7 +402,7 @@ jsonpath "$.data.stakes" count == 3
 duration < 200
 
 #
-# Genesis state hash bounded query (present)
+# Pre-hardfork stakes query (epoch 0 present)
 #
 
 POST {{url}}
@@ -408,11 +411,13 @@ POST {{url}}
   stakes(
     limit: 1
     query: {
-      epoch: 1
+      epoch: 0
       genesisStateHash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
     }
   ) {
     epoch
+    ledgerHash
+    genesisStateHash
     epoch_num_accounts
   }
 }
@@ -424,13 +429,41 @@ HTTP 200
 jsonpath "$.data.stakes" count == 1
 
 # only datum
-jsonpath "$.data.stakes[0].epoch" == 1
+jsonpath "$.data.stakes[0].epoch" == 0
+jsonpath "$.data.stakes[0].ledgerHash" == "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"
+jsonpath "$.data.stakes[0].genesisStateHash" == "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
 jsonpath "$.data.stakes[0].epoch_num_accounts" == 1676
 
 duration < 500
 
 #
-# Genesis state hash bounded query (absent)
+# Pre-hardfork stakes query (epoch 2 absent)
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(
+    limit: 1
+    query: {
+      epoch: 2
+      genesisStateHash: "3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ"
+    }
+  ) {
+    epoch
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# no data
+jsonpath "$.data.stakes" count == 0
+
+duration < 500
+
+#
+# Post-hardfork stakes query (epoch 0 present)
 #
 
 POST {{url}}
@@ -444,7 +477,43 @@ POST {{url}}
     }
   ) {
     epoch
+    ledgerHash
+    genesisStateHash
     epoch_num_accounts
+    num_accounts
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.stakes" count == 1
+
+# only datum
+jsonpath "$.data.stakes[0].epoch" == 0
+jsonpath "$.data.stakes[0].ledgerHash" == "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL"
+jsonpath "$.data.stakes[0].genesisStateHash" == "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP"
+jsonpath "$.data.stakes[0].epoch_num_accounts" == 226659
+jsonpath "$.data.stakes[0].num_accounts" == 226659
+
+duration < 500
+
+#
+# Post-hardfork stakes query (epoch 1 absent)
+#
+
+POST {{url}}
+```graphql
+{
+  stakes(
+    limit: 1
+    query: {
+      epoch: 1
+      genesisStateHash: "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP"
+    }
+  ) {
+    epoch
   }
 }
 ```
