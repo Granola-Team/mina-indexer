@@ -73,29 +73,75 @@ pub fn extract_epoch_hash(path: &Path) -> (u32, LedgerHash) {
 #[cfg(test)]
 mod tests {
     use super::StakingLedgerParser;
-    use std::path::PathBuf;
+    use crate::{
+        base::state_hash::StateHash,
+        constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH},
+        ledger::hash::LedgerHash,
+    };
+    use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
     #[tokio::test]
     async fn parser() -> anyhow::Result<()> {
-        let ledgers_dir: PathBuf = "./tests/data/staking_ledgers".into();
-        let mut n = 0;
+        let ledgers_dir: PathBuf = "../tests/data/staking_ledgers".into();
         let mut ledger_parser = StakingLedgerParser::new(&ledgers_dir)?;
-        let expect = [
-            (
-                0,
-                "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string(),
-            ),
-            (
-                42,
-                "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH".to_string(),
-            ),
-        ];
+
+        #[derive(Debug, PartialEq, Eq, Hash)]
+        struct StakingAccountInfo {
+            epoch: u32,
+            ledger_hash: LedgerHash,
+            genesis_state_hash: StateHash,
+            num_accounts: usize,
+        }
+
+        let expect = HashSet::from([
+            // pre-hardfork
+            StakingAccountInfo {
+                epoch: 0,
+                ledger_hash: LedgerHash::from_str(
+                    "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+                )?,
+                genesis_state_hash: MAINNET_GENESIS_HASH.into(),
+                num_accounts: 1676,
+            },
+            StakingAccountInfo {
+                epoch: 1,
+                ledger_hash: LedgerHash::from_str(
+                    "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee",
+                )?,
+                genesis_state_hash: MAINNET_GENESIS_HASH.into(),
+                num_accounts: 1676,
+            },
+            StakingAccountInfo {
+                epoch: 42,
+                ledger_hash: LedgerHash::from_str(
+                    "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH",
+                )?,
+                genesis_state_hash: MAINNET_GENESIS_HASH.into(),
+                num_accounts: 130791,
+            },
+            // post-hardfork
+            StakingAccountInfo {
+                epoch: 0,
+                ledger_hash: LedgerHash::from_str(
+                    "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL",
+                )?,
+                genesis_state_hash: HARDFORK_GENESIS_HASH.into(),
+                num_accounts: 226659,
+            },
+        ]);
+
+        let mut res = HashSet::new();
 
         while let Some(staking_ledger) = ledger_parser.next_ledger(None).await? {
-            assert_eq!(staking_ledger.epoch, expect[n].0);
-            assert_eq!(staking_ledger.ledger_hash.0, expect[n].1);
-            n += 1;
+            res.insert(StakingAccountInfo {
+                epoch: staking_ledger.epoch,
+                ledger_hash: staking_ledger.ledger_hash.to_owned(),
+                genesis_state_hash: staking_ledger.genesis_state_hash.to_owned(),
+                num_accounts: staking_ledger.staking_ledger.len(),
+            });
         }
+
+        assert_eq!(res, expect);
         Ok(())
     }
 }
