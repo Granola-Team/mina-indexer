@@ -43,6 +43,7 @@ pub fn create_socket_listener(domain_socket_path: &Path) -> UnixListener {
         .unwrap_or_else(|e| {
             panic!("Unable to bind to Unix domain socket file {domain_socket_path:#?} due to {e}")
         });
+
     info!("Created Unix domain socket server at {domain_socket_path:#?}");
     listener
 }
@@ -64,10 +65,13 @@ async fn parse_conn_to_cli(stream: &UnixStream) -> anyhow::Result<ClientCli> {
                 return Err(e.into());
             }
         }
+
         let (command, _): (ClientCli, usize) =
             bincode::decode_from_slice(&buffer, BIN_CODE_CONFIG)?;
+
         return Ok(command);
     }
+
     bail!("Unexpected Unix domain socket read error");
 }
 
@@ -77,7 +81,6 @@ pub enum ServerCliResponse {
     Error(String),
 }
 
-#[allow(clippy::just_underscores_and_digits)]
 #[allow(clippy::too_many_lines)]
 pub async fn handle_connection(
     listener: UnixListener,
@@ -102,116 +105,248 @@ pub async fn handle_connection(
             let response =
                 ServerCliResponse::Error("Unable to get a handle on indexer store...".to_string());
             let encoded = bincode::encode_to_vec(&response, BIN_CODE_CONFIG)?;
+
             writer.write_all(&encoded).await?;
             continue;
         };
 
         let response = match command {
-            ClientCli::Accounts(__) => match __ {
-                Accounts::PublicKey { public_key: pk } => {
-                    info!("Received account command for {pk}");
-                    if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
+            ClientCli::Accounts(Accounts::PublicKey { public_key: pk }) => {
+                debug!("Received account command for {pk}");
+                if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else {
+                    let pk: PublicKey = pk.into();
+                    if let Some(account) = db.get_best_account(&pk, &TokenAddress::default())? {
+                        debug!("Writing account {pk} to client");
+                        ServerCliResponse::Success(format!("{account}"))
                     } else {
-                        let pk: PublicKey = pk.into();
-                        if let Some(account) = db.get_best_account(&pk, &TokenAddress::default())? {
-                            info!("Writing account {pk} to client");
-                            ServerCliResponse::Success(format!("{account}"))
-                        } else {
-                            account_missing_from_db(&pk)
-                        }
+                        account_missing_from_db(&pk)
                     }
                 }
-            },
-            ClientCli::Blocks(__) => match __ {
-                Blocks::Best { verbose, path } => {
-                    info!("Received best block command");
-                    if let Some(best_tip) = db.get_best_block()? {
-                        let block_str = if let Some(canonicity) =
-                            db.get_block_canonicity(&best_tip.state_hash())?
-                        {
-                            if verbose {
-                                serde_json::to_string_pretty(&best_tip.with_canonicity(canonicity))?
+            }
+            ClientCli::Blocks(Blocks::Best { verbose, path }) => {
+                debug!("Received best block command");
+                if let Some(best_tip) = db.get_best_block()? {
+                    let block_str = if let Some(canonicity) =
+                        db.get_block_canonicity(&best_tip.state_hash())?
+                    {
+                        if verbose {
+                            serde_json::to_string_pretty(&best_tip.with_canonicity(canonicity))?
+                        } else {
+                            let block = BlockWithoutHeight::with_canonicity(&best_tip, canonicity);
+                            serde_json::to_string_pretty(&block)?
+                        }
+                    } else {
+                        block_missing_from_db(&best_tip.state_hash().0)
+                    };
+
+                    if path.is_some() {
+                        let path = &path.unwrap();
+                        debug!("Writing best tip block to {path:?}");
+                        std::fs::write(path, block_str)?;
+                        ServerCliResponse::Success(format!("Best block written to {path:?}"))
+                    } else {
+                        debug!("Writing best tip block to stdout");
+                        ServerCliResponse::Success(block_str)
+                    }
+                } else {
+                    best_tip_missing_from_db()
+                }
+            }
+            ClientCli::Blocks(Blocks::StateHash {
+                state_hash,
+                verbose,
+                path,
+            }) => {
+                debug!("Received block-state-hash command");
+                if !StateHash::is_valid(&state_hash) {
+                    invalid_state_hash(&state_hash)
+                } else {
+                    match db.get_block(&state_hash.clone().into()) {
+                        Ok(Some((ref block, _))) => {
+                            let block_str = if let Some(canonicity) =
+                                db.get_block_canonicity(&block.state_hash())?
+                            {
+                                if verbose {
+                                    serde_json::to_string_pretty(
+                                        &block.with_canonicity(canonicity),
+                                    )?
+                                } else {
+                                    let block =
+                                        BlockWithoutHeight::with_canonicity(block, canonicity);
+                                    serde_json::to_string_pretty(&block)?
+                                }
                             } else {
-                                let block =
-                                    BlockWithoutHeight::with_canonicity(&best_tip, canonicity);
-                                serde_json::to_string_pretty(&block)?
+                                block_missing_from_db(&block.state_hash().0)
+                            };
+                            if path.is_some() {
+                                let path = &path.unwrap();
+                                debug!("Writing block {state_hash} to {path:?}");
+                                std::fs::write(path, block_str)?;
+                                ServerCliResponse::Success(format!(
+                                    "Block {} written to {:?}",
+                                    block.state_hash().0,
+                                    path
+                                ))
+                            } else {
+                                debug!("Writing block to stdout {}", block.summary());
+                                ServerCliResponse::Success(block_str)
                             }
-                        } else {
-                            block_missing_from_db(&best_tip.state_hash().0)
-                        };
+                        }
+                        Ok(None) => ServerCliResponse::Success(format!(
+                            "Block at state hash not present in store: {state_hash}"
+                        )),
+                        Err(e) => ServerCliResponse::Error(format!(
+                            "Failed to lookup block for '{state_hash}': {e}"
+                        )),
+                    }
+                }
+            }
+            ClientCli::Blocks(Blocks::Height {
+                height,
+                verbose,
+                path,
+            }) => {
+                debug!("Received blocks-at-height {height} command");
+                let blocks_at_height = db.get_blocks_at_height(height)?;
+                let blocks_str = if verbose {
+                    let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(block.with_canonicity(canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    serde_json::to_string(&blocks)?
+                } else {
+                    let blocks: Vec<BlockWithoutHeight> = blocks_at_height
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    format_vec_jq_compatible(&blocks)
+                };
 
-                        if path.is_some() {
-                            let path = &path.unwrap();
-                            info!("Writing best tip block to {path:?}");
-                            std::fs::write(path, block_str)?;
-                            ServerCliResponse::Success(format!("Best block written to {path:?}"))
-                        } else {
-                            info!("Writing best tip block to stdout");
-                            ServerCliResponse::Success(block_str)
-                        }
+                if path.is_none() {
+                    debug!("Writing blocks at height {height} to stdout");
+                    ServerCliResponse::Success(blocks_str)
+                } else {
+                    let path = path.unwrap();
+                    if !path.is_dir() {
+                        debug!("Writing blocks at height {height} to {path:?}");
+                        std::fs::write(path.clone(), blocks_str)?;
+                        ServerCliResponse::Success(format!(
+                            "Blocks at height {height} written to {path:?}"
+                        ))
                     } else {
-                        best_tip_missing_from_db()
+                        file_must_not_be_a_directory(&path)
                     }
                 }
-                Blocks::StateHash {
-                    state_hash,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received block-state-hash command");
-                    if !StateHash::is_valid(&state_hash) {
-                        invalid_state_hash(&state_hash)
-                    } else {
-                        match db.get_block(&state_hash.clone().into()) {
-                            Ok(Some((ref block, _))) => {
-                                let block_str = if let Some(canonicity) =
-                                    db.get_block_canonicity(&block.state_hash())?
-                                {
-                                    if verbose {
-                                        serde_json::to_string_pretty(
-                                            &block.with_canonicity(canonicity),
-                                        )?
-                                    } else {
-                                        let block =
-                                            BlockWithoutHeight::with_canonicity(block, canonicity);
-                                        serde_json::to_string_pretty(&block)?
-                                    }
-                                } else {
-                                    block_missing_from_db(&block.state_hash().0)
-                                };
-                                if path.is_some() {
-                                    let path = &path.unwrap();
-                                    info!("Writing block {state_hash} to {path:?}");
-                                    std::fs::write(path, block_str)?;
-                                    ServerCliResponse::Success(format!(
-                                        "Block {} written to {:?}",
-                                        block.state_hash().0,
-                                        path
-                                    ))
-                                } else {
-                                    info!("Writing block to stdout {}", block.summary());
-                                    ServerCliResponse::Success(block_str)
-                                }
+            }
+            ClientCli::Blocks(Blocks::GlobalSlot {
+                slot,
+                verbose,
+                path,
+            }) => {
+                debug!("Received blocks-at-slot {slot} command");
+                let slot: u32 = slot.parse()?;
+                let blocks_at_slot = db.get_blocks_at_slot(slot)?;
+                let blocks_str = if verbose {
+                    let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(block.with_canonicity(canonicity))
+                            } else {
+                                None
                             }
-                            Ok(None) => ServerCliResponse::Success(format!(
-                                "Block at state hash not present in store: {state_hash}"
-                            )),
-                            Err(e) => ServerCliResponse::Error(format!(
-                                "Failed to lookup block for '{state_hash}': {e}"
-                            )),
-                        }
+                        })
+                        .collect();
+                    serde_json::to_string(&blocks)?
+                } else {
+                    let blocks: Vec<BlockWithoutHeight> = blocks_at_slot
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    format_vec_jq_compatible(&blocks)
+                };
+
+                if path.is_none() {
+                    debug!("Writing blocks at slot {slot} to stdout");
+                    ServerCliResponse::Success(blocks_str)
+                } else {
+                    let path = path.unwrap();
+                    if !path.is_dir() {
+                        debug!("Writing blocks at slot {slot} to {path:?}");
+
+                        std::fs::write(path.clone(), blocks_str)?;
+                        ServerCliResponse::Success(format!(
+                            "Blocks at slot {slot} written to {path:?}"
+                        ))
+                    } else {
+                        file_must_not_be_a_directory(&path)
                     }
                 }
-                Blocks::Height {
-                    height,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received blocks-at-height {height} command");
-                    let blocks_at_height = db.get_blocks_at_height(height)?;
+            }
+            ClientCli::Blocks(Blocks::PublicKey {
+                public_key: pk,
+                verbose,
+                path,
+            }) => {
+                debug!("Received blocks-at-public-key command {pk}");
+                if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else {
+                    let blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
                     let blocks_str = if verbose {
-                        let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_height
+                        let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_pk
                             .iter()
                             .flat_map(|state_hash| {
                                 if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
@@ -231,7 +366,7 @@ pub async fn handle_connection(
                             .collect();
                         serde_json::to_string(&blocks)?
                     } else {
-                        let blocks: Vec<BlockWithoutHeight> = blocks_at_height
+                        let blocks: Vec<BlockWithoutHeight> = blocks_at_pk
                             .iter()
                             .flat_map(|state_hash| {
                                 if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
@@ -253,526 +388,339 @@ pub async fn handle_connection(
                     };
 
                     if path.is_none() {
-                        info!("Writing blocks at height {height} to stdout");
+                        debug!("Writing blocks at public key {pk} to stdout");
                         ServerCliResponse::Success(blocks_str)
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
-                            info!("Writing blocks at height {height} to {path:?}");
+                            debug!("Writing blocks at public key {pk} to {path:?}");
+
                             std::fs::write(path.clone(), blocks_str)?;
                             ServerCliResponse::Success(format!(
-                                "Blocks at height {height} written to {path:?}"
+                                "Blocks at public key {pk} written to {path:?}"
                             ))
                         } else {
                             file_must_not_be_a_directory(&path)
                         }
                     }
                 }
-                Blocks::GlobalSlot {
-                    slot,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received blocks-at-slot {slot} command");
-                    let slot: u32 = slot.parse()?;
-                    let blocks_at_slot = db.get_blocks_at_slot(slot)?;
-                    let blocks_str = if verbose {
-                        let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_slot
-                            .iter()
-                            .flat_map(|state_hash| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                                    let block = db
-                                        .get_block(state_hash)
-                                        .with_context(|| {
-                                            format!("block missing from store {state_hash}")
-                                        })
-                                        .unwrap()
-                                        .unwrap()
-                                        .0;
-                                    Some(block.with_canonicity(canonicity))
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        serde_json::to_string(&blocks)?
+            }
+            ClientCli::Blocks(Blocks::Children {
+                state_hash,
+                verbose,
+                path,
+            }) => {
+                debug!("Received block-children command for block {state_hash}");
+                let children = db.get_block_children(&state_hash.clone().into())?;
+                let blocks_str = if verbose {
+                    let blocks: Vec<PrecomputedBlockWithCanonicity> = children
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(block.with_canonicity(canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    serde_json::to_string(&blocks)?
+                } else {
+                    let blocks: Vec<BlockWithoutHeight> = children
+                        .iter()
+                        .flat_map(|state_hash| {
+                            if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
+                                let block = db
+                                    .get_block(state_hash)
+                                    .with_context(|| {
+                                        format!("block missing from store {state_hash}")
+                                    })
+                                    .unwrap()
+                                    .unwrap()
+                                    .0;
+                                Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    format_vec_jq_compatible(&blocks)
+                };
+
+                if path.is_none() {
+                    debug!("Writing children of block {state_hash} to stdout");
+                    ServerCliResponse::Success(blocks_str)
+                } else {
+                    let path = path.unwrap();
+                    if !path.is_dir() {
+                        debug!("Writing children of block {state_hash} to {path:?}");
+                        std::fs::write(path.clone(), blocks_str)?;
+                        ServerCliResponse::Success(format!(
+                            "Children of block {state_hash} written to {path:?}"
+                        ))
                     } else {
-                        let blocks: Vec<BlockWithoutHeight> = blocks_at_slot
-                            .iter()
-                            .flat_map(|state_hash| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                                    let block = db
-                                        .get_block(state_hash)
-                                        .with_context(|| {
-                                            format!("block missing from store {state_hash}")
-                                        })
-                                        .unwrap()
-                                        .unwrap()
-                                        .0;
-                                    Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
+                        file_must_not_be_a_directory(&path)
+                    }
+                }
+            }
+            ClientCli::Chain(Chain::Best {
+                num,
+                verbose,
+                start_state_hash,
+                end_state_hash,
+                path,
+            }) => {
+                debug!("Received best-chain command");
+                let start_state_hash: StateHash = match start_state_hash {
+                    None => {
+                        if let Ok(Some(PcbVersion::V2)) = db.get_best_block_version() {
+                            HARDFORK_GENESIS_HASH.into()
+                        } else {
+                            MAINNET_GENESIS_HASH.into()
+                        }
+                    }
+                    Some(start_state_hash) => start_state_hash.into(),
+                };
+
+                if let Some(best_tip) = db.get_best_block()? {
+                    let end_state_hash = {
+                        match end_state_hash {
+                            None => best_tip.state_hash(),
+                            Some(end_state_hash) => {
+                                if !StateHash::is_valid(&end_state_hash) {
+                                    best_tip.state_hash()
                                 } else {
-                                    None
+                                    end_state_hash.into()
                                 }
-                            })
-                            .collect();
-                        format_vec_jq_compatible(&blocks)
+                            }
+                        }
                     };
 
-                    if path.is_none() {
-                        info!("Writing blocks at slot {slot} to stdout");
-                        ServerCliResponse::Success(blocks_str)
-                    } else {
-                        let path = path.unwrap();
-                        if !path.is_dir() {
-                            info!("Writing blocks at slot {slot} to {path:?}");
+                    if !StateHash::is_valid(&start_state_hash.0) {
+                        invalid_state_hash(&start_state_hash.0)
+                    } else if let (Some((end_block, _)), Some((start_block, _))) = (
+                        db.get_block(&end_state_hash)?,
+                        db.get_block(&start_state_hash)?,
+                    ) {
+                        let start_height = start_block.blockchain_length();
+                        let end_height = end_block.blockchain_length();
+                        let mut parent_hash = end_block.previous_state_hash();
+                        let mut best_chain = vec![end_block];
 
-                            std::fs::write(path.clone(), blocks_str)?;
-                            ServerCliResponse::Success(format!(
-                                "Blocks at slot {slot} written to {path:?}"
-                            ))
-                        } else {
-                            file_must_not_be_a_directory(&path)
+                        // constrain by num and state hash bound
+                        for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
+                            if let Some((parent_pcb, _)) = db.get_block(&parent_hash)? {
+                                let curr_hash: StateHash = parent_pcb.state_hash();
+                                parent_hash = parent_pcb.previous_state_hash();
+                                best_chain.push(parent_pcb);
+
+                                if curr_hash == start_state_hash {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
                         }
-                    }
-                }
-                Blocks::PublicKey {
-                    public_key: pk,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received blocks-at-public-key command {pk}");
-                    if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
-                    } else {
-                        let blocks_at_pk = db.get_blocks_at_public_key(&pk.clone().into())?;
-                        let blocks_str = if verbose {
-                            let blocks: Vec<PrecomputedBlockWithCanonicity> = blocks_at_pk
+
+                        let best_chain_str = if verbose {
+                            let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
                                 .iter()
-                                .flat_map(|state_hash| {
+                                .flat_map(|block| {
                                     if let Ok(Some(canonicity)) =
-                                        db.get_block_canonicity(state_hash)
+                                        db.get_block_canonicity(&block.state_hash())
                                     {
-                                        let block = db
-                                            .get_block(state_hash)
-                                            .with_context(|| {
-                                                format!("block missing from store {state_hash}")
-                                            })
-                                            .unwrap()
-                                            .unwrap()
-                                            .0;
                                         Some(block.with_canonicity(canonicity))
                                     } else {
                                         None
                                     }
                                 })
                                 .collect();
-                            serde_json::to_string(&blocks)?
+                            serde_json::to_string(&best_chain)?
                         } else {
-                            let blocks: Vec<BlockWithoutHeight> = blocks_at_pk
+                            let best_chain: Vec<BlockWithoutHeight> = best_chain
                                 .iter()
-                                .flat_map(|state_hash| {
+                                .flat_map(|block| {
                                     if let Ok(Some(canonicity)) =
-                                        db.get_block_canonicity(state_hash)
+                                        db.get_block_canonicity(&block.state_hash())
                                     {
-                                        let block = db
-                                            .get_block(state_hash)
-                                            .with_context(|| {
-                                                format!("block missing from store {state_hash}")
-                                            })
-                                            .unwrap()
-                                            .unwrap()
-                                            .0;
-                                        Some(BlockWithoutHeight::with_canonicity(
-                                            &block, canonicity,
-                                        ))
+                                        Some(BlockWithoutHeight::with_canonicity(block, canonicity))
                                     } else {
                                         None
                                     }
                                 })
                                 .collect();
-                            format_vec_jq_compatible(&blocks)
+                            format_vec_jq_compatible(&best_chain)
                         };
 
                         if path.is_none() {
-                            info!("Writing blocks at public key {pk} to stdout");
-                            ServerCliResponse::Success(blocks_str)
+                            debug!("Writing best chain to stdout");
+                            ServerCliResponse::Success(best_chain_str)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                info!("Writing blocks at public key {pk} to {path:?}");
+                                debug!("Writing best chain to {path:?}");
 
-                                std::fs::write(path.clone(), blocks_str)?;
+                                std::fs::write(path.clone(), best_chain_str)?;
                                 ServerCliResponse::Success(format!(
-                                    "Blocks at public key {pk} written to {path:?}"
+                                    "Best chain written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
                         }
-                    }
-                }
-                Blocks::Children {
-                    state_hash,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received block-children command for block {state_hash}");
-                    let children = db.get_block_children(&state_hash.clone().into())?;
-                    let blocks_str = if verbose {
-                        let blocks: Vec<PrecomputedBlockWithCanonicity> = children
-                            .iter()
-                            .flat_map(|state_hash| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                                    let block = db
-                                        .get_block(state_hash)
-                                        .with_context(|| {
-                                            format!("block missing from store {state_hash}")
-                                        })
-                                        .unwrap()
-                                        .unwrap()
-                                        .0;
-                                    Some(block.with_canonicity(canonicity))
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        serde_json::to_string(&blocks)?
                     } else {
-                        let blocks: Vec<BlockWithoutHeight> = children
-                            .iter()
-                            .flat_map(|state_hash| {
-                                if let Ok(Some(canonicity)) = db.get_block_canonicity(state_hash) {
-                                    let block = db
-                                        .get_block(state_hash)
-                                        .with_context(|| {
-                                            format!("block missing from store {state_hash}")
-                                        })
-                                        .unwrap()
-                                        .unwrap()
-                                        .0;
-                                    Some(BlockWithoutHeight::with_canonicity(&block, canonicity))
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        format_vec_jq_compatible(&blocks)
-                    };
-
+                        ServerCliResponse::Success("No results".to_string())
+                    }
+                } else {
+                    best_tip_missing_from_db()
+                }
+            }
+            ClientCli::CreateSnapshot { output_path } => {
+                debug!("Received create-snapshot command");
+                match db.create_snapshot(&output_path) {
+                    Err(e) => ServerCliResponse::Error(e.to_string()),
+                    Ok(s) => ServerCliResponse::Success(s),
+                }
+            }
+            ClientCli::Ledgers(Ledgers::Best { path, memoize }) => {
+                debug!("Received best-ledger command");
+                if let Some(ledger) = db.get_best_ledger(memoize)? {
+                    let ledger = ledger.to_string_pretty();
                     if path.is_none() {
-                        info!("Writing children of block {state_hash} to stdout");
-                        ServerCliResponse::Success(blocks_str)
+                        debug!("Writing best ledger to stdout");
+                        ServerCliResponse::Success(ledger)
+                    } else {
+                        let path = path.unwrap();
+                        if path.is_dir() {
+                            file_must_not_be_a_directory(&path)
+                        } else {
+                            debug!("Writing best ledger to {path:?}");
+                            std::fs::write(path.clone(), ledger)?;
+                            ServerCliResponse::Success(format!("Best ledger written to {path:?}"))
+                        }
+                    }
+                } else {
+                    ServerCliResponse::Error("Best ledger cannot be calculated".to_string())
+                }
+            }
+            ClientCli::Ledgers(Ledgers::Hash {
+                hash,
+                path,
+                memoize,
+            }) => {
+                debug!("Received staged ledger command for {hash}");
+                fn write_ledger(
+                    path: Option<std::path::PathBuf>,
+                    ledger: Ledger,
+                    hash: &str,
+                ) -> ServerCliResponse {
+                    let ledger = ledger.to_string_pretty();
+                    if path.is_none() {
+                        debug!("Writing staged ledger at hash {hash} to stdout");
+                        ServerCliResponse::Success(ledger)
                     } else {
                         let path = path.unwrap();
                         if !path.is_dir() {
-                            info!("Writing children of block {state_hash} to {path:?}");
-                            std::fs::write(path.clone(), blocks_str)?;
+                            debug!("Writing staged ledger at {hash} to {path:?}");
+                            std::fs::write(path.clone(), ledger).ok();
                             ServerCliResponse::Success(format!(
-                                "Children of block {state_hash} written to {path:?}"
+                                "Ledger at hash {hash} written to {path:?}"
                             ))
                         } else {
                             file_must_not_be_a_directory(&path)
                         }
                     }
                 }
-            },
-            ClientCli::Chain(__) => match __ {
-                Chain::Best {
-                    num,
-                    verbose,
-                    start_state_hash,
-                    end_state_hash,
-                    path,
-                } => {
-                    info!("Received best-chain command");
-                    let start_state_hash: StateHash = match start_state_hash {
-                        None => {
-                            if let Ok(Some(PcbVersion::V2)) = db.get_best_block_version() {
-                                HARDFORK_GENESIS_HASH.into()
-                            } else {
-                                MAINNET_GENESIS_HASH.into()
-                            }
-                        }
-                        Some(start_state_hash) => start_state_hash.into(),
-                    };
 
-                    if let Some(best_tip) = db.get_best_block()? {
-                        let end_state_hash = {
-                            match end_state_hash {
-                                None => best_tip.state_hash(),
-                                Some(end_state_hash) => {
-                                    if !StateHash::is_valid(&end_state_hash) {
-                                        best_tip.state_hash()
-                                    } else {
-                                        end_state_hash.into()
-                                    }
-                                }
-                            }
-                        };
-
-                        if !StateHash::is_valid(&start_state_hash.0) {
-                            invalid_state_hash(&start_state_hash.0)
-                        } else if let (Some((end_block, _)), Some((start_block, _))) = (
-                            db.get_block(&end_state_hash)?,
-                            db.get_block(&start_state_hash)?,
-                        ) {
-                            let start_height = start_block.blockchain_length();
-                            let end_height = end_block.blockchain_length();
-                            let mut parent_hash = end_block.previous_state_hash();
-                            let mut best_chain = vec![end_block];
-
-                            // constrain by num and state hash bound
-                            for _ in 1..num.min(end_height.saturating_sub(start_height) + 1) {
-                                if let Some((parent_pcb, _)) = db.get_block(&parent_hash)? {
-                                    let curr_hash: StateHash = parent_pcb.state_hash();
-                                    parent_hash = parent_pcb.previous_state_hash();
-                                    best_chain.push(parent_pcb);
-
-                                    if curr_hash == start_state_hash {
-                                        break;
-                                    }
-                                } else {
-                                    break;
-                                }
-                            }
-
-                            let best_chain_str = if verbose {
-                                let best_chain: Vec<PrecomputedBlockWithCanonicity> = best_chain
-                                    .iter()
-                                    .flat_map(|block| {
-                                        if let Ok(Some(canonicity)) =
-                                            db.get_block_canonicity(&block.state_hash())
-                                        {
-                                            Some(block.with_canonicity(canonicity))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .collect();
-                                serde_json::to_string(&best_chain)?
-                            } else {
-                                let best_chain: Vec<BlockWithoutHeight> = best_chain
-                                    .iter()
-                                    .flat_map(|block| {
-                                        if let Ok(Some(canonicity)) =
-                                            db.get_block_canonicity(&block.state_hash())
-                                        {
-                                            Some(BlockWithoutHeight::with_canonicity(
-                                                block, canonicity,
-                                            ))
-                                        } else {
-                                            None
-                                        }
-                                    })
-                                    .collect();
-                                format_vec_jq_compatible(&best_chain)
-                            };
-
-                            if path.is_none() {
-                                info!("Writing best chain to stdout");
-                                ServerCliResponse::Success(best_chain_str)
-                            } else {
-                                let path = path.unwrap();
-                                if !path.is_dir() {
-                                    info!("Writing best chain to {path:?}");
-
-                                    std::fs::write(path.clone(), best_chain_str)?;
-                                    ServerCliResponse::Success(format!(
-                                        "Best chain written to {path:?}"
-                                    ))
-                                } else {
-                                    file_must_not_be_a_directory(&path)
-                                }
-                            }
-                        } else {
-                            ServerCliResponse::Success("No results".to_string())
-                        }
+                // check if ledger or state hash and use appropriate getter
+                if StateHash::is_valid(&hash) {
+                    trace!("{hash} is a state hash");
+                    if let Some(ledger) =
+                        db.get_staged_ledger_at_state_hash(&hash.clone().into(), memoize)?
+                    {
+                        write_ledger(path, ledger, &hash)
                     } else {
-                        best_tip_missing_from_db()
+                        ServerCliResponse::Error(format!(
+                            "Ledger at state hash {hash} is not in the store"
+                        ))
                     }
-                }
-            },
-            ClientCli::CreateSnapshot { output_path } => {
-                info!("Received create-snapshot command");
-                match db.create_snapshot(&output_path) {
-                    Err(e) => ServerCliResponse::Error(e.to_string()),
-                    Ok(s) => ServerCliResponse::Success(s),
+                } else if LedgerHash::is_valid(&hash) {
+                    trace!("{hash} is a ledger hash");
+                    if let Some(ledger) = db.get_staged_ledger_at_ledger_hash(
+                        &LedgerHash::new_or_panic(hash.clone()),
+                        memoize,
+                    )? {
+                        write_ledger(path, ledger, &hash)
+                    } else {
+                        ServerCliResponse::Error(format!(
+                            "Ledger at ledger hash {hash} is not in the store"
+                        ))
+                    }
+                } else {
+                    ServerCliResponse::Error(format!("Invalid ledger or state hash: {hash}"))
                 }
             }
-            ClientCli::Ledgers(__) => match __ {
-                Ledgers::Best { path, memoize } => {
-                    info!("Received best-ledger command");
-                    if let Some(ledger) = db.get_best_ledger(memoize)? {
-                        let ledger = ledger.to_string_pretty();
-                        if path.is_none() {
-                            debug!("Writing best ledger to stdout");
-                            ServerCliResponse::Success(ledger)
-                        } else {
-                            let path = path.unwrap();
-                            if path.is_dir() {
-                                file_must_not_be_a_directory(&path)
-                            } else {
-                                debug!("Writing best ledger to {path:?}");
-                                std::fs::write(path.clone(), ledger)?;
-                                ServerCliResponse::Success(format!(
-                                    "Best ledger written to {path:?}"
-                                ))
-                            }
-                        }
+            ClientCli::Ledgers(Ledgers::Height {
+                height,
+                path,
+                memoize,
+            }) => {
+                debug!("Received staged ledger at height {height} command");
+                if let Ok(Some(best_tip_height)) = db.get_best_block_height() {
+                    if height > best_tip_height {
+                        // ahead of witness tree - cannot compute
+                        ServerCliResponse::Error(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {best_tip_height}"))
                     } else {
-                        ServerCliResponse::Error("Best ledger cannot be calculated".to_string())
-                    }
-                }
-                Ledgers::Hash {
-                    hash,
-                    path,
-                    memoize,
-                } => {
-                    info!("Received staged ledger command for {hash}");
-                    fn write_ledger(
-                        path: Option<std::path::PathBuf>,
-                        ledger: Ledger,
-                        hash: &str,
-                    ) -> ServerCliResponse {
-                        let ledger = ledger.to_string_pretty();
+                        let ledger_str = db
+                            .get_staged_ledger_at_block_height(height, memoize)?
+                            .unwrap()
+                            .to_string_pretty();
                         if path.is_none() {
-                            debug!("Writing staged ledger at hash {hash} to stdout");
-                            ServerCliResponse::Success(ledger)
+                            debug!("Writing ledger at height {height} to stdout");
+                            ServerCliResponse::Success(ledger_str)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!("Writing staged ledger at {hash} to {path:?}");
-                                std::fs::write(path.clone(), ledger).ok();
+                                debug!("Writing ledger at height {height} to {path:?}");
+                                std::fs::write(&path, ledger_str)?;
                                 ServerCliResponse::Success(format!(
-                                    "Ledger at hash {hash} written to {path:?}"
+                                    "Ledger at height {height} written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
                             }
                         }
                     }
-
-                    // check if ledger or state hash and use appropriate getter
-                    if StateHash::is_valid(&hash) {
-                        trace!("{hash} is a state hash");
-                        if let Some(ledger) =
-                            db.get_staged_ledger_at_state_hash(&hash.clone().into(), memoize)?
-                        {
-                            write_ledger(path, ledger, &hash)
-                        } else {
-                            ServerCliResponse::Error(format!(
-                                "Ledger at state hash {hash} is not in the store"
-                            ))
-                        }
-                    } else if LedgerHash::is_valid(&hash) {
-                        trace!("{hash} is a ledger hash");
-                        if let Some(ledger) = db.get_staged_ledger_at_ledger_hash(
-                            &LedgerHash::new_or_panic(hash.clone()),
-                            memoize,
-                        )? {
-                            write_ledger(path, ledger, &hash)
-                        } else {
-                            ServerCliResponse::Error(format!(
-                                "Ledger at ledger hash {hash} is not in the store"
-                            ))
-                        }
-                    } else {
-                        ServerCliResponse::Error(format!("Invalid ledger or state hash: {hash}"))
-                    }
+                } else {
+                    best_tip_missing_from_db()
                 }
-                Ledgers::Height {
-                    height,
-                    path,
-                    memoize,
-                } => {
-                    info!("Received staged ledger at height {height} command");
-                    if let Ok(Some(best_tip_height)) = db.get_best_block_height() {
-                        if height > best_tip_height {
-                            // ahead of witness tree - cannot compute
-                            ServerCliResponse::Error(format!("Invalid query: ledger at height {height} cannot be determined from a chain of length {best_tip_height}"))
-                        } else {
-                            let ledger_str = db
-                                .get_staged_ledger_at_block_height(height, memoize)?
-                                .unwrap()
-                                .to_string_pretty();
-                            if path.is_none() {
-                                debug!("Writing ledger at height {height} to stdout");
-                                ServerCliResponse::Success(ledger_str)
-                            } else {
-                                let path = path.unwrap();
-                                if !path.is_dir() {
-                                    debug!("Writing ledger at height {height} to {path:?}");
-                                    std::fs::write(&path, ledger_str)?;
-                                    ServerCliResponse::Success(format!(
-                                        "Ledger at height {height} written to {path:?}"
-                                    ))
-                                } else {
-                                    file_must_not_be_a_directory(&path)
-                                }
-                            }
-                        }
-                    } else {
-                        best_tip_missing_from_db()
-                    }
-                }
-            },
-            ClientCli::StakingLedgers(__) => match __ {
-                StakingLedgers::Hash { hash, path } => {
-                    info!("Received staking-ledgers-hash command for {hash}");
-                    if LedgerHash::is_valid(&hash) {
-                        trace!("{hash} is a ledger hash");
-                        if let Some(staking_ledger) =
-                            db.get_staking_ledger(&hash.clone().into(), None, None)?
-                        {
-                            let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
-                            if path.is_none() {
-                                debug!("Writing staking ledger at hash {hash} to stdout");
-                                ServerCliResponse::Success(ledger_json)
-                            } else {
-                                let path = path.unwrap();
-                                if !path.is_dir() {
-                                    debug!("Writing ledger at {hash} to {path:?}");
-
-                                    std::fs::write(path.clone(), ledger_json)?;
-                                    ServerCliResponse::Success(format!(
-                                        "Staking ledger at hash {hash} written to {path:?}"
-                                    ))
-                                } else {
-                                    file_must_not_be_a_directory(&path)
-                                }
-                            }
-                        } else {
-                            ServerCliResponse::Error(format!(
-                                "Staking ledger at {hash} is not in the store"
-                            ))
-                        }
-                    } else {
-                        ServerCliResponse::Error(format!("Invalid ledger hash: {hash}"))
-                    }
-                }
-                StakingLedgers::Epoch {
-                    epoch,
-                    genesis_state_hash,
-                    path,
-                } => {
-                    info!("Received staking-ledgers-epoch {epoch} command");
-                    if !StateHash::is_valid(&genesis_state_hash) {
-                        invalid_state_hash(&genesis_state_hash)
-                    } else if let Some(staking_ledger) =
-                        db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
+            }
+            ClientCli::StakingLedgers(StakingLedgers::Hash { hash, path }) => {
+                debug!("Received staking-ledgers-hash command for {hash}");
+                if LedgerHash::is_valid(&hash) {
+                    trace!("{hash} is a ledger hash");
+                    if let Some(staking_ledger) =
+                        db.get_staking_ledger(&hash.clone().into(), None, None)?
                     {
                         let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                         if path.is_none() {
-                            debug!("Writing staking ledger at epoch {epoch} to stdout");
+                            debug!("Writing staking ledger at hash {hash} to stdout");
                             ServerCliResponse::Success(ledger_json)
                         } else {
                             let path = path.unwrap();
                             if !path.is_dir() {
-                                debug!("Writing ledger at epoch {epoch} to {path:?}");
+                                debug!("Writing ledger at {hash} to {path:?}");
+
                                 std::fs::write(path.clone(), ledger_json)?;
                                 ServerCliResponse::Success(format!(
-                                    "Staking ledger at epoch {epoch} written to {path:?}"
+                                    "Staking ledger at hash {hash} written to {path:?}"
                                 ))
                             } else {
                                 file_must_not_be_a_directory(&path)
@@ -780,166 +728,197 @@ pub async fn handle_connection(
                         }
                     } else {
                         ServerCliResponse::Error(format!(
-                            "Staking ledger at epoch {epoch} is not in the store"
+                            "Staking ledger at {hash} is not in the store"
                         ))
                     }
+                } else {
+                    ServerCliResponse::Error(format!("Invalid ledger hash: {hash}"))
                 }
-                StakingLedgers::PublicKey {
-                    epoch,
-                    genesis_state_hash,
-                    public_key: pk,
-                } => {
-                    info!("Received staking ledger account command for pk {pk} epoch {epoch}");
-                    if !StateHash::is_valid(&genesis_state_hash) {
-                        invalid_state_hash(&genesis_state_hash)
-                    } else if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
-                    } else if let Some(aggregated_delegations) =
-                        db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?
-                    {
-                        let pk: PublicKey = pk.into();
-                        let epoch = aggregated_delegations.epoch;
-                        let network = aggregated_delegations.network;
-                        let total_delegations = aggregated_delegations.total_delegations;
-                        let count_delegates = aggregated_delegations
-                            .delegations
-                            .get(&pk)
-                            .and_then(|agg_del| agg_del.count_delegates);
-                        let total_delegated = aggregated_delegations
-                            .delegations
-                            .get(&pk)
-                            .and_then(|agg_del| agg_del.total_delegated);
-                        let delegates = aggregated_delegations
-                            .delegations
-                            .get(&pk)
-                            .map_or(vec![], |agg_del| {
-                                agg_del.delegates.iter().cloned().collect()
-                            });
-                        ServerCliResponse::Success(serde_json::to_string_pretty(
-                            &AggregatedEpochStakeDelegation {
-                                pk,
-                                epoch,
-                                network,
-                                count_delegates,
-                                total_delegated,
-                                total_stake: total_delegations,
-                                delegates,
-                            },
-                        )?)
+            }
+            ClientCli::StakingLedgers(StakingLedgers::Epoch {
+                epoch,
+                genesis_state_hash,
+                path,
+            }) => {
+                debug!("Received staking-ledgers-epoch {epoch} command");
+                if !StateHash::is_valid(&genesis_state_hash) {
+                    invalid_state_hash(&genesis_state_hash)
+                } else if let Some(staking_ledger) =
+                    db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
+                {
+                    let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
+                    if path.is_none() {
+                        debug!("Writing staking ledger at epoch {epoch} to stdout");
+                        ServerCliResponse::Success(ledger_json)
                     } else {
-                        ServerCliResponse::Error(format!(
-                            "Public key {pk} is missing from staking ledger epoch {epoch}"
-                        ))
+                        let path = path.unwrap();
+                        if !path.is_dir() {
+                            debug!("Writing ledger at epoch {epoch} to {path:?}");
+                            std::fs::write(path.clone(), ledger_json)?;
+                            ServerCliResponse::Success(format!(
+                                "Staking ledger at epoch {epoch} written to {path:?}"
+                            ))
+                        } else {
+                            file_must_not_be_a_directory(&path)
+                        }
                     }
+                } else {
+                    ServerCliResponse::Error(format!(
+                        "Staking ledger at epoch {epoch} is not in the store"
+                    ))
                 }
-                StakingLedgers::Delegations {
-                    epoch,
-                    genesis_state_hash,
-                    path,
-                } => {
-                    info!("Received staking-delegations command for epoch {epoch}");
-                    let aggregated_delegations =
-                        db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?;
-                    if let Some(agg_del_str) = aggregated_delegations
-                        .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
-                    {
-                        if path.is_none() {
+            }
+            ClientCli::StakingLedgers(StakingLedgers::PublicKey {
+                epoch,
+                genesis_state_hash,
+                public_key: pk,
+            }) => {
+                debug!("Received staking ledger account command for pk {pk} epoch {epoch}");
+                if !StateHash::is_valid(&genesis_state_hash) {
+                    invalid_state_hash(&genesis_state_hash)
+                } else if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else if let Some(aggregated_delegations) =
+                    db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?
+                {
+                    let pk: PublicKey = pk.into();
+                    let epoch = aggregated_delegations.epoch;
+                    let network = aggregated_delegations.network;
+                    let total_delegations = aggregated_delegations.total_delegations;
+                    let count_delegates = aggregated_delegations
+                        .delegations
+                        .get(&pk)
+                        .and_then(|agg_del| agg_del.count_delegates);
+                    let total_delegated = aggregated_delegations
+                        .delegations
+                        .get(&pk)
+                        .and_then(|agg_del| agg_del.total_delegated);
+                    let delegates = aggregated_delegations
+                        .delegations
+                        .get(&pk)
+                        .map_or(vec![], |agg_del| {
+                            agg_del.delegates.iter().cloned().collect()
+                        });
+                    ServerCliResponse::Success(serde_json::to_string_pretty(
+                        &AggregatedEpochStakeDelegation {
+                            pk,
+                            epoch,
+                            network,
+                            count_delegates,
+                            total_delegated,
+                            total_stake: total_delegations,
+                            delegates,
+                        },
+                    )?)
+                } else {
+                    ServerCliResponse::Error(format!(
+                        "Public key {pk} is missing from staking ledger epoch {epoch}"
+                    ))
+                }
+            }
+            ClientCli::StakingLedgers(StakingLedgers::Delegations {
+                epoch,
+                genesis_state_hash,
+                path,
+            }) => {
+                debug!("Received staking-delegations command for epoch {epoch}");
+                let aggregated_delegations =
+                    db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?;
+                if let Some(agg_del_str) = aggregated_delegations
+                    .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
+                {
+                    if path.is_none() {
+                        debug!("Writing aggregated staking delegations epoch {epoch} to stdout");
+                        ServerCliResponse::Success(agg_del_str)
+                    } else {
+                        let path = path.unwrap();
+                        if !path.is_dir() {
                             debug!(
-                                "Writing aggregated staking delegations epoch {epoch} to stdout"
+                                "Writing aggregated staking delegations epoch {epoch} to {path:?}"
                             );
-                            ServerCliResponse::Success(agg_del_str)
+                            std::fs::write(&path, agg_del_str)?;
+                            ServerCliResponse::Success(format!(
+                                "Aggregated staking delegations epoch {epoch} written to {path:?}"
+                            ))
                         } else {
-                            let path = path.unwrap();
-                            if !path.is_dir() {
-                                debug!("Writing aggregated staking delegations epoch {epoch} to {path:?}");
-                                std::fs::write(&path, agg_del_str)?;
-                                ServerCliResponse::Success(format!(
-                                    "Aggregated staking delegations epoch {epoch} written to {path:?}"))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            file_must_not_be_a_directory(&path)
                         }
-                    } else {
-                        ServerCliResponse::Error(format!(
-                            "Unable to aggregate staking delegations epoch {epoch}"
-                        ))
                     }
+                } else {
+                    ServerCliResponse::Error(format!(
+                        "Unable to aggregate staking delegations epoch {epoch}"
+                    ))
                 }
-            },
-            ClientCli::Snarks(__) => match __ {
-                Snarks::PublicKey {
-                    public_key: pk,
-                    path,
-                } => {
-                    info!("Received SNARK work command for public key {pk}");
+            }
+            ClientCli::Snarks(Snarks::PublicKey {
+                public_key: pk,
+                path,
+            }) => {
+                debug!("Received SNARK work command for public key {pk}");
 
-                    if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
+                if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else {
+                    let snarks = db.get_snark_work_by_public_key(&pk.clone().into())?;
+                    let snarks_str = format_vec_jq_compatible(&snarks);
+
+                    if path.is_none() {
+                        debug!("Writing SNARK work for public key {pk} to stdout");
+                        ServerCliResponse::Success(snarks_str)
                     } else {
-                        let snarks = db.get_snark_work_by_public_key(&pk.clone().into())?;
-                        let snarks_str = format_vec_jq_compatible(&snarks);
+                        let path = path.unwrap();
 
-                        if path.is_none() {
-                            debug!("Writing SNARK work for public key {pk} to stdout");
-                            ServerCliResponse::Success(snarks_str)
+                        if !path.is_dir() {
+                            debug!("Writing SNARK work for public key {pk} to {path:?}");
+                            std::fs::write(&path, snarks_str)?;
+                            ServerCliResponse::Success(format!(
+                                "SNARK work for public key {pk} written to {path:?}"
+                            ))
                         } else {
-                            let path = path.unwrap();
-
-                            if !path.is_dir() {
-                                debug!("Writing SNARK work for public key {pk} to {path:?}");
-                                std::fs::write(&path, snarks_str)?;
-                                ServerCliResponse::Success(format!(
-                                    "SNARK work for public key {pk} written to {path:?}"
-                                ))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 }
-                Snarks::StateHash { state_hash, path } => {
-                    info!("Received SNARK work command for state hash {state_hash}");
+            }
+            ClientCli::Snarks(Snarks::StateHash { state_hash, path }) => {
+                debug!("Received SNARK work command for state hash {state_hash}");
 
-                    if !StateHash::is_valid(&state_hash) {
-                        invalid_state_hash(&state_hash)
-                    } else {
-                        match db.get_block_snark_work(&state_hash.clone().into())? {
-                            Some(snarks) => {
-                                let snarks_str = format_vec_jq_compatible(&snarks);
-                                if path.is_none() {
-                                    debug!("Writing SNARK work for block {state_hash} to stdout");
-                                    ServerCliResponse::Success(snarks_str)
+                if !StateHash::is_valid(&state_hash) {
+                    invalid_state_hash(&state_hash)
+                } else {
+                    match db.get_block_snark_work(&state_hash.clone().into())? {
+                        Some(snarks) => {
+                            let snarks_str = format_vec_jq_compatible(&snarks);
+                            if path.is_none() {
+                                debug!("Writing SNARK work for block {state_hash} to stdout");
+                                ServerCliResponse::Success(snarks_str)
+                            } else {
+                                let path = path.unwrap();
+                                if !path.is_dir() {
+                                    debug!("Writing SNARK work for block {state_hash} to {path:?}");
+                                    std::fs::write(&path, snarks_str).unwrap();
+                                    ServerCliResponse::Success(format!(
+                                        "SNARK work for block {state_hash} written to {path:?}"
+                                    ))
                                 } else {
-                                    let path = path.unwrap();
-                                    if !path.is_dir() {
-                                        debug!(
-                                            "Writing SNARK work for block {state_hash} to {path:?}"
-                                        );
-                                        std::fs::write(&path, snarks_str).unwrap();
-                                        ServerCliResponse::Success(format!(
-                                            "SNARK work for block {state_hash} written to {path:?}"
-                                        ))
-                                    } else {
-                                        file_must_not_be_a_directory(&path)
-                                    }
+                                    file_must_not_be_a_directory(&path)
                                 }
                             }
-                            None => ServerCliResponse::Success(format!(
-                                "No SNARK work found for block {state_hash}"
-                            )),
                         }
+                        None => ServerCliResponse::Success(format!(
+                            "No SNARK work found for block {state_hash}"
+                        )),
                     }
                 }
-
-                Snarks::Top { num } => {
-                    info!("Received top {num} SNARKers command");
-                    ServerCliResponse::Success(serde_json::to_string_pretty(
-                        &db.get_top_snark_provers_by_total_fees(num)?,
-                    )?)
-                }
-            },
+            }
+            ClientCli::Snarks(Snarks::Top { num }) => {
+                debug!("Received top {num} SNARKers command");
+                ServerCliResponse::Success(serde_json::to_string_pretty(
+                    &db.get_top_snark_provers_by_total_fees(num)?,
+                )?)
+            }
             ClientCli::Shutdown => {
-                info!("Received shutdown command");
+                debug!("Received shutdown command");
                 // First respond success to client before shutting down
                 let response =
                     ServerCliResponse::Success("Shutting down Mina Indexer...".to_string());
@@ -956,7 +935,7 @@ pub async fn handle_connection(
                 json,
                 path,
             } => {
-                info!("Received summary command");
+                debug!("Received summary command");
 
                 let summary = state.summary_verbose();
                 let summary_str = if verbose {
@@ -967,12 +946,12 @@ pub async fn handle_connection(
                 };
 
                 if path.is_none() {
-                    info!("Writing summary to stdout");
+                    debug!("Writing summary to stdout");
                     ServerCliResponse::Success(summary_str)
                 } else {
                     let path = path.unwrap();
                     if !path.is_dir() {
-                        info!("Writing summary to {path:?}");
+                        debug!("Writing summary to {path:?}");
                         std::fs::write(&path, summary_str)?;
                         ServerCliResponse::Success(format!("Summary written to {path:?}"))
                     } else {
@@ -980,208 +959,202 @@ pub async fn handle_connection(
                     }
                 }
             }
-            ClientCli::Transactions(__) => match __ {
-                Transactions::PublicKey {
-                    public_key: pk,
-                    verbose,
-                    start_state_hash,
-                    end_state_hash,
-                    path,
-                    csv,
-                } => {
-                    let start_state_hash: StateHash = start_state_hash.into();
-                    let end_state_hash_result = match end_state_hash {
-                        Some(hash) => Ok(hash.into()),
-                        None => match db.get_best_block()? {
-                            Some(best_tip) => Ok(best_tip.state_hash()),
-                            None => Err(()),
-                        },
-                    };
+            ClientCli::Transactions(Transactions::PublicKey {
+                public_key: pk,
+                verbose,
+                start_state_hash,
+                end_state_hash,
+                path,
+                csv,
+            }) => {
+                let start_state_hash: StateHash = start_state_hash.into();
+                let end_state_hash_result = match end_state_hash {
+                    Some(hash) => Ok(hash.into()),
+                    None => match db.get_best_block()? {
+                        Some(best_tip) => Ok(best_tip.state_hash()),
+                        None => Err(()),
+                    },
+                };
 
-                    info!("Received tx-public-key command for {pk}");
+                debug!("Received tx-public-key command for {pk}");
 
-                    if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
-                    } else if !StateHash::is_valid(&start_state_hash.0) {
-                        invalid_state_hash(&start_state_hash.0)
-                    } else if end_state_hash_result.is_err() {
-                        best_tip_missing_from_db()
+                if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else if !StateHash::is_valid(&start_state_hash.0) {
+                    invalid_state_hash(&start_state_hash.0)
+                } else if end_state_hash_result.is_err() {
+                    best_tip_missing_from_db()
+                } else {
+                    let end_state_hash = end_state_hash_result.unwrap();
+                    if !StateHash::is_valid(&end_state_hash.0) {
+                        invalid_state_hash(&end_state_hash.0)
+                    } else if csv {
+                        match db.write_user_commands_csv(&pk.clone().into(), path) {
+                            Ok(path) => ServerCliResponse::Success(format!(
+                                "Successfully wrote user commands CSV for {pk} to {path:?}"
+                            )),
+                            Err(e) => ServerCliResponse::Error(format!(
+                                "Error writing user commands CSV for {pk}: {e}"
+                            )),
+                        }
                     } else {
-                        let end_state_hash = end_state_hash_result.unwrap();
-                        if !StateHash::is_valid(&end_state_hash.0) {
-                            invalid_state_hash(&end_state_hash.0)
-                        } else if csv {
-                            match db.write_user_commands_csv(&pk.clone().into(), path) {
-                                Ok(path) => ServerCliResponse::Success(format!(
-                                    "Successfully wrote user commands CSV for {pk} to {path:?}"
-                                )),
-                                Err(e) => ServerCliResponse::Error(format!(
-                                    "Error writing user commands CSV for {pk}: {e}"
-                                )),
-                            }
+                        let transactions = db
+                            .get_user_commands_for_public_key(&pk.clone().into())?
+                            .unwrap_or_default();
+                        let transaction_str = if verbose {
+                            format_vec_jq_compatible(&transactions)
                         } else {
-                            let transactions = db
-                                .get_user_commands_for_public_key(&pk.clone().into())?
-                                .unwrap_or_default();
-                            let transaction_str = if verbose {
-                                format_vec_jq_compatible(&transactions)
+                            let txs: Vec<Command> =
+                                transactions.into_iter().map(Command::from).collect();
+                            format_vec_jq_compatible(&txs)
+                        };
+
+                        if path.is_none() {
+                            debug!("Writing transactions for {pk} to stdout");
+                            ServerCliResponse::Success(transaction_str)
+                        } else {
+                            let path = path.unwrap();
+                            if !path.is_dir() {
+                                debug!("Writing transactions for {pk} to {path:?}");
+                                std::fs::write(&path, transaction_str)?;
+                                ServerCliResponse::Success(format!(
+                                    "Transactions for {pk} written to {path:?}"
+                                ))
                             } else {
-                                let txs: Vec<Command> =
-                                    transactions.into_iter().map(Command::from).collect();
-                                format_vec_jq_compatible(&txs)
+                                file_must_not_be_a_directory(&path)
+                            }
+                        }
+                    }
+                }
+            }
+            ClientCli::Transactions(Transactions::Hash { hash, verbose }) => {
+                debug!("Received tx-hash command for {hash}");
+                let hash = TxnHash::new(hash)?;
+                match db.get_user_command(&hash, 0) {
+                    Ok(Some(cmd)) => {
+                        let msg = if verbose {
+                            format!("{cmd:?}")
+                        } else {
+                            let cmd: Command = cmd.into();
+                            format!("{cmd:?}")
+                        };
+                        ServerCliResponse::Success(msg)
+                    }
+                    Ok(None) => ServerCliResponse::Success(format!(
+                        "Transaction at hash not present in store: '{hash}'"
+                    )),
+                    Err(e) => ServerCliResponse::Error(format!(
+                        "Failed to retrieve transaction hash for '{hash}': {e}"
+                    )),
+                }
+            }
+            ClientCli::Transactions(Transactions::StateHash {
+                state_hash,
+                verbose,
+                path,
+            }) => {
+                debug!("Received tx-state-hash command for {state_hash}");
+                if !StateHash::is_valid(&state_hash) {
+                    invalid_state_hash(&state_hash)
+                } else {
+                    let block_hash = StateHash(state_hash.to_owned());
+                    match db.get_block_user_commands(&block_hash).unwrap_or_default() {
+                        Some(cmds) => {
+                            let transaction_str = if verbose {
+                                format_vec_jq_compatible(&cmds)
+                            } else {
+                                let cmds: Vec<Command> =
+                                    cmds.into_iter().map(Command::from).collect();
+                                format_vec_jq_compatible(&cmds)
                             };
 
                             if path.is_none() {
-                                debug!("Writing transactions for {pk} to stdout");
+                                debug!("Writing transactions for {state_hash} to stdout");
                                 ServerCliResponse::Success(transaction_str)
                             } else {
                                 let path = path.unwrap();
                                 if !path.is_dir() {
-                                    debug!("Writing transactions for {pk} to {path:?}");
-                                    std::fs::write(&path, transaction_str)?;
+                                    debug!("Writing transactions for {state_hash} to {path:?}");
+                                    std::fs::write(&path, transaction_str).unwrap();
                                     ServerCliResponse::Success(format!(
-                                        "Transactions for {pk} written to {path:?}"
+                                        "Transactions for {state_hash} written to {path:?}"
                                     ))
                                 } else {
                                     file_must_not_be_a_directory(&path)
                                 }
                             }
                         }
+                        None => ServerCliResponse::Success(format!(
+                            "No transactions found for block {state_hash}"
+                        )),
                     }
                 }
-                Transactions::Hash { hash, verbose } => {
-                    info!("Received tx-hash command for {hash}");
-                    let hash = TxnHash::new(hash)?;
-                    match db.get_user_command(&hash, 0) {
-                        Ok(Some(cmd)) => {
-                            let msg = if verbose {
-                                format!("{cmd:?}")
-                            } else {
-                                let cmd: Command = cmd.into();
-                                format!("{cmd:?}")
-                            };
-                            ServerCliResponse::Success(msg)
-                        }
-                        Ok(None) => ServerCliResponse::Success(format!(
-                            "Transaction at hash not present in store: '{hash}'"
+            }
+            ClientCli::InternalCommands(InternalCommands::PublicKey {
+                path,
+                public_key: pk,
+                csv,
+            }) => {
+                if !PublicKey::is_valid(&pk) {
+                    invalid_public_key(&pk)
+                } else if csv {
+                    match db.write_internal_commands_csv(pk.clone().into(), path) {
+                        Ok(path) => ServerCliResponse::Success(format!(
+                            "Successfully wrote internal commands CSV for {pk} to {path:?}"
                         )),
                         Err(e) => ServerCliResponse::Error(format!(
-                            "Failed to retrieve transaction hash for '{hash}': {e}"
+                            "Error writing internal commands CSV for {pk}: {e}"
                         )),
                     }
-                }
-                Transactions::StateHash {
-                    state_hash,
-                    verbose,
-                    path,
-                } => {
-                    info!("Received tx-state-hash command for {state_hash}");
-                    if !StateHash::is_valid(&state_hash) {
-                        invalid_state_hash(&state_hash)
-                    } else {
-                        let block_hash = StateHash(state_hash.to_owned());
-                        match db.get_block_user_commands(&block_hash).unwrap_or_default() {
-                            Some(cmds) => {
-                                let transaction_str = if verbose {
-                                    format_vec_jq_compatible(&cmds)
-                                } else {
-                                    let cmds: Vec<Command> =
-                                        cmds.into_iter().map(Command::from).collect();
-                                    format_vec_jq_compatible(&cmds)
-                                };
+                } else {
+                    let internal_cmds =
+                        db.get_internal_commands_public_key(&pk.clone().into(), 0, usize::MAX)?;
+                    let internal_cmds_str = serde_json::to_string_pretty(&internal_cmds)?;
 
-                                if path.is_none() {
-                                    debug!("Writing transactions for {state_hash} to stdout");
-                                    ServerCliResponse::Success(transaction_str)
-                                } else {
-                                    let path = path.unwrap();
-                                    if !path.is_dir() {
-                                        debug!("Writing transactions for {state_hash} to {path:?}");
-                                        std::fs::write(&path, transaction_str).unwrap();
-                                        ServerCliResponse::Success(format!(
-                                            "Transactions for {state_hash} written to {path:?}"
-                                        ))
-                                    } else {
-                                        file_must_not_be_a_directory(&path)
-                                    }
-                                }
-                            }
-                            None => ServerCliResponse::Success(format!(
-                                "No transactions found for block {state_hash}"
-                            )),
-                        }
-                    }
-                }
-            },
-            ClientCli::InternalCommands(__) => match __ {
-                InternalCommands::PublicKey {
-                    path,
-                    public_key: pk,
-                    csv,
-                } => {
-                    if !PublicKey::is_valid(&pk) {
-                        invalid_public_key(&pk)
-                    } else if csv {
-                        match db.write_internal_commands_csv(pk.clone().into(), path) {
-                            Ok(path) => ServerCliResponse::Success(format!(
-                                "Successfully wrote internal commands CSV for {pk} to {path:?}"
-                            )),
-                            Err(e) => ServerCliResponse::Error(format!(
-                                "Error writing internal commands CSV for {pk}: {e}"
-                            )),
-                        }
+                    if path.is_none() {
+                        debug!("Writing internal commands for {pk} to stdout");
+                        ServerCliResponse::Success(internal_cmds_str)
                     } else {
-                        let internal_cmds =
-                            db.get_internal_commands_public_key(&pk.clone().into(), 0, usize::MAX)?;
-                        let internal_cmds_str = serde_json::to_string_pretty(&internal_cmds)?;
-
-                        if path.is_none() {
-                            debug!("Writing internal commands for {pk} to stdout");
-                            ServerCliResponse::Success(internal_cmds_str)
+                        let path = path.unwrap();
+                        if !path.is_dir() {
+                            debug!("Writing internal commands for {pk} to {path:?}");
+                            std::fs::write(&path, internal_cmds_str)?;
+                            ServerCliResponse::Success(format!(
+                                "Internal commands for {pk} written to {path:?}"
+                            ))
                         } else {
-                            let path = path.unwrap();
-                            if !path.is_dir() {
-                                debug!("Writing internal commands for {pk} to {path:?}");
-                                std::fs::write(&path, internal_cmds_str)?;
-                                ServerCliResponse::Success(format!(
-                                    "Internal commands for {pk} written to {path:?}"
-                                ))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 }
-                InternalCommands::StateHash { path, state_hash } => {
-                    info!("Received internal-state-hash command for {}", state_hash);
-                    if !StateHash::is_valid(&state_hash) {
-                        invalid_state_hash(&state_hash)
+            }
+            ClientCli::InternalCommands(InternalCommands::StateHash { path, state_hash }) => {
+                debug!("Received internal-state-hash command for {}", state_hash);
+                if !StateHash::is_valid(&state_hash) {
+                    invalid_state_hash(&state_hash)
+                } else {
+                    let state_hash = StateHash(state_hash);
+                    let internal_cmds_str =
+                        serde_json::to_string_pretty(&db.get_internal_commands(&state_hash)?)?;
+
+                    if path.is_none() {
+                        debug!("Writing block internal commands for {state_hash} to stdout");
+                        ServerCliResponse::Success(internal_cmds_str)
                     } else {
-                        let state_hash = StateHash(state_hash);
-                        let internal_cmds_str =
-                            serde_json::to_string_pretty(&db.get_internal_commands(&state_hash)?)?;
+                        let path = path.unwrap();
+                        if !path.is_dir() {
+                            debug!("Writing block internal commands for {state_hash} to {path:?}");
 
-                        if path.is_none() {
-                            debug!("Writing block internal commands for {state_hash} to stdout");
-                            ServerCliResponse::Success(internal_cmds_str)
+                            std::fs::write(&path, internal_cmds_str)?;
+                            ServerCliResponse::Success(format!(
+                                "Block internal commands for {state_hash} written to {path:?}"
+                            ))
                         } else {
-                            let path = path.unwrap();
-                            if !path.is_dir() {
-                                debug!(
-                                    "Writing block internal commands for {state_hash} to {path:?}"
-                                );
-
-                                std::fs::write(&path, internal_cmds_str)?;
-                                ServerCliResponse::Success(format!(
-                                    "Block internal commands for {state_hash} written to {path:?}"
-                                ))
-                            } else {
-                                file_must_not_be_a_directory(&path)
-                            }
+                            file_must_not_be_a_directory(&path)
                         }
                     }
                 }
-            },
+            }
             ClientCli::DbVersion => ServerCliResponse::Success(format!(
                 "mina-indexer database v{}",
                 db.get_db_version()?

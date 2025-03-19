@@ -6,6 +6,7 @@ use mina_indexer::{
     cli::{
         database::DatabaseArgs,
         server::{ServerArgs, ServerArgsJson},
+        LogLevelFilter,
     },
     client,
     constants::*,
@@ -107,6 +108,16 @@ enum DatabaseCommand {
         #[arg(long)]
         json: bool,
     },
+}
+
+impl From<&DatabaseCommand> for LevelFilter {
+    fn from(value: &DatabaseCommand) -> Self {
+        if let DatabaseCommand::Create(args) = value {
+            args.log_level.clone().0
+        } else {
+            LogLevelFilter::default().0
+        }
+    }
 }
 
 #[tokio::main]
@@ -222,7 +233,7 @@ impl DatabaseCommand {
             .module(module_path!())
             .color(ColorChoice::Never)
             .timestamp(Timestamp::Microsecond)
-            .verbosity(LevelFilter::Info)
+            .verbosity(LevelFilter::from(&self))
             .init()
             .unwrap();
 

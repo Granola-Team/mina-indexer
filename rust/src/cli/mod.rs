@@ -16,9 +16,10 @@ impl std::str::FromStr for LogLevelFilter {
 
 impl Default for LogLevelFilter {
     fn default() -> Self {
-        Self(LevelFilter::Warn)
+        Self(LevelFilter::Info)
     }
 }
+
 impl std::fmt::Display for LogLevelFilter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
