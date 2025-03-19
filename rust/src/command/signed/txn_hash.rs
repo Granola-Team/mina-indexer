@@ -62,6 +62,7 @@ impl TxnHash {
         if bytes.starts_with(Self::V2_PREFIX.as_bytes()) {
             let mut bytes = bytes;
             bytes.remove(Self::V2_LEN);
+
             return Self::new(String::from_utf8(bytes)?);
         }
 
@@ -88,11 +89,71 @@ impl TxnHash {
 }
 
 #[cfg(test)]
+impl quickcheck::Arbitrary for TxnHash {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        if bool::arbitrary(g) {
+            Self::arbitrary_v1(g)
+        } else {
+            Self::arbitrary_v2(g)
+        }
+    }
+}
+
+#[cfg(test)]
+impl TxnHash {
+    pub fn arbitrary_v1(g: &mut quickcheck::Gen) -> Self {
+        use quickcheck::Arbitrary;
+
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..TxnHash::V1_LEN - TxnHash::V1_PREFIX.len() {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self::V1(Self::V1_PREFIX.to_string() + &chars.iter().collect::<String>())
+    }
+
+    pub fn arbitrary_v2(g: &mut quickcheck::Gen) -> Self {
+        use quickcheck::Arbitrary;
+
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..TxnHash::V2_LEN - TxnHash::V2_PREFIX.len() {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self::V2(Self::V2_PREFIX.to_string() + &chars.iter().collect::<String>())
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
+    use quickcheck::Gen;
 
     const V1_TXN_HASH: &str = "CkpBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS";
     const V2_TXN_HASH: &str = "5JBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUSBOGUS";
+
+    #[test]
+    fn arbitrary_is_valid() -> anyhow::Result<()> {
+        let g = &mut Gen::new(1000);
+
+        for _ in 0..100 {
+            let v1 = TxnHash::arbitrary_v1(g);
+            assert!(v1.is_valid());
+
+            let v2 = TxnHash::arbitrary_v2(g);
+            assert!(v2.is_valid());
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn round_trip_padding() -> anyhow::Result<()> {
