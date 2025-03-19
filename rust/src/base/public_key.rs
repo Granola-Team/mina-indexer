@@ -12,8 +12,14 @@ impl PublicKey {
     pub const LEN: usize = 55;
     pub const PREFIX: &'static str = "B62q";
 
-    pub fn new<S: Into<String>>(key: S) -> Self {
-        Self(key.into())
+    pub fn new<S: Into<String>>(pk: S) -> anyhow::Result<Self> {
+        let pk: String = pk.into();
+
+        if Self::is_valid(&pk) {
+            Ok(Self(pk))
+        } else {
+            bail!("Invalid public key: {}", pk)
+        }
     }
 
     pub fn to_address(&self) -> String {

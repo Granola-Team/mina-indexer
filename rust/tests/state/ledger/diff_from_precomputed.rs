@@ -49,7 +49,7 @@ async fn account_diffs() {
                 (1000000000000, 0),
             ),
         ]
-        .map(|(pk, amt)| (PublicKey::new(pk), amt)),
+        .map(|(pk, amt)| (PublicKey::new(pk).unwrap(), amt)),
     );
     let initial_ledger = ledger.clone();
 
@@ -177,7 +177,7 @@ async fn account_diffs() {
                 (156800000000, 0),
             ),
         ]
-        .map(|(pk, amt)| (PublicKey::new(pk), amt)),
+        .map(|(pk, amt)| (PublicKey::new(pk).unwrap(), amt)),
     );
 
     for pk in ledger.keys() {

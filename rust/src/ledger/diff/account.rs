@@ -1418,13 +1418,13 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_amount() {
+    fn test_amount() -> anyhow::Result<()> {
         let credit_amount = Amount(1000);
         let debit_amount = Amount(500);
 
         // Test Credit for PaymentDiff
         let payment_diff_credit = AccountDiff::Payment(PaymentDiff {
-            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: credit_amount,
             update_type: UpdateType::Credit,
             token: TokenAddress::default(),
@@ -1433,7 +1433,7 @@ mod tests {
 
         // Test Debit for PaymentDiff
         let payment_diff_debit = AccountDiff::Payment(PaymentDiff {
-            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: debit_amount,
             update_type: UpdateType::Debit(Some(Nonce(1))),
             token: TokenAddress::default(),
@@ -1442,14 +1442,14 @@ mod tests {
 
         // Test Credit for CoinbaseDiff
         let coinbase_diff = AccountDiff::Coinbase(CoinbaseDiff {
-            public_key: PublicKey::new("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs"),
+            public_key: PublicKey::new("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs")?,
             amount: credit_amount,
         });
         assert_eq!(coinbase_diff.amount(), 1000);
 
         // Test Credit for FeeTransfer PaymentDiff
         let fee_transfer_diff_credit = AccountDiff::FeeTransfer(PaymentDiff {
-            public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u"),
+            public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u")?,
             amount: credit_amount,
             update_type: UpdateType::Credit,
             token: TokenAddress::default(),
@@ -1461,7 +1461,7 @@ mod tests {
             AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                 public_key: PublicKey::new(
                     "B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u",
-                ),
+                )?,
                 amount: debit_amount,
                 update_type: UpdateType::Debit(None),
                 token: TokenAddress::default(),
@@ -1470,8 +1470,8 @@ mod tests {
 
         let delegation_diff = AccountDiff::Delegation(DelegationDiff {
             nonce: Nonce(42),
-            delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi"),
-            delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
+            delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi")?,
+            delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz")?,
         });
         assert_eq!(delegation_diff.amount(), 0);
 
@@ -1479,10 +1479,12 @@ mod tests {
             AccountDiff::FailedTransactionNonce(FailedTransactionNonceDiff {
                 public_key: PublicKey::new(
                     "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi",
-                ),
+                )?,
                 nonce: Nonce(10),
             });
+
         assert_eq!(failed_tx_nonce_diff.amount(), 0);
+        Ok(())
     }
 
     #[test]
@@ -1612,18 +1614,21 @@ mod tests {
     }
 
     #[test]
-    fn test_public_key_payment() {
+    fn test_public_key_payment() -> anyhow::Result<()> {
         let nonce = Nonce(42);
         let payment_diff = PaymentDiff {
-            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG"),
+            public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: Amount(536900000000),
             update_type: UpdateType::Debit(Some(nonce)),
             token: TokenAddress::default(),
         };
         let account_diff = AccountDiff::Payment(payment_diff);
         let result = account_diff.public_key();
-        let expected = PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG");
+
+        let expected = PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?;
         assert_eq!(result, expected);
+
+        Ok(())
     }
 
     #[test]

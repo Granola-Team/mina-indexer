@@ -202,8 +202,8 @@ impl Ledger {
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> anyhow::Result<Self> {
         let mut ledger = TokenLedger::new();
         for (pubkey, balance, nonce, delgation) in value {
-            let pk = PublicKey::new(pubkey);
-            let delegate = delgation.map(PublicKey::new).unwrap_or(pk.clone());
+            let pk = PublicKey::new(pubkey)?;
+            let delegate = delgation.map(PublicKey::new).unwrap_or(Ok(pk.clone()))?;
 
             ledger.accounts.insert(
                 pk.clone(),
@@ -367,8 +367,8 @@ impl TokenLedger {
     pub fn from(value: Vec<(&str, u64, Option<u32>, Option<&str>)>) -> anyhow::Result<Self> {
         let mut ledger = Self::new();
         for (pubkey, balance, nonce, delgation) in value {
-            let pk = PublicKey::new(pubkey);
-            let delegate = delgation.map(PublicKey::new).unwrap_or(pk.clone());
+            let pk = PublicKey::new(pubkey)?;
+            let delegate = delgation.map(PublicKey::new).unwrap_or(Ok(pk.clone()))?;
             ledger.accounts.insert(
                 pk.clone(),
                 Account {
@@ -535,9 +535,9 @@ mod tests {
     }
 
     #[test]
-    fn apply_diff_payment() {
+    fn apply_diff_payment() -> anyhow::Result<()> {
         let amount = Amount(42 * MINA_SCALE);
-        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")?;
         let account_before = Account::empty(public_key.clone(), TokenAddress::default());
 
         let mut accounts = HashMap::new();
@@ -576,8 +576,10 @@ mod tests {
             token_diffs: vec![],
             accounts_created: vec![],
         };
+
         let ledger = TokenLedger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
+
         assert_eq!(
             *account_after,
             Account {
@@ -585,13 +587,15 @@ mod tests {
                 ..account_before
             }
         );
+
+        Ok(())
     }
 
     #[test]
-    fn apply_diff_delegation() {
+    fn apply_diff_delegation() -> anyhow::Result<()> {
         let prev_nonce = Nonce(42);
-        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy");
-        let delegate = PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6");
+        let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")?;
+        let delegate = PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")?;
         let account_before = Account::empty(public_key.clone(), TokenAddress::default());
 
         let mut accounts = HashMap::new();
@@ -612,10 +616,12 @@ mod tests {
             token_diffs: vec![],
             accounts_created: vec![],
         };
+
         let ledger = TokenLedger { accounts }
             .apply_diff(&ledger_diff)
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
+
         assert_eq!(
             *account_after,
             Account {
@@ -624,5 +630,7 @@ mod tests {
                 ..account_before
             }
         );
+
+        Ok(())
     }
 }
