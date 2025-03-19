@@ -15,13 +15,18 @@ config_base_dir
 config_exe_dir
 config_log_dir
 
-puts "Fetching snapshot."
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
-system(
-  "#{SRC_TOP}/ops/download-snapshot.sh",
-  snapshot_name,
-  BASE_DIR
-) || abort("Failed to download snapshot.")
+if BUILD_TYPE == "dev"
+  puts "Moving snapshot."
+  system("mv #{BASE_DIR}/../../mina-indexer-test/#{REV}/#{snapshot_name} #{snapshot_path(BLOCKS_COUNT)}") || abort("Failed to move snapshot file.")
+else
+  puts "Fetching snapshot."
+  system(
+    "#{SRC_TOP}/ops/download-snapshot.sh",
+    snapshot_name,
+    BASE_DIR
+  ) || abort("Failed to download snapshot.")
+end
 
 # Terminate the current version, if any.
 #

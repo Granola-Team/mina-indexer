@@ -87,12 +87,15 @@ invoke_mina_indexer(
   "database", "snapshot",
   "--output-path", snapshot_path(BLOCKS_COUNT)
 ) || abort("Snapshot creation failed. Aborting.")
-puts "Snapshot complete. Uploading."
-system(
-  "#{SRC_TOP}/ops/upload-snapshot.sh",
-  File.basename(snapshot_path(BLOCKS_COUNT)),
-  {chdir: File.dirname(snapshot_path(BLOCKS_COUNT))}
-) || abort("Snapshot upload failed. Aborting.")
+puts "Snapshot complete."
+if BUILD_TYPE != "dev"
+  puts "Uploading."
+  system(
+    "#{SRC_TOP}/ops/upload-snapshot.sh",
+    File.basename(snapshot_path(BLOCKS_COUNT)),
+    {chdir: File.dirname(snapshot_path(BLOCKS_COUNT))}
+  ) || abort("Snapshot upload failed. Aborting.")
+end
 
 #####################
 # Ledger diff tests #
@@ -193,7 +196,9 @@ File.delete(CURRENT)
 # Delete the snapshot and the database directory restored to.
 #
 FileUtils.rm_rf(restore_path)
-File.unlink(snapshot_path(BLOCKS_COUNT))
+if BUILD_TYPE != "dev"
+  File.unlink(snapshot_path(BLOCKS_COUNT))
+end
 
 # Delete the database directory. We have the snapshot if we want it.
 #
