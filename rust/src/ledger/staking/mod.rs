@@ -53,7 +53,7 @@ pub struct StakingAccount {
 pub struct StakingAccountJson {
     pub pk: PublicKey,
     pub balance: String,
-    pub delegate: PublicKey,
+    pub delegate: Option<PublicKey>,
     pub username: Option<String>,
     pub token: String,
     pub permissions: StakingPermissions,
@@ -149,8 +149,8 @@ impl From<StakingAccountJson> for StakingAccount {
             token,
             timing,
             balance,
+            delegate: value.delegate.unwrap_or_else(|| value.pk.to_owned()),
             pk: value.pk,
-            delegate: value.delegate,
             username: value.username,
             voting_for: value.voting_for,
             permissions: value.permissions,
