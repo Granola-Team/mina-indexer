@@ -3,4 +3,4 @@
 
 git lfs pull
 # The argument to "just deploy-local-prod" is the number of blocks to use.
-nix develop --command just deploy-local-prod 434808
+nix develop --command just deploy-local-prod 436391
