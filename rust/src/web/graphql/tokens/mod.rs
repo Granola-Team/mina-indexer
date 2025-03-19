@@ -11,7 +11,7 @@ use crate::{
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
 
-#[derive(InputObject)]
+#[derive(InputObject, Default)]
 pub struct TokensQueryInput {
     token: Option<String>,
     owner: Option<String>,
@@ -125,23 +125,32 @@ impl TokensQueryRoot {
         let db = db(ctx);
 
         // specific token query
-        if let Some(token) = query.as_ref().map(|q| {
-            q.token
-                .as_ref()
-                .map(|t| TokenAddress::new(t).expect("valid token address"))
-                .unwrap_or_default()
-        }) {
-            if let Some(token) = db.get_token(&token)? {
-                let token = TokenWithMeta::new(db, token).expect("token with meta");
+        if query
+            .as_ref()
+            .map(|q| q.token.is_some())
+            .unwrap_or_default()
+        {
+            if let Some(token) = query.as_ref().map(|q| {
+                q.token
+                    .as_ref()
+                    .and_then(TokenAddress::new)
+                    .unwrap_or_default()
+            }) {
+                if let Some(token) = db.get_token(&token)? {
+                    let token = TokenWithMeta::new(db, token).expect("token with meta");
 
-                return Ok(vec![token.into()]);
+                    return Ok(vec![token.into()]);
+                }
+            } else {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid token address: {}",
+                    query.as_ref().unwrap().token.as_ref().unwrap()
+                )));
             }
         }
 
         // default query
         let mut tokens = Vec::with_capacity(limit);
-        let sort_by = sort_by.unwrap_or(TokensSortByInput::SupplyDesc);
-
         for (_, value) in db.token_iterator().flatten() {
             let token = serde_json::from_slice(&value)?;
 
@@ -155,10 +164,10 @@ impl TokensQueryRoot {
         }
 
         match sort_by {
-            TokensSortByInput::SupplyAsc => {
+            Some(TokensSortByInput::SupplyAsc) => {
                 tokens.sort_by(|x: &Token, y: &Token| x.token.supply.cmp(&y.token.supply))
             }
-            TokensSortByInput::SupplyDesc => {
+            Some(TokensSortByInput::SupplyDesc) | None => {
                 tokens.sort_by(|x: &Token, y: &Token| y.token.supply.cmp(&x.token.supply))
             }
         }
@@ -380,5 +389,35 @@ impl From<TokenAccount> for TokenHolder {
             owner: value.token.owner.map(Into::into),
             symbol: Some(value.token.symbol.to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TokensQueryInput;
+    use crate::{
+        base::public_key::PublicKey,
+        ledger::token::{Token, TokenAddress, TokenSymbol},
+    };
+
+    #[test]
+    fn matches() {
+        let query = TokensQueryInput {
+            symbol: Some("MINU".to_string()),
+            ..Default::default()
+        };
+
+        // does not match MINA token
+        let mina = Token::mina_with_supply(100000000000000);
+        assert!(!TokensQueryInput::matches(Some(&query), &mina));
+
+        // matches MINU token
+        let minu = Token {
+            token: TokenAddress::new("wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd").unwrap(),
+            owner: PublicKey::new("B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF").ok(),
+            symbol: TokenSymbol::new("MINU"),
+            supply: 100000000000000.into(),
+        };
+        assert!(TokensQueryInput::matches(Some(&query), &minu));
     }
 }
