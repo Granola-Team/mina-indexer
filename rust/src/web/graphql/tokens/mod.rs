@@ -142,12 +142,10 @@ impl TokensQueryRoot {
             .map(|q| q.token.is_some())
             .unwrap_or_default()
         {
-            if let Some(token) = query.as_ref().map(|q| {
-                q.token
-                    .as_ref()
-                    .and_then(TokenAddress::new)
-                    .unwrap_or_default()
-            }) {
+            if let Some(token) = query
+                .as_ref()
+                .and_then(|q| q.token.as_ref().and_then(TokenAddress::new))
+            {
                 if let Some(token) = db.get_token(&token)? {
                     let token = TokenWithMeta::new(db, token).expect("token with meta");
 
