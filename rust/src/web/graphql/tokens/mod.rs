@@ -43,12 +43,24 @@ pub struct Token {
 
 #[derive(Enum, Default, Copy, Clone, Eq, PartialEq)]
 pub enum TokensSortByInput {
-    #[graphql(name = "SUPPLY_ASC")]
-    SupplyAsc,
-
     #[default]
     #[graphql(name = "SUPPLY_DESC")]
     SupplyDesc,
+
+    #[graphql(name = "SUPPLY_ASC")]
+    SupplyAsc,
+
+    #[graphql(name = "NUM_HOLDERS_DESC")]
+    NumHoldersDesc,
+
+    #[graphql(name = "NUM_HOLDERS_ASC")]
+    NumHoldersAsc,
+
+    #[graphql(name = "TOTAL_NUM_TXNS_DESC")]
+    NumTxnsDesc,
+
+    #[graphql(name = "TOTAL_NUM_TXNS_ASC")]
+    NumTxnsAsc,
 }
 
 #[derive(SimpleObject)]
@@ -152,23 +164,36 @@ impl TokensQueryRoot {
         // default query
         let mut tokens = Vec::with_capacity(limit);
         for (_, value) in db.token_iterator().flatten() {
-            let token = serde_json::from_slice(&value)?;
-
-            if TokensQueryInput::matches(query.as_ref(), &token) {
-                tokens.push(TokenWithMeta::new(db, token)?.into());
-            }
-
             if tokens.len() >= limit {
                 break;
             }
+
+            let token = serde_json::from_slice(&value)?;
+            if TokensQueryInput::matches(query.as_ref(), &token) {
+                tokens.push(TokenWithMeta::new(db, token)?.into());
+            }
         }
 
+        // sort tokens
+        use TokensSortByInput::*;
         match sort_by {
-            Some(TokensSortByInput::SupplyAsc) => {
+            Some(SupplyDesc) | None => {
+                tokens.sort_by(|x: &Token, y: &Token| y.token.supply.cmp(&x.token.supply))
+            }
+            Some(SupplyAsc) => {
                 tokens.sort_by(|x: &Token, y: &Token| x.token.supply.cmp(&y.token.supply))
             }
-            Some(TokensSortByInput::SupplyDesc) | None => {
-                tokens.sort_by(|x: &Token, y: &Token| y.token.supply.cmp(&x.token.supply))
+            Some(NumHoldersDesc) => {
+                tokens.sort_by(|x: &Token, y: &Token| y.num_holders.cmp(&x.num_holders))
+            }
+            Some(NumHoldersAsc) => {
+                tokens.sort_by(|x: &Token, y: &Token| x.num_holders.cmp(&y.num_holders))
+            }
+            Some(NumTxnsDesc) => {
+                tokens.sort_by(|x: &Token, y: &Token| y.total_num_txns.cmp(&x.total_num_txns))
+            }
+            Some(NumTxnsAsc) => {
+                tokens.sort_by(|x: &Token, y: &Token| x.total_num_txns.cmp(&y.total_num_txns))
             }
         }
 
@@ -206,7 +231,8 @@ impl TokensQueryRoot {
 
             let mode = speedb::IteratorMode::From(&start, direction);
             for (key, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
-                if key[..TokenAddress::LEN] != *token.0.as_bytes() {
+                if key[..TokenAddress::LEN] != *token.0.as_bytes() || holders.len() >= limit {
+                    // beyond token or limit
                     break;
                 }
 
@@ -218,11 +244,8 @@ impl TokensQueryRoot {
                         token,
                         account: Account::with_meta(db, account),
                     };
-                    holders.push(account.into());
-                }
 
-                if holders.len() >= limit {
-                    break;
+                    holders.push(account.into());
                 }
             }
 
@@ -232,7 +255,8 @@ impl TokensQueryRoot {
         // specific holder's token accounts
         if let Some(holder) = query.as_ref().and_then(|q| q.holder.to_owned()) {
             for (key, value) in db.tokens_pk_iterator(&holder.to_owned().into()).flatten() {
-                if key[..PublicKey::LEN] != *holder.as_bytes() {
+                if key[..PublicKey::LEN] != *holder.as_bytes() || holders.len() >= limit {
+                    // beyond public key or limit
                     break;
                 }
 
@@ -246,10 +270,6 @@ impl TokensQueryRoot {
                     };
 
                     holders.push(account.into());
-
-                    if holders.len() >= limit {
-                        break;
-                    }
                 }
             }
         }
