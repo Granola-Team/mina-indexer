@@ -280,11 +280,13 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {height}{txn_hash}{state_hash}
-    /// - val: b""
+    /// - val: [SignedCommandWithData] serde bytes
     /// where
     /// - height:     [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes
     /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [txn_sort_key]
     fn user_commands_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-height-sort")
@@ -294,15 +296,49 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: b""
+    /// - val: [SignedCommandWithData] serde bytes
     /// where
     /// - slot:       [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes
     /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [txn_sort_key]
     fn user_commands_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-slot-sort")
             .expect("user-commands-slot-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{height}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [token_txn_sort_key]
+    fn user_commands_per_token_height_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-per-token-height-sort")
+            .expect("user-commands-per-token-height-sort column family exists")
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{slot}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [token_txn_sort_key]
+    fn user_commands_per_token_slot_sort_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("user-commands-per-token-slot-sort")
+            .expect("user-commands-per-token-slot-sort column family exists")
     }
 
     /// Key-value pairs

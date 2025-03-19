@@ -137,6 +137,12 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting user commands by global slot
     fn user_commands_slot_sort_cf(&self) -> &ColumnFamily;
 
+    /// CF for sorting user commands per token by blockchain length
+    fn user_commands_per_token_height_sort_cf(&self) -> &ColumnFamily;
+
+    /// CF for sorting user commands per token by global slot
+    fn user_commands_per_token_slot_sort_cf(&self) -> &ColumnFamily;
+
     /// CF for sorting user commands by sender public key
     fn txn_from_slot_sort_cf(&self) -> &ColumnFamily;
 

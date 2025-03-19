@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 163] = [
+    const COLUMN_FAMILIES: [&'static str; 165] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -103,6 +103,8 @@ impl IndexerStore {
         "user-commands-slot-sort",
         "user-commands-height-sort",
         "user-commands-state-hashes",
+        "user-commands-per-token-slot-sort",
+        "user-commands-per-token-height-sort",
         // sorting user commands by sender/receiver
         "txn-from-slot-sort",
         "txn-from-height-sort",
