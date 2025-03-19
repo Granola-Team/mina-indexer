@@ -194,7 +194,7 @@ impl IndexerConfiguration {
                 .add_startup_staking_ledgers_to_store(staking_ledgers_dir)
                 .await
             {
-                error!("Failed to ingest staking ledger {staking_ledgers_dir:#?}: {e}");
+                panic!("Failed to ingest staking ledger {staking_ledgers_dir:#?}: {e}");
             }
         }
 
