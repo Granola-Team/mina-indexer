@@ -69,6 +69,7 @@ impl InternalCommandStore for IndexerStore {
             self.set_pk_internal_command(&pk, int_cmd)?;
 
             // sort data
+            let value = serde_json::to_vec(int_cmd)?;
             self.database.put_cf(
                 self.internal_commands_pk_block_height_sort_cf(),
                 internal_commmand_pk_sort_key(
@@ -78,8 +79,9 @@ impl InternalCommandStore for IndexerStore {
                     i as u32,
                     int_cmd.kind(),
                 ),
-                serde_json::to_vec(int_cmd)?,
+                &value,
             )?;
+
             self.database.put_cf(
                 self.internal_commands_pk_global_slot_sort_cf(),
                 internal_commmand_pk_sort_key(
@@ -89,9 +91,10 @@ impl InternalCommandStore for IndexerStore {
                     i as u32,
                     int_cmd.kind(),
                 ),
-                serde_json::to_vec(int_cmd)?,
+                &value,
             )?;
         }
+
         Ok(())
     }
 
@@ -106,21 +109,28 @@ impl InternalCommandStore for IndexerStore {
         let block_height = block.blockchain_length();
         trace!("Setting block internal command {state_hash} index {index}");
 
+        let value = serde_json::to_vec(internal_command)?;
+
+        // store
         self.database.put_cf(
             self.internal_commands_cf(),
             internal_commmand_block_key(&state_hash, index),
-            serde_json::to_vec(internal_command)?,
+            &value,
         )?;
+
+        // sort
         self.database.put_cf(
             self.internal_commands_block_height_sort_cf(),
             internal_commmand_sort_key(block_height, &state_hash, index),
-            serde_json::to_vec(internal_command)?,
+            &value,
         )?;
+
         self.database.put_cf(
             self.internal_commands_global_slot_sort_cf(),
             internal_commmand_sort_key(global_slot, &state_hash, index),
-            serde_json::to_vec(internal_command)?,
+            &value,
         )?;
+
         Ok(())
     }
 

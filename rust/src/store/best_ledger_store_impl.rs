@@ -131,17 +131,15 @@ impl BestLedgerStore for IndexerStore {
         self.increment_num_accounts()?;
 
         // store new account
-        self.database.put_cf(
-            self.best_ledger_accounts_cf(),
-            account_key,
-            serde_json::to_vec(&after)?,
-        )?;
+        let value = serde_json::to_vec(&after)?;
+        self.database
+            .put_cf(self.best_ledger_accounts_cf(), account_key, &value)?;
 
         // balance-sort new account
         self.database.put_cf(
             self.best_ledger_accounts_balance_sort_cf(),
             sort_key,
-            serde_json::to_vec(&after)?,
+            &value,
         )?;
 
         // zkapp account
@@ -150,17 +148,14 @@ impl BestLedgerStore for IndexerStore {
             self.increment_num_zkapp_accounts()?;
 
             // store new zkapp account
-            self.database.put_cf(
-                self.zkapp_best_ledger_accounts_cf(),
-                account_key,
-                serde_json::to_vec(&after)?,
-            )?;
+            self.database
+                .put_cf(self.zkapp_best_ledger_accounts_cf(), account_key, &value)?;
 
             // balance-sort new zkapp account
             self.database.put_cf(
                 self.zkapp_best_ledger_accounts_balance_sort_cf(),
                 sort_key,
-                serde_json::to_vec(&after)?,
+                &value,
             )?;
         }
 

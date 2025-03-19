@@ -63,17 +63,18 @@ impl UserCommandStore for IndexerStore {
                 block.global_slot_since_genesis(),
             );
 
+            let value = serde_json::to_vec(&signed_command_with_data)?;
             batch.put_cf(
                 self.user_commands_cf(),
                 txn_block_key(&txn_hash, &state_hash),
-                serde_json::to_vec(&signed_command_with_data)?,
+                &value,
             );
 
             if command.is_zkapp_command() {
                 batch.put_cf(
                     self.zkapp_commands_cf(),
                     txn_block_key(&txn_hash, &state_hash),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
             }
 
@@ -84,14 +85,14 @@ impl UserCommandStore for IndexerStore {
             batch.put_cf(
                 self.user_commands_height_sort_cf(),
                 txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
-                serde_json::to_vec(&signed_command_with_data)?,
+                &value,
             );
 
             if command.is_zkapp_command() {
                 batch.put_cf(
                     self.zkapp_commands_height_sort_cf(),
                     txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
             }
 
@@ -99,14 +100,14 @@ impl UserCommandStore for IndexerStore {
             batch.put_cf(
                 self.user_commands_slot_sort_cf(),
                 txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
-                serde_json::to_vec(&signed_command_with_data)?,
+                &value,
             );
 
             if command.is_zkapp_command() {
                 batch.put_cf(
                     self.zkapp_commands_slot_sort_cf(),
                     txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
             }
 
@@ -116,7 +117,7 @@ impl UserCommandStore for IndexerStore {
                 batch.put_cf(
                     self.user_commands_per_token_height_sort_cf(),
                     token_txn_sort_key(token, block.blockchain_length(), &txn_hash, &state_hash),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
 
                 batch.put_cf(
@@ -127,7 +128,7 @@ impl UserCommandStore for IndexerStore {
                         &txn_hash,
                         &state_hash,
                     ),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
             }
 
@@ -157,7 +158,7 @@ impl UserCommandStore for IndexerStore {
                     &txn_hash,
                     &state_hash,
                 ),
-                serde_json::to_vec(&signed_command_with_data)?,
+                &value,
             );
 
             batch.put_cf(
@@ -169,7 +170,7 @@ impl UserCommandStore for IndexerStore {
                     &txn_hash,
                     &state_hash,
                 ),
-                serde_json::to_vec(&signed_command_with_data)?,
+                &value,
             );
 
             // add receiver index
@@ -183,7 +184,7 @@ impl UserCommandStore for IndexerStore {
                         &txn_hash,
                         &state_hash,
                     ),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
                 batch.put_cf(
                     self.txn_to_slot_sort_cf(),
@@ -194,7 +195,7 @@ impl UserCommandStore for IndexerStore {
                         &txn_hash,
                         &state_hash,
                     ),
-                    serde_json::to_vec(&signed_command_with_data)?,
+                    &value,
                 );
             }
         }
