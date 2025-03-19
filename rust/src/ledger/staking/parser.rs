@@ -33,7 +33,8 @@ impl StakingLedgerParser {
             )
             .collect();
 
-        debug!("{:?}", ledger_paths);
+        debug!("Staking ledger paths {:#?}", ledger_paths);
+
         Ok(Self {
             ledgers_dir: ledgers_dir.to_path_buf(),
             ledger_paths: ledger_paths.into_iter(),

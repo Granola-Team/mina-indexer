@@ -44,11 +44,13 @@ pub enum Permission {
     Signature(PermissionSignature),
     Proof(PermissionProof),
     None(PermissionNone),
+    Either(PermissionEither),
+    Impossible(PermissionImpossible),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PermissionAuth {
-    pub auth: PermissionSignatureProof,
+    pub auth: PermissionPermission,
     pub txn_version: Numeric<u32>,
 }
 
@@ -75,10 +77,27 @@ pub enum PermissionNone {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum PermissionSignatureProof {
+pub enum PermissionEither {
+    #[default]
+    Either,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionImpossible {
+    #[default]
+    Impossible,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionPermission {
     #[default]
     Signature,
     Proof,
+    None,
+    Either,
+    Impossible,
 }
 
 impl std::default::Default for Permission {
