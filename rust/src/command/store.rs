@@ -7,9 +7,10 @@ use crate::{
         signed::{SignedCommandWithData, TxnHash},
         UserCommandWithStatus,
     },
+    ledger::token::TokenAddress,
 };
 use anyhow::Result;
-use speedb::{DBIterator, IteratorMode, WriteBatch};
+use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;
 
 pub trait UserCommandStore {
@@ -90,6 +91,20 @@ pub trait UserCommandStore {
 
     /// Iterator for user commands via blockchain length
     fn user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator for user commands per token via global slot
+    fn user_commands_per_token_slot_iterator(
+        &self,
+        token: &TokenAddress,
+        mode: Direction,
+    ) -> DBIterator<'_>;
+
+    /// Iterator for user commands per token via blockchain length
+    fn user_commands_per_token_height_iterator(
+        &self,
+        token: &TokenAddress,
+        mode: Direction,
+    ) -> DBIterator<'_>;
 
     /// Iterator for user commands by sender via block height
     fn txn_from_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;

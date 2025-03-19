@@ -1,6 +1,7 @@
 use crate::{
     base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     command::signed::TxnHash,
+    ledger::token::TokenAddress,
     utility::store::common::{state_hash_suffix, u32_from_be_bytes, U32_LEN},
 };
 
@@ -22,6 +23,31 @@ pub fn txn_sort_key(
     bytes
 }
 
+/// Key format for sorting txns by block height/global slot & txn hash
+/// `{token}{sort}{txn_hash}{state_hash}`
+/// ```
+/// - token:      [TokenAddress] bytes
+/// - sort:       [u32] BE bytes
+/// - txn_hash:   [TxnHash::V1_LEN] bytes
+/// - state_hash: [StateHash::LEN] bytes
+pub fn token_txn_sort_key(
+    token: &TokenAddress,
+    sort: u32,
+    txn_hash: &TxnHash,
+    state_hash: &StateHash,
+) -> [u8; TokenAddress::LEN + U32_LEN + TxnHash::V1_LEN + StateHash::LEN] {
+    let mut bytes = [0; TokenAddress::LEN + U32_LEN + TxnHash::V1_LEN + StateHash::LEN];
+
+    bytes[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
+    bytes[TokenAddress::LEN..][..U32_LEN].copy_from_slice(&sort.to_be_bytes());
+    bytes[TokenAddress::LEN..][U32_LEN..][..TxnHash::V1_LEN]
+        .copy_from_slice(&txn_hash.right_pad_v2());
+    bytes[TokenAddress::LEN..][U32_LEN..][TxnHash::V1_LEN..]
+        .copy_from_slice(state_hash.0.as_bytes());
+
+    bytes
+}
+
 /// Key format for sorting txns by sender/receiver:
 /// `{pk}{u32_sort}{nonce}{txn_hash}{state_hash}`
 /// ```
@@ -38,6 +64,7 @@ pub fn pk_txn_sort_key(
     state_hash: &StateHash,
 ) -> [u8; PublicKey::LEN + U32_LEN + U32_LEN + TxnHash::V1_LEN + StateHash::LEN] {
     let mut bytes = [0; PublicKey::LEN + U32_LEN + U32_LEN + TxnHash::V1_LEN + StateHash::LEN];
+
     bytes[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     bytes[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort.to_be_bytes());
     bytes[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&nonce.to_be_bytes());
@@ -45,14 +72,17 @@ pub fn pk_txn_sort_key(
         .copy_from_slice(&txn_hash.right_pad_v2());
     bytes[PublicKey::LEN..][U32_LEN..][U32_LEN..][TxnHash::V1_LEN..]
         .copy_from_slice(state_hash.0.as_bytes());
+
     bytes
 }
 
 /// Prefix `{pk}{u32_sort}`
 pub fn pk_txn_sort_key_prefix(public_key: &PublicKey, sort: u32) -> [u8; PublicKey::LEN + U32_LEN] {
     let mut bytes = [0; PublicKey::LEN + U32_LEN];
+
     bytes[..PublicKey::LEN].copy_from_slice(public_key.0.as_bytes());
     bytes[PublicKey::LEN..].copy_from_slice(&sort.to_be_bytes());
+
     bytes
 }
 
@@ -107,4 +137,38 @@ pub fn user_commands_iterator_txn_hash(key: &[u8]) -> anyhow::Result<TxnHash> {
 /// - [user_commands_slot_iterator] & [user_commands_height_iterator]
 pub fn user_commands_iterator_state_hash(key: &[u8]) -> anyhow::Result<StateHash> {
     StateHash::from_bytes(&key[U32_LEN..][TxnHash::V1_LEN..])
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        base::state_hash::StateHash, command::TxnHash, ledger::token::TokenAddress,
+        utility::store::common::U32_LEN,
+    };
+    use quickcheck::{Arbitrary, Gen};
+
+    #[test]
+    fn token_txn_sort_key() {
+        let g = &mut Gen::new(1000);
+
+        for _ in 0..100 {
+            let token = TokenAddress::arbitrary(g);
+            let sort = u32::arbitrary(g);
+            let txn_hash = TxnHash::arbitrary(g);
+            let state_hash = StateHash::arbitrary(g);
+
+            let key = super::token_txn_sort_key(&token, sort, &txn_hash, &state_hash);
+
+            assert_eq!(&key[..TokenAddress::LEN], token.0.as_bytes());
+            assert_eq!(&key[TokenAddress::LEN..][..U32_LEN], &sort.to_be_bytes());
+            assert_eq!(
+                key[TokenAddress::LEN..][U32_LEN..][..TxnHash::V1_LEN],
+                txn_hash.right_pad_v2()
+            );
+            assert_eq!(
+                &key[TokenAddress::LEN..][U32_LEN..][TxnHash::V1_LEN..],
+                state_hash.0.as_bytes()
+            );
+        }
+    }
 }
