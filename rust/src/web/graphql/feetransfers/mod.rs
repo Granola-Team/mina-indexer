@@ -101,10 +101,12 @@ impl FeetransferWithMeta {
                 block: BlockWithoutCanonicity::new(
                     &block,
                     self.canonical,
-                    epoch_num_user_commands,
-                    total_num_user_commands,
-                    epoch_num_zkapp_commands,
-                    total_num_zkapp_commands,
+                    [
+                        epoch_num_user_commands,
+                        total_num_user_commands,
+                        epoch_num_zkapp_commands,
+                        total_num_zkapp_commands,
+                    ],
                 ),
                 canonical: self.canonical,
                 epoch_num_blocks,

@@ -343,6 +343,13 @@ impl Block {
         let epoch_num_zkapp_commands = counts[13];
         let total_num_zkapp_commands = counts[14];
 
+        let num_commands = [
+            epoch_num_user_commands,
+            total_num_user_commands,
+            epoch_num_zkapp_commands,
+            total_num_zkapp_commands,
+        ];
+
         Self {
             canonical,
             epoch_num_blocks,
@@ -355,14 +362,7 @@ impl Block {
             block_num_user_commands,
             block_num_zkapp_commands,
             block_num_internal_commands,
-            block: BlockWithoutCanonicity::new(
-                block,
-                canonical,
-                epoch_num_user_commands,
-                total_num_user_commands,
-                epoch_num_zkapp_commands,
-                total_num_zkapp_commands,
-            ),
+            block: BlockWithoutCanonicity::new(block, canonical, num_commands),
             epoch_num_slots_produced,
             num_unique_block_producers_last_n_blocks: None,
         }
@@ -370,14 +370,7 @@ impl Block {
 }
 
 impl BlockWithoutCanonicity {
-    pub fn new(
-        block: &PrecomputedBlock,
-        canonical: bool,
-        epoch_num_user_commands: u32,
-        total_num_user_commands: u32,
-        epoch_num_zkapp_commands: u32,
-        total_num_zkapp_commands: u32,
-    ) -> Self {
+    pub fn new(block: &PrecomputedBlock, canonical: bool, num_commands: [u32; 4]) -> Self {
         let winner_account = block.block_creator().0;
         let date_time = millis_to_iso_date_string(block.timestamp() as i64);
         let creator = block.block_creator().0;
@@ -445,16 +438,7 @@ impl BlockWithoutCanonicity {
         let user_commands: Vec<TransactionWithoutBlock> =
             SignedCommandWithData::from_precomputed(block)
                 .into_iter()
-                .map(|cmd| {
-                    TransactionWithoutBlock::new(
-                        cmd,
-                        canonical,
-                        epoch_num_user_commands,
-                        total_num_user_commands,
-                        epoch_num_zkapp_commands,
-                        total_num_zkapp_commands,
-                    )
-                })
+                .map(|cmd| TransactionWithoutBlock::new(cmd, canonical, num_commands))
                 .collect();
 
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(block)
