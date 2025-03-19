@@ -288,7 +288,7 @@ deploy-local-prod blocks='5000' web_port='': nix-build
     time {{ DEPLOY_PROD }} {{ PROD_MODE }} {{ blocks }} {{ web_port }}
 
 # Run a server as if in production with the dev-built binary.
-deploy-local-prod-dev blocks='5000' web_port='': tier3-dev
+deploy-local-prod-dev blocks='5000' web_port='': (tier3-dev blocks)
     @echo "--- Deploying dev prod indexer"
     time {{ DEPLOY_PROD }} dev {{ blocks }} {{ web_port }}
 
