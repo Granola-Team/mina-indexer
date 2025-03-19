@@ -17,8 +17,8 @@ config_log_dir
 
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
 if BUILD_TYPE == "dev"
-  puts "Moving snapshot."
-  system("mv #{BASE_DIR}/../../mina-indexer-test/#{REV}/#{snapshot_name} #{snapshot_path(BLOCKS_COUNT)}") || abort("Failed to move snapshot file.")
+  puts "Copying snapshot."
+  system("cp #{BASE_DIR}/../../mina-indexer-test/#{REV}/#{snapshot_name} #{snapshot_path(BLOCKS_COUNT)}") || abort("Failed to move snapshot file.")
 else
   puts "Fetching snapshot."
   system(
