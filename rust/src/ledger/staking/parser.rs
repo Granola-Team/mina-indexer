@@ -5,6 +5,7 @@ use crate::{
     store::IndexerStore,
 };
 use glob::glob;
+use log::debug;
 use std::{
     path::{Path, PathBuf},
     vec::IntoIter,
@@ -15,10 +16,9 @@ pub struct StakingLedgerParser {
     pub ledger_paths: IntoIter<PathBuf>,
 }
 
-/// Staking ledgers have this format:
-///  <network_name>-<epoch_number>-<ledger_hash>.json
-/// or
-///  <network_name>-<epoch_number>-<ledger_hash>.json.gz
+/// Staking ledgers have one of these formats:
+/// - <network_name>-<epoch_number>-<ledger_hash>.json
+/// - <network_name>-<epoch_number>-<ledger_hash>.json.gz (compressed)
 
 impl StakingLedgerParser {
     pub fn new(ledgers_dir: &Path) -> anyhow::Result<Self> {
@@ -33,6 +33,7 @@ impl StakingLedgerParser {
             )
             .collect();
 
+        debug!("{:?}", ledger_paths);
         Ok(Self {
             ledgers_dir: ledgers_dir.to_path_buf(),
             ledger_paths: ledger_paths.into_iter(),
@@ -49,7 +50,13 @@ impl StakingLedgerParser {
                 // extract epoch and ledger hash to check if it's in the db
                 let (epoch, hash) = extract_epoch_hash(&next_path);
 
-                if store.get_staking_ledger_hash_by_epoch(epoch, None)? != Some(hash) {
+                if store
+                    .get_staking_ledger_hash_by_epoch(
+                        epoch,
+                        Some(&StakingLedger::genesis_state_hash(&hash)),
+                    )?
+                    .is_none()
+                {
                     // add the missing staking ledger
                     return StakingLedger::parse_file(&next_path).await.map(Some);
                 } else {
