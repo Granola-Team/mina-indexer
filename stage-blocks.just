@@ -1,7 +1,12 @@
 # Define variables
 
 HARDFORK_GENESIS_BLOCK_HEIGHT := "359605"
-STAGE_BLOCKS := justfile_directory() + "/ops/stage-blocks.rb"
+STAGE_BLOCKS := source_directory() + "/ops/stage-blocks.rb"
+
+# List available recipes
+list:
+    @echo "Mina Indexer stage-blocks - available recipes:"
+    @just -f {{ source_file() }} --list
 
 # Stage pre-hardfork blocks
 [no-cd]
