@@ -91,7 +91,8 @@ database-create IDXR_BIN *args:
     {{ IDXR_BIN }} --socket {{ SOCKET_FILE }} database create \
         --blocks-dir {{ BLOCKS_DIR }} \
         --staking-ledgers-dir {{ STAKING_LEDGERS_DIR }} \
-        --database-dir {{ DATABASE_DIR }}
+        --database-dir {{ DATABASE_DIR }} \
+        {{ args }}
 
 # Start the indexer server and wait for socket (with timeout)
 start IDXR_BIN *args:
