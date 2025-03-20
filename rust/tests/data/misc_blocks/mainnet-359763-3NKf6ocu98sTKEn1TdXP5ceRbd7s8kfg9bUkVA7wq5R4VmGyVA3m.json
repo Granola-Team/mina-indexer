@@ -1,0 +1,2367 @@
+{
+    "version": 3,
+    "data": {
+        "scheduled_time": "1717595467438",
+        "protocol_state": {
+            "previous_state_hash": "3NKgc2Dd3t52eY9VNZwijD4PmMpbRrJtiAfMifFu5m2MdQBAjR3D",
+            "body": {
+                "genesis_state_hash": "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP",
+                "blockchain_state": {
+                    "staged_ledger_hash": {
+                        "non_snark": {
+                            "ledger_hash": "jwjWgQnfQyBE3hWcxrjxXvFhLCW7J4iPAUdFGvbmY6zZjx14zdR",
+                            "aux_hash": "VMGaoa9cYtJNdk4Md9tCWu4kevqNkGYNb2pjedr1HSesYhEd4E",
+                            "pending_coinbase_aux": "XLLb46i68pSJ4qS2oKnzQYJvpzP6qK65hZ8znCSpxYcqMJRSuX"
+                        },
+                        "pending_coinbase_hash": "2n1dmWTBhkhoppVtAPVMKhwQthccAtx7MiFBmu3LNKcyk1pR3duy"
+                    },
+                    "genesis_ledger_hash": "jwNw4qb6tnNhpQNxiMLem9WumxZTwmbSx3fYXW4FP3hZRkoQJSE",
+                    "ledger_proof_statement": {
+                        "source": {
+                            "first_pass_ledger": "jxqkeetwMLASWjt58dDkhCdTcgmvgczazgE3aXt24hY8ga3KrLK",
+                            "second_pass_ledger": "jwkmzCtvHaTVGFU8xASfizJVpYwmhjsQ7Nxc4jptKe5y7hMzgNT",
+                            "pending_coinbase_stack": {
+                                "data": "4QNrZFBTDQCPfEZqBZsaPYx8qdaNFv1nebUyCUsQW9QUJqyuD3un",
+                                "state": {
+                                    "init": "4YxZtaubkeQDGvHoSP5gFGHiN9BavYamq8Lr9smoRqPhVdS3gJWu",
+                                    "curr": "4YxZtaubkeQDGvHoSP5gFGHiN9BavYamq8Lr9smoRqPhVdS3gJWu"
+                                }
+                            },
+                            "local_state": {
+                                "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                                "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "excess": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "supply_increase": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                                "success": true,
+                                "account_update_index": "0",
+                                "failure_status_tbl": [],
+                                "will_succeed": true
+                            }
+                        },
+                        "target": {
+                            "first_pass_ledger": "jxCE5r2Jw1s3f971M9ZtceGc9kudixodruezXssTZ7cAj5JsJTU",
+                            "second_pass_ledger": "jx3FgNzhD17QZhHywnPPjZvZEDDhA9cVxpKmxt9tZ7o2XM9Xnfk",
+                            "pending_coinbase_stack": {
+                                "data": "4QNXfkjR4QiZ874Gnson9x7xv3EtFzkbAbx6eKpoHtEU2hCkU4Ho",
+                                "state": {
+                                    "init": "4YxZtaubkeQDGvHoSP5gFGHiN9BavYamq8Lr9smoRqPhVdS3gJWu",
+                                    "curr": "4YxxS2YeTPSSU7Rn9zM5AhJNc6gnFLcG3Q3c1TPBjQXz9vZ1cYRE"
+                                }
+                            },
+                            "local_state": {
+                                "stack_frame": "0x0641662E94D68EC970D0AFC059D02729BBF4A2CD88C548CCD9FB1E26E570C66C",
+                                "call_stack": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "full_transaction_commitment": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                "excess": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "supply_increase": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                },
+                                "ledger": "jw6bz2wud1N6itRUHZ5ypo3267stk4UgzkiuWtAMPRZo9g4Udyd",
+                                "success": true,
+                                "account_update_index": "0",
+                                "failure_status_tbl": [],
+                                "will_succeed": true
+                            }
+                        },
+                        "connecting_ledger_left": "jxwWcfTYcfjJUsi7jEp3Y11DMfmdAaxncp4HdxBsuZTi6FCEJtc",
+                        "connecting_ledger_right": "jwDEfCUaZADCYLjgMqEe66etMQGv59oY4mBKyi7mc1UNUn7hUUY",
+                        "supply_increase": {
+                            "magnitude": "720000000000",
+                            "sgn": [
+                                "Pos"
+                            ]
+                        },
+                        "fee_excess": [
+                            {
+                                "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                "amount": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                }
+                            },
+                            {
+                                "token": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                "amount": {
+                                    "magnitude": "0",
+                                    "sgn": [
+                                        "Pos"
+                                    ]
+                                }
+                            }
+                        ],
+                        "sok_digest": null
+                    },
+                    "timestamp": "1717595460000",
+                    "body_reference": "a1f1d1303b2df197a905cee7c1ddd639ec1151e5061e9659713c7e91d0202874"
+                },
+                "consensus_state": {
+                    "blockchain_length": "359763",
+                    "epoch_count": "0",
+                    "min_window_density": "77",
+                    "sub_window_densities": [
+                        "5",
+                        "5",
+                        "4",
+                        "2",
+                        "2",
+                        "4",
+                        "4",
+                        "4",
+                        "5",
+                        "5",
+                        "3"
+                    ],
+                    "last_vrf_output": "8dKTyGYegzMYPgtAfFKpYdUCehIVUA5zRtYHE6A1PwA=",
+                    "total_currency": "1166133317840039233",
+                    "curr_global_slot_since_hard_fork": {
+                        "slot_number": "277",
+                        "slots_per_epoch": "7140"
+                    },
+                    "global_slot_since_genesis": "564757",
+                    "staking_epoch_data": {
+                        "ledger": {
+                            "hash": "jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL",
+                            "total_currency": "1160334549840039233"
+                        },
+                        "seed": "2vahsgRV5nDPmtgr2Xo2Uq2dkngfSgvg7d1TKqQbY3wUS2ZDxCC3",
+                        "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "lock_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "epoch_length": "1"
+                    },
+                    "next_epoch_data": {
+                        "ledger": {
+                            "hash": "jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq",
+                            "total_currency": "1165736008840039233"
+                        },
+                        "seed": "2vb9XVyXzXY439N7E2HTj8US66LZwpfRWMzyCSJFb6DkfcTW6L2u",
+                        "start_checkpoint": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                        "lock_checkpoint": "3NKgc2Dd3t52eY9VNZwijD4PmMpbRrJtiAfMifFu5m2MdQBAjR3D",
+                        "epoch_length": "160"
+                    },
+                    "has_ancestor_in_same_checkpoint_window": true,
+                    "block_stake_winner": "B62qomtdTPhSjX1HCbwkN9K2QdnfFh737Mi8cz2A7xyyR82XbFzx4m1",
+                    "block_creator": "B62qpbpoWmfjZ12jA8TYrS8QktRDYGYjz2cj41tuUe1f2UP2wfpKvXs",
+                    "coinbase_receiver": "B62qomtdTPhSjX1HCbwkN9K2QdnfFh737Mi8cz2A7xyyR82XbFzx4m1",
+                    "supercharge_coinbase": true
+                },
+                "constants": {
+                    "k": "290",
+                    "slots_per_epoch": "7140",
+                    "slots_per_sub_window": "7",
+                    "grace_period_slots": "2160",
+                    "delta": "0",
+                    "genesis_state_timestamp": "1717545600000"
+                }
+            }
+        },
+        "protocol_state_proof": "_EUlld6hI28a_Mlsi26B7F6NAPxxBp5EFz0jpfxEbyeXC-xBvAD8b719T_s5VeD8OjJTOoGCwK0A_C1OENNx9CVb_Per2a0fWPXpAAAAAAAAAAAAAPxgX3sNj_K68_y2Ijb4PObU7AD8ob1mMYTdwzP8Ph19mNrJ2vYA_MjReop5-XCY_CJYKC1e8A-FAPxTKga0J9kcbvzfvi8APMsl6wD8_hb0QFlaPgf8mE-Qo1zKyDcA_KC5ypKWtVSp_CHqZ1zmRYxkAPww1luRVWBCUPwCO9szX7RjFAD8vdUIdA2uEl38S5f7mpjXUgkA_PvaHh_HtRZK_OFdaSh2kp8sAPwswdrWD252Dvyo0SwSH42CVwD8QVpMV4_Ov4f8NS4K_k8eg54A_PrFgBsT7Ug6_L7x5mAzRWhPAPx248poeVXnUvzqpJ4gFfKQEAD81JiFdPW_awb8XGNlNVJ0f0sA_GlHLH7cQisy_In2v57fj68SAPza-vYCqkVkFvwfuLkTXA0ENAAAAhD8P9ZPQ_SrcwX8RYCTM8Q2N3j83xA786INhiT8Yw9XAdyPIRkAeRLyWzqiHuScNyXReBxUlkFVUqQ456OHJJ58NQTWMi2tDqe-zhPTq1e8E8xaK8uo2qzylRzCJ1H6mnh9ZBlxOPytCb0mI4SeOvxnQVwugC2ucwD8V53Jw3H4_-38HrRKs83UEZgA_FSAuz-3akS4_KIqWAzTaHf3APwYirCj7L9r-_z83qMNGGYnoAD821_7Wg6wbhz8kKBfcnVFay4A_FiXKkU1i2pK_CuVDvE4XCPSAPyB67t7g6Nwvfx85O85peraPQD8hHazNvJo8OD871QS6HkNOv0A_MErgADqfl-F_AAzFcMlljI-APzUSCIrLXu8rfzRLHK8hRVrUgD8NylTX96Ti7D8OGbYuFGCpOwA_DVCAgszQyXu_DZbGnAsljpFAPx7fGzy56ruTfxcG1zdZ8SFrgD8ArNuNnkr_7b88xSHiOFM-vAA_KCAKVgXZsZo_Gqc66IcuE-tAAD80bMv-hjmmpX8_oCbxkrk3ssA_CZjKPMPRaiF_NDaienzJVIrAPwRr3YKMOMpVvwt05YjlvdeNAD8f4OU4FhhWMP8Zjd5PT8crb4A_DMpyRPbggpy_CnYLDC1V753APzXdb37TpH2w_zoFUf1K6LLIAD8sKPEqgxVklr8vbi7owrLQKIA_Nyr-pWqIeQF_GuPWbE-0JhWAPxoCZTfU0Fx1Pxma80swuxEvAD8NbUHp_6e2Lj8O2t6uLhYFUgA_E_Hq663xrjR_HlmIduUGnHnAPxUrSwBttk3qPzOgeDnbZxN5AD8hMHHwP0FKM78XSm0NDtzKEgA_AvlIG19WlNa_EODPI1cgAdaAPz7NHJhq4FZPvyk1rAgiAyNBwAAAAAC4ZoFIK3U3F1pB23d8fjvSmRMkEq-d5dq7xHu1uWFyzJvvu1Tn-eOhrv8yNxIzVnsn9rYTiFqbcjaVu6_bNDxN_TSUM38AmEw7kMMsZvVgIQm_dlLRZdxK9Tvu5zYGVAf32N4EMFh8-v5p-k7PekmcL_vNVFRvpRLyTPQ26QpCiUC_Alv9VS8EwF1_H40S_8KctIEAPyIPMobpptB7Pw0Pv3FUpJaPQD8UvMIoXUjOy_8VDc2AlYwovsA_NZnCl4IvmeW_An7-lr19-8zAPxpiT16KHXQ9vx_oBvxdfGhnwD8MZ-Mb4FaQ4v8djc1aYJsGz8A_OiNyB3p4qmX_CdMaQ_rtjEyAPwTQGt6WfMKF_wfVmP7FDIBtAD80DSYMUGxDRj8gRWPkq5H8RkA_IL13rcRc7hV_CnSD5q6HT43APw-qFSIpnjzw_y3rDDLxZQHOwD8iJKRjiSVwDD8uhNM6SKwWoIA_BrtTwcmF8BR_PNK1sVLyWAQAPyHHLe5ylctM_yteUuPX3k1WQD8LB_hWd0BRjD8adIuaTfKNm0A_NJx_VIRFBEc_MsNDFqhmGw9AAD8uSqnVrRwc638_J7x1SP5TzYA_AB8L45iHIdZ_IfMJqJz9secAPyv8raeHYJUI_x-9X320Wu51QD89oaQoND3exT8aCokQM5iXmIA_A6tVjJjG8av_PvhH6EQcoAJAPyRQazKvh5Y-fymybc-mdUeVwD8vcNkzaNQTqr8aMX-wQrnFNgA_G3eXoLfrB2y_KUH28UXogj-APx_qubp1g9Ogvwsf7lOmDr2_AD8ygQbcSuIMcP8KSautsesOZEA_O9Rgf1Hjw_c_IeVO8RDeqkAAPy_MobRHtg4YPyrBaqicLyz-QD8Wkev5eDSdZT89tLDrgKny9EA_AR8Lfn2D3i-_FTi-zKRWD3hAPwTdTG4ErdwxvwIPkiaM8x1FgD80bjKsaKwwUj8zrFxwOMEZhsAAIlb67hEic4E8aVAbhn6lNkkY81HcfB8Q6BAgHGBXaMgcmeYqHx0N8VTmfywLrlnFgqFzZFnwAUcWfHZjOt12ywBHkr9K49Clc_BkQNbN6TUepDpt53p8QRIchJH08eZiB8BH68MA701GStTsbWjX8sW9x3Qr8tOdYgRq2ukGgRGZxgBNHo_0y3zXwRY-6PztTMp5z3SOZnSk-vWbkjTE3WgDgkBNnh3Z8bNT-vv5lBS0PN-AZXJnoEo4k7Ir5VOUIKcQREBNF47gQN_sBSog1Nz7csNspmPR10bWLTrzQIKKQ4e1wEBfvgmU9jzTsfhm2Hol84P2KLM6lL4uAIGEKocxdx_mgYB4yCkjrViUsrDrzqs2HLw8llNTHshKVUY3Hwbd29SDhcBY9iUkFx1tnRxIXfaJmtc_e37xg2aT90_9_1tY9eVsz4BYEELG1SkdIdv78Cl5XLMufrLbAm8VQ9hldz4eUQJ7gkBKb62qNnK4prNnFd-l4klTo2kggzMUz_QA7cwo_7uljgB5fwQ8nH3ZdwJEPL9q8Bn6c61g-aAwzm2j-tDj6B2yioBp16L0UIadCl2Adt_xKdu81EEmfyfaZdzFi3gVVcDQiUB0H_5yENLo7A35VP5jzDodr7oVgt3L8cFERYYMLi8jDMBuH4y0ggDRdKw0M6UGgW94o2THNMJ6XGZe1Lx_tAoUxEBeEew5twXnHJxH97XVNYVPp25DdQwgmt-VC8Bz4j6szsB1CUJ3DdeQWge-jKyPA57ze_R6d6gT-NOfzJRif-1NgABwRabuqvMcCNzYFASFRjBCPLz4NHNb5Ed_5toN_EggwsBglSSaOAPluyOZn-MEnSeuG75NBKUprdRawPN8eEbbSYBzxWygeufFZq17m8KZEF1N0O1Zj7TGJL9gTmwPt_4sTUBD9Ob0CxcFUVvbW32oShCQDG2NgtHAsQRorTMK3-7ESEBr5TGfx3Mr9RwVl3IxYWzM5UmwHeM4hR72hK9xXGBkD0BjUr9IkzGcf01fLAD0HDRD4_IXymQTW5hOnxCtLFTvA8BGiVhm6oeFNYaVbK6zTeuvHC9aXyW4-IOyw-GpDNW_goBYqq9BPXPdOFoBEBy6zz9NT_FM6490gV-VEUoTmNS6BEB3ejpVTcn_MrEcB7fVTjX_E895_8NkSwyKuDi1XFqRzoBxzvHy5tvYp-a3oAeN_ySB6xcRrnCkKIgRqZ05FtfehABTmC5p56UY-D19ZgtSyFOybT6Iq5ukc-8fvTTx3ZoHzQBvlMOyOY56PKR6yg3IKa1Jz15QfILWkxb1yPWOlCNjiIB71DfrBus7Ubm2NVoHxB1zEpmb_Sc0YwAn5Gwi7TuCyQB6LVYc-lNl5H5dZe9984k7WgCModTRu8Vz-meRDQ6ZwUAAbFpVNZpr8B0wsM88MvFBDNvQ-RNf3R3OgHYeOzIjSU5AdBwK_LSLxpfHcJ5sB0nzqbKujAsR3nITNWtX7suw-k2Afjxsbn-hClgIBrO8NSjxUTnT73nn4iA2rBO5TbvinAIAd1c-U2YmW0FffKnYs5sBpViCTIGM2jj-SCVN5Blt8Y5Aai1yhuqFWpkRY7pxmjRH5yPXBDMLBUsu8CfRlMYw6UYAccgC9ao88b_ApL5UGtSV26HQ8kPEf3EDba2jXhdJzIjAcKkXH97nJ8JSyBfY6U6_isqeBqwIObnKo17WoeK4psMAS6zjUQqgNOkYD3gikCrOQ7-wBYid2rIzFD7Ud84-eInAalROphgwusN2O5Oc-LWRcMa7W9oZwWd1PG9g624UAgMAbK8Maoqid9dMMakh-KJ8hh9L33x-qCg0MLxRNIgNOMtAcNKOaI8ORRtcKn4S6vgs7ttC-Xpdq86sNZlQvk63UMZAXJYBJB36026Qnzp1d2BJZUvaVbA8sdTKAhnWC-KMvgZAbAyIc9xm5TZ0l7DGwxilw5IEV8zKdJJZYdFj_NZ_TUMAd48m3jMj1tTm6yzX5LTlh32jpcFQlZFkQTve3raaGwHAeghRPaUxf_cRtZeIOwFGrpjWIAAmucJ-bW8ebsfGgU3AXtZCokcpxFMqbzegC9W8M1Yfld1OBMIx6BFNqQgsQwaAe_b01EdYuK3KB-jsDNyaP6Y-2OZhTZlK0wHro_-5II4AeXX3xzQnff0_QkR4s7K2ZYhNkcMB8RxjJ_u3LOTl_8SARe7w8COIHzD2XqaejvEl3JH8X73YUuZqFc5QQGqT_cJAXuKzQqoRI2QeoMZAY-DQHZUsptvPfUCbE0C9XQWJjAKAQY6_hHPYDgy0X-NwN8GuU7Zp3U0Teb3x0XB1pVW1lwWARd64oWi_j0GzfY8dxCZx1qrR2-CpODON1mC33G8JeUUAVjKqCjhGNvM5zsv9uYkT9TXwIUN6RZ8gacvfSRhE0ggAUDWLBuuXEYQi7qV6XqhkpAKYJEjSpOcjjGlJNQueIQ4AXowWH7AGhNqgKphOCuv-z3gbvq_AAetKKE8_M3wTMYEAfZRZkWPCYiK4DMqcqgrff1n4om-wE5sgh6-U8noMoMDAYbDM3_dNoXtudVnABl-141lpVZfzSORXMEqpSJvquY_AXRjOEbZP-mZ-gSawpptrM2SFu5_0qv8wsp15bBLu7MUAYGaUheo0uXteSEvhfyxsez826fxfMj9rYGrcjMyC0wyAX4_bsgRzqPPdtJA_3rF02-PWaCEroARRn7keC-3ELU8AAH_NDQMFqxWVfV2v5AIGW-BmTQo3FZFBjIzNlRtIqSjAQH38dbw0Og5B0nmXRaAltQ7NPnwlv_0J7viCV4tkIAmMQHhtt3uUPF_pqWMmuLV-tlvX8BgxcuJKQqhf5Dmf-AyJwF1zrIJNv3M1pK1dHszqk8J2eXd-6iepnzaQPpsXRdhKgEkiLjL7v3DCcLXPIp5jcIU6WmWZwV6U6REtqDoj9kgFQELZwtjKyLDjAiOiMsTc9yA8L1AzER_VX4OXnArxliQPgE6RXldX4Upb0SZ7TnzyHPsqW5KxDEeYyXc8w_cr3GhMAFqthXnVgVlAl1ahqxoLs5YC9fjrUUildLqKd_QMD9xBwFla0-_sR8QTsGD8fUpenzPGs2Z5qaeK3Fj3qBUcmIjLQFpkpn2coFBFySOcLuCYLLu7mS-PcIHPnmPvn8guHtMHAH2O8t2X3-JjmuEHnY7licd4SmCxianz6ITVeTchmXQMgHkETqR2mPmk1A6cY5bASkS54mmVQiDSNmwnemvO21yLgHaLhSz7Gnheh2uFO8v2f35IrScQ9K7SAcpsLmc5S_yMAF_ZbkAgvIs74QrjeIFOP5p0ANW20cPQLf0VW8qQat6BAABTngXHrJWEBSCnXHT9nelfhmA_nA3BIOAUEWduGk6nAMBVJ6A47yH9gI9sLL-L0yBYZYgv81y4VXYWW-bLCUS3AMB_BYd4GbIPgQGkq3MqCzeOoDH0O3BXKRZKx-kyWpKoRUB3urp4BdMDNnIAKCL47dEsM38hiJSyWOWfP_dMG_RvSUBgadrbBhmCzpvZdmVyRUI7l4uHy8ytsK5rGitvBO7tCEBdVU0aqSYXjJWrmWY7nka4Fr5jL-SPxvKbxn1wZF7CxoBSQ8_-iWvwuCkA4VyguewTGcRqq88vBCeEdK26nTBxw0BChZCm109dPsGZIZL2AQQ8PEYjP90RjgVgQHKJJynwy4BpCYOzCoHx8XTFn6eC7lWVU7fyd1sQEMdBMjTVe-iAykBAS41ZSkGCexXhGTsoPuQTw0wPjG0_05NsdsumDgx1gQB6iOuq9fePIuLZASwkO-SwhlgU8mmLk3f6ONubZQPKDYBVNylY5FAu_TbDJ3CPdSzQNttucIw59C4cMRrfdYViQkAAAAAAAAAAAAAAAAAAAAAAAAAAEuUOwLu-ZyG2VBnb9gniftfwClO1N4Obhp9pYWlBQM-a3CSTtn1LOqe1V3YRhFS7ZxZQRXf2eIDetM7D_eo2gwW8quAfplfmyZBiLV6g7OqpNJqDFL9XX1Doc851OQQEfKg8qjxHqlmYJ5popP5M385RIpLhCprb4h1VaofEvANshQ8lA2A10_1VTbpmlikqd8elrjespDgViiX15ptjhLNj_WyFjtHV7T3mgL9O2xUViqjRlLxt78JmZNh6ojYJcGOzj2uDFrrmQXBl0br4fb3VRc46FEZ5Ezt2EIURJMMldtvHuvBig8phqpmfdEBTHdGLV9oUNG7dfq6lnDPNC7f8FljzZ4x8k7uwbaYwx5eBL12UxitWKLAmHeMln3ZKjuHLfcK9kP4O11Xy3TNKRvtjFLci_ni947QIoJRoSwaolT-Yz1hoyHpTEjduTEckm4Mrn_adv-pnmvqCVIAJgb9MTU9RIBn8zL_jIo7a_VRNJOz3bxSyy6F8UBZ2nV-GK6Xrt9brrms5cL3U8PuiWQyPMiguvS7rE4uoXf0NwklQRmqaFa8NZiDu7dSEUGGXuW_S1b5ifcJbyKL9R1RgSloMigsztZg2Mm-cvpHaxoVdKn9BVXSgkfKINB4TQUxFvegltw-IgTLog8FasKq-T4kszjkXQpDZUClzirSycspii9QiGIHWQNJ9jIr12TiVi6Jygnqd1kC32BRoLUuwi5e_z0ictnUDumMQIJT4wz-i2G3P9pV7tfAKb3flOmACJ8JrlapP2DTgeB-D3OVOCPPqOcoNqoihXU9HN94ZB4CH5UFpq9PUUxbBvNC5jrgDRI2eYCH-hhMcRL8o7KsvggvnCb0AK1YDblIS0FUQKOXZ8ynwGF2gIp1lGNnu1NAGSxLrLIuSqUyXqLKsX9mdPdh-OxXDp2v518TMykwNP8xzYXTQgN_ATa9HKfSSQSHE_5WIDr7YYzRA68hPtjbvjzOyv2KoYOkcn5CMhMbwgQIsPGxL6TcsN0IMUG4gz1bNiy6sYlk_1hRF2q0h5HzAh0P1w1Kw3CRNXkO5XkBkDEXvcJsezzwCQTM0tJ4Ue_-lPhwsEl8YbFvijtSvP9VciX9Dc_asA71m6Eokaawkq8SBpFgDf8JrMSZZrZaq-A0E33sE8JRDzyzQBbky77vN6ztCQf6q--JdPz5A54fPYsqgVus_ygDfvyxutY80VBw4BeBZdagBoMqCyACaEw73SztOIvXFUNZhtbv2Cvj2jKctCL2t7vvHHL0Un7ZALgAKIkrJ-flBlQu85cBQQD_iRQ8VXAbKb-IOx_tq6PH8aAtAHPG0A4waXN9KoODeC3taJMkufGwMyKgondAKHShIhAKiVMmq1sApRYRXhg_H9Zc_rZ10_4nGh5hb4AZtAu8iyDgaAHGJUMwAP7IPYUGZZgEU17nR9aCjs_yaKj6RilZNcJiKFnsS1xD7OziUoKDYtJdSQp3umupK6Dq1gntdgwrkbtQUjypHl-MkqzjwVvjOT9H_tMwRZKImbDtTutfvj7DvFlHb5BlgPWNiQsr3TPdwzVPjXJEZ-NPVvfgkojWH7QCRdkEjKUMahLgFX4QOhkRAQphkF3ULTaWH0fbMR0bSIKQDQ27NFKFS11jMHDtdiu50ESGDn8F0egmAJ3f2hUyFkDdGwupY6z5ss83asfs-t_C2Rv4LEvJGyiop-mMBYDJJvE-skXvDhh-QfNnkPPwVshIPBHO1ENIHWoFcU8Y3HAnnNdFfHpJ__0QTyhxnzPrKJssF9AviC2aHuFdOTqRAwEyFJaOOVHNxfTCbWdPmSEKfA7smWYJfHRzHrNNEuUuiCif7vrTLAbTECo9vljTvSrM7Y5QCV1C0dbZHOUBFHtYygH-FC3dYEpjwK6yal0voKO1EqGawSlfHCwgHjyqUY1LrXCo9o-tzJZSBxKW9zYEbTfH7zosdvqaXC_LCtiGbS2G93iU-y_uQV02oREIto1DQdyNU_RpglsLxZcqAJuV_jPjsv5G6HEJcoj3-XkTdhqrZRF9kpB5a3ktYTY30zfV8WT4AG6jcK1JPx6eiODaj77y5lfWrvIikp3B8zAQp3DoaZBCbcO0xSnCcq8IxuUcvDU81OBpLVLut564EGX4sBcOXIjUpaBjZJd580BnS73LMcMisIxSOyXJ_9ksAvWh-A79JeoBOJG1r-xDPssBXrx3Anyxljxoh_2JBA_VF7tIuNDZ8lhPHBNxYPdqT2Zu01VQ_s_KHu_nbKsJG7o5qOdmG0p14XQ-NraOW6Zcy0u4E7VRbf4X21OZ4psawlfyL7sKjliNHcgr-CZvEbiP2gOYtgaCZVJ7dblIKwgulRWS1Bt3RWAiT6obF26rSUP7F7Z0o1q5M4dgtqIvN0Q6DyXQk9ihfYPlVX9jl_wznO-J6xoIUPHvZ9044vA2DyuEhzR_G1yuybVkVgEWHss9AoP62qfpbFyjm7xukSZoGV6EYnskkc7Xd0oMvadRP4F47zf3QvbaE2XugESkGjENcsEnFY0iLYLan18dbkhLHBy1waFfYRwAd5HqP4kQdQaOLxloVqS_qV_0oioWCHSnz16SqlSpv8CfPjZXwDCdX24W5k2SPa00lG2iO0Wp_y06pPd1UFjt_YZm-vUeH53ZtQ5XaFMtOJQAAHx5JG9CsrsNOsOL23QFjdVCjk81hxHz385gkCcsfYuBQILNhRiqWMTs9sV4gdCGhlBxlDw0D6MQ2tD3JQMO4FBKGx5Oz1qr7CmnuSbwuIv_9yHwASL-Dj34FwSBS2Yh4tOi6ou_E-FU69H8hm5629kPAtcB6auVVHsRi8pEjHCCWAKhcvgHRVTJi-fRBOkYpSYx-xJZLO2irMoOZX_qFi2RXqtWU5lZC2BtuXEYovOg5LlvH5X4sOTSdXarHNemmREFAd0NJWesrOooaNgs06h_Gj4vseC74U92taRYrZZ5Oo2p7zyTW_28odz-0ZLZC9CnuTCX7OM555L1-N_iJzwgJseURVPgXg2GlDUx6QvrOk5-MZu8itNe9oge9A2Bkl0_g_7A2l_Cp2HB6ae3nXuHBUkFZFDMLnrhKub1nEWm4V_Gy_Zu138436LF1eEXOLx6AAiW3cUXToneXdm6mjQ5uItQ3CJun0dcQ6oxx74Ui9BdBx5IfhfjK3RRbyXVr6BWc-YtvV6RissRpJBg_ufef-M-pTiP0voobS4YhJllOv780umkUDTpwzGl27II9xsLJSfxHLt8oY_tBunkL4TqvO6hP5tJ2LvDaUR3lwnzlBfcIQBP7kxefMDKmr1D_sufsS7Trvv5pEwODelqIG8lPfaKMS5dqwjPa4axErnU02TCJWfn_fqIDSvJtF-MZr9TUJMjElRBbtZLT_DSVXqFxlKhlzDCuuYEcSFvNohdbw2K7hEP_9W45mFYO4Q8PIvPuXa_hT9fCGIYRaJ6PkhdiOMMITsyqvQEHZ4kzW7GXKlTU9mURHDUJ9yOJXvlFU_YZHchruSEDK2BZDsGHhgqqw1M6ZU3ZNpKfbN8PmzH7SXXeiiq6Tp4JeKprp-Eg6BcIq3wiJm12AWyDcr2tpkpGL64MYckUMeYlxJiM9SNxGgQsw9lWGohXKloIWI01kXzo_wlEmOaBiZzSbXX66SjZ9INdgSkq4XUf4ApVrOCN_g-KQxiCfEtTqL_hPEQ5DxylvVgYTxj1N_DHTHFt9Mt2YlVJkTbshSal_3qPNj4vKjdJfBVP9dcWoC1s1gOVN2V0fEmlomGMA8tugQA8ylMrmAqPd6KfwpLYtI2iwxtxCtCtzWx8f-xXvt48uloF8MuL1CN_hk-wOcgz5Iv7PJYcRqnCtth1THV27MsdX2PEiewi1g3IBXS_1UjD075cNxLilMlA1jfNweUvaci6bC8zfzmXYQ0Wb3i_xA-IHcH7F-Z6BXm9sK99ex6ul9CNP3G_eMR-ImeKwsEKc4A5RbBD0cxE6RT4eSuYrevnBO0cRzpxHdil9gTQso0VW5SSzlneUIMEgessSX6M_TOsvo6EESvsqrh0jqeNmO4G8FzDPTnZjEYalU0puzU3b8RsAe20IFDyXShd1q1afD0Cvotb1ZtEYyIXuWJ1DXNW9Qgv_dGUiJoCsSfndvg60w3KkTTqTMma_B85fwj1NL9Npa1VaA9pbenB9iIb1MoqxLegr8Z_Tu-V_Ljjxa-5To1E1x7Vr8QQsnWRFRRrGPr0p1h8GBoIBZ7c_BR8nj8QDcaCJvkVIt87ZYtwQmVHkxVDuuEb5QX4LR4V-O8wQdBpRb5fwoqEkomion_4YdYbXgHzH2qBi2wTg5LlB8PWP80oMEfHtnyvhs0PVYM2Emcp1jtgXmsMIB4zG3QD8LWs27FcVKl-Beh-h-7bLEbT-8lRBb_08sseOu2JLxdwGgVlplMYMBd-lbZid1eASr57WPMyLXwXBom1d49VniU1nKPMBA_XdFC-p_ziEDkBosxWtrPf3D5JIoUQCOSRJMjCgH3XzzbLb7877fKNbFzgaCPNFSHAm80u-lvrCmdA91LyW-6Nq7491aT81ZqMKT2S0oTFgyBtywAzqhqI14wHtnrJhno2axemZgGWzMzHCsPnscFuvnppj-zsllWOBhEJZo4o9qx2bwZyPJp0xIHMir_jFbPgQc6LyPVVbqdErFC2CRZCObFFIOPq5u8M0JTlaTKIZLU0mwBxzKuMSJiePvW4s0EA88CCaHcKHUULR-xmVBCZWIsSiuer5TJum0EiLz8vvpKcUjQfTUjAKGy7mdsczvra3qoFGdPjSnUkiS60eD-2pu1dm7OJJnxgw14NXK59DIRGPUS4zpN5pAVXdgsg96ukIGZfgqfSPw4UlqDJlbt9DaWZz1Ic82jXW4chr5k6oPITkfRxylJEIwYU89daj5qd3wFPGRkv3fvoqKwQ2nKzcc0xO3WDu1Mj4vs3QRDqLjz2WkqyRMtKmwWaeDc8J9iVDGaczFYPdh5gY6HyouMyVFvODpYUjtehMbeyg4GWRrHI8lFgALwV-Q5AdamuB3yxhIELz2PPa80McDdeTnybcK6-d6LieGfIlytWwMYUz9G-5woT-9EMHsWqYf4A0hQWdXBPcZa95Lw_hhdMaw8XHyCTQ1qpO4Fsp-nXzf8TvRH4MI1XYv_29z9j5uu-qC1pP6LCwBO3-MyOpV-OvicaiCX3yDawa4JvJGsZ_edFE418uEFKYX-5Sxllg6-YXEVGSbo9SBBGv9pWroW_HFo98yr6qUCjRmGKwb65ZdJKPBC-nlzJxymZY6aPfByxvRhh4f7Bi76x4HOLekmEv6PHQnJGBcSTQCObVLGfjVqAHTLP4hUCiZWZaU17qGfMYat8RICVTIMnMacBkqWbf3hB1tjOHYUsUH-n90JoTh0JlNL3lzqGsmyon4ejk7kfLVrrwDbfTJMnoB9kG1wA98o5lxwlR7UTGesb-h0Za9eYrmkPn6_NYyB3ZJvradtNELcCoaTLV2OV6EoQjGLhyGai4PTTEsYBkhBJwW4oQa3Yz8BFTzYFZqefS4Wb84VGBb1c1RzeQfyh19vmGIEwiPV1SqV1ylXFmVeVE4l5_Ho1OvNIm2iJazMHbypYteaAfB47x6Exb-yrfRYjnx1TYQ5Rkuy7Ec56zSfzEciXRr7OeLoIbq65rFZwqFGMIrKKENU5wukpQh7N8yQyCTj3J85ZrBffabRkuHEIf_XKO9GNcgLb59lNA95mQ2-2WjC-giHgTn9B0MQbqI8lORa7D9R0OJM-j0GKXAwW7spg2QiQkf_XqXnZhpKH5qwL3W1YTk7q5MpgwsatmsaAsA63lY-l5k54FVzJp8DOy2fVK20LvKv_XybzwSAO362sBuB9V-eI0XWwxqNssBK_M1QhFariilvGPIeDmNoXrFlOaMZl9gTRg-CbMkhtoyz-NpvgKUnu_wCiVk3juCbJ5mBUS8jtHylVRSYCn5uxcgrhA2sENEAjHgjjTI0ja98MkpGjygac9W1SzpL6n-UoySEr3LAk09hScUoPD3cIP4AlVHN0liaQaNJj7lvrtIXya_4f4AlRzBh-z82qnGKYIr1VUZh8a2c_8KrWVCTHy3vAZOWIX7ER3wy7jXLlT8DwWrIFFMLuHHryzj5g48aidNYsRT9k9JXArFEAkFfAhEV4jqjj296i08-4i5WAtb_G_pRhnroj053m88aVpVfbfTruoUya9A3_6tlHlnjMW8s1LqACp_7gu71JQdbuRrUk9mHqvPKH939F3YJQMkkS1UUV8CBgPppGSkHCgqIhSasckaTp5cAzfv5yapG3arYqaCWAiCigCyLseUdd7rQ-pSUC5CNvLS9Y-SF-3l7KsMfYP8HPHTNOUK9nQY0yumH_5dUDsnO29sFLqU_rtiaugGEJRAmmhHaeIMeAkWYDdryOqX914HsjLEVBxqyeu8_wvwUeq49lK9dqL4ZciKshx5qi_d4nVuYzLYEWwaHmypczwza-fYQvX_MGQnA0cC0dpCp7AtHDl015MvKzYHx6O_F9zblXe_4ptUaDYV7X66ZZLeQdKSI2ugHW9pkktQcZCZhDqPQdc5tX3g5bGvyoJrN-76_J63UiH7AxqPoUnGK2Gwm1y7oRrCXrSCVi_T4m4QRjx4EHhZUllSOIJOrQLXWOLp27HflQx8AJDyE__zQhRgmwIRRhcpkU02-rQs0V0numSBYa1Wov8cqXxHZiCaS7smiuo6s5rtZeIYFYjbL5rwjNvn0Iq-lfR02YOp-Zq-ipA7PlXy2AI_HjNNip-9OMDYqA-JlNIZ_IHLUrBtykHoEl8KwrYVN55mN9-tjrZ88MQFdF_26tvwjpwFHAkKhak3AL95j7KKCONIJRxpXQd8Yo_Co9fHWUSIhVuBvFAR55DF0hC3K2l-3kXPoi8Vvd7rmlokWxaV4Fgsr1Thg3Rhfd8nfBjV_ANplI_uB9HL_cUfht12eJ-E5QaGKz4tO50Fhn1tXjS9Dhs8nZT_D2RQbqM9zMJJ3bC73deqI4l_NpnwQ2wIa9LM-mNjNNCOz5ZptkEIJLt62G0yY9pwENrWfKboGEUTxlwuk_6mj1C0s5Jw-1EoykmwtAyDeEoXaIQub2L1gOrNLAkTeTqhIPgIvCXwJCAS8IxK__dJIZP3pmuWY6kQ7Q1Y6jboJsbYghLfQM5CHJhaBEW1QjB7oqzABKumWCmKbgpPNHu-QuinoIRy-TZmvQsMjh6tV29piWhGATFAj-Mq1ZPqFxaSR1WB9488SqtMOUQiLX2G1npl-ItLlOsFbdOGz2RzEmbFmmH9TmLwRTdgjHOKEHW2MsSmIIQOOTI4Sk0hMO5BlkvsDAlHmcQ42yLYyC9NmzVnalhBu13PrNAVdALqUcaA1-zapU7ieH0y_pCZZXnFqjd2ChmDLn8-FUcpqEcNzFwPm2vOgIWX3Mk-SBUKlfKd24r0n3S3XodK_XOXkDw3s6CrMlvCtHP_LXuYKMLh7zrQb-O_FDnW2RfHs4ajgfGTOa70I9dZoSHcUxyn0lvq8XqseB8gLyzBxylffRG9mSdc_e0mEBaPYvlhSDFFDcBlgfgRg77ga4ujY9JtiC9Kjh8QqhsYxN1mlxLUYxlxweNPA2_t-c-8JQYqLA5IXLTpRq7SAOvFijwpqbyI7U8VJgF1CA5B8JQZOBg9WOT8IWpVQnqcOUobKUfInLFSQJAc6BsqtNtv6CZ2_R5wg0HXjIBArXib9fgTlcFo6l5wCHX8FRbG5uxLyxFpxE9nx3stYUCrn5OLjDvjWiDCNwItpmU27qEnY6Z9C0wv6DYjzuQIkSFBLdB8JMKF4AzHpM2LoYjyZch8vgLB_HO57eKzYUMa9q6ityCA-UOIuPk7LnxzYhAyz1ZMG59eDColmmlF2VaRwcxSiC8M4cjrxjnqngpVR3uTKr0LpiUE31y4gaxorqqCsvA3CqL5ADsvWd9lcX2G6DWcq8mgPzyVhGkA6xepMmY53nXE8i2AQo2Ei0HFIbQ_ASLFewxk7c_oeqLxmytsYMTvDpBxzxRXSHnjqF0HbRsRYct1TKpzVL3o5P5wOYaxwFkGTTUQBNEwOCRdC9PQ3oV6519M9nYtNf8C3OdOUxL6IuWF15Go44y1n7ogMCZHxyx5qoqEd83kvFmySG9KySJcCvljHnSxz3lSmmlMp7hVVx-jw0aPxtCgeAwGxwe3WMBtVORmdFV31b_9NmHNeRj7uvI91ZRnA5RDbzPJ_aJGoozyMcnIcz91Bo0iUHYMWKIvrjplhtjYRm604JZolHudaGxJLVTZiMOEAQli2CfgM8EhWkUeny4PB6rjZt-TJvTOMHutZKT-KOIfhDF-LLGMiQWyRhJUHTk4hWRpDcbzhjWA4cEQKVYSXlD_p9hnml-VzNIkvmpokVx81cqhAQ4YkRKpblgkS4qJCwJn1MQ-wkInj9V2e86VAhLkaBvjdUUtIAo52AVR_BPow0FrC6d2jTnupXFiVBGkPJWoS9NNr5B1NxUQyQKjA4yzsjUO53uCku6-enNS9GP5h6W5-khMWdH3UwiI=",
+        "staged_ledger_diff": {
+            "diff": [
+                {
+                    "completed_works": [],
+                    "commands": [
+                        {
+                            "data": [
+                                "Zkapp_command",
+                                {
+                                    "fee_payer": {
+                                        "body": {
+                                            "public_key": "B62qiTrtDyWmDFMQvUDRUdWVsVwNFhUV4rkPVgeANi4adKhrUwfdNFT",
+                                            "fee": "0.2",
+                                            "valid_until": null,
+                                            "nonce": "0"
+                                        },
+                                        "authorization": "7mXL9H7n92tcAjZnpFgLbhw8kd6t2ZN6rFRwGCtZN2X2syPsHaMnAHCV39g9Fhk4rhvFnpXkzSnyhBVntSQ1b4oqDRwBUQft"
+                                    },
+                                    "account_updates": [
+                                        {
+                                            "elt": {
+                                                "account_update": {
+                                                    "body": {
+                                                        "public_key": "B62qiTrtDyWmDFMQvUDRUdWVsVwNFhUV4rkPVgeANi4adKhrUwfdNFT",
+                                                        "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                                        "update": {
+                                                            "app_state": [
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ],
+                                                                [
+                                                                    "Keep"
+                                                                ]
+                                                            ],
+                                                            "delegate": [
+                                                                "Keep"
+                                                            ],
+                                                            "verification_key": [
+                                                                "Keep"
+                                                            ],
+                                                            "permissions": [
+                                                                "Keep"
+                                                            ],
+                                                            "zkapp_uri": [
+                                                                "Keep"
+                                                            ],
+                                                            "token_symbol": [
+                                                                "Keep"
+                                                            ],
+                                                            "timing": [
+                                                                "Keep"
+                                                            ],
+                                                            "voting_for": [
+                                                                "Keep"
+                                                            ]
+                                                        },
+                                                        "balance_change": {
+                                                            "magnitude": "1000000000",
+                                                            "sgn": [
+                                                                "Neg"
+                                                            ]
+                                                        },
+                                                        "increment_nonce": false,
+                                                        "events": [],
+                                                        "actions": [],
+                                                        "call_data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                                        "preconditions": {
+                                                            "network": {
+                                                                "snarked_ledger_hash": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "blockchain_length": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "min_window_density": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "total_currency": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "global_slot_since_genesis": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "staking_epoch_data": {
+                                                                    "ledger": {
+                                                                        "hash": [
+                                                                            "Ignore"
+                                                                        ],
+                                                                        "total_currency": [
+                                                                            "Ignore"
+                                                                        ]
+                                                                    },
+                                                                    "seed": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "start_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "lock_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "epoch_length": [
+                                                                        "Ignore"
+                                                                    ]
+                                                                },
+                                                                "next_epoch_data": {
+                                                                    "ledger": {
+                                                                        "hash": [
+                                                                            "Ignore"
+                                                                        ],
+                                                                        "total_currency": [
+                                                                            "Ignore"
+                                                                        ]
+                                                                    },
+                                                                    "seed": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "start_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "lock_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "epoch_length": [
+                                                                        "Ignore"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "account": {
+                                                                "balance": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "nonce": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "receipt_chain_hash": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "delegate": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "state": [
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ]
+                                                                ],
+                                                                "action_state": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "proved_state": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "is_new": [
+                                                                    "Ignore"
+                                                                ]
+                                                            },
+                                                            "valid_while": [
+                                                                "Ignore"
+                                                            ]
+                                                        },
+                                                        "use_full_commitment": true,
+                                                        "implicit_account_creation_fee": false,
+                                                        "may_use_token": [
+                                                            "No"
+                                                        ],
+                                                        "authorization_kind": [
+                                                            "Signature"
+                                                        ]
+                                                    },
+                                                    "authorization": [
+                                                        "Signature",
+                                                        "7mXL9H7n92tcAjZnpFgLbhw8kd6t2ZN6rFRwGCtZN2X2syPsHaMnAHCV39g9Fhk4rhvFnpXkzSnyhBVntSQ1b4oqDRwBUQft"
+                                                    ]
+                                                },
+                                                "account_update_digest": "0x15D02D92BAD9C4A8B507567897B5B3E153C4E52BBEBD61AADF1964A7EE32B231",
+                                                "calls": []
+                                            },
+                                            "stack_hash": "0x18187674A5B1EC09F51C8AF4D955D18C98454A3BFF1BAC77CA784282F57C4DC1"
+                                        },
+                                        {
+                                            "elt": {
+                                                "account_update": {
+                                                    "body": {
+                                                        "public_key": "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT",
+                                                        "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                                                        "update": {
+                                                            "app_state": [
+                                                                [
+                                                                    "Set",
+                                                                    "0x000000000000000000000000000000000000000000000000000000746A528800"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0D066C469EDD1F69D84454D5A7B8A148264DF7ED2D6A74AA086D8AE03F006C05"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x3ECC0FC66665B96DA4ED0CC9EF3926C359B0EA44D81E537D02051DAD97F49BED"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                                                ],
+                                                                [
+                                                                    "Set",
+                                                                    "0x0000000000000000000000000000000000000000000000000000000000000000"
+                                                                ]
+                                                            ],
+                                                            "delegate": [
+                                                                "Keep"
+                                                            ],
+                                                            "verification_key": [
+                                                                "Set",
+                                                                {
+                                                                    "data": "zBpKaWGf4kQT88RkhKsdM763esRRM3dTvHau3rcdvXDunebPSkRLweAk92FwvwK4KuDhQfEbAw2kcqvgdxPqzSVk3f3KeksbcnZUf7sWoMArmhtyHBifPkHSGLtBS41voqzBAybVQJnzhzpPm6N2Egx57KZzumVWRkCoaHwH7Vyn4q2L8P8Rqf3Uy2kz6Q8BsnRuZ1qdguqMQrGrTn8X78GmiMW6No9av9SQA1U4Z9pyF5UndwNqWTdZ3bkgS5QfPzuWvGvVdifNu29t1YLu8JRcse5SHAkdGpXCza9UTpdsN5VYykCmDde8b5ezxuYt7rhcu6t6ssESkcvki8AjibxpKk5f2KLBX8VyzGwxEs3Lhd4NWh6buyP3t7JeURoHTukzmtRq92BJJccL6AqsexLFBmsNbajv3pETtMnqRTfQvtr2zj9GeLzKbp46TtkCFpMtDijQJ5cbqGbaF113miDdaVSNrAZnHqZywk2gmqDRpYs7m6UHNqQvEYSHa7MZjjG7JzdBCRNeQQV5MWH1uPFS3TgaDnAr3Q5fA5TwQPMqzxRdrdDpR5pnqSjCwjsDVhHHkJ5WNjcjNzeSBp13ZXHbdTdf2xEEH554G6FBrGuFoAqpJRGF1PWN2iBEPq1XhbVUqhBhRt8A6DpHusMWTiS2FFd1pXP53hTfbSz37KXWJeJhPBLYTbpouzwdvxoJpogcH48BRZ3PLxnT1UPfwKoDJpSCM7wLMUMgKrHx76fwuGkTzen8V6mFU7eciEsZH8vbUpY7BHMujeMfLYFiZK3YDDRCQEwPs5eG911pnMAzbMYAmoFFFe81bu31KV7Di7BFxgK6vwC4pMwfnGNw99TLZFbnywZzXSCrS8cVDbU5rx9mn7aj1rJAPHbqRzWpAJJdif4qMVaWcg75iYNepG9ymQK4sffxDhSNRxZkRWhPfqGgp83dbe3ZrF1mh2JVEu9bCK7erH9DiPGShEoYn6g4aciyPbjxnGFMWqSvAUZyyAUNZCFq1dTron5BwD3ti5HS9HAe6KCYHMdrWStFtKzi6N74ibQhwu3oWnTfYjsBuHyzBULnVrTFSb6xQz8pdtmxv5HZAdxDxdfTVMZaAwJsjUDbHGJ8PxRinpxMynakFTQcM6jPNms13mW2EdxSF2puCaAVvXBAwXEcxEDSgZ5UbM2kcccGshfkax3SZw4j9U4WHvbU38cVDyLiF7n8aska3SDx6w5EjtBcik6gjd8xm3vqy4YUfaKcvYojwrAEgE6Jp1rPQ4eTihNQYvgfwoK8164jwsGS8PXAGW2oYBtk63wwRZVNrR8fKahBGP6x8VsQoBcfxQr7bG3BStcaYzzaUwi8UazXWxfQ4K7EpyzR8KPVhRuyC3hYpGuUv43H7TPUu7m4NjTigfD5qfzZPuboS4x12QUQNqNtPf2HmsVvJJBUf2p1NuY7p25sW3KJWpHfaE2KbwRZrxcUFUzz6gAZLDg36Kvh9LidKFD2yY6tX9kwyEZHV8S4beEbKrN3NBmqiwHHQSvzLjuAtbxbR2ZxQj7hsr311kNKUSDNUyVGxAgv42Kxc5tuoSY172RS3Rky8g4hRntDKQ9zyXDaQLtMQFs4SrLVpAUPsX69DoezHQh5eqFFwJg6aSxjGa3ec94btbvsJaFqPYuhXQbYGyCJxi1kGVyt2jvEbjg2VvHvSwDfSzkAEzDXd2yM4Qf7n4SWBVApBXBXZxbv3PA2Q3DvbdpxyxCxTxfeZmfk6B2mvfUgc2uHT5di9DJK5JKLspw8tYzFgYfb812K1pn7jaD4SwVN8BFEhWUPrGyX1kR6mz9K84PAHSgmZj7CZjeMKmRo6b16JCojMCLgd7G4Q4gGztZ41KpYUusCqhD4xNcLu9En9BGcPEjPH3Gb3XmZV53jhkdcTfaTLEbNC1NB9PYPN2EyeGTSVf9TJzzEXbNtAyvDVduuUTEXBqk9h3xXr6PAWSPFhefAxCnDBqcu4BD87QquFTrkJZ3X338nx3DMt2k3nCpEjVCeJm663qEtjrVog5ZTW518QCGsuACq1U2UvrSerNqdQ8VPYVfrnNN2y5ryW4hdMfpzDPaFK9yRQK2MyJwmgu8d2pvM8yJPH1jGhBVxsWqz9mytkZygu4CVaspnHUbocenK3mSFouZQAE7U37KB3Ps3bzaMqw6v3CmfnTbrpz6HtSdvxiJNRdUwN7nQeKm1DnAwEaiz37TQJuoxx1vRZP5P5EXgyg1PtK3KreuZJNSn8c1gCJsuMMBBWu3RABtkU8M9987PZpH2TPwb5J8xa5XjkpxVsuq8aeqhuG7kfGCaQAsQbyJ5epKEVt1oNKHfKCDqHUyjnMmcdcekqmu9rmuxvUqnhsS91WeJVQmAZAoStbfdbcujnUTzS8q58epMDdDsFh1KbcnGu3YAYc1vTBhp55ar8PqrevjPTAqvXsytVJGRpgHkkPHNWNT",
+                                                                    "hash": "0x239215F2D9A9318CDDF61678DDE2A85E6EF0B4574EA677A2FF724AA2EA6A2B15"
+                                                                }
+                                                            ],
+                                                            "permissions": [
+                                                                "Set",
+                                                                {
+                                                                    "edit_state": [
+                                                                        "Proof"
+                                                                    ],
+                                                                    "access": [
+                                                                        "Either"
+                                                                    ],
+                                                                    "send": [
+                                                                        "Proof"
+                                                                    ],
+                                                                    "receive": [
+                                                                        "None"
+                                                                    ],
+                                                                    "set_delegate": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "set_permissions": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "set_verification_key": [
+                                                                        [
+                                                                            "Signature"
+                                                                        ],
+                                                                        "3"
+                                                                    ],
+                                                                    "set_zkapp_uri": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "edit_action_state": [
+                                                                        "Proof"
+                                                                    ],
+                                                                    "set_token_symbol": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "increment_nonce": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "set_voting_for": [
+                                                                        "Signature"
+                                                                    ],
+                                                                    "set_timing": [
+                                                                        "Signature"
+                                                                    ]
+                                                                }
+                                                            ],
+                                                            "zkapp_uri": [
+                                                                "Set",
+                                                                "https://minanft.io"
+                                                            ],
+                                                            "token_symbol": [
+                                                                "Set",
+                                                                "NFT"
+                                                            ],
+                                                            "timing": [
+                                                                "Keep"
+                                                            ],
+                                                            "voting_for": [
+                                                                "Keep"
+                                                            ]
+                                                        },
+                                                        "balance_change": {
+                                                            "magnitude": "0",
+                                                            "sgn": [
+                                                                "Pos"
+                                                            ]
+                                                        },
+                                                        "increment_nonce": true,
+                                                        "events": [],
+                                                        "actions": [],
+                                                        "call_data": "0x0000000000000000000000000000000000000000000000000000000000000000",
+                                                        "preconditions": {
+                                                            "network": {
+                                                                "snarked_ledger_hash": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "blockchain_length": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "min_window_density": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "total_currency": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "global_slot_since_genesis": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "staking_epoch_data": {
+                                                                    "ledger": {
+                                                                        "hash": [
+                                                                            "Ignore"
+                                                                        ],
+                                                                        "total_currency": [
+                                                                            "Ignore"
+                                                                        ]
+                                                                    },
+                                                                    "seed": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "start_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "lock_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "epoch_length": [
+                                                                        "Ignore"
+                                                                    ]
+                                                                },
+                                                                "next_epoch_data": {
+                                                                    "ledger": {
+                                                                        "hash": [
+                                                                            "Ignore"
+                                                                        ],
+                                                                        "total_currency": [
+                                                                            "Ignore"
+                                                                        ]
+                                                                    },
+                                                                    "seed": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "start_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "lock_checkpoint": [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    "epoch_length": [
+                                                                        "Ignore"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "account": {
+                                                                "balance": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "nonce": [
+                                                                    "Check",
+                                                                    {
+                                                                        "lower": "0",
+                                                                        "upper": "0"
+                                                                    }
+                                                                ],
+                                                                "receipt_chain_hash": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "delegate": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "state": [
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ],
+                                                                    [
+                                                                        "Ignore"
+                                                                    ]
+                                                                ],
+                                                                "action_state": [
+                                                                    "Ignore"
+                                                                ],
+                                                                "proved_state": [
+                                                                    "Check",
+                                                                    false
+                                                                ],
+                                                                "is_new": [
+                                                                    "Check",
+                                                                    true
+                                                                ]
+                                                            },
+                                                            "valid_while": [
+                                                                "Ignore"
+                                                            ]
+                                                        },
+                                                        "use_full_commitment": false,
+                                                        "implicit_account_creation_fee": false,
+                                                        "may_use_token": [
+                                                            "No"
+                                                        ],
+                                                        "authorization_kind": [
+                                                            "Signature"
+                                                        ]
+                                                    },
+                                                    "authorization": [
+                                                        "Signature",
+                                                        "7mXT6bwfN5pWukgxHpLzXuesfZBQMuKqaD6zB621Zdw8YsAvQtyCjxposdqt4CDvD7zBV9Bsy3FYHJi7g27NkremULTMM8Fz"
+                                                    ]
+                                                },
+                                                "account_update_digest": "0x37A10E3ADDE2D4745A4182FE8E69ACBFD55BF317A3882128A8B83A2411ABA858",
+                                                "calls": []
+                                            },
+                                            "stack_hash": "0x2C3794D030302B71C26CA570D51D609BCB78300D99CCD78AC8D6DCC68C15590E"
+                                        }
+                                    ],
+                                    "memo": "E4YhJYzmTvWtj7tnZzm16fha8Ju7GisdPnbH1WrVvmyeTqRuQUv6s"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.0174862",
+                                            "fee_payer_pk": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                                            "nonce": "318704",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qjdk4R6rjtrJpWypvMcpNMdfyqgxHEAz88UnzbMK4TzELiGbhQ97",
+                                                "amount": "78000000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                                    "signature": "7mWyhYfyLpgoeA4q8vCGWd3qVow2h8Pqgiwamxs35kDjtwEkC6DjebRCVeTpYqare3sBsWmEfaQCiuhDAiePsQVuvcb8tKDq"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.01",
+                                            "fee_payer_pk": "B62qov9yv8TayLteD6SDXvxyYtmn3KkUoozAbs47fVo9JZSpcynbzTz",
+                                            "nonce": "180603",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4YM2vTHhWEg66xpj52JErHUBU4pZ1yageL4TVDDpTTSsv8mK6YaH"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qpcg32fT9EmuKKVoRUYt5PUaTEoAY8V1Gs6b6bkwo6wWUWW17bRW",
+                                                "amount": "900000000"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qov9yv8TayLteD6SDXvxyYtmn3KkUoozAbs47fVo9JZSpcynbzTz",
+                                    "signature": "7mXRmnciM2xPYVH9dURRzkCjun9ZY5WKPguHKB2TEtxeGjPpHt418xLb6KinJsKuU8jy3P2WiZY8NA2GF7GGs8NLwKebm7Up"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578666",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qqkVYCPT5xVyDogasjSrPXJsay6YvqjwsP6WvmY22RWYnTHRDDZd",
+                                                "amount": "36511666657"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXR5Qu6yW3qasUFzYRdwnqKAHnhYEZroq7FAKXT8H81GuWR5626SDVX8Me8gSu27AisC5kEo9pMYiHbwfJ4B4aTEXC5TUji"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578667",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qkJKvhp42SoqzbHjY1S45oywZvGWQJucYd3kK9mqi9W2xBgu73ks",
+                                                "amount": "36508387302"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mX7WEcsotaPzwfycDumukQ46HMhQiqDHdWhr81xehcuidrePd4EM56bvL3hJBGXEuNp7efcZJV4SUzUuXiK7vRumEgh751H"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578668",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qk5DCdMCuJQVxJkir3QF7uhJ1vGvpKGLdo3WDvhbLeauEF28xQpu",
+                                                "amount": "36486037658"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXNKe8gVkvtZ4fhHF7yAVC2xE95vpwRYzLrHazqq92AgUJtxrgg7bKNHAgBeFk8jhmjyqMffaB2ZfS6s957Mm4p2KVH9V6h"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578669",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qoqf36BRCExn9ykCeoPssRRYA1Qhb5VKXFSFcom1eWpda8A9MKj9",
+                                                "amount": "36461773215"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mX8HJrgfr3h1Pc7T4WWaiu5BMZBums4dt5rhRCsp89x5Kqmnu6ad8iym9Esi3XKELWTdvbprNLz6E9gFiFBA6pfffwZRoZR"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578670",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qk2Gk4kE2EWwicoLDRCorhZUZF8GC3irhRcnzjCjLaJ3iHEC64Jt",
+                                                "amount": "36455570880"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXWMwQU99fNu16PSarvB8MXj9TrwDqf9YKvWmMDSeavX6FzCfu87gyCwzPM9C5nt4jrDwMyRDnC3xTGFLG7FPfAaUEp2MaE"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578671",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qryAFoekBkXKr4VH7ygUWDW5TR6UaohibmFWXxn8swZFztypToCa",
+                                                "amount": "36365144120"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mX9Jipb5ZSsN4fstDPAMaFtWntpnoaGJSDuRRwQH9fXvg2yBKTRxNwfTgMr4iJ2ymPFQRZjKoqQsPKQZkYLiGBgnnLjGsiN"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578672",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qj9kda4fpZMSU2ZpbzNn5iCZT8aANmEqCFEQaLbyrYoo56rJX27U",
+                                                "amount": "36322298385"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXFCWedVPbozBDRSHHs6NAZETdNNBDTWyMCxXSojvcktxPQKTffhrXHCtuhRH821uBgGuXK8MBavDomfoZUftj8zJcUUgZq"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578673",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qoDBFTbv29eVrMyjcCcnHTWES4VSUdnAM58gCXtpiotNKiR7fiKJ",
+                                                "amount": "36253028117"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXVHn84fYg9RvpGjYPWg4zBEZRkdfZ2Up3HjWYptSLgagVs5sBofj1pBPH7H9sFYCEcjF5fdzNZW2htx5Rc5AxxScFUii8H"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578674",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qo7PUT3LVoBYHGK6nH5KqNeqXjvaNfsDJKmQ8CtbzVGr2872VXk3",
+                                                "amount": "36185638495"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mWxfr9CgwUBebRh83GTHhKXBT2fLatdXqytjZf3TGstKFt3nMziXUuVc75ZX93JrXUS1PEaTzw3TAD1w5vBQcdQ3sFtyHYy"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578675",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qrtCBBDFpPcstmq2QT8jFUpJQeRi8r7y4jFrKu3NSHtaF1gdxQWd",
+                                                "amount": "36157782631"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXPEMyaGt1KBaM6Nfa9yxcJe7AkFxyKtQABkgpuM71JvWhjfjNAWUsomPYWnUBUPT85Ck9rzKANFKMJ4uwXQdo4y8aNJm2d"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578676",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qjthNSsaQXZHEas9RPTSph4VhhvSS7MWcT8uHfYQiUY8mg3L6HFg",
+                                                "amount": "36143503854"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mXK7ngV9iqHK6RsVeiQFif8vpoGV97GsB2tqTMVGNNZHxTMEuWmoo2mZSAzVgvpxrux7FfvAsgLLJDRzKtL1ZuMBPN8yZpU"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        },
+                        {
+                            "data": [
+                                "Signed_command",
+                                {
+                                    "payload": {
+                                        "common": {
+                                            "fee": "0.001",
+                                            "fee_payer_pk": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                            "nonce": "578677",
+                                            "valid_until": "4294967295",
+                                            "memo": "E4ZCV2Uo1YXfKoJDd9uGCVjVUGo7J28T6dGBw82iyqh44qfEXXNcA"
+                                        },
+                                        "body": [
+                                            "Payment",
+                                            {
+                                                "receiver_pk": "B62qo9beiqXDjhFyBBvE5cJ8uB8m2rJE9cC9AD8Th4etmZUHBCghZ8M",
+                                                "amount": "36130161783"
+                                            }
+                                        ]
+                                    },
+                                    "signer": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                                    "signature": "7mX8eEQGJtwi8nvWWJPd5joL1UNaFzZX4msH1gzgvacSAS8f5Q2x8Qx9BJNth4bF5dNRgskgrL4Jr8nCXgEMLFUMBEFdBRs5"
+                                }
+                            ],
+                            "status": [
+                                "Applied"
+                            ]
+                        }
+                    ],
+                    "coinbase": [
+                        "One",
+                        null
+                    ],
+                    "internal_command_statuses": [
+                        [
+                            "Applied"
+                        ],
+                        [
+                            "Applied"
+                        ]
+                    ]
+                },
+                null
+            ]
+        },
+        "delta_transition_chain_proof": [
+            "jwkKFFj8BzWvr13HjbtyJ232acRFFKtvJovZfSrgVjXXkvzRCHE",
+            []
+        ],
+        "protocol_version": {
+            "transaction": 3,
+            "network": 0,
+            "patch": 0
+        },
+        "accounts_accessed": [
+            [
+                189607,
+                {
+                    "public_key": "B62qoDBFTbv29eVrMyjcCcnHTWES4VSUdnAM58gCXtpiotNKiR7fiKJ",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5053088521699",
+                    "nonce": "2",
+                    "receipt_chain_hash": "2mzXdp2UJzUiGqWZN5xDQVGgtjGqiFZwiiLoD5GqbxpRSzxxv7md",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                184990,
+                {
+                    "public_key": "B62qk2Gk4kE2EWwicoLDRCorhZUZF8GC3irhRcnzjCjLaJ3iHEC64Jt",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5101300483563",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n2M5bcmRmZ41se4rvEgKoqTjbJrBSLdbKBW6iYrbHkxD8KdD119",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                110565,
+                {
+                    "public_key": "B62qqkVYCPT5xVyDogasjSrPXJsay6YvqjwsP6WvmY22RWYnTHRDDZd",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "37655286457",
+                    "nonce": "22",
+                    "receipt_chain_hash": "2mzuUba4BWPnjWuLTrYcULRvrSRofmojyj8QGHLmcpGaVAiHhVCt",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                140848,
+                {
+                    "public_key": "B62qk5DCdMCuJQVxJkir3QF7uhJ1vGvpKGLdo3WDvhbLeauEF28xQpu",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "8998049480604",
+                    "nonce": "8",
+                    "receipt_chain_hash": "2n1f3d77BhtP8pCCtgW5V3qURLef6d4ZFapJ6KEHiB3LSVuswLtF",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                160382,
+                {
+                    "public_key": "B62qjthNSsaQXZHEas9RPTSph4VhhvSS7MWcT8uHfYQiUY8mg3L6HFg",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5057632323519",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2mzoNebjqb7icVdVZZXUUJSTnjHn81ood4itRCcn8t2U8u5o2fMp",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                564,
+                {
+                    "public_key": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "12073709937001",
+                    "nonce": "318705",
+                    "receipt_chain_hash": "2mznEq8F6zJothBfqVGwqcCTBEXpuCNJAECCqA8hGEDdk2FAtWkY",
+                    "delegate": "B62qrAWZFqvgJbfU95t1owLAMKtsDTAGgSZzsBJYUzeQZ7dQNMmG5vw",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Timed",
+                        {
+                            "initial_minimum_balance": "66000000000000",
+                            "cliff_time": "172800",
+                            "cliff_amount": "16500000000000",
+                            "vesting_period": "1",
+                            "vesting_increment": "95486111"
+                        }
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                215746,
+                {
+                    "public_key": "B62qj9kda4fpZMSU2ZpbzNn5iCZT8aANmEqCFEQaLbyrYoo56rJX27U",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5061599776961",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2mzs9iyLbxgv3SteQT2EpFpwq9KC3sn2uzBUdxSBJLkP8nvmDDRR",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                147535,
+                {
+                    "public_key": "B62qo9beiqXDjhFyBBvE5cJ8uB8m2rJE9cC9AD8Th4etmZUHBCghZ8M",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5055765341348",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n1c9hLqH7p15WWAz6oZDFApuTmMja4G5vbGuxnEBtcVcpiRNL7i",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                228220,
+                {
+                    "public_key": "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "NFT",
+                    "balance": "0",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n2CxRgofZiRQxH9Bd6dtWfQWFEVJtwJWqrCxXwk7oPbbz74v9Nj",
+                    "delegate": "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Proof"
+                        ],
+                        "access": [
+                            "Either"
+                        ],
+                        "send": [
+                            "Proof"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "3"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Proof"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": {
+                        "app_state": [
+                            "0x000000000000000000000000000000000000000000000000000000746A528800",
+                            "0x0D066C469EDD1F69D84454D5A7B8A148264DF7ED2D6A74AA086D8AE03F006C05",
+                            "0x0000000000000000000000000000000000000000000000000000000000000000",
+                            "0x3ECC0FC66665B96DA4ED0CC9EF3926C359B0EA44D81E537D02051DAD97F49BED",
+                            "0x0000000000000000000000000000000000000000000000000000000000000000",
+                            "0x0000000000000000000000000000000000000000000000000000000000000000",
+                            "0x0000000000000000000000000000000000000000000000000000000000000000",
+                            "0x0000000000000000000000000000000000000000000000000000000000000000"
+                        ],
+                        "verification_key": {
+                            "data": "zBpKaWGf4kQT88RkhKsdM763esRRM3dTvHau3rcdvXDunebPSkRLweAk92FwvwK4KuDhQfEbAw2kcqvgdxPqzSVk3f3KeksbcnZUf7sWoMArmhtyHBifPkHSGLtBS41voqzBAybVQJnzhzpPm6N2Egx57KZzumVWRkCoaHwH7Vyn4q2L8P8Rqf3Uy2kz6Q8BsnRuZ1qdguqMQrGrTn8X78GmiMW6No9av9SQA1U4Z9pyF5UndwNqWTdZ3bkgS5QfPzuWvGvVdifNu29t1YLu8JRcse5SHAkdGpXCza9UTpdsN5VYykCmDde8b5ezxuYt7rhcu6t6ssESkcvki8AjibxpKk5f2KLBX8VyzGwxEs3Lhd4NWh6buyP3t7JeURoHTukzmtRq92BJJccL6AqsexLFBmsNbajv3pETtMnqRTfQvtr2zj9GeLzKbp46TtkCFpMtDijQJ5cbqGbaF113miDdaVSNrAZnHqZywk2gmqDRpYs7m6UHNqQvEYSHa7MZjjG7JzdBCRNeQQV5MWH1uPFS3TgaDnAr3Q5fA5TwQPMqzxRdrdDpR5pnqSjCwjsDVhHHkJ5WNjcjNzeSBp13ZXHbdTdf2xEEH554G6FBrGuFoAqpJRGF1PWN2iBEPq1XhbVUqhBhRt8A6DpHusMWTiS2FFd1pXP53hTfbSz37KXWJeJhPBLYTbpouzwdvxoJpogcH48BRZ3PLxnT1UPfwKoDJpSCM7wLMUMgKrHx76fwuGkTzen8V6mFU7eciEsZH8vbUpY7BHMujeMfLYFiZK3YDDRCQEwPs5eG911pnMAzbMYAmoFFFe81bu31KV7Di7BFxgK6vwC4pMwfnGNw99TLZFbnywZzXSCrS8cVDbU5rx9mn7aj1rJAPHbqRzWpAJJdif4qMVaWcg75iYNepG9ymQK4sffxDhSNRxZkRWhPfqGgp83dbe3ZrF1mh2JVEu9bCK7erH9DiPGShEoYn6g4aciyPbjxnGFMWqSvAUZyyAUNZCFq1dTron5BwD3ti5HS9HAe6KCYHMdrWStFtKzi6N74ibQhwu3oWnTfYjsBuHyzBULnVrTFSb6xQz8pdtmxv5HZAdxDxdfTVMZaAwJsjUDbHGJ8PxRinpxMynakFTQcM6jPNms13mW2EdxSF2puCaAVvXBAwXEcxEDSgZ5UbM2kcccGshfkax3SZw4j9U4WHvbU38cVDyLiF7n8aska3SDx6w5EjtBcik6gjd8xm3vqy4YUfaKcvYojwrAEgE6Jp1rPQ4eTihNQYvgfwoK8164jwsGS8PXAGW2oYBtk63wwRZVNrR8fKahBGP6x8VsQoBcfxQr7bG3BStcaYzzaUwi8UazXWxfQ4K7EpyzR8KPVhRuyC3hYpGuUv43H7TPUu7m4NjTigfD5qfzZPuboS4x12QUQNqNtPf2HmsVvJJBUf2p1NuY7p25sW3KJWpHfaE2KbwRZrxcUFUzz6gAZLDg36Kvh9LidKFD2yY6tX9kwyEZHV8S4beEbKrN3NBmqiwHHQSvzLjuAtbxbR2ZxQj7hsr311kNKUSDNUyVGxAgv42Kxc5tuoSY172RS3Rky8g4hRntDKQ9zyXDaQLtMQFs4SrLVpAUPsX69DoezHQh5eqFFwJg6aSxjGa3ec94btbvsJaFqPYuhXQbYGyCJxi1kGVyt2jvEbjg2VvHvSwDfSzkAEzDXd2yM4Qf7n4SWBVApBXBXZxbv3PA2Q3DvbdpxyxCxTxfeZmfk6B2mvfUgc2uHT5di9DJK5JKLspw8tYzFgYfb812K1pn7jaD4SwVN8BFEhWUPrGyX1kR6mz9K84PAHSgmZj7CZjeMKmRo6b16JCojMCLgd7G4Q4gGztZ41KpYUusCqhD4xNcLu9En9BGcPEjPH3Gb3XmZV53jhkdcTfaTLEbNC1NB9PYPN2EyeGTSVf9TJzzEXbNtAyvDVduuUTEXBqk9h3xXr6PAWSPFhefAxCnDBqcu4BD87QquFTrkJZ3X338nx3DMt2k3nCpEjVCeJm663qEtjrVog5ZTW518QCGsuACq1U2UvrSerNqdQ8VPYVfrnNN2y5ryW4hdMfpzDPaFK9yRQK2MyJwmgu8d2pvM8yJPH1jGhBVxsWqz9mytkZygu4CVaspnHUbocenK3mSFouZQAE7U37KB3Ps3bzaMqw6v3CmfnTbrpz6HtSdvxiJNRdUwN7nQeKm1DnAwEaiz37TQJuoxx1vRZP5P5EXgyg1PtK3KreuZJNSn8c1gCJsuMMBBWu3RABtkU8M9987PZpH2TPwb5J8xa5XjkpxVsuq8aeqhuG7kfGCaQAsQbyJ5epKEVt1oNKHfKCDqHUyjnMmcdcekqmu9rmuxvUqnhsS91WeJVQmAZAoStbfdbcujnUTzS8q58epMDdDsFh1KbcnGu3YAYc1vTBhp55ar8PqrevjPTAqvXsytVJGRpgHkkPHNWNT",
+                            "hash": "0x239215F2D9A9318CDDF61678DDE2A85E6EF0B4574EA677A2FF724AA2EA6A2B15"
+                        },
+                        "zkapp_version": "0",
+                        "action_state": [
+                            "0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9",
+                            "0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9",
+                            "0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9",
+                            "0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9",
+                            "0x3772BC5435B957F81F86F752E93F2E29E886AC24580B3D1EC879C1DAD26965F9"
+                        ],
+                        "last_action_slot": "0",
+                        "proved_state": false,
+                        "zkapp_uri": "https://minanft.io"
+                    }
+                }
+            ],
+            [
+                114862,
+                {
+                    "public_key": "B62qjdk4R6rjtrJpWypvMcpNMdfyqgxHEAz88UnzbMK4TzELiGbhQ97",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "779940120442",
+                    "nonce": "281",
+                    "receipt_chain_hash": "2n13jP9VWSKdUWdCBfVb4YzhSDY93DP78w8CMasTq1Eks421WLsP",
+                    "delegate": "B62qjdk4R6rjtrJpWypvMcpNMdfyqgxHEAz88UnzbMK4TzELiGbhQ97",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                143219,
+                {
+                    "public_key": "B62qryAFoekBkXKr4VH7ygUWDW5TR6UaohibmFWXxn8swZFztypToCa",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5088646887433",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n1o16gRGxNpj4qffGjcLpiKURiKaTVdw57DQ5iZmpXiDnjmbtPq",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                145201,
+                {
+                    "public_key": "B62qomtdTPhSjX1HCbwkN9K2QdnfFh737Mi8cz2A7xyyR82XbFzx4m1",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "10202544888684858",
+                    "nonce": "2",
+                    "receipt_chain_hash": "2n2SojK8sodKooasR9EtVxFNDRBZyuos5McdzzonNYeonrwxs3ZU",
+                    "delegate": "B62qpbpoWmfjZ12jA8TYrS8QktRDYGYjz2cj41tuUe1f2UP2wfpKvXs",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                23327,
+                {
+                    "public_key": "B62qmPc8Ziq7txW48YPf4qtavcD5mcQVjEAGo9LEZD8DeaNsNthYLsz",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "473281147453686",
+                    "nonce": "578678",
+                    "receipt_chain_hash": "2n2LXJ7UfyG27LsL1vPmDMK6P2WTDSAGEnLSWnD4MDa3y9piFsmx",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                228219,
+                {
+                    "public_key": "B62qiTrtDyWmDFMQvUDRUdWVsVwNFhUV4rkPVgeANi4adKhrUwfdNFT",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "7800000000",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2mzsYPajJTb5PEeiLa4UQsUVNrGXqVNGMYvZf9DmEceRCgY9j8Q4",
+                    "delegate": "B62qiTrtDyWmDFMQvUDRUdWVsVwNFhUV4rkPVgeANi4adKhrUwfdNFT",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "3"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                220328,
+                {
+                    "public_key": "B62qoqf36BRCExn9ykCeoPssRRYA1Qhb5VKXFSFcom1eWpda8A9MKj9",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "2036483574458",
+                    "nonce": "8",
+                    "receipt_chain_hash": "2n1vkX2vQ14ykCwJ52ptcjQMPcjL3gHA1FExUKuesZGwmhn6RYBE",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                152751,
+                {
+                    "public_key": "B62qo7PUT3LVoBYHGK6nH5KqNeqXjvaNfsDJKmQ8CtbzVGr2872VXk3",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5063528308728",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n27ghNFFi4ad9TNdpgrQxum3dT8BbyzLUqzkN9rNKsKWtTXB8sR",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                247,
+                {
+                    "public_key": "B62qov9yv8TayLteD6SDXvxyYtmn3KkUoozAbs47fVo9JZSpcynbzTz",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "12073700324671",
+                    "nonce": "180604",
+                    "receipt_chain_hash": "2n1cZqMBoeBfJwcD5fUiktAcwFV64DXbVErRgX7J9JqMRSjyFe2T",
+                    "delegate": "B62qov9yv8TayLteD6SDXvxyYtmn3KkUoozAbs47fVo9JZSpcynbzTz",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Timed",
+                        {
+                            "initial_minimum_balance": "66000000000000",
+                            "cliff_time": "172800",
+                            "cliff_amount": "16500000000000",
+                            "vesting_period": "1",
+                            "vesting_increment": "95486111"
+                        }
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                169331,
+                {
+                    "public_key": "B62qkJKvhp42SoqzbHjY1S45oywZvGWQJucYd3kK9mqi9W2xBgu73ks",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5105455500224",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n1jK7RmTUxd8ZUdUfak3dgypy5qTda71ad1fG5zw9ouZfwrDdvE",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                216926,
+                {
+                    "public_key": "B62qrtCBBDFpPcstmq2QT8jFUpJQeRi8r7y4jFrKu3NSHtaF1gdxQWd",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "5059873377835",
+                    "nonce": "1",
+                    "receipt_chain_hash": "2n1FA1h6kXYAuk4Ft2bReeQFCC8hxjE9wNfGX9ZAcwPeDDgDHKke",
+                    "delegate": "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ],
+            [
+                27191,
+                {
+                    "public_key": "B62qpcg32fT9EmuKKVoRUYt5PUaTEoAY8V1Gs6b6bkwo6wWUWW17bRW",
+                    "token_id": "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                    "token_symbol": "",
+                    "balance": "2382026232155",
+                    "nonce": "134",
+                    "receipt_chain_hash": "2n1ymRQEbbBRH6pkkc6HHG6yRJu1EWTwYfHxeUdKHbDiot9EzZX7",
+                    "delegate": "B62qov9yv8TayLteD6SDXvxyYtmn3KkUoozAbs47fVo9JZSpcynbzTz",
+                    "voting_for": "3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x",
+                    "timing": [
+                        "Untimed"
+                    ],
+                    "permissions": {
+                        "edit_state": [
+                            "Signature"
+                        ],
+                        "access": [
+                            "None"
+                        ],
+                        "send": [
+                            "Signature"
+                        ],
+                        "receive": [
+                            "None"
+                        ],
+                        "set_delegate": [
+                            "Signature"
+                        ],
+                        "set_permissions": [
+                            "Signature"
+                        ],
+                        "set_verification_key": [
+                            [
+                                "Signature"
+                            ],
+                            "2"
+                        ],
+                        "set_zkapp_uri": [
+                            "Signature"
+                        ],
+                        "edit_action_state": [
+                            "Signature"
+                        ],
+                        "set_token_symbol": [
+                            "Signature"
+                        ],
+                        "increment_nonce": [
+                            "Signature"
+                        ],
+                        "set_voting_for": [
+                            "Signature"
+                        ],
+                        "set_timing": [
+                            "Signature"
+                        ]
+                    },
+                    "zkapp": null
+                }
+            ]
+        ],
+        "accounts_created": [
+            [
+                [
+                    "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT",
+                    "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+                ],
+                "1"
+            ]
+        ],
+        "tokens_used": [
+            [
+                "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                null
+            ]
+        ]
+    }
+}
