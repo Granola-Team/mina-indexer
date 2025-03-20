@@ -82,7 +82,9 @@ lint: clippy
     ruby -cw ops/*.rb
     standardrb --no-fix "ops/**/*.rb"
     @echo "--- Linting just recipes"
-    just --fmt --check --unstable
+    just --fmt --check --unstable --justfile Justfile
+    just --fmt --check --unstable --justfile bin.just
+    just --fmt --check --unstable --justfile stage-blocks.just
     @echo "--- Linting regression scripts"
     shellcheck tests/regression.bash
     @echo "--- Linting Nix configs"
@@ -112,7 +114,9 @@ clippy:
 format:
     cd rust && cargo {{ nightly_if_required }} fmt --all > /dev/null 2>&1
     standardrb --fix "ops/**/*.rb"
-    just --fmt --unstable
+    just --fmt --unstable --justfile Justfile
+    just --fmt --unstable --justfile bin.just
+    just --fmt --unstable --justfile stage-blocks.just
     shfmt --write ops/*.sh 2>&1 >/dev/null
     shfmt --write tests/*.sh 2>&1 >/dev/null
     shfmt --write tests/*.bash 2>&1 >/dev/null
