@@ -89,7 +89,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  tokens(query: {symbol: "MINA" }) {
+  tokens(query: { symbol: "MINA" }) {
     token
     supply
     owner

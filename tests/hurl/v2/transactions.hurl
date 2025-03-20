@@ -5,7 +5,11 @@
 POST {{url}}
 ```graphql
 {
-  transactions(limit: 50, sortBy: BLOCKHEIGHT_ASC, query: { canonical: true, zkapp: true }) {
+  transactions(
+    limit: 50
+    sortBy: BLOCKHEIGHT_ASC
+    query: { canonical: true, zkapp: true }
+  ) {
     blockHeight
     canonical
     amount
@@ -49,10 +53,7 @@ POST {{url}}
   transactions(
     limit: 25
     sortBy: BLOCKHEIGHT_DESC
-    query: {
-      canonical: true,
-      zkapp: true
-    }
+    query: { canonical: true, zkapp: true }
   ) {
     blockHeight
     canonical
@@ -126,8 +127,8 @@ POST {{url}}
   transactions(
     limit: 1
     query: {
-      canonical: true,
-      zkapp: true,
+      canonical: true
+      zkapp: true
       token: "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
     }
   ) {
@@ -159,13 +160,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  transactions(
-    limit: 1
-    query: {
-      canonical: true,
-      zkapp: true
-    }
-  ) {
+  transactions(limit: 1, query: { canonical: true, zkapp: true }) {
     zkapp {
       accounts_updated {
         pk

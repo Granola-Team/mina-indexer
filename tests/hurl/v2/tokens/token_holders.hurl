@@ -6,9 +6,8 @@ POST {{url}}
 ```graphql
 {
   tokenHolders(
-    query: {
-      token: "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
-    }) {
+    query: { token: "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd" }
+  ) {
     token
     supply
     owner
@@ -52,9 +51,8 @@ POST {{url}}
 ```graphql
 {
   tokenHolders(
-    query: {
-      holder: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-    }) {
+    query: { holder: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF" }
+  ) {
     token
     supply
     owner

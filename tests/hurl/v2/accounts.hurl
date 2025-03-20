@@ -7,7 +7,7 @@ POST {{url}}
 {
   accounts(
     query: {
-      publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P",
+      publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P"
       zkapp: true
     }
   ) {
@@ -20,7 +20,7 @@ POST {{url}}
     is_genesis_account
     token
     zkapp {
-      appState,
+      appState
       zkappUri
     }
   }
@@ -61,7 +61,11 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  accounts(query: { publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P" }) {
+  accounts(
+    query: {
+      publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P"
+    }
+  ) {
     publicKey
     balance
     token
@@ -97,12 +101,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  accounts(
-    query: {
-      zkapp: true
-    }
-    sortBy: BALANCE_DESC
-  ) {
+  accounts(sortBy: BALANCE_DESC, query: { zkapp: true }) {
     publicKey
     balance
     token
@@ -133,12 +132,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  accounts(
-    query: {
-      zkapp: true
-    }
-    sortBy: BALANCE_ASC
-  ) {
+  accounts(sortBy: BALANCE_ASC, query: { zkapp: true }) {
     publicKey
     balance
     token
@@ -167,10 +161,7 @@ jsonpath "$.data.accounts[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbo
 POST {{url}}
 ```graphql
 {
-  accounts(
-    sortBy: BALANCE_DESC,
-    limit: 5
-  ) {
+  accounts(limit: 5, sortBy: BALANCE_DESC) {
     publicKey
     balance
     token
@@ -214,11 +205,9 @@ POST {{url}}
 ```graphql
 {
   accounts(
-    query: {
-      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
-    },
-    sortBy: BALANCE_DESC,
     limit: 5
+    sortBy: BALANCE_DESC
+    query: { token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" }
   ) {
     publicKey
     balance
@@ -263,11 +252,11 @@ POST {{url}}
 ```graphql
 {
   accounts(
+    sortBy: BALANCE_DESC
     query: {
-      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
       zkapp: true
     }
-    sortBy: BALANCE_DESC
   ) {
     publicKey
     balance
@@ -313,7 +302,7 @@ POST {{url}}
 {
   accounts(
     query: {
-      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
       publicKey: "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P"
     }
   ) {

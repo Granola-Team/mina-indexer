@@ -117,6 +117,7 @@ format:
     just --fmt --unstable --justfile Justfile
     just --fmt --unstable --justfile bin.just
     just --fmt --unstable --justfile stage-blocks.just
+    ops/format-graphql-in-hurl-files.rb tests/hurl/
     shfmt --write ops/*.sh 2>&1 >/dev/null
     shfmt --write tests/*.sh 2>&1 >/dev/null
     shfmt --write tests/*.bash 2>&1 >/dev/null
