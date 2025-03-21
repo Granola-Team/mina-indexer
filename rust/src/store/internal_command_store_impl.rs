@@ -471,7 +471,7 @@ impl InternalCommandStore for IndexerStore {
         epoch: u32,
     ) -> anyhow::Result<()> {
         let receiver = match internal_command {
-            DbInternalCommandWithData::Coinbase { .. } => return Ok(()),
+            DbInternalCommandWithData::Coinbase { receiver, .. } => receiver,
             DbInternalCommandWithData::FeeTransfer { receiver, .. } => receiver,
         };
         trace!("Incrementing internal command counts {internal_command:?}");
