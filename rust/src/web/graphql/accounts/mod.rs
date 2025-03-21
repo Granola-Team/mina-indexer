@@ -363,7 +363,7 @@ impl AccountWithMeta {
                 .get_username(&pk)
                 .expect("username")
                 .map(|user| user.0)
-                .or(Some("Unkown".to_string())),
+                .or(Some("Unknown".to_string())),
             account: account.into(),
         }
     }
