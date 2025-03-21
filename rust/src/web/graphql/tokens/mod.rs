@@ -1,12 +1,14 @@
 //! GraphQL `tokens` & `tokenHolders` endpoints
 
-use super::{accounts, db};
+use super::{
+    accounts::{self, AccountWithMeta},
+    db,
+};
 use crate::{
     base::public_key::PublicKey,
     ledger::{self, account, store::best::BestLedgerStore, token::TokenAddress},
     store::{zkapp::tokens::ZkappTokenStore, IndexerStore},
     utility::store::common::U64_LEN,
-    web::graphql::accounts::Account,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
@@ -240,7 +242,7 @@ impl TokensQueryRoot {
                 if TokenHoldersQueryInput::matches(query.as_ref(), &account) {
                     let account = TokenAccount {
                         token,
-                        account: Account::with_meta(db, account),
+                        account: AccountWithMeta::new(db, account),
                     };
 
                     holders.push(account.into());
@@ -264,7 +266,7 @@ impl TokensQueryRoot {
                 if TokenHoldersQueryInput::matches(query.as_ref(), &account) {
                     let account = TokenAccount {
                         token: db.get_token(&token)?.expect("token"),
-                        account: Account::with_meta(db, account),
+                        account: AccountWithMeta::new(db, account),
                     };
 
                     holders.push(account.into());
@@ -394,14 +396,14 @@ impl From<ledger::token::Token> for TokenSimple {
 }
 
 struct TokenAccount {
-    account: accounts::Account,
+    account: accounts::AccountWithMeta,
     token: ledger::token::Token,
 }
 
 impl From<TokenAccount> for TokenHolder {
     fn from(value: TokenAccount) -> Self {
         Self {
-            account: value.account,
+            account: value.account.into(),
             token: value.token.token.to_string(),
             supply: value.token.supply.0,
             owner: value.token.owner.map(Into::into),
