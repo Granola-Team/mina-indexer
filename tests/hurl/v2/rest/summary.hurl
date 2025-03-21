@@ -32,7 +32,7 @@ jsonpath "$.totalNumSnarks" == 0
 jsonpath "$.totalNumCanonicalSnarks" == 0
 
 # internal commands
-jsonpath "$.epochNumInternalCommands" == 22
+jsonpath "$.epochNumInternalCommands" == 45
 jsonpath "$.totalNumInternalCommands" == 45
 
 # canonical internal commands
