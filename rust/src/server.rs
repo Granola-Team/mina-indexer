@@ -103,7 +103,7 @@ impl IndexerConfiguration {
 
     /// Initializes the indexer with the given config & store
     async fn initialize(self, store: &Arc<IndexerStore>) -> anyhow::Result<IndexerState> {
-        info!("Initializing mina indexer database");
+        debug!("Initializing mina indexer database");
         let db_path = store.db_path.clone();
 
         // read the config from the store if it exists or write it
@@ -467,10 +467,11 @@ async fn run_indexer<P: AsRef<Path>>(
 
     let state = state.write().await;
     if let Some(store) = state.indexer_store.as_ref() {
-        info!("Canceling db background work");
+        debug!("Canceling db background work");
         store.database.cancel_all_background_work(true)
     }
-    info!("Filesystem watchers successfully shutdown");
+
+    debug!("Filesystem watchers successfully shutdown");
     Ok(())
 }
 
