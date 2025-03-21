@@ -16,6 +16,7 @@ jsonpath "$.totalNumZkappAccounts" == 6
 # blocks
 jsonpath "$.epochNumBlocks" == 24
 jsonpath "$.totalNumBlocks" == 38
+jsonpath "$.numUniqueBlockProducers" == 26
 
 # canonical blocks
 jsonpath "$.epochNumCanonicalBlocks" == 13
