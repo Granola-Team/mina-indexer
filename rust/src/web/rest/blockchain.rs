@@ -11,7 +11,7 @@ use crate::{
         IndexerStore,
     },
     utility::functions::nanomina_to_mina,
-    web::rest::locked_balances::LockedBalances,
+    web::{common::unique_block_producers_last_n_blocks, rest::locked_balances::LockedBalances},
 };
 use actix_web::{get, http::header::ContentType, web::Data, HttpResponse};
 use chrono::DateTime;
@@ -58,6 +58,8 @@ pub struct BlockchainSummary {
 
     epoch_num_canonical_blocks: u32,
     total_num_canonical_blocks: u32,
+
+    num_unique_block_producers: Option<u32>,
 
     // SNARKs
     epoch_num_snarks: u32,
@@ -145,6 +147,9 @@ struct SummaryInput {
     epoch_num_canonical_blocks: u32,
     total_num_canonical_blocks: u32,
 
+    /// Unique block producer count in last n blocks
+    num_unique_block_producers: Option<u32>,
+
     // SNARKs
     epoch_num_snarks: u32,
     total_num_snarks: u32,
@@ -204,6 +209,7 @@ impl BlockchainSummary {
             total_num_blocks,
             epoch_num_canonical_blocks,
             total_num_canonical_blocks,
+            num_unique_block_producers,
 
             epoch_num_snarks,
             total_num_snarks,
@@ -284,6 +290,7 @@ impl BlockchainSummary {
             total_num_blocks,
             epoch_num_canonical_blocks,
             total_num_canonical_blocks,
+            num_unique_block_producers,
 
             epoch_num_snarks,
             total_num_snarks,
@@ -359,6 +366,10 @@ pub async fn get_blockchain_summary(
         let total_num_canonical_blocks = store
             .get_block_production_canonical_total_count()
             .expect("total canonical blocks count");
+
+        let num_unique_block_producers =
+            unique_block_producers_last_n_blocks(db, total_num_canonical_blocks)
+                .expect("unique block producers");
 
         let epoch_num_snarks = store
             .get_snarks_epoch_count(None)
@@ -453,6 +464,7 @@ pub async fn get_blockchain_summary(
             total_num_blocks,
             epoch_num_canonical_blocks,
             total_num_canonical_blocks,
+            num_unique_block_producers,
 
             epoch_num_snarks,
             total_num_snarks,
