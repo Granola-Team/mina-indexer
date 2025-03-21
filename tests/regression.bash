@@ -46,7 +46,7 @@ start_v1() {
 }
 
 start_v2() {
-	just -f "$SRC"/bin.just start-v2 "$IDXR" "$@"
+	just -f "$SRC"/bin.just start-v2 "$IDXR"
 }
 
 start() {

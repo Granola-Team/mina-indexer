@@ -101,6 +101,7 @@ start IDXR_BIN *args:
     mkdir -p {{ BASE_DIR }}
     cd {{ BASE_DIR }}
     {{ IDXR_BIN }} --socket {{ SOCKET_FILE }} server start {{ args }} & echo $! > {{ PID_FILE }}
+    sleep 2  # Add a small delay before checking for socket
     just -f {{ source_file() }} wait-for-socket
 
 # Start the indexer server with an ephemeral port
@@ -115,27 +116,27 @@ _start IDXR_BIN *args:
         --database-dir {{ DATABASE_DIR }} \
         {{ args }}
 
-# Create and start a v1 database/server with `blocks-dir`, `staking-ledgers-dir`, and `database-dir`
+# Create a v1 database and start server with this database
 start-v1 IDXR_BIN *args:
     @echo "Creating v1 mina indexer database"
-    @just -f {{ source_file() }} database-create {{ IDXR_BIN }}
+    @just -f {{ source_file() }} database-create {{ IDXR_BIN }} \
+        {{ args }}
 
     @echo "Starting mina indexer server from v1 database"
     @just -f {{ source_file() }} _start {{ IDXR_BIN }} \
         {{ args }}
 
-# Create and start a v2 database/server with `blocks-dir`, `staking-ledgers-dir`, and `database-dir`
-start-v2 IDXR_BIN *args:
+# Create a v2 database and start server with this database
+start-v2 IDXR_BIN:
     @echo "Creating v2 mina indexer database"
     @just -f {{ source_file() }} database-create {{ IDXR_BIN }} \
         --genesis-hash {{ V2_GENESIS_STATE_HASH }}
 
     @echo "Starting mina indexer server from v2 database"
     @just -f {{ source_file() }} _start {{ IDXR_BIN }} \
-        --genesis-hash {{ V2_GENESIS_STATE_HASH }} \
-        {{ args }}
+        --genesis-hash {{ V2_GENESIS_STATE_HASH }}
 
-# Create and start a v2 database/server
+# Stage blocks (up to `block_height`), create a v2 database, and start server with this database
 stage-and-start-v2 IDXR_BIN block_height *args:
     #!/usr/bin/env bash
     set -euo pipefail
