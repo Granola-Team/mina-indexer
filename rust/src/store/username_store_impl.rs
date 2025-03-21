@@ -11,14 +11,15 @@ use crate::{
 };
 use log::{error, trace};
 use speedb::WriteBatch;
-use std::collections::HashMap;
 
 impl UsernameStore for IndexerStore {
     fn get_username(&self, pk: &PublicKey) -> anyhow::Result<Option<Username>> {
         trace!("Getting {pk} username");
+
         if let Ok(Some(index)) = self.get_pk_num_username_updates(pk) {
             return self.get_pk_username(pk, index);
         }
+
         Ok(None)
     }
 
@@ -40,12 +41,12 @@ impl UsernameStore for IndexerStore {
     fn get_block_username_updates(
         &self,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
+    ) -> anyhow::Result<Option<UsernameUpdate>> {
         trace!("Getting block username updates {state_hash}");
         Ok(self
             .database
             .get_pinned_cf(self.usernames_per_block_cf(), state_hash.0.as_bytes())?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .map(|bytes| serde_json::from_slice(&bytes).expect("msg")))
     }
 
     fn update_block_usernames(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
@@ -54,14 +55,18 @@ impl UsernameStore for IndexerStore {
                 .apply
                 .iter()
                 .map(|BlockUpdate { state_hash: a, .. }| {
-                    UsernameUpdate(self.get_block_username_updates(a).ok().flatten().unwrap())
+                    self.get_block_username_updates(a)
+                        .unwrap()
+                        .expect("username update")
                 })
                 .collect(),
             unapply: blocks
                 .unapply
                 .iter()
                 .map(|BlockUpdate { state_hash: u, .. }| {
-                    UsernameUpdate(self.get_block_username_updates(u).ok().flatten().unwrap())
+                    self.get_block_username_updates(u)
+                        .unwrap()
+                        .expect("username update")
                 })
                 .collect(),
         };
@@ -102,12 +107,9 @@ impl UsernameStore for IndexerStore {
         // apply
         for updates in update.apply {
             for (pk, username) in updates.0 {
-                let index = if let Some(num) = self.get_pk_num_username_updates(&pk)? {
-                    // incr pk num username updates
-                    num + 1
-                } else {
-                    0
-                };
+                let index = self
+                    .get_pk_num_username_updates(&pk)?
+                    .map_or(0, |num| num + 1);
 
                 // update num
                 self.database.put_cf(
@@ -133,7 +135,7 @@ impl UsernameStore for IndexerStore {
         Ok(self
             .database
             .get_cf(self.username_pk_index_cf(), pk_index_key(pk, index))?
-            .and_then(|bytes| Username::from_bytes(bytes).ok()))
+            .map(|bytes| Username::from_bytes(bytes).expect("username")))
     }
 
     fn get_pk_num_username_updates(&self, pk: &PublicKey) -> anyhow::Result<Option<u32>> {

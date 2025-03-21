@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use speedb::WriteBatch;
 use std::collections::HashMap;
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct UsernameUpdate(pub HashMap<PublicKey, Username>);
 
 pub type UsernameAccountUpdate = DbUpdate<UsernameUpdate>;
@@ -35,7 +35,7 @@ pub trait UsernameStore {
     fn get_block_username_updates(
         &self,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>>;
+    ) -> anyhow::Result<Option<UsernameUpdate>>;
 
     /// Update block usernames
     fn update_block_usernames(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()>;

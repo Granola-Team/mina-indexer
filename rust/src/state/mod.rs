@@ -1187,8 +1187,12 @@ impl IndexerState {
     ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.set_best_block(state_hash)?;
-            return indexer_store.get_block_username_updates(state_hash);
+
+            return Ok(indexer_store
+                .get_block_username_updates(state_hash)?
+                .map(|update| update.0));
         }
+
         Ok(None)
     }
 
