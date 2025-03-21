@@ -1014,8 +1014,8 @@ test_rest_accounts_summary() {
 	assert '241' $(curl --silent http://localhost:${port}/accounts/B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy | jq -r .total_num_user_commands)
 
 	# internal commands
-	assert '2' $(curl --silent http://localhost:${port}/accounts/B62qmRG3THXszPjfJXDCk2MjDZqWLXMoVzyEWMPStEdfqhMe7GJaGxE | jq -r .epoch_num_internal_commands)
-	assert '2' $(curl --silent http://localhost:${port}/accounts/B62qmRG3THXszPjfJXDCk2MjDZqWLXMoVzyEWMPStEdfqhMe7GJaGxE | jq -r .total_num_internal_commands)
+	assert '5' $(curl --silent http://localhost:${port}/accounts/B62qmRG3THXszPjfJXDCk2MjDZqWLXMoVzyEWMPStEdfqhMe7GJaGxE | jq -r .epoch_num_internal_commands)
+	assert '5' $(curl --silent http://localhost:${port}/accounts/B62qmRG3THXszPjfJXDCk2MjDZqWLXMoVzyEWMPStEdfqhMe7GJaGxE | jq -r .total_num_internal_commands)
 
 	# Testing blockchain summary endpoint
 	curl --silent http://localhost:${port}/summary >output.json
