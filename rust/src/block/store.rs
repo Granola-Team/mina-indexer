@@ -242,6 +242,10 @@ pub trait BlockStore {
         batch: &mut WriteBatch,
     ) -> Result<()>;
 
+    /// Index the tokens used for the given block
+    fn add_tokens_used_batch(&self, block: &PrecomputedBlock, batch: &mut WriteBatch)
+        -> Result<()>;
+
     /// Index the epoch slot for a block
     fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32, pk: &PublicKey) -> Result<()>;
 

@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 165] = [
+    const COLUMN_FAMILIES: [&'static str; 166] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -84,6 +84,7 @@ impl IndexerStore {
         "block-epoch-slots-produced",
         "block-pk-epoch-slots-produced",
         "blocks-pk-count",
+        "blocks-tokens-used",
         //////////////////////////
         // Canonicity store CFs //
         //////////////////////////

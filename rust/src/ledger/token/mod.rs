@@ -48,6 +48,21 @@ impl Token {
         }
     }
 
+    /// Create a new token with the specified address, owner & symbol
+    pub fn new_with_owner_symbol(
+        token: TokenAddress,
+        owner: PublicKey,
+        symbol: TokenSymbol,
+    ) -> Self {
+        Self {
+            symbol,
+            owner: Some(owner),
+            token: token.to_owned(),
+            ..Default::default()
+        }
+    }
+
+    /// Create a new MINA token with given nano-MINA supply
     pub fn mina_with_supply(supply: u64) -> Self {
         Self {
             supply: supply.into(),

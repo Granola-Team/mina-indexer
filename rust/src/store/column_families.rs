@@ -90,6 +90,9 @@ pub trait ColumnFamilyHelpers {
     /// CF for storing the number of blocks for a specified public key
     fn blocks_pk_count_cf(&self) -> &ColumnFamily;
 
+    /// CF for storing the tokens used in a blocks
+    fn blocks_tokens_used_cf(&self) -> &ColumnFamily;
+
     //////////////////////////
     // Canonicity store CFs //
     //////////////////////////

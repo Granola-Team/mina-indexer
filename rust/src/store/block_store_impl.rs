@@ -145,6 +145,8 @@ impl BlockStore for IndexerStore {
         // add block internal commands
         self.add_internal_commands_batch(block, &mut batch)?;
 
+        self.add_tokens_used_batch(block, &mut batch)?;
+
         // write the batch
         trace!(
             "Writing {} bytes to database from batch",
@@ -180,6 +182,7 @@ impl BlockStore for IndexerStore {
             blockchain_length: block.blockchain_length(),
         });
         self.add_event(&IndexerEvent::Db(db_event.clone()))?;
+
         Ok(Some(db_event))
     }
 
@@ -571,6 +574,24 @@ impl BlockStore for IndexerStore {
             ),
             b"",
         );
+
+        Ok(())
+    }
+
+    fn add_tokens_used_batch(
+        &self,
+        block: &PrecomputedBlock,
+        batch: &mut WriteBatch,
+    ) -> Result<()> {
+        let state_hash = block.state_hash();
+        trace!("Adding tokens used {}", state_hash);
+
+        batch.put_cf(
+            self.blocks_tokens_used_cf(),
+            state_hash.0.as_bytes(),
+            serde_json::to_vec(&block.tokens_used())?,
+        );
+
         Ok(())
     }
 

@@ -9,7 +9,7 @@
 //! - symbols: `TokenAddress -> Vec<TokenSymbol>`
 
 use crate::{
-    base::{amount::Amount, public_key::PublicKey},
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     constants::MINA_TOKEN_ADDRESS,
     ledger::{
         account::Account,
@@ -29,6 +29,7 @@ use crate::{
 use anyhow::Context;
 use log::trace;
 use speedb::{DBIterator, Direction, IteratorMode};
+use std::collections::HashMap;
 
 impl ZkappTokenStore for IndexerStore {
     fn set_token(&self, token: &Token) -> Result<u32> {
@@ -184,16 +185,32 @@ impl ZkappTokenStore for IndexerStore {
         Ok(index)
     }
 
-    fn apply_token_diff(&self, diff: &TokenDiff) -> Result<Option<Token>> {
-        trace!("Applying token diff {:?}", diff);
+    fn apply_token_diff(&self, state_hash: &StateHash, diff: &TokenDiff) -> Result<Option<Token>> {
+        trace!("Applying {} token diff {:?}", state_hash, diff);
 
         // get token to modify
         let diff_pk = &diff.public_key;
         let diff_token = &diff.token;
 
-        let mut token = self
-            .get_token(diff_token)?
-            .unwrap_or_else(|| Token::new_with_owner(diff.token.to_owned(), diff_pk.to_owned()));
+        let mut token = self.get_token(diff_token)?.unwrap_or_else(|| {
+            // look for a pre-existing owner
+            if let Some((owner, owner_token)) = self
+                .get_tokens_used(state_hash)
+                .expect("tokens used")
+                .and_then(|used| used.get(diff_token).cloned())
+            {
+                // look for a pre-existing symbol
+                let symbol = self
+                    .get_best_account(&owner, &owner_token)
+                    .expect("best ledger account")
+                    .and_then(|acct| acct.token_symbol)
+                    .unwrap_or_default();
+
+                Token::new_with_owner_symbol(diff_token.to_owned(), owner, symbol)
+            } else {
+                Token::new_with_owner(diff.token.to_owned(), diff_pk.to_owned())
+            }
+        });
 
         // check token address
         assert_eq!(token.token, diff.token);
@@ -218,10 +235,11 @@ impl ZkappTokenStore for IndexerStore {
             .unwrap_or_else(|| {
                 let num = self
                     .get_token_holders_num(diff_token)
-                    .ok()
-                    .flatten()
+                    .with_context(|| format!("token holders count for {}", diff_token))
+                    .expect("token holders count")
                     .unwrap_or_default();
 
+                // increment holder count
                 self.database
                     .put_cf(
                         self.zkapp_tokens_holder_count_cf(),
@@ -245,8 +263,8 @@ impl ZkappTokenStore for IndexerStore {
             .get_token_holder(diff_token, index)?
             .unwrap_or_else(|| {
                 self.get_best_account(diff_pk, diff_token)
-                    .ok()
-                    .flatten()
+                    .with_context(|| format!("token holder {} index {}", diff_token, index))
+                    .expect("token holder")
                     .unwrap_or_else(|| {
                         let token_account = Account {
                             balance: token.supply,
@@ -489,6 +507,27 @@ impl ZkappTokenStore for IndexerStore {
                 pk.0.as_bytes(),
             )?
             .map(from_be_bytes))
+    }
+
+    fn get_last_token_pk_diff(&self, pk: &PublicKey) -> Result<Option<TokenDiff>> {
+        trace!("Getting last pk token diff {}", pk);
+
+        let index = self
+            .get_token_pk_diff_num(pk)?
+            .expect("pk token diffs")
+            .saturating_sub(1);
+
+        Ok(self
+            .database
+            .get_pinned_cf(
+                self.zkapp_tokens_historical_pk_diffs_cf(),
+                zkapp_tokens_historical_pk_diffs_key(pk, index),
+            )?
+            .map(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("pk last token diff {} index {}", pk, index))
+                    .expect("pk last token diff")
+            }))
     }
 
     fn remove_last_token_diff(&self, token: &TokenAddress) -> Result<Option<(u32, TokenDiff)>> {
@@ -789,6 +828,10 @@ impl ZkappTokenStore for IndexerStore {
     fn get_token_holders_num(&self, token: &TokenAddress) -> Result<Option<u32>> {
         trace!("Getting token holders count for {}", token);
 
+        if token.0 == MINA_TOKEN_ADDRESS {
+            return self.get_num_mina_accounts();
+        }
+
         Ok(self
             .database
             .get_cf(self.zkapp_tokens_holder_count_cf(), token.0.as_bytes())?
@@ -928,6 +971,22 @@ impl ZkappTokenStore for IndexerStore {
             .map(from_be_bytes))
     }
 
+    fn get_tokens_used(
+        &self,
+        state_hash: &StateHash,
+    ) -> Result<Option<HashMap<TokenAddress, (PublicKey, TokenAddress)>>> {
+        trace!("Getting tokens used {}", state_hash);
+
+        Ok(self
+            .database
+            .get_pinned_cf(self.blocks_tokens_used_cf(), state_hash.0.as_bytes())?
+            .map(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("tokens used for {}", state_hash))
+                    .expect("tokens used")
+            }))
+    }
+
     ///////////////
     // Iterators //
     ///////////////
@@ -1036,7 +1095,7 @@ mod token_store_tests {
 mod tests {
     use super::Result;
     use crate::{
-        base::public_key::PublicKey,
+        base::{public_key::PublicKey, state_hash::StateHash},
         ledger::{
             diff::token::{TokenDiff, TokenDiffType},
             token::Token,
@@ -1180,7 +1239,9 @@ mod tests {
             token0.supply,
         );
 
-        let new_token0 = store.apply_token_diff(&token_diff)?.unwrap();
+        let new_token0 = store
+            .apply_token_diff(&StateHash::arbitrary(g), &token_diff)?
+            .unwrap();
         assert_eq!(new_token0.token, token0.token);
 
         match &token_diff.diff {

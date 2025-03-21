@@ -209,15 +209,22 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing the number of blocks for a specified public key
     /// ```
-    /// key: pk
-    /// val: count
-    /// where
-    /// - pk:    [PublicKey] bytes
-    /// - count: [u32] BE bytes
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn blocks_pk_count_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("blocks-pk-count")
             .expect("blocks-pk-count column family exists")
+    }
+
+    /// CF for storing the tokens used in a blocks
+    /// ```
+    /// key: [StateHash] bytes
+    /// val: [PublicKey] bytes
+    fn blocks_tokens_used_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("blocks-tokens-used")
+            .expect("blocks-tokens-used column family exists")
     }
 
     ////////////////////////////

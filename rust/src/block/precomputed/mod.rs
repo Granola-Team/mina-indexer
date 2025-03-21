@@ -192,7 +192,7 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn tokens_used(&self) -> HashMap<(PublicKey, TokenAddress), TokenAddress> {
+    pub fn tokens_used(&self) -> HashMap<TokenAddress, (PublicKey, TokenAddress)> {
         match self {
             Self::V1(_v1) => HashMap::new(),
             Self::V2(v2) => {
@@ -204,7 +204,7 @@ impl PrecomputedBlock {
                     .map(TokenUsed::from)
                     .for_each(|tu| {
                         if let (Some(pk), Some(t)) = (tu.token_owner, tu.payment_token) {
-                            used.insert((pk, t), tu.used_token);
+                            used.insert(tu.used_token, (pk, t));
                         }
                     });
 
