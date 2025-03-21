@@ -1299,6 +1299,7 @@ impl PrecomputedBlock {
 
                 for receiver in receivers {
                     let memo = cmd.memo();
+
                     if memo.starts_with(NAME_SERVICE_MEMO_PREFIX)
                         && (receiver.0 == MINA_EXPLORER_NAME_SERVICE_ADDRESS
                             || receiver.0 == MINA_SEARCH_NAME_SERVICE_ADDRESS)
@@ -1465,6 +1466,21 @@ mod tests {
         }];
 
         assert_eq!(pcb.accounts_created_v2(), expect);
+        Ok(())
+    }
+
+    #[test]
+    fn username_updates() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        let expect = UsernameUpdate(HashMap::from([(
+            "B62qpqCBExtxzfHUPkmrrfmYhXZyg3V7pSmwuxHMzTi8E6gBbopauJS".into(),
+            "Romek".into(),
+        )]))
+        .0;
+
+        assert_eq!(pcb.username_updates().0, expect);
         Ok(())
     }
 

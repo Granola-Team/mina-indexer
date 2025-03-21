@@ -501,7 +501,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(v1) = &v1.t.data.t.t;
-                decode_memo(&v1.t.t.payload.t.t.common.t.t.t.memo.t.0, true)
+                decode_memo(v1.t.t.payload.t.t.common.t.t.t.memo.t.0.as_slice(), true)
             }
             Self::V2(v2) => match &v2.data.1 {
                 UserCommandData::SignedCommandData(data) => {
@@ -1585,5 +1585,17 @@ mod test {
 
         let result: TransactionStatus2 = status.into();
         assert!(matches!(result, TransactionStatus2::Failed(_)));
+    }
+
+    #[test]
+    fn txn_memos() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        let cmds = pcb.commands();
+        let res: Vec<_> = cmds.iter().map(|cmd| cmd.memo()).collect();
+
+        assert_eq!(res, vec!["", "Name: Romek"]);
+        Ok(())
     }
 }
