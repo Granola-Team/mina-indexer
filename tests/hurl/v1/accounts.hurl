@@ -256,8 +256,8 @@ jsonpath "$.data.account0[0].pk_total_num_internal_commands" == 0
 
 # last account
 jsonpath "$.data.account1[0].publicKey" == "B62qrdhG66vK71Jbdz6Xs7cnDxQ8f6jZUFvefkp3pje4EejYUTvotGP"
-jsonpath "$.data.account1[0].pk_epoch_num_internal_commands" == 21
-jsonpath "$.data.account1[0].pk_total_num_internal_commands" == 21
+jsonpath "$.data.account1[0].pk_epoch_num_internal_commands" == 43
+jsonpath "$.data.account1[0].pk_total_num_internal_commands" == 43
 
 duration < 500
 

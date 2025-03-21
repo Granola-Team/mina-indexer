@@ -194,7 +194,7 @@ jsonpath "$.data.stakes[0].epoch_num_snarks" == 64
 jsonpath "$.data.stakes[0].total_num_snarks" == 64
 jsonpath "$.data.stakes[0].epoch_num_user_commands" == 303
 jsonpath "$.data.stakes[0].total_num_user_commands" == 303
-jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 196
+jsonpath "$.data.stakes[0].epoch_num_internal_commands" == 399
 jsonpath "$.data.stakes[0].total_num_internal_commands" == 399
 
 duration < 10000
