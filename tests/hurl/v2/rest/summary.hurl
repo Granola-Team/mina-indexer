@@ -10,7 +10,7 @@ HTTP 200
 jsonpath "$.blockchainLength" == 359617
 
 # accounts
-jsonpath "$.totalNumAccounts" == 228353
+jsonpath "$.totalNumAccounts" == 228180
 jsonpath "$.totalNumZkappAccounts" == 6
 
 # blocks

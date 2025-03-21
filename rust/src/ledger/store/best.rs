@@ -15,6 +15,10 @@ use speedb::{DBIterator, IteratorMode};
 use std::collections::HashSet;
 
 pub trait BestLedgerStore {
+    /////////////////////////
+    // Best ledger account //
+    /////////////////////////
+
     /// Get the token account from the best ledger
     fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>>;
 
@@ -41,7 +45,11 @@ pub trait BestLedgerStore {
     fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()>;
 
     /// Update the best ledger tokens
-    fn apply_best_token_diffs(&self, token_diffs: &[TokenDiff]) -> Result<()>;
+    fn apply_best_token_diffs(
+        &self,
+        state_hash: &StateHash,
+        token_diffs: &[TokenDiff],
+    ) -> Result<()>;
 
     /// Update the best ledger token
     fn unapply_best_token_diffs(&self, token_diffs: &[TokenDiff]) -> Result<()>;
@@ -65,11 +73,12 @@ pub trait BestLedgerStore {
     /// Get the `idx`-th delegation
     fn get_pk_delegation(&self, pk: &PublicKey, idx: u32) -> Result<Option<PublicKey>>;
 
+    //////////////////
+    // All accounts //
+    //////////////////
+
     /// Update the count of best ledger accounts
     fn update_num_accounts(&self, adjust: i32) -> Result<()>;
-
-    /// Update the count of zkapp best ledger accounts
-    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()>;
 
     /// Get the count of best ledger accounts
     fn get_num_accounts(&self) -> Result<Option<u32>>;
@@ -82,6 +91,32 @@ pub trait BestLedgerStore {
 
     /// Decrement the count of all best ledger accounts
     fn decrement_num_accounts(&self) -> Result<()>;
+
+    ///////////////////
+    // MINA accounts //
+    ///////////////////
+
+    /// Update the count of best ledger MINA accounts
+    fn update_num_mina_accounts(&self, adjust: i32) -> Result<()>;
+
+    /// Get the count of best ledger MINA accounts
+    fn get_num_mina_accounts(&self) -> Result<Option<u32>>;
+
+    /// Set the count of best ledger MINA accounts
+    fn set_num_mina_accounts(&self, num: u32) -> Result<()>;
+
+    /// Increment the count of best ledger MINA accounts
+    fn increment_num_mina_accounts(&self) -> Result<()>;
+
+    /// Decrement the count of best ledger MINA accounts
+    fn decrement_num_mina_accounts(&self) -> Result<()>;
+
+    ////////////////////
+    // zkApp accounts //
+    ////////////////////
+
+    /// Update the count of zkapp best ledger accounts
+    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()>;
 
     /// Get the count of best ledger zkapp accounts
     fn get_num_zkapp_accounts(&self) -> Result<Option<u32>>;
@@ -97,6 +132,10 @@ pub trait BestLedgerStore {
 
     /// Check whether a a token account is a zkapp account
     fn is_zkapp_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<bool>>;
+
+    /////////////////////////
+    // Best ledger builder //
+    /////////////////////////
 
     /// Build the best ledger from the CF representation
     fn build_best_ledger(&self) -> Result<Option<Ledger>>;

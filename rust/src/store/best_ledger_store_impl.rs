@@ -5,6 +5,8 @@ use crate::{
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
         AccountCreated,
     },
+    chain::store::ChainStore,
+    constants::MINA_TOKEN_ADDRESS,
     ledger::{
         account::Account,
         diff::{account::AccountDiff, token::TokenDiff},
@@ -52,20 +54,6 @@ impl BestLedgerStore for IndexerStore {
         Ok(None)
     }
 
-    fn get_best_ledger(&self, memoize: bool) -> Result<Option<Ledger>> {
-        Ok(self.build_best_ledger()?.inspect(|best_ledger| {
-            if let (Ok(Some(state_hash)), Ok(Some(block_height))) =
-                (self.get_best_block_hash(), self.get_best_block_height())
-            {
-                if memoize {
-                    trace!("Memoizing best ledger (state hash {state_hash})");
-                    self.add_staged_ledger_at_state_hash(&state_hash, best_ledger, block_height)
-                        .ok();
-                }
-            }
-        }))
-    }
-
     fn update_best_account(
         &self,
         pk: &PublicKey,
@@ -80,9 +68,6 @@ impl BestLedgerStore for IndexerStore {
                 let account_key = best_account_key(token, pk);
                 let sort_key = best_account_sort_key(token, before.1, pk);
 
-                // decrement count
-                self.decrement_num_accounts()?;
-
                 // delete account
                 self.database
                     .delete_cf(self.best_ledger_accounts_cf(), account_key)?;
@@ -91,7 +76,6 @@ impl BestLedgerStore for IndexerStore {
 
                 // zkapp account
                 if before.0 {
-                    // decrement count
                     self.decrement_num_zkapp_accounts()?;
 
                     // delete
@@ -127,9 +111,6 @@ impl BestLedgerStore for IndexerStore {
         let account_key = best_account_key(token, pk);
         let sort_key = best_account_sort_key(token, balance, pk);
 
-        // increment count
-        self.increment_num_accounts()?;
-
         // store new account
         let value = serde_json::to_vec(&after)?;
         self.database
@@ -144,7 +125,6 @@ impl BestLedgerStore for IndexerStore {
 
         // zkapp account
         if after.is_zkapp_account() {
-            // increment count
             self.increment_num_zkapp_accounts()?;
 
             // store new zkapp account
@@ -162,12 +142,16 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
-    fn apply_best_token_diffs(&self, token_diffs: &[TokenDiff]) -> Result<()> {
+    fn apply_best_token_diffs(
+        &self,
+        state_hash: &StateHash,
+        token_diffs: &[TokenDiff],
+    ) -> Result<()> {
         trace!("Applying best ledger token diffs {:#?}", token_diffs);
 
         // TODO get token once & apply all diffs
         for token_diff in token_diffs {
-            self.apply_token_diff(token_diff)?;
+            self.apply_token_diff(state_hash, token_diff)?;
         }
 
         Ok(())
@@ -184,7 +168,9 @@ impl BestLedgerStore for IndexerStore {
             if let Some((_, token_diff)) = self.remove_last_token_diff(&token_diff.token)? {
                 trace!("Unapplying best ledger token diff {:?}", token_diff);
 
+                // TODO get previous owner/symbol/supply
                 token.unapply(token_diff);
+
                 self.set_token(&token)?;
             }
         }
@@ -256,18 +242,41 @@ impl BestLedgerStore for IndexerStore {
             acc - update.new_accounts.len() as i32
         });
 
-        self.update_num_accounts(adjust)?;
+        if adjust != 0 {
+            self.update_num_accounts(adjust)?;
+        }
+
+        // mina accounts
+        let mina_accounts = |update: &AccountUpdate| -> i32 {
+            update
+                .new_accounts
+                .iter()
+                .filter(|(_, token)| token.0 == MINA_TOKEN_ADDRESS)
+                .count() as i32
+        };
+        let apply_acc = updates
+            .apply
+            .iter()
+            .fold(0, |acc, update| acc + mina_accounts(update));
+        let mina_adjust = updates
+            .unapply
+            .iter()
+            .fold(apply_acc, |acc, update| acc - mina_accounts(update));
+
+        if mina_adjust != 0 {
+            self.update_num_mina_accounts(mina_adjust)?;
+        }
 
         // zkapp accounts
         let apply_acc = updates.apply.iter().fold(0, |acc, update| {
             acc + update.new_zkapp_accounts.len() as i32
         });
-        let adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
+        let zkapp_adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
             acc - update.new_zkapp_accounts.len() as i32
         });
 
-        if adjust != 0 {
-            self.update_num_zkapp_accounts(adjust)?;
+        if zkapp_adjust != 0 {
+            self.update_num_zkapp_accounts(zkapp_adjust)?;
         }
 
         // unapply account & token diffs, remove accounts
@@ -275,6 +284,7 @@ impl BestLedgerStore for IndexerStore {
             account_diffs,
             token_diffs,
             new_accounts,
+            new_zkapp_accounts,
             ..
         } in updates.unapply
         {
@@ -284,7 +294,7 @@ impl BestLedgerStore for IndexerStore {
                 let before = self.get_best_account(&pk, &token)?;
                 let (before_values, mut after) = (
                     before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or(Account::empty(pk.clone(), token.clone())),
+                    before.unwrap_or_else(|| Account::empty(pk.clone(), token.clone())),
                 );
 
                 for diff in diffs.iter() {
@@ -334,7 +344,7 @@ impl BestLedgerStore for IndexerStore {
             }
 
             // remove accounts
-            for (pk, token) in new_accounts.iter() {
+            for (pk, token) in new_accounts.iter().chain(new_zkapp_accounts.iter()) {
                 self.update_best_account(pk, token, None, None)?;
             }
 
@@ -358,7 +368,7 @@ impl BestLedgerStore for IndexerStore {
                 let before = self.get_best_account(&pk, &token)?;
                 let (before_values, mut after) = (
                     before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or(Account::empty(pk.clone(), token.clone())),
+                    before.unwrap_or_else(|| Account::empty(pk.clone(), token.clone())),
                 );
 
                 for diff in diffs.iter() {
@@ -399,7 +409,7 @@ impl BestLedgerStore for IndexerStore {
             // apply token diffs
             for diffs in aggregate_token_diffs(token_diffs).values() {
                 if !diffs.is_empty() {
-                    self.apply_best_token_diffs(diffs)?;
+                    self.apply_best_token_diffs(state_hash, diffs)?;
                 }
             }
         }
@@ -475,6 +485,10 @@ impl BestLedgerStore for IndexerStore {
         Ok(())
     }
 
+    //////////////////
+    // All accounts //
+    //////////////////
+
     fn update_num_accounts(&self, adjust: i32) -> Result<()> {
         use std::cmp::Ordering::*;
 
@@ -493,32 +507,6 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
-                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
-                )?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()> {
-        use std::cmp::Ordering::*;
-
-        match adjust.cmp(&0) {
-            Equal => (),
-            Greater => {
-                // add to num accounts
-                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
-                self.database.put(
-                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
-                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
-                )?;
-            }
-            Less => {
-                // sub from num accounts
-                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
-                self.database.put(
-                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
                     old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
@@ -558,6 +546,99 @@ impl BestLedgerStore for IndexerStore {
 
         let old = self.get_num_accounts()?.unwrap_or_default();
         self.set_num_accounts(old + 1)
+    }
+
+    ///////////////////
+    // MINA accounts //
+    ///////////////////
+
+    fn update_num_mina_accounts(&self, adjust: i32) -> Result<()> {
+        use std::cmp::Ordering::*;
+
+        match adjust.cmp(&0) {
+            Equal => (),
+            Greater => {
+                // add to num mina accounts
+                let old = self.get_num_mina_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_MINA_ACCOUNTS_KEY,
+                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+            Less => {
+                // sub from num mina accounts
+                let old = self.get_num_mina_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_MINA_ACCOUNTS_KEY,
+                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_num_mina_accounts(&self) -> Result<Option<u32>> {
+        trace!("Getting count of mina accounts");
+
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_MINA_ACCOUNTS_KEY)?
+            .map(from_be_bytes))
+    }
+
+    fn set_num_mina_accounts(&self, num: u32) -> Result<()> {
+        trace!("Setting count of mina accounts to {}", num);
+
+        Ok(self
+            .database
+            .put(Self::TOTAL_NUM_MINA_ACCOUNTS_KEY, num.to_be_bytes())?)
+    }
+
+    fn decrement_num_mina_accounts(&self) -> Result<()> {
+        trace!("Decrementing count of mina accounts");
+
+        let old = self.get_num_mina_accounts()?.unwrap_or_default();
+        assert!(old >= 1);
+
+        self.set_num_mina_accounts(old - 1)
+    }
+
+    fn increment_num_mina_accounts(&self) -> Result<()> {
+        trace!("Incrementing count of mina accounts");
+
+        let old = self.get_num_mina_accounts()?.unwrap_or_default();
+        self.set_num_mina_accounts(old + 1)
+    }
+
+    ////////////////////
+    // zkApp accounts //
+    ////////////////////
+
+    fn update_num_zkapp_accounts(&self, adjust: i32) -> Result<()> {
+        use std::cmp::Ordering::*;
+
+        match adjust.cmp(&0) {
+            Equal => (),
+            Greater => {
+                // add to num accounts
+                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+            Less => {
+                // sub from num accounts
+                let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+        }
+
+        Ok(())
     }
 
     fn get_num_zkapp_accounts(&self) -> Result<Option<u32>> {
@@ -602,15 +683,34 @@ impl BestLedgerStore for IndexerStore {
             .map(|a| a.zkapp.is_some()))
     }
 
+    /////////////////////////
+    // Best ledger builder //
+    /////////////////////////
+
+    fn get_best_ledger(&self, memoize: bool) -> Result<Option<Ledger>> {
+        Ok(self.build_best_ledger()?.inspect(|best_ledger| {
+            if let (Ok(Some(state_hash)), Ok(Some(block_height))) =
+                (self.get_best_block_hash(), self.get_best_block_height())
+            {
+                if memoize {
+                    trace!("Memoizing best ledger (state hash {state_hash})");
+                    self.add_staged_ledger_at_state_hash(&state_hash, best_ledger, block_height)
+                        .ok();
+                }
+            }
+        }))
+    }
+
     fn build_best_ledger(&self) -> Result<Option<Ledger>> {
         trace!("Building best ledger");
 
         if let (Some(best_block_height), Some(best_block_hash)) =
             (self.get_best_block_height()?, self.get_best_block_hash()?)
         {
-            trace!("Best ledger (length {best_block_height}): {best_block_hash}");
-            let mut accounts = HashMap::new();
+            let network = self.get_current_network()?;
+            trace!("Best ledger {network}-{best_block_height}-{best_block_hash}");
 
+            let mut accounts = HashMap::new();
             for (_, value) in self
                 .best_ledger_account_balance_iterator(IteratorMode::End)
                 .flatten()
@@ -710,10 +810,10 @@ fn update_token_accounts(
                      public_key, token, ..
                  }| {
                     if let Ok(Some(true)) = db.is_zkapp_account(public_key, token) {
-                        Some((public_key.to_owned(), token.to_owned()))
-                    } else {
-                        None
+                        return Some((public_key.to_owned(), token.to_owned()));
                     }
+
+                    None
                 },
             )
             .collect(),

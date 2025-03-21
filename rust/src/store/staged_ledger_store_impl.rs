@@ -275,9 +275,7 @@ impl StagedLedgerStore for IndexerStore {
                     }
                 }
                 None => {
-                    if state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH
-                        && state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
-                    {
+                    if !is_genesis_prev_state_hash(state_hash) {
                         bail!("Staged ledger hash block missing from store: {state_hash}")
                     }
                 }
@@ -321,10 +319,13 @@ impl StagedLedgerStore for IndexerStore {
             }
         }
 
-        // initialize account/token counts
+        // initialize account/zkapp/token counts
         let count = genesis_ledger.len() as u32;
+
         self.set_num_accounts(count)?;
+        self.set_num_mina_accounts(count)?;
         self.set_mina_token_holders_num(count)?;
+        self.set_num_zkapp_accounts(0)?;
 
         // initialize genesis token
         if let Some(token) = genesis_token {
@@ -369,9 +370,7 @@ impl StagedLedgerStore for IndexerStore {
                     curr_state_hash = parent_hash;
                 }
             } else {
-                if curr_state_hash.0 != MAINNET_GENESIS_PREV_STATE_HASH
-                    || curr_state_hash.0 != HARDFORK_GENESIS_PREV_STATE_HASH
-                {
+                if !is_genesis_prev_state_hash(&curr_state_hash) {
                     error!("Block missing from store: {curr_state_hash}");
                 }
 
@@ -530,23 +529,23 @@ impl StagedLedgerStore for IndexerStore {
         direction: Direction,
     ) -> DBIterator<'_> {
         let mut start = [0; StateHash::LEN + TokenAddress::LEN + 1];
-        let mode = IteratorMode::From(
-            match direction {
-                Direction::Forward => state_hash.0.as_bytes(),
-                Direction::Reverse => {
-                    // need to "overshoot" all {state_hash}{token}{pk} keys for this staged ledger
-                    // without going into the "next" staged ledger's data
-                    start[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-                    start[StateHash::LEN..][..TokenAddress::LEN]
-                        .copy_from_slice(&TokenAddress::upper_bound());
-                    start[StateHash::LEN..][TokenAddress::LEN..].copy_from_slice(b"C");
-                    start.as_slice()
-                }
-            },
-            direction,
-        );
+        start[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
 
+        if let Direction::Reverse = direction {
+            // need to go beyond all {state_hash}{token}{pk} keys for this staged ledger
+            // without going into the "next" staged ledger's data
+            start[StateHash::LEN..][..TokenAddress::LEN]
+                .copy_from_slice(&TokenAddress::upper_bound());
+            start[StateHash::LEN..][TokenAddress::LEN..].copy_from_slice(b"C");
+        }
+
+        let mode = IteratorMode::From(&start, direction);
         self.database
             .iterator_cf(self.staged_ledger_account_balance_sort_cf(), mode)
     }
+}
+
+fn is_genesis_prev_state_hash(state_hash: &StateHash) -> bool {
+    state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH
+        || state_hash.0 == HARDFORK_GENESIS_PREV_STATE_HASH
 }

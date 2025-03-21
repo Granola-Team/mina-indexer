@@ -1,7 +1,7 @@
 //! Zkapp & MINA token store trait
 
 use crate::{
-    base::{amount::Amount, public_key::PublicKey},
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     ledger::{
         account::Account,
         diff::token::TokenDiff,
@@ -10,6 +10,7 @@ use crate::{
     store::Result,
 };
 use speedb::{DBIterator, Direction};
+use std::collections::HashMap;
 
 pub trait ZkappTokenStore {
     /// Set a token
@@ -18,7 +19,7 @@ pub trait ZkappTokenStore {
     /// Update a token by applying a diff
     ///
     /// Returns the new token if any
-    fn apply_token_diff(&self, diff: &TokenDiff) -> Result<Option<Token>>;
+    fn apply_token_diff(&self, state_hash: &StateHash, diff: &TokenDiff) -> Result<Option<Token>>;
 
     /// Update a token by unapplying last diff
     ///
@@ -140,6 +141,9 @@ pub trait ZkappTokenStore {
     /// Get the count of token diffs applied to the token by `pk`
     fn get_token_pk_diff_num(&self, pk: &PublicKey) -> Result<Option<u32>>;
 
+    /// Get the last applied token pk diff
+    fn get_last_token_pk_diff(&self, pk: &PublicKey) -> Result<Option<TokenDiff>>;
+
     /// Get the number of tokens for `pk`
     fn get_token_pk_num(&self, pk: &PublicKey) -> Result<Option<u32>>;
 
@@ -154,6 +158,12 @@ pub trait ZkappTokenStore {
 
     /// Remove & return last applied pk token diff: `Some(count, token diff)`
     fn remove_last_pk_token_diff(&self, pk: &PublicKey) -> Result<Option<(u32, TokenDiff)>>;
+
+    /// Get the tokens used in the given block
+    fn get_tokens_used(
+        &self,
+        state_hash: &StateHash,
+    ) -> Result<Option<HashMap<TokenAddress, (PublicKey, TokenAddress)>>>;
 
     ///////////////
     // Iterators //
