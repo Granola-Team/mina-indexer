@@ -1,3 +1,4 @@
+mod common;
 pub mod graphql;
 pub mod rest;
 

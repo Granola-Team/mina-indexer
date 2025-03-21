@@ -12,19 +12,18 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     snark_work::store::SnarkStore,
     store::IndexerStore,
-    utility::store::common::{
-        block_u32_prefix_from_key, from_be_bytes, state_hash_suffix, U32_LEN,
-    },
-    web::graphql::{
-        gen::{BlockProtocolStateConsensusStateQueryInput, BlockQueryInput},
-        get_block,
+    utility::store::common::{block_u32_prefix_from_key, state_hash_suffix, U32_LEN},
+    web::{
+        common::unique_block_producers_last_n_blocks,
+        graphql::{
+            gen::{BlockProtocolStateConsensusStateQueryInput, BlockQueryInput},
+            get_block,
+        },
     },
 };
 use async_graphql::{self, Object, Result};
 use block::{Block, BlockSortByInput};
-use log::error;
-use speedb::{Direction, IteratorMode};
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct BlocksQueryRoot;
@@ -99,44 +98,17 @@ impl BlocksQueryRoot {
         let db = db(ctx);
 
         // unique block producer query
-        if let Some(mut num_blocks) = query
+        if let Some(num_blocks) = query
             .as_ref()
             .and_then(|q| q.unique_block_producers_last_n_blocks)
         {
-            const MAX_NUM_BLOCKS: u32 = 1000;
-            num_blocks = num_blocks.min(MAX_NUM_BLOCKS);
-
-            if let Some(best_height) = db.get_best_block_height()? {
-                let start_height = 1.max(best_height.saturating_sub(num_blocks));
-                let mut producers = HashSet::new();
-
-                for (key, _) in db
-                    .blocks_height_iterator(IteratorMode::From(
-                        &(best_height + 1).to_be_bytes(),
-                        Direction::Reverse,
-                    ))
-                    .flatten()
-                {
-                    let height = from_be_bytes(key[..U32_LEN].to_vec());
-                    if height <= start_height {
-                        break;
-                    }
-
-                    let state_hash = state_hash_suffix(&key)?;
-
-                    if let Some(creator) = db.get_block_creator(&state_hash)? {
-                        producers.insert(creator);
-                        continue;
-                    }
-
-                    error!("Block creator index missing (length {height}) {state_hash}")
-                }
-
-                return Ok(vec![Block {
-                    num_unique_block_producers_last_n_blocks: Some(producers.len() as u32),
+            return match unique_block_producers_last_n_blocks(db, num_blocks) {
+                Ok(num_unique_block_producers_last_n_blocks) => Ok(vec![Block {
+                    num_unique_block_producers_last_n_blocks,
                     ..Default::default()
-                }]);
-            }
+                }]),
+                Err(e) => Err(async_graphql::Error::new(e.to_string())),
+            };
         }
 
         let counts = get_counts(db).await?;
