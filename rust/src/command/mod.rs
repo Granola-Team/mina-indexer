@@ -547,15 +547,19 @@ pub fn decode_memo(encoded: &[u8], v1: bool) -> String {
         let decoded = bs58::decode(encoded)
             .into_vec()
             .expect("base58 decode memo");
-        String::from_utf8(decoded).unwrap_or_default()
+
+        let value = decoded[3..decoded[2] as usize + 3].to_vec();
+        String::from_utf8(value).unwrap_or_default()
     }
 }
 
 impl From<String> for mina_rs::SignedCommandMemo {
     fn from(value: String) -> Self {
         let mut bytes = value.as_bytes().to_vec();
+
         bytes.insert(0, bytes.len() as u8);
         bytes.insert(0, 1); // version byte
+
         Self(bytes)
     }
 }
@@ -1588,7 +1592,7 @@ mod test {
     }
 
     #[test]
-    fn txn_memos() -> anyhow::Result<()> {
+    fn txn_memos_v1() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
@@ -1596,6 +1600,33 @@ mod test {
         let res: Vec<_> = cmds.iter().map(|cmd| cmd.memo()).collect();
 
         assert_eq!(res, vec!["", "Name: Romek"]);
+        Ok(())
+    }
+
+    #[test]
+    fn txn_memos_v2() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-425422-3NLhbkx92FD5CETZDBKA4PEXfb2QpVdcrrKdsDEcH2V3DqXkqgZ1.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        let cmds = pcb.commands();
+        let res: Vec<_> = cmds.iter().map(|cmd| cmd.memo()).collect();
+
+        assert_eq!(
+            res,
+            vec![
+                "",
+                "Paribu",
+                "ZkNoid: Reward claim (172 MINA)",
+                "ZkNoid: Reward claim (7 MINA)",
+                "",
+                "token:mint POM",
+                "ukr svin, oink oink",
+                "ukr svin, oink oink",
+                "ukr svin, oink oink",
+                "",
+                ""
+            ]
+        );
         Ok(())
     }
 }
