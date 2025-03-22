@@ -1175,7 +1175,7 @@ mod test {
 
     #[test]
     fn decode_memo_v2() {
-        let expected = "".to_string();
+        let expected = "Test ZKApp to Receiver".to_string();
 
         // encoded memo
         let bytes = "E4Z6SU8DEmNRnD5vn9WFTVx8fjUtQAKxX8XFZaDg9prFcG8FZs1EG".as_bytes();

@@ -32,13 +32,13 @@ jsonpath "$.data.transactions" count == 42
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 359609
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].memo" == ""
+jsonpath "$.data.transactions[0].memo" == "Test ZKApp to Receiver"
 jsonpath "$.data.transactions[0].hash" == "5Jtarnuf2gvYuQsv3HYeDYNLWMb3ZosKubkYYMDxWhaYxojbaDMg"
 
 # last datum
 jsonpath "$.data.transactions[41].blockHeight" == 359617
 jsonpath "$.data.transactions[41].canonical" == true
-jsonpath "$.data.transactions[41].memo" == ""
+jsonpath "$.data.transactions[41].memo" == "Test ZKApp to Receiver"
 jsonpath "$.data.transactions[41].hash" == "5Jv8ZMpRwgxuDkXp4fDqRpCSQ1s7k8shGUTMxyPQbS3UJiJvjb3U"
 
 duration < 100
