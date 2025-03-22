@@ -213,7 +213,7 @@ impl ServerCommand {
             start_web_server(s, store, (host, web_port))
         }));
 
-        println!("GraphQL server started at: http://{web_hostname}:{web_port}/graphql");
+        info!("GraphQL server started at: http://{web_hostname}:{web_port}/graphql");
         subsys.on_shutdown_requested().await;
 
         debug!("Shutting down primary database instance");
