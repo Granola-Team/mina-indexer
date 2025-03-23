@@ -15,15 +15,21 @@ shift
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(git rev-parse --show-toplevel)"
-REV="$(git rev-parse --short=8 HEAD)"
-STAKING_LEDGERS="$SRC"/tests/data/staking_ledgers
-SUMMARY_SCHEMA="$SRC"/tests/data/json-schemas/summary.json
+export TOPLEVEL="$SRC"
+export GIT_COMMIT_HASH
+GIT_COMMIT_HASH="$(git rev-parse --short=8 HEAD)"
+
+STAKING_LEDGERS="$SRC/tests/data/staking_ledgers"
+SUMMARY_SCHEMA="$SRC/tests/data/json-schemas/summary.json"
+
+RAKEFILE="$SRC/Rakefile"
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 : "${VOLUMES_DIR:=/mnt}"
-DEV_DIR="$VOLUMES_DIR"/mina-indexer-dev
-BASE_DIR="$DEV_DIR"/"$REV"
+DEV_DIR="$VOLUMES_DIR/mina-indexer-dev"
+BASE_DIR="$DEV_DIR/$GIT_COMMIT_HASH"
+BLOCKS_DIR="$BASE_DIR/blocks"
 
 mkdir -p "$BASE_DIR"
 cd "$BASE_DIR"
@@ -38,35 +44,44 @@ HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
 # Indexer helpers
 #
 idxr() {
-	just -f "$SRC"/bin.just idxr-bin "$IDXR" "$@"
+	args=$(echo "$*" | tr ' ' ',')
+	rake -f "$RAKEFILE" "bin:run[$IDXR,$args]"
 }
 
 start_v1() {
-	just -f "$SRC"/bin.just start-v1 "$IDXR" "$@"
+	args=$(echo "$*" | tr ' ' ',')
+	rake -f "$RAKEFILE" "bin:start_v1[$IDXR,$args]"
 }
 
 start_v2() {
-	just -f "$SRC"/bin.just start-v2 "$IDXR"
+	rake -f "$RAKEFILE" "bin:start_v2[$IDXR]"
 }
 
 start() {
-	just -f "$SRC"/bin.just start "$IDXR" "$@"
+	args=$(echo "$*" | tr ' ' ',')
+	rake -f "$RAKEFILE" "bin:start[$IDXR,$args]"
 }
 
 shutdown_idxr() {
-	just -f "$SRC"/bin.just shutdown "$IDXR"
+	rake -f "$RAKEFILE" "bin:shutdown[$IDXR]"
 }
 
 ephemeral_port() {
-	just -f "$SRC"/bin.just ephemeral-port
+	rake -f "$RAKEFILE" "bin:ephemeral_port"
 }
 
 database_create() {
-	just -f "$SRC"/bin.just database-create "$IDXR" "$@"
+	args=$(echo "$*" | tr ' ' ',')
+	rake -f "$RAKEFILE" "bin:database_create[$IDXR,$args]"
 }
 
 stage_blocks() {
-	just -f "$SRC"/stage-blocks.just "$@"
+	# First argument is the task name
+	local task="$1"
+	shift
+
+	args=$(echo "$*" | tr ' ' ',')
+	rake -f "$RAKEFILE" "stage_blocks:${task}[$args]"
 }
 
 # Assert helpers
@@ -232,7 +247,7 @@ test_server_startup_v2() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-	stage_blocks v1 100 ./blocks
+	stage_blocks v1 100 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -273,7 +288,7 @@ test_account_public_key_json() {
 
 # Indexer summary returns the correct canonical root
 test_canonical_root() {
-	stage_blocks v1 15 ./blocks
+	stage_blocks v1 15 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -288,7 +303,7 @@ test_canonical_root() {
 test_canonical_threshold() {
 	num_seq_blocks=15
 	canonical_threshold=2
-	stage_blocks v1 $num_seq_blocks ./blocks
+	stage_blocks v1 $num_seq_blocks "$BLOCKS_DIR"
 
 	start_v1 --canonical-threshold $canonical_threshold
 
@@ -301,7 +316,7 @@ test_canonical_threshold() {
 
 # Indexer server returns the correct v1 best tip
 test_best_tip_v1() {
-	stage_blocks v1 15 ./blocks
+	stage_blocks v1 15 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -323,7 +338,7 @@ test_best_tip_v1() {
 
 # Indexer server returns the correct v2 best tip
 test_best_tip_v2() {
-	stage_blocks v2 359617 ./blocks
+	stage_blocks v2 359617 "$BLOCKS_DIR"
 
 	start_v2
 
@@ -345,7 +360,7 @@ test_best_tip_v2() {
 
 # Indexer server returns the correct blocks for height and slot queries
 test_blocks() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -448,7 +463,7 @@ test_blocks() {
 
 # Indexer handles copied blocks correctly
 test_block_copy() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -464,7 +479,7 @@ test_block_copy() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add block 11
-	stage_blocks v1-single 11 ./blocks
+	stage_blocks v1_single 11 "$BLOCKS_DIR"
 	sleep 1
 
 	# check
@@ -481,9 +496,9 @@ test_block_copy() {
 
 # Indexer handles missing blocks correctly
 test_missing_blocks() {
-	stage_blocks v1 10 ./blocks
-	stage_blocks v1-range 12 20 ./blocks # missing 11
-	stage_blocks v1-range 22 30 ./blocks # missing 21
+	stage_blocks v1 10 "$BLOCKS_DIR"
+	stage_blocks v1_range 12 20 "$BLOCKS_DIR" # missing 11
+	stage_blocks v1_range 22 30 "$BLOCKS_DIR" # missing 21
 
 	start_v1
 
@@ -501,7 +516,7 @@ test_missing_blocks() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add missing block which connects the dangling branches
-	stage_blocks v1-single 21 ./blocks
+	stage_blocks v1_single 21 "$BLOCKS_DIR"
 	sleep 1
 
 	# dangling branches combine
@@ -519,7 +534,7 @@ test_missing_blocks() {
 	assert $MAINNET_GENESIS_STATE_HASH $canonical_hash
 
 	# add remaining missing block
-	stage_blocks v1-single 11 ./blocks
+	stage_blocks v1_single 11 "$BLOCKS_DIR"
 	sleep 1
 
 	# dangling branches move into the root branch
@@ -538,7 +553,7 @@ test_missing_blocks() {
 
 # Indexer server returns the correct v1 best chain
 test_best_chain_v1() {
-	stage_blocks v1 12 ./blocks
+	stage_blocks v1 12 "$BLOCKS_DIR"
 	mkdir -p best_chain
 
 	start_v1
@@ -584,7 +599,7 @@ test_best_chain_v1() {
 
 # Indexer server returns the correct v2 best chain
 test_best_chain_v2() {
-	stage_blocks v2 359617 ./blocks
+	stage_blocks v2 359617 "$BLOCKS_DIR"
 	mkdir -p best_chain
 
 	start_v2
@@ -624,7 +639,7 @@ test_best_chain_v2() {
 
 # Indexer server returns correct ledgers
 test_ledgers() {
-	stage_blocks v1 15 ./blocks
+	stage_blocks v1 15 "$BLOCKS_DIR"
 	mkdir -p ledgers
 
 	start_v1
@@ -694,7 +709,7 @@ test_ledgers() {
 
 # Indexer server syncs with existing Speedb
 test_sync() {
-	stage_blocks v1 15 ./blocks
+	stage_blocks v1 15 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -703,7 +718,7 @@ test_sync() {
 	shutdown_idxr
 
 	# add more blocks to the watch dir while not indexing
-	stage_blocks v1-range 16 20 ./blocks
+	stage_blocks v1_range 16 20 "$BLOCKS_DIR"
 
 	# sync from previous indexer db
 	start \
@@ -722,7 +737,7 @@ test_sync() {
 
 # Indexer server replays events
 test_replay() {
-	stage_blocks v1 15 ./blocks
+	stage_blocks v1 15 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -730,7 +745,7 @@ test_replay() {
 	shutdown_idxr
 
 	# add 8 more blocks to the watch dir while not indexing
-	stage_blocks v1-range 16 20 ./blocks
+	stage_blocks v1_range 16 20 "$BLOCKS_DIR"
 
 	# replay events from previous indexer db + new blocks
 	start \
@@ -751,7 +766,7 @@ test_replay() {
 
 # Indexer server returns correct transactions
 test_transactions() {
-	stage_blocks v1 13 ./blocks
+	stage_blocks v1 13 "$BLOCKS_DIR"
 	mkdir -p transactions
 
 	start_v1
@@ -843,7 +858,7 @@ test_transactions() {
 
 # Indexer correctly exports user commands CSV
 test_transactions_csv() {
-	stage_blocks v1 5 ./blocks
+	stage_blocks v1 5 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -869,7 +884,7 @@ test_transactions_csv() {
 
 # Indexer server returns correct SNARK work
 test_snark_work() {
-	stage_blocks v1 120 ./blocks
+	stage_blocks v1 120 "$BLOCKS_DIR"
 	mkdir -p snark_work
 
 	start_v1 --canonical-threshold 5
@@ -922,7 +937,7 @@ test_snark_work() {
 
 # Restart from a snapshot of a running indexer database
 test_snapshot() {
-	stage_blocks v1 13 ./blocks
+	stage_blocks v1 13 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -970,7 +985,7 @@ test_snapshot() {
 
 # Restart from a bogus snapshot to ensure it properly returns a failure
 test_restore_snapshot_failure_returns_proper_code() {
-	stage_blocks v1 13 ./blocks
+	stage_blocks v1 13 "$BLOCKS_DIR"
 
 	# Run the command directly without capturing output
 	# The command should fail with a non-zero exit code
@@ -986,7 +1001,7 @@ test_restore_snapshot_failure_returns_proper_code() {
 }
 
 test_rest_accounts_summary() {
-	stage_blocks v1 100 ./blocks
+	stage_blocks v1 100 "$BLOCKS_DIR"
 
 	port=$(ephemeral_port)
 	database_create
@@ -1077,7 +1092,7 @@ test_rest_accounts_summary() {
 }
 
 test_rest_blocks() {
-	stage_blocks v1 100 ./blocks
+	stage_blocks v1 100 "$BLOCKS_DIR"
 
 	port=$(ephemeral_port)
 	database_create
@@ -1102,10 +1117,10 @@ test_rest_blocks() {
 }
 
 test_best_chain_many_blocks() {
-	stage_blocks v1 5000 ./blocks
+	stage_blocks v1 5000 "$BLOCKS_DIR"
 
 	start_v1
-	just -f "$SRC"/bin.just wait-forever-for-socket
+	rake bin:wait_forever_for_socket
 
 	# write best chain to file
 	file=./best_chain.json
@@ -1217,7 +1232,7 @@ test_genesis_block_creator() {
 }
 
 test_txn_nonces() {
-	stage_blocks v1 100 ./blocks
+	stage_blocks v1 100 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -1339,7 +1354,7 @@ test_watch_staking_ledgers() {
 
 test_staking_delegations() {
 	idxr database create \
-		--blocks-dir ./blocks \
+		--blocks-dir "$BLOCKS_DIR" \
 		--database-dir ./database \
 		--staking-ledgers-dir $STAKING_LEDGERS
 	start --database-dir ./database
@@ -1381,7 +1396,7 @@ test_staking_delegations() {
 }
 
 test_internal_commands() {
-	stage_blocks v1 11 ./blocks
+	stage_blocks v1 11 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -1438,7 +1453,7 @@ test_internal_commands() {
 
 # Indexer correctly exports internal commands CSV
 test_internal_commands_csv() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -1497,7 +1512,7 @@ test_clean_kill() {
 }
 
 test_block_children() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -1539,7 +1554,7 @@ test_load_v2() {
 
 # Test v1 GQL functionality
 test_hurl_v1() {
-	stage_blocks v1 120 ./blocks
+	stage_blocks v1 120 "$BLOCKS_DIR"
 
 	port=$(ephemeral_port)
 	idxr database create \
@@ -1598,7 +1613,7 @@ test_hurl_v1() {
 
 # Test v2 GQL functionality
 test_hurl_v2() {
-	stage_blocks v2 359617 ./blocks
+	stage_blocks v2 359617 "$BLOCKS_DIR"
 
 	port=$(ephemeral_port)
 	idxr database create \
@@ -1665,7 +1680,7 @@ test_version_file() {
 }
 
 test_fetch_new_blocks() {
-	stage_blocks v1 9 ./blocks
+	stage_blocks v1 9 "$BLOCKS_DIR"
 
 	# start the indexer using the block fetching exe on path "$SRC"/tests/recovery.sh
 	# wait for 3s in between recovery attempts
@@ -1692,7 +1707,7 @@ test_fetch_new_blocks() {
 }
 
 test_missing_block_recovery() {
-	stage_blocks v1 5 ./blocks
+	stage_blocks v1 5 "$BLOCKS_DIR"
 
 	# start the indexer using the block recovery exe on path "$SRC"/tests/recovery.sh
 	# wait for 3s in between recovery attempts
@@ -1707,10 +1722,10 @@ test_missing_block_recovery() {
 		--missing-block-recovery-batch true
 
 	# miss blocks at heights 6, 8, 11-16, 18-20
-	stage_blocks v1-single 7 ./blocks
-	stage_blocks v1-range 9 10 ./blocks
-	stage_blocks v1-single 17 ./blocks
-	stage_blocks v1-single 21 ./blocks
+	stage_blocks v1_single 7 "$BLOCKS_DIR"
+	stage_blocks v1_range 9 10 "$BLOCKS_DIR"
+	stage_blocks v1_single 17 "$BLOCKS_DIR"
+	stage_blocks v1_single 21 "$BLOCKS_DIR"
 
 	# after blocks are added, check dangling branches
 	sleep 3
@@ -1728,7 +1743,7 @@ test_missing_block_recovery() {
 
 # Create an indexer database & start indexing
 test_database_create() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
@@ -1747,7 +1762,7 @@ test_database_create() {
 # Create an indexer database snapshot from a db directory without a running indexer.
 # Restore the database from the snapshot & start indexing
 test_snapshot_database_dir() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	database_create
 
@@ -1778,7 +1793,7 @@ test_snapshot_database_dir() {
 
 # Indexer databases can be reused & expanded
 test_reuse_databases() {
-	stage_blocks v1 10 ./blocks
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	# create initial db
 	start_v1
@@ -1787,7 +1802,7 @@ test_reuse_databases() {
 	shutdown_idxr
 
 	# add more blocks to the watch dir while not indexing
-	stage_blocks v1-range 11 12 ./blocks
+	stage_blocks v1_range 11 12 "$BLOCKS_DIR"
 
 	# sync from previous indexer db
 	start_v1
@@ -1798,7 +1813,7 @@ test_reuse_databases() {
 
 # Indexer doesn't ingest orphan blocks
 test_do_not_ingest_orphan_blocks() {
-	stage_blocks v1 20 ./blocks
+	stage_blocks v1 20 "$BLOCKS_DIR"
 
 	start_v1 --do-not-ingest-orphan-blocks
 
@@ -1827,7 +1842,7 @@ test_do_not_ingest_orphan_blocks() {
 	shutdown_idxr
 
 	# start a "normal" indexer to compare the best ledger
-	stage_blocks v1 20 ./blocks
+	stage_blocks v1 20 "$BLOCKS_DIR"
 
 	start_v1
 

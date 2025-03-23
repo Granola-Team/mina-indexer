@@ -40,7 +40,7 @@ def parse_arguments
 
   parser.parse!
 
-  # Check if using the "just recipes" commands
+  # Check if using a rake task
   if ["block", "blocks"].include?(ARGV[0])
     command = ARGV[0]
     height = ARGV[1]
