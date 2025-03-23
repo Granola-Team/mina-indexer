@@ -79,8 +79,7 @@ Normal operation of the 'mina-indexer' does not require this change.
 
 ### Building the Project
 
-Run `just check` to verify that the project compiles. This will compile the
-`mina-indexer` binary in debug mode.
+Run `rake check` to check that Mina Indexer and all of its dependencies for errors.
 
 ### Storage
 
@@ -98,7 +97,8 @@ another path.
 Execute [unit tests](/rust/tests) to validate code functionality with:
 
 ```bash
-just test-unit
+rake test:unit:tier1
+rake test:unit:tier2
 ```
 
 #### Regression Tests
@@ -110,13 +110,13 @@ To quickly perform regression tests, which check for new bugs in existing
 features after updates, use:
 
 ```bash
-just dev
+rake dev
 ```
 
 To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
 
 ```bash
-just tier1
+rake test:tier1
 ```
 
 #### More Tests
@@ -127,24 +127,24 @@ To invoke a more comprehensive regression test suite, the directory
 Invoke:
 
 ```bash
-just tier2
+rake test:tier2
 ```
 
 Or, for even more testing:
 
 ```bash
-just tier3
+rake test:tier3
 ```
 
 ### Deployment
 
-To deploy a mina-indexer locally, the directory `/mnt/mina-indexer-prod`
+To deploy a Mina Indexer locally, the directory `/mnt/mina-indexer-prod`
 must exist.
 
 There are two options to start an instance:
 
-1. `just deploy-local-prod` uses the release binary
-1. `just deploy-local-prod-dev` uses the debug binary
+1. `rake deploy:local_prod` uses the release binary
+1. `rake deploy:local_prod_dev` uses the debug binary
 
 ## Generating OCI Images With Nix
 
@@ -156,7 +156,7 @@ machine.
 Issue the following command to build the image and load it into Docker:
 
 ```bash
-just build-image
+rake build:oci_image
 ```
 
 ## License

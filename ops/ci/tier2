@@ -2,4 +2,4 @@
 # (Buildkite) 'command' for tier-2 testing.
 
 git lfs pull
-nix develop --command just tier2
+nix develop --command rake test:tier2
