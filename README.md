@@ -161,13 +161,13 @@ just build-image
 
 ## License
 
-Copyright 2022-2024 Granola Systems Inc.
+Copyright 2022-2025 Granola Systems Inc.
 
 This software is [licensed](LICENSE) under the Apache License, Version 2.0.
 
 ## Contributing
 
-This project uses [C4(Collective Code Construction
-Contract)](https://rfc.zeromq.org/spec/42/) process for contributions.
-Additionally, maintainers and select members of Granola-Team have direct access
-and are permitted to push directly to 'main'.
+This project uses [C4 (Collective Code Construction
+Contract)](https://rfc.zeromq.org/spec/42/) process for external contributions.
+Additionally, maintainers and select members of [Granola-Team](https://github.com/Granola-Team/) have direct access
+and are permitted to push directly to [`main`](https://github.com/Granola-Team/mina-indexer/tree/main).
