@@ -77,7 +77,6 @@
           curl
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
-          git-lfs
           hurl
           jq
           nightlyToolchain.passthru.availableComponents.rustfmt

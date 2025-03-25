@@ -1,7 +1,5 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-3 testing.
 
-git lfs pull
-
 # The argument to "rake test:tier3:prod" is the number of blocks to use.
 nix develop --command rake test:tier3:prod 436391
