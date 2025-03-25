@@ -5,13 +5,22 @@ BUILD_TYPE ||= "nix" # standard:disable Lint/OrAssignmentToConstant
 DEPLOY_TYPE ||= "test" # standard:disable Lint/OrAssignmentToConstant
 REV ||= `git rev-parse --short=8 HEAD`.strip # standard:disable Lint/OrAssignmentToConstant
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
-DEPLOY_DIR ||= "#{VOLUMES_DIR}/mina-indexer-#{DEPLOY_TYPE}" # standard:disable Lint/OrAssignmentToConstant
 
-def base_dir_from_rev(rev)
-  "#{DEPLOY_DIR}/#{rev}"
+def deploy_dir(deploy_type = DEPLOY_TYPE)
+  "#{VOLUMES_DIR}/mina-indexer-#{deploy_type}"
 end
 
-BASE_DIR ||= base_dir_from_rev(REV) # standard:disable Lint/OrAssignmentToConstant
+DEPLOY_DIR ||= deploy_dir # standard:disable Lint/OrAssignmentToConstant
+
+def base_dir(deploy_type = DEPLOY_TYPE)
+  "#{deploy_dir(deploy_type)}/#{REV}"
+end
+
+def base_dir_from_rev(rev)
+  "#{deploy_dir}/#{rev}"
+end
+
+BASE_DIR ||= base_dir # standard:disable Lint/OrAssignmentToConstant
 
 def config_base_dir
   puts "Using base directory: #{BASE_DIR}"
