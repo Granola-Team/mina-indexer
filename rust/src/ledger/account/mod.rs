@@ -17,7 +17,7 @@ use super::{
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::genesis::GenesisBlock,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
     ledger::diff::account::PaymentDiff,
     mina_blocks::v2::{self, ZkappAccount},
 };
@@ -96,10 +96,18 @@ impl Account {
 
     /// Display view of account, removes non-genesis account creation fee
     pub fn display(self) -> Self {
-        Self {
-            balance: self.balance.display(),
-            ..self
+        if self
+            .token
+            .as_ref()
+            .map_or(true, |t| t.0 == MINA_TOKEN_ADDRESS)
+        {
+            return Self {
+                balance: self.balance.display(),
+                ..self
+            };
         }
+
+        self
     }
 
     /// Time-locked balance (subtracted from circulating supply)
