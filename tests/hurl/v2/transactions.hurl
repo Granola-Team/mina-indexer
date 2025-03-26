@@ -154,7 +154,7 @@ jsonpath "$.data.transactions[0].tokens[1]" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZ
 duration < 100
 
 #
-# Filter based on token ID
+# Accounts updated query
 #
 
 POST {{url}}
@@ -165,6 +165,8 @@ POST {{url}}
       accounts_updated {
         pk
         token
+        balance_change
+        increment_nonce
       }
       actions
       events
@@ -186,8 +188,12 @@ jsonpath "$.data.transactions[0].zkapp.accounts_updated" count == 2
 # account updates
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change" == -2000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].increment_nonce" == false
 
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change" == 2000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].increment_nonce" == false
 
 duration < 100

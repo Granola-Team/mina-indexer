@@ -552,8 +552,19 @@ impl TransactionQueryInput {
             }
         }
 
+        // if zkapp command, check the accounts updated
         if let Some(to) = to {
-            if let Some(txn_to) = transaction.transaction.to.as_ref() {
+            if let Some(zkapp) = transaction.transaction.zkapp.as_ref() {
+                let pk_updated = zkapp
+                    .accounts_updated
+                    .iter()
+                    .map(|account| account.pk == *to)
+                    .any(|b| b);
+
+                if !pk_updated {
+                    return false;
+                }
+            } else if let Some(txn_to) = transaction.transaction.to.as_ref() {
                 if txn_to != to {
                     return false;
                 }
