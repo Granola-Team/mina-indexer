@@ -184,6 +184,8 @@
               LIBCLANG_PATH = "${libclang.lib}/lib";
             }
             // commonEnv;
+          # for backwards compatibility
+          shellHook = "alias just='rake'";
           buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher;
         };
       });
