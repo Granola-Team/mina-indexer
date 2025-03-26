@@ -209,7 +209,8 @@ POST {{url}}
     query: {
       canonical: true
       to: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-    }) {
+    }
+  ) {
     blockHeight
     amount
     fee
