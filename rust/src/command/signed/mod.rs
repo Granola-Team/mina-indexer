@@ -368,15 +368,17 @@ impl SignedCommandWithData {
     }
 
     /// Only called on zkapp commands
-    pub fn accounts_updated(&self) -> Vec<(PublicKey, TokenAddress)> {
+    pub fn accounts_updated(&self) -> Vec<(PublicKey, TokenAddress, i64, bool)> {
         let mut updated = vec![];
 
         if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = &self.command {
             for update in &data.account_updates {
                 let pk = update.elt.account_update.body.public_key.to_owned();
                 let token = update.elt.account_update.body.token_id.to_owned();
+                let balance_change: i64 = (&update.elt.account_update.body.balance_change).into();
+                let increment_nonce = update.elt.account_update.body.increment_nonce;
 
-                updated.push((pk, token));
+                updated.push((pk, token, balance_change, increment_nonce));
                 recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
             }
         }
@@ -902,14 +904,16 @@ impl std::fmt::Display for TxnHash {
 /////////////
 
 fn recurse_calls_accounts_updated<'a>(
-    accounts: &mut Vec<(PublicKey, TokenAddress)>,
+    accounts: &mut Vec<(PublicKey, TokenAddress, i64, bool)>,
     calls: impl Iterator<Item = &'a Call>,
 ) {
     for update in calls {
         let pk = update.elt.account_update.body.public_key.to_owned();
         let token = update.elt.account_update.body.token_id.to_owned();
+        let balance_change: i64 = (&update.elt.account_update.body.balance_change).into();
+        let increment_nonce = update.elt.account_update.body.increment_nonce;
 
-        accounts.push((pk, token));
+        accounts.push((pk, token, balance_change, increment_nonce));
         recurse_calls_accounts_updated(accounts, update.elt.calls.iter());
     }
 }
@@ -1162,12 +1166,16 @@ mod tests {
                 (
                     "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
                     TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
-                        .unwrap()
+                        .unwrap(),
+                    -2000000000,
+                    false,
                 ),
                 (
                     "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
                     TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
-                        .unwrap()
+                        .unwrap(),
+                    2000000000,
+                    false,
                 ),
             ])
         );

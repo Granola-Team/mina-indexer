@@ -101,6 +101,14 @@ struct TokenAccount {
 
     /// Token address
     token: String,
+
+    /// Balance change
+    #[graphql(name = "balance_change")]
+    balance_change: i64,
+
+    /// Increment nonce
+    #[graphql(name = "increment_nonce")]
+    increment_nonce: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, SimpleObject, Serialize)]
@@ -1357,11 +1365,13 @@ impl TransactionQueryInput {
 // conversions //
 /////////////////
 
-impl From<(PublicKey, TokenAddress)> for TokenAccount {
-    fn from(value: (PublicKey, TokenAddress)) -> Self {
+impl From<(PublicKey, TokenAddress, i64, bool)> for TokenAccount {
+    fn from(value: (PublicKey, TokenAddress, i64, bool)) -> Self {
         Self {
             pk: value.0.to_string(),
             token: value.1.to_string(),
+            balance_change: value.2,
+            increment_nonce: value.3,
         }
     }
 }
