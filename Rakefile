@@ -309,6 +309,26 @@ namespace :test do
     run("time #{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
   end
 
+  # tier 2 regression tests
+  tier2_regression_tests = ["load_v1", "load_v2", "best_chain_many_blocks", "all"]
+
+  # Create regression test tasks dynamically
+  namespace :regression do
+    # Define a helper method to create regression test tasks
+    def define_regression_test(name)
+      desc "Run #{name} regression test"
+      task name do
+        test_name = (name == "all") ? nil : name
+        Rake::Task["test:regression"].reenable
+        Rake::Task["test:regression"].invoke(test_name)
+      end
+    end
+
+    tier2_regression_tests.each do |test|
+      define_regression_test(test)
+    end
+  end
+
   desc "Run the 1st tier of tests"
   task tier1: ["prereqs:tier1", :lint, "test:unit:tier1"] do
     puts "--- Performing tier 1 regression tests"
@@ -325,12 +345,8 @@ namespace :test do
   end
 
   desc "Run the 2nd tier of tests"
-  task tier2: ["prereqs:tier2", "test:unit:tier2", "build:dev"] do
-    Rake::Task["test:regression"].invoke("load_v1")
-    Rake::Task["test:regression"].invoke("load_v2")
-    Rake::Task["test:regression"].invoke("best_chain_many_blocks")
-    Rake::Task["test:regression"].invoke
-  end
+  task tier2: ["prereqs:tier2", "test:unit:tier2", "build:dev"] +
+    tier2_regression_tests.map { |test| "test:regression:#{test}" }
 
   namespace :tier3 do
     desc "Run the 3rd tier of tests with Nix-built binary"

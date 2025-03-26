@@ -1120,7 +1120,7 @@ test_best_chain_many_blocks() {
 	stage_blocks v1 5000 "$BLOCKS_DIR"
 
 	start_v1
-	rake bin:wait_forever_for_socket
+	rake -f "$RAKEFILE" bin:wait_forever_for_socket
 
 	# write best chain to file
 	file=./best_chain.json
