@@ -17,19 +17,19 @@ database/
 # Editor Droppings
 .idea*
 .*.swp
+.*.swo
 /.vscode
-
-# Don't ignore the config.toml file
-!/.cargo/config.toml
 
 # Local Cargo cache
 /.cargo/
-
-# Emacs project preferences
-.dir-locals.el
+# Don't ignore the config.toml file
+!/.cargo/config.toml
 
 # tier3 blocks
 files-to-fetch.list
 
 # mina_txn_hasher wrapper
-.local
+/.local
+
+# Our temporary build output
+/.build

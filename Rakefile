@@ -84,11 +84,9 @@ namespace :prereqs do
   desc "Check for presence of tier 1 dependencies"
   task :tier1 do
     puts "--- Checking for tier-1 prereqs"
-    run("ruby --version")
     run_in_rust_dir("cargo --version")
     run_in_rust_dir("cargo nextest --version")
     run_in_rust_dir("cargo audit --version")
-    run_in_rust_dir("cargo clippy --version")
     run_in_rust_dir("cargo machete --version")
     run("shellcheck --version")
     run("shfmt --version")
@@ -111,10 +109,20 @@ task :audit do
   run_in_rust_dir("time cargo audit")
 end
 
-desc "Lint Rust code"
-task :clippy do
-  puts "--- Linting Rust code"
-  run_in_rust_dir("time cargo clippy --all-targets --all-features \
+file ".build" do |t|
+  FileUtils.mkdir_p(t.name)
+end
+
+desc "Lint Rust code with clippy"
+task clippy: [".build/clippy"]
+
+RUST_SRC_FILES = Dir.glob("rust/**")
+
+file ".build/clippy": [".build"] + RUST_SRC_FILES do
+  puts "--- Linting Rust code with clippy"
+  run_in_rust_dir("cargo --version")
+  run_in_rust_dir("cargo clippy --version")
+  run_in_rust_dir("cargo clippy --all-targets --all-features \
     -- \
     -Dwarnings \
     -Dclippy::too_many_lines \
@@ -123,14 +131,32 @@ task :clippy do
     -Dclippy::wildcard_dependencies \
     -Dclippy::unused_self \
     -Dclippy::used_underscore_binding \
-    -Dclippy::zero_sized_map_values")
+    -Dclippy::zero_sized_map_values \
+    2>&1 | tee ../.build/clippy")
+  # Lints that demonstrably fail
+  # -Dclippy::unused_async \
+  # -Dclippy::multiple_crate_versions \
+  # -Dclippy::cargo_common_metadata
+  # -Dclippy::pedantic
+  # -Dclippy::wildcard_imports
+end
+
+RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + ["Rakefile"]
+
+desc "Lint all Ruby code"
+task lint_ruby: [".build/lint_ruby"]
+
+file ".build/lint_ruby": [".build"] + RUBY_SRC_FILES do |t|
+  puts "--- Linting Ruby code"
+  run("ruby --version")
+  run("standardrb --version")
+  ruby_cw_out = `ruby -cw #{RUBY_SRC_FILES.join(" ")}`
+  standardrb_out = `standardrb --no-fix #{RUBY_SRC_FILES.join(" ")}`
+  File.write(t.name, [ruby_cw_out, standardrb_out].join("\n"))
 end
 
 desc "Lint all code"
-task lint: :clippy do
-  puts "--- Linting ops scripts"
-  run("ruby -cw ops/*.rb")
-  run("standardrb --no-fix \"ops/**/*.rb\" Rakefile")
+task lint: [:clippy, :lint_ruby] do
   puts "--- Linting regression scripts"
   run("shellcheck tests/regression.bash")
   puts "--- Linting Nix configs"
@@ -229,6 +255,7 @@ namespace :clean do
   task :all do
     run_in_rust_dir("cargo clean")
     FileUtils.rm_f("result")
+    FileUtils.rm_rf(".build")
     puts "Consider also 'git clean -xdfn'"
   end
 
