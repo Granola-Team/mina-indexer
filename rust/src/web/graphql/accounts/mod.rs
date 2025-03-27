@@ -11,6 +11,7 @@ use crate::{
     ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
+    utility::store::common::U64_LEN,
     web::graphql::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -54,9 +55,11 @@ pub struct Account {
     zkapp: Option<ZkappAccount>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
 pub enum AccountSortByInput {
     BalanceAsc,
+
+    #[default]
     BalanceDesc,
 }
 
@@ -119,6 +122,9 @@ impl AccountQueryRoot {
         use AccountSortByInput::*;
 
         let db = db(ctx);
+        let sort_by = sort_by.unwrap_or_default();
+
+        // query or default token
         let token = query
             .as_ref()
             .map_or(TokenAddress::default(), |q| match q.token.as_ref() {
@@ -140,7 +146,6 @@ impl AccountQueryRoot {
 
                     if query.as_ref().unwrap().matches(acct, username.as_ref()) {
                         let account = AccountWithMeta::new(db, acct.to_owned());
-
                         return Some(account);
                     }
 
@@ -149,20 +154,25 @@ impl AccountQueryRoot {
                 .collect());
         }
 
-        // default query handler use balance-sorted accounts
+        // token query handler
+        if let Some(token) = query.as_ref().and_then(|q| q.token.as_ref()) {
+            return query
+                .as_ref()
+                .unwrap()
+                .token_query_handler(db, token as &str, sort_by, limit);
+        }
+
         let mode = match sort_by {
-            Some(BalanceAsc) => IteratorMode::Start,
-            Some(BalanceDesc) | None => IteratorMode::End,
+            BalanceAsc => IteratorMode::Start,
+            BalanceDesc => IteratorMode::End,
         };
+
+        // default query handler use balance-sorted accounts
         let iter = match query.as_ref().and_then(|q| q.zkapp) {
-            // all account types
             None | Some(false) => db.best_ledger_account_balance_iterator(mode).flatten(),
-            // zkapp accounts only
             Some(true) => db
                 .zkapp_best_ledger_account_balance_iterator(mode)
                 .flatten(),
-            // non-zkapp account only
-            // Some(false) => todo!("non-zkapp account"),
         };
         let mut accounts = Vec::with_capacity(limit);
 
@@ -182,46 +192,7 @@ impl AccountQueryRoot {
                 .as_ref()
                 .map_or(true, |q| q.matches(&account, username.as_ref()))
             {
-                let account_with_meta = AccountWithMeta {
-                    is_genesis_account: account.genesis_account,
-                    account: account.into(),
-                    pk_epoch_num_blocks: db
-                        .get_block_production_pk_epoch_count(&pk, None)
-                        .expect("pk epoch block count"),
-                    pk_total_num_blocks: db
-                        .get_block_production_pk_total_count(&pk)
-                        .expect("pk total block count"),
-                    pk_epoch_num_snarks: db
-                        .get_snarks_pk_epoch_count(&pk, None)
-                        .expect("pk epoch snark count"),
-                    pk_total_num_snarks: db
-                        .get_snarks_pk_total_count(&pk)
-                        .expect("pk total snark count"),
-                    pk_epoch_num_user_commands: db
-                        .get_user_commands_pk_epoch_count(&pk, None)
-                        .expect("pk epoch user command count"),
-                    pk_total_num_user_commands: db
-                        .get_user_commands_pk_total_count(&pk)
-                        .expect("pk total user command count"),
-                    pk_epoch_num_zkapp_commands: db
-                        .get_zkapp_commands_pk_epoch_count(&pk, None)
-                        .expect("pk epoch zkapp command count"),
-                    pk_total_num_zkapp_commands: db
-                        .get_zkapp_commands_pk_total_count(&pk)
-                        .expect("pk total zkapp command count"),
-                    pk_epoch_num_internal_commands: db
-                        .get_internal_commands_pk_epoch_count(&pk, None)
-                        .expect("pk epoch internal command count"),
-                    pk_total_num_internal_commands: db
-                        .get_internal_commands_pk_total_count(&pk)
-                        .expect("pk total internal command count"),
-                    block_height: db
-                        .get_best_block_height()
-                        .unwrap()
-                        .expect("best block height"),
-                    username,
-                };
-
+                let account_with_meta = AccountWithMeta::new(db, account);
                 accounts.push(account_with_meta);
             }
         }
@@ -316,6 +287,62 @@ impl AccountQueryInput {
         }
 
         true
+    }
+
+    fn token_query_handler(
+        &self,
+        db: &std::sync::Arc<IndexerStore>,
+        token: &str,
+        sort_by: AccountSortByInput,
+        limit: usize,
+    ) -> Result<Vec<AccountWithMeta>> {
+        // iterator mode
+        let mut start = [0u8; TokenAddress::LEN + U64_LEN + 1];
+        start[..TokenAddress::LEN].copy_from_slice(token.as_bytes());
+
+        let mode = match sort_by {
+            AccountSortByInput::BalanceAsc => {
+                IteratorMode::From(&start, speedb::Direction::Forward)
+            }
+            AccountSortByInput::BalanceDesc => {
+                // go beyond current token accounts
+                start[TokenAddress::LEN..][..U64_LEN].copy_from_slice(&u64::MAX.to_be_bytes());
+                start[TokenAddress::LEN..][U64_LEN..].copy_from_slice("Z".as_bytes());
+
+                IteratorMode::From(&start, speedb::Direction::Reverse)
+            }
+        };
+
+        // iterator
+        let iter = match self.zkapp {
+            None | Some(false) => db.best_ledger_account_balance_iterator(mode).flatten(),
+            Some(true) => db
+                .zkapp_best_ledger_account_balance_iterator(mode)
+                .flatten(),
+        };
+        let mut accounts = Vec::with_capacity(limit);
+
+        // iterate
+        for (key, value) in iter {
+            if key[..TokenAddress::LEN] != *token.as_bytes() || accounts.len() >= limit {
+                // beyond desired token accounts or limit
+                break;
+            }
+
+            let account = serde_json::from_slice::<account::Account>(&value)?.display();
+            let pk = account.public_key.clone();
+            let username = match db.get_username(&pk) {
+                Ok(None) | Err(_) => None,
+                Ok(Some(username)) => Some(username.0),
+            };
+
+            if self.matches(&account, username.as_ref()) {
+                let account_with_meta = AccountWithMeta::new(db, account);
+                accounts.push(account_with_meta);
+            }
+        }
+
+        Ok(accounts)
     }
 }
 
