@@ -249,13 +249,16 @@ namespace :show do
   end
 end
 
+task clean: "clean:all"
+
 # Clean tasks
 namespace :clean do
   desc "Cargo clean & remove nix build"
   task :all do
-    run_in_rust_dir("cargo clean")
-    FileUtils.rm_f("result")
     FileUtils.rm_rf(".build")
+    FileUtils.rm_f("result")
+    run_in_rust_dir("cargo --version")
+    run_in_rust_dir("cargo clean")
     puts "Consider also 'git clean -xdfn'"
   end
 
