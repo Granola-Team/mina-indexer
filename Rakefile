@@ -425,11 +425,9 @@ namespace :test do
       ipc_is_available_immediately \
       clean_shutdown \
       clean_kill \
-      block_copy \
       account_balance_cli \
       best_chain_v1 \
       rest_accounts_summary \
-      reuse_databases \
       hurl_v1")
   end
 

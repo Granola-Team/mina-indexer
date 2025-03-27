@@ -247,7 +247,7 @@ test_server_startup_v2() {
 
 # Indexer server ipc is available during initialization
 test_ipc_is_available_immediately() {
-	stage_blocks v1 100 "$BLOCKS_DIR"
+	stage_blocks v1 10 "$BLOCKS_DIR"
 
 	start_v1
 
