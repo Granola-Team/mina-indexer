@@ -8,4 +8,4 @@ rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 rustflags = ["-C", "link-arg=-fuse-ld=zld"]
 
 [build]
-target-dir = "../.build/cargo-target"
+target-dir = ".build/cargo-target"

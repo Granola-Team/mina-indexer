@@ -29,14 +29,6 @@ def nightly_if_required
   is_rustfmt_nightly ? "" : "+nightly"
 end
 
-def run_in_rust_dir(cmd)
-  if Dir.pwd == RUST_DIR
-    run(cmd, dir: RUST_DIR)
-  else
-    Dir.chdir(RUST_DIR) { run(cmd, dir: RUST_DIR) }
-  end
-end
-
 def run(cmd, *args, dir: ENV["TOPLEVEL"])
   success = system(cmd, *args, chdir: dir)
   abort "Command failed: #{cmd} #{args.join(" ")}" unless success
@@ -242,7 +234,7 @@ task lint: [:lint_ruby, :lint_shell, :lint_nix, :cargo_machete, :lint_rust]
 desc "Format all code"
 task :format do
   # Format Rust code
-  run_in_rust_dir("cargo #{nightly_if_required} fmt --all")
+  cargo_output("#{nightly_if_required} fmt --all")
 
   # Format Ruby code
   run("standardrb --fix \"ops/**/*.rb\" Rakefile rakelib/*.rake")
@@ -263,7 +255,7 @@ end
 desc "Perform a fast verification of whether the source compiles"
 task :check do
   puts "--- Invoking 'cargo check'"
-  run_in_rust_dir("time cargo check")
+  cargo_output("check")
 end
 
 # Build tasks
@@ -276,15 +268,15 @@ namespace :build do
 
   desc "Perform a dev build"
   task :dev do
-    run_in_rust_dir("cargo build")
+    cargo_output("build")
   end
 
   desc "Build OCI images"
   task :oci_image do
     puts "--- Building #{IMAGE}"
     run("docker --version")
-    run("time nom build .#dockerImage")
-    run("time docker load < ./result")
+    run("nom build .#dockerImage")
+    run("docker load < ./result")
     run("docker run --rm -it #{IMAGE} mina-indexer server start --help")
     FileUtils.rm_f("result")
   end
@@ -376,14 +368,14 @@ end
 desc "Debug build and run regression tests"
 task :dev, [:subtest] => "build:dev" do |_, args|
   subtest = args[:subtest] || ""
-  run("time #{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
+  run("#{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
 end
 
 namespace :dev do
   desc "Debug build and continue regression tests from given test"
   task :continue, [:subtest] => "build:dev" do |_, args|
     subtest = args[:subtest] || ""
-    run("time #{REGRESSION_TEST} #{BUILD_TYPE} continue #{subtest}")
+    run("#{REGRESSION_TEST} #{BUILD_TYPE} continue #{subtest}")
   end
 end
 
@@ -396,16 +388,16 @@ namespace :test do
       puts "--- Invoking 'rspec ops/spec'"
       run("rspec ops/spec/*_spec.rb")
       puts "--- Performing tier 1 unit test(s)"
-      run_in_rust_dir("cargo nextest --version")
-      run_in_rust_dir("time cargo nextest run #{test}")
+      cargo_output("nextest --version")
+      cargo_output("nextest run #{test}")
     end
 
     desc "Run all feature unit tests (debug build)"
     task :tier2, [:test] do |_, args|
       test = args[:test] || ""
       puts "--- Performing all feature unit test(s)"
-      run_in_rust_dir("cargo nextest --version")
-      run_in_rust_dir("time cargo nextest run --all-features #{test}")
+      cargo_output("nextest --version")
+      cargo_output("nextest run --all-features #{test}")
     end
   end
 
@@ -413,7 +405,7 @@ namespace :test do
   task :regression, [:subtest] do |_, args|
     subtest = args[:subtest] || ""
     puts "--- Performing regression tests #{subtest}"
-    run("time #{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
+    run("#{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
   end
 
   # tier 2 regression tests
@@ -437,9 +429,9 @@ namespace :test do
   end
 
   desc "Run the 1st tier of tests"
-  task tier1: [:lint, "test:unit:tier1"] do
+  task tier1: [:lint, "test:unit:tier1", "build:dev"] do
     puts "--- Performing tier 1 regression tests"
-    run("time #{REGRESSION_TEST} #{BUILD_TYPE} \
+    run("#{REGRESSION_TEST} #{BUILD_TYPE} \
       ipc_is_available_immediately \
       clean_shutdown \
       clean_kill \
@@ -460,14 +452,14 @@ namespace :test do
     task :prod, [:blocks] => ["build:prod", "build:oci_image", "build:delete_oci_image"] do |_, args|
       blocks = args[:blocks] || "5000"
       puts "--- Performing tier3 regression tests with Nix-built binary"
-      run("time #{DEPLOY_TIER3} #{PROD_MODE} #{blocks}")
+      run("#{DEPLOY_TIER3} #{PROD_MODE} #{blocks}")
     end
 
     desc "Run the 3rd tier of tests with dev build & no unit tests"
     task :dev, [:blocks] => "build:dev" do |_, args|
       blocks = args[:blocks] || "5000"
       puts "--- Performing tier3 regression tests with dev-built binary"
-      run("time #{DEPLOY_TIER3} dev #{blocks}")
+      run("#{DEPLOY_TIER3} dev #{blocks}")
     end
   end
 end
@@ -479,7 +471,7 @@ namespace :deploy do
     blocks = args[:blocks] || "5000"
     web_port = args[:web_port] || ""
     puts "--- Deploying prod indexer"
-    run("time #{DEPLOY_PROD} #{PROD_MODE} #{blocks} #{web_port}")
+    run("#{DEPLOY_PROD} #{PROD_MODE} #{blocks} #{web_port}")
   end
 
   desc "Run a server as if in production with the dev-built binary"
@@ -488,7 +480,7 @@ namespace :deploy do
     web_port = args[:web_port] || ""
     Rake::Task["test:tier3:dev"].invoke(blocks)
     puts "--- Deploying dev prod indexer"
-    run("time #{DEPLOY_PROD} dev #{blocks} #{web_port}")
+    run("#{DEPLOY_PROD} dev #{blocks} #{web_port}")
   end
 end
 
