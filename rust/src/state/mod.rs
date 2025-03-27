@@ -319,10 +319,7 @@ impl IndexerState {
             &genesis_block.previous_state_hash(),
             &genesis_ledger,
             config.version.genesis.blockchain_lenth,
-            Some(&Token {
-                supply: genesis_block.total_currency().into(),
-                ..Default::default()
-            }),
+            Some(&Token::mina_with_supply(genesis_block.total_currency())),
         )?;
         info!("Genesis ledger added to indexer store");
 

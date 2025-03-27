@@ -275,7 +275,13 @@ impl AccountQueryInput {
         }
 
         if let Some(token) = token.as_ref() {
-            if account.token != Some(TokenAddress::new(token).expect("valid token address")) {
+            if account
+                .token
+                .as_ref()
+                .map_or(token != MINA_TOKEN_ADDRESS, |t| {
+                    *t != TokenAddress::new(token).expect("valid token address")
+                })
+            {
                 return false;
             }
         }
