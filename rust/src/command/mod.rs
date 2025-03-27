@@ -540,45 +540,19 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     fn hash(&self) -> anyhow::Result<TxnHash> {
         match self {
             Self::V1(v1) => {
+                if let Some(txn_hash) = v1.t.txn_hash.to_owned() {
+                    return Ok(txn_hash);
+                }
+
                 let UserCommand1::SignedCommand(ref signed_cmd) = v1.t.data.t.t;
-                // convert versioned signed command to bin_prot bytes
-                let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
-                bin_prot::to_writer(&mut binprot_bytes, signed_cmd)?;
-
-                // base58 encode + Blake2b hash
-                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
-                    .with_check_version(USER_COMMAND)
-                    .into_string();
-                let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
-
-                // add length + version bytes
-                let mut hash = hasher.finalize_boxed().to_vec();
-                const VERSION_BYTE: u8 = 1;
-                hash.insert(0, hash.len() as u8);
-                hash.insert(0, VERSION_BYTE);
-
-                // base58 encode txn hash
-                Ok(TxnHash::V1(
-                    bs58::encode(hash)
-                        .with_check_version(V1_TXN_HASH)
-                        .into_string(),
-                ))
+                hash_command_v1(signed_cmd)
             }
-            Self::V2(data) => {
-                let bytes = serde_json::to_vec(&data.data.1)?;
+            Self::V2(v2) => {
+                if let Some(txn_hash) = v2.txn_hash.to_owned() {
+                    return Ok(txn_hash);
+                }
 
-                let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(&bytes[..])?;
-
-                let mut hash = hasher.finalize_boxed().to_vec();
-                hash.insert(0, hash.len() as u8);
-
-                Ok(TxnHash::V2(
-                    bs58::encode(hash)
-                        .with_check_version(V2_TXN_HASH)
-                        .into_string(),
-                ))
+                hash_command_v2(&v2.data.1)
             }
         }
     }
