@@ -1,6 +1,7 @@
 /rust/target/
 /result
 /.gitconfig
+.hooks/
 
 # local database
 database/
