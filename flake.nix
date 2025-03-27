@@ -137,7 +137,7 @@
               src = lib.cleanSource ./.;
               filter = path: type:
                 (path != ".direnv")
-                && (path != "rust/target")
+                && (path != ".build")
                 && (path != "ops")
                 && (path != "Justfile")
                 && (path != "tests");

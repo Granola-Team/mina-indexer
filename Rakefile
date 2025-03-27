@@ -117,28 +117,26 @@ end
 desc "Perform Cargo audit"
 task audit: [".build/cargo_audit"]
 
-file ".build/cargo_audit": [".build", "rust/Cargo.lock"] do |t|
+file ".build/cargo_audit": ["rust/Cargo.lock"] do |t|
   puts "--- Performing Cargo audit"
+  FileUtils.mkdir_p(".build")
   cargo_output("--version")
   cargo_output("audit --version")
   audit_output = cargo_output("audit")
   File.write(t.name, audit_output)
 end
 
-file ".build" do |t|
-  FileUtils.mkdir_p(t.name)
-end
-
 desc "Lint Rust code with clippy"
-task clippy: [".build/clippy"]
+task lint_rust: [:audit, ".build/cargo_clippy"]
 
-RUST_SRC_FILES = Dir.glob("rust/**")
+RUST_SRC_FILES = Dir.glob("rust/**/*")
 
-file ".build/clippy": [".build"] + RUST_SRC_FILES do
+file ".build/cargo_clippy": RUST_SRC_FILES do |t|
   puts "--- Linting Rust code with clippy"
-  run_in_rust_dir("cargo --version")
-  run_in_rust_dir("cargo clippy --version")
-  run_in_rust_dir("cargo clippy --all-targets --all-features \
+  FileUtils.mkdir_p(".build")
+  cargo_output("--version")
+  cargo_output("clippy --version")
+  clippy_output = cargo_output("clippy --all-targets --all-features \
     -- \
     -Dwarnings \
     -Dclippy::too_many_lines \
@@ -147,8 +145,8 @@ file ".build/clippy": [".build"] + RUST_SRC_FILES do
     -Dclippy::wildcard_dependencies \
     -Dclippy::unused_self \
     -Dclippy::used_underscore_binding \
-    -Dclippy::zero_sized_map_values \
-    2>&1 | tee ../.build/clippy")
+    -Dclippy::zero_sized_map_values")
+  File.write(t.name, clippy_output)
   # Lints that demonstrably fail
   # -Dclippy::unused_async \
   # -Dclippy::multiple_crate_versions \
@@ -162,8 +160,9 @@ RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + Dir.glob("ops/**/*.rake") + ["Rakefil
 desc "Lint all Ruby code"
 task lint_ruby: [".build/lint_ruby"]
 
-file ".build/lint_ruby": [".build"] + RUBY_SRC_FILES do |t|
+file ".build/lint_ruby": RUBY_SRC_FILES do |t|
   puts "--- Linting Ruby code"
+  FileUtils.mkdir_p(".build")
   run("ruby --version")
   run("standardrb --version")
   ruby_cw_out = cmd_output("ruby -cw #{RUBY_SRC_FILES.join(" ")}")
@@ -202,8 +201,9 @@ def run_command(cmd)
   output
 end
 
-file ".build/lint_shell": [".build"] + SHELL_SCRIPTS do |t|
+file ".build/lint_shell": SHELL_SCRIPTS do |t|
   puts "--- Linting shell scripts"
+  FileUtils.mkdir_p(".build")
   run("shellcheck --version")
   sc_out = cmd_output("shellcheck #{SHELL_SCRIPTS.join(" ")}")
   File.write(t.name, sc_out)
@@ -217,24 +217,27 @@ NIX_FILES = %W[
   ops/mina/mina_txn_hasher.nix
 ]
 
-file ".build/lint_nix": [".build"] + NIX_FILES do |t|
+file ".build/lint_nix": NIX_FILES do |t|
   puts "--- Linting Nix configs"
+  FileUtils.mkdir_p(".build")
   run("alejandra --version")
   out = run_command("alejandra --check #{NIX_FILES}")
   File.write(t.name, out)
 end
 
-task machete: [".build/cargo_machete"]
+task cargo_machete: [".build/cargo_machete"]
 
-file ".build/cargo_machete": [".build"] + RUST_SRC_FILES do |t|
+file ".build/cargo_machete": RUST_SRC_FILES do |t|
   puts "--- Linting Cargo dependencies"
-  run_in_rust_dir("cargo --version")
-  run_in_rust_dir("cargo machete --version")
-  run_in_rust_dir("cargo machete 2>&1 | tee ../#{t.name}")
+  FileUtils.mkdir_p(".build")
+  cargo_output("--version")
+  cargo_output("machete --version")
+  machete_output = cargo_output("machete")
+  File.write(t.name, machete_output)
 end
 
 desc "Lint all code"
-task lint: [:clippy, :lint_ruby, :lint_shell, :lint_nix, :audit, :machete]
+task lint: [:lint_ruby, :lint_shell, :lint_nix, :cargo_machete, :lint_rust]
 
 desc "Format all code"
 task :format do
@@ -329,8 +332,8 @@ namespace :clean do
   task :all do
     FileUtils.rm_rf(".build")
     FileUtils.rm_f("result")
-    run_in_rust_dir("cargo --version")
-    run_in_rust_dir("cargo clean")
+    cargo_output("--version")
+    cargo_output("clean")
     puts "Consider also 'git clean -xdfn'"
   end
 

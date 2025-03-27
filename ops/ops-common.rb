@@ -56,7 +56,7 @@ EXE_DIR = "#{BASE_DIR}/bin"
 EXE_SRC = if BUILD_TYPE == "nix"
   "#{SRC_TOP}/result/bin/mina-indexer"
 else
-  "#{SRC_TOP}/rust/target/debug/mina-indexer"
+  "#{SRC_TOP}/.build/cargo-target/debug/mina-indexer"
 end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
