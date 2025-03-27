@@ -687,7 +687,7 @@ mod tests {
     };
 
     #[test]
-    fn test_account_display() -> anyhow::Result<()> {
+    fn test_mina_account_display() -> anyhow::Result<()> {
         let ledger_account = Account {
             balance: Amount::new(100),
             ..Default::default()
@@ -702,6 +702,31 @@ mod tests {
         assert_eq!(
             format!("{ledger_account:?}"),
             serde_json::to_string_pretty(&deduct_account)?
+        );
+
+        // same account display & debug
+        assert_eq!(format!("{ledger_account}"), format!("{ledger_account:?}"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_non_minaaccount_display() -> anyhow::Result<()> {
+        let ledger_account = Account {
+            balance: Amount::new(100),
+            token: Some(
+                TokenAddress::new("wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd").unwrap(),
+            ),
+            ..Default::default()
+        };
+
+        // account display & debug => deduct "creation fee"
+        assert_eq!(
+            format!("{ledger_account}"),
+            serde_json::to_string_pretty(&ledger_account)?
+        );
+        assert_eq!(
+            format!("{ledger_account:?}"),
+            serde_json::to_string_pretty(&ledger_account)?
         );
 
         // same account display & debug
