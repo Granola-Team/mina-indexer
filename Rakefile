@@ -81,19 +81,8 @@ end
 
 # Prerequisite checks
 namespace :prereqs do
-  desc "Check for presence of tier 1 dependencies"
-  task :tier1 do
-    puts "--- Checking for tier-1 prereqs"
-    run_in_rust_dir("cargo --version")
-    run_in_rust_dir("cargo nextest --version")
-    run_in_rust_dir("cargo audit --version")
-    run_in_rust_dir("cargo machete --version")
-    run("shellcheck --version")
-    run("shfmt --version")
-  end
-
   desc "Check for presence of tier 2 dependencies"
-  task tier2: "prereqs:tier1" do
+  task :tier2 do
     puts "--- Checking for tier-2 prereqs"
     run("jq --version")
     run("check-jsonschema --version")
@@ -104,9 +93,13 @@ end
 # Audit and linting tasks
 
 desc "Perform Cargo audit"
-task :audit do
+task audit: [".build/cargo_audit"]
+
+file ".build/cargo_audit": ["rust/Cargo.lock"] do |t|
   puts "--- Performing Cargo audit"
-  run_in_rust_dir("time cargo audit")
+  run_in_rust_dir("cargo --version")
+  run_in_rust_dir("cargo audit --version")
+  run_in_rust_dir("cargo audit 2>&1 | tee ../#{t.name}")
 end
 
 file ".build" do |t|
@@ -189,18 +182,38 @@ def run_command(cmd)
 end
 
 file ".build/lint_shell": [".build"] + SHELL_SCRIPTS do |t|
-  puts "--- Linting regression scripts"
+  puts "--- Linting shell scripts"
+  run("shellcheck --version")
   sc_out = run_command("shellcheck #{SHELL_SCRIPTS.join(" ")}")
   File.write(t.name, sc_out)
 end
 
-desc "Lint all code"
-task lint: [:clippy, :lint_ruby, :lint_shell] do
+desc "Lint Nix code"
+task lint_nix: [".build/lint_nix"]
+
+NIX_FILES = %W[
+  flake.nix
+  ops/mina/mina_txn_hasher.nix
+]
+
+file ".build/lint_nix": [".build"] + NIX_FILES do |t|
   puts "--- Linting Nix configs"
-  run("alejandra --check flake.nix ops/mina/mina_txn_hasher.nix")
-  puts "--- Linting Cargo dependencies"
-  run_in_rust_dir("cargo machete")
+  run("alejandra --version")
+  out = run_command("alejandra --check #{NIX_FILES}")
+  File.write(t.name, out)
 end
+
+task machete: [".build/cargo_machete"]
+
+file ".build/cargo_machete": [".build"] + RUST_SRC_FILES do |t|
+  puts "--- Linting Cargo dependencies"
+  run_in_rust_dir("cargo --version")
+  run_in_rust_dir("cargo machete --version")
+  run_in_rust_dir("cargo machete 2>&1 | tee ../#{t.name}")
+end
+
+desc "Lint all code"
+task lint: [:clippy, :lint_ruby, :lint_shell, :lint_nix, :audit, :machete]
 
 desc "Format all code"
 task :format do
@@ -214,6 +227,7 @@ task :format do
   run("ops/format-graphql-in-hurl-files.rb tests/hurl/")
 
   # Format shell scripts
+  run("shfmt --version")
   run_silent("shfmt --write ops/*.sh")
   run_silent("shfmt --write tests/*.sh")
   run_silent("shfmt --write tests/*.bash")
@@ -358,6 +372,7 @@ namespace :test do
       puts "--- Invoking 'rspec ops/spec'"
       run("rspec ops/spec/*_spec.rb")
       puts "--- Performing tier 1 unit test(s)"
+      run_in_rust_dir("cargo nextest --version")
       run_in_rust_dir("time cargo nextest run #{test}")
     end
 
@@ -365,6 +380,7 @@ namespace :test do
     task :tier2, [:test] do |_, args|
       test = args[:test] || ""
       puts "--- Performing all feature unit test(s)"
+      run_in_rust_dir("cargo nextest --version")
       run_in_rust_dir("time cargo nextest run --all-features #{test}")
     end
   end
@@ -397,7 +413,7 @@ namespace :test do
   end
 
   desc "Run the 1st tier of tests"
-  task tier1: ["prereqs:tier1", :lint, "test:unit:tier1"] do
+  task tier1: [:lint, "test:unit:tier1"] do
     puts "--- Performing tier 1 regression tests"
     run("time #{REGRESSION_TEST} #{BUILD_TYPE} \
       ipc_is_available_immediately \
