@@ -40,6 +40,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     assert_eq!(tracked_tokens, vec![mina_token.clone(), minu_token.clone()]);
 
     // check all token accounts
+    assert_eq!(best_ledger.len(), 228180);
     assert_eq!(
         best_ledger.len(),
         indexer_store

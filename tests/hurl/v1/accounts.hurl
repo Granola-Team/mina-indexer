@@ -363,3 +363,27 @@ jsonpath "$.data.accounts[99].timing.vesting_period" == 1
 jsonpath "$.data.accounts[99].timing.vesting_increment" == 0
 
 duration < 750
+
+#
+# Accounts data integrity
+#
+
+
+POST {{url}}
+```graphql
+{
+  accounts(
+    limit: 2000
+    query: {
+    token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+  }) {
+    publicKey
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+jsonpath "$.data.accounts" count == 1705
+
+duration < 1000
