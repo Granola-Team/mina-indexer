@@ -1,5 +1,6 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for production deployment.
 
-# The argument to "rake deploy:local_prod" is the number of blocks to use.
-nix develop --command rake deploy:local_prod 436391
+git lfs pull
+# The argument to "just deploy-local-prod" is the number of blocks to use.
+nix develop --command just deploy-local-prod 436391

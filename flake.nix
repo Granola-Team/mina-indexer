@@ -77,8 +77,10 @@
           curl
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
+          git-lfs  # Needed because this repo uses Git LFS.
           hurl
           jq
+          just
           nightlyToolchain.passthru.availableComponents.rustfmt
           nix-output-monitor # Use 'nom' in place of 'nix' to use this.
           openssh # Needed by 'git' but not declared.
@@ -184,7 +186,6 @@
             }
             // commonEnv;
           # for backwards compatibility
-          shellHook = "alias just='rake'";
           buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher;
         };
       });
