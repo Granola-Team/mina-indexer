@@ -48,6 +48,28 @@ def run_silent(cmd, *args) # standard:disable all
   status.success?
 end
 
+def cmd_output(cmd)
+  output = ""
+  IO.popen(cmd, err: [:child, :out]) do |io|
+    while (line = io.gets)
+      output += line
+      print line
+    end
+  end
+  unless $?.success?
+    raise "Command '#{cmd}' failed with exit status #{$?.exitstatus}"
+  end
+  output
+end
+
+def cargo_output(subcmd)
+  output = ""
+  Dir.chdir("rust") do
+    output = cmd_output("cargo #{subcmd}")
+  end
+  output
+end
+
 # Include other rake files (necessary if running using `rake -f`)
 Dir.glob(File.join(ENV["TOPLEVEL"], "ops", "*.rake")).each { |r| import r }
 
@@ -95,11 +117,12 @@ end
 desc "Perform Cargo audit"
 task audit: [".build/cargo_audit"]
 
-file ".build/cargo_audit": ["rust/Cargo.lock"] do |t|
+file ".build/cargo_audit": [".build", "rust/Cargo.lock"] do |t|
   puts "--- Performing Cargo audit"
-  run_in_rust_dir("cargo --version")
-  run_in_rust_dir("cargo audit --version")
-  run_in_rust_dir("cargo audit 2>&1 | tee ../#{t.name}")
+  cargo_output("--version")
+  cargo_output("audit --version")
+  audit_output = cargo_output("audit")
+  File.write(t.name, audit_output)
 end
 
 file ".build" do |t|
@@ -143,8 +166,8 @@ file ".build/lint_ruby": [".build"] + RUBY_SRC_FILES do |t|
   puts "--- Linting Ruby code"
   run("ruby --version")
   run("standardrb --version")
-  ruby_cw_out = run_command("ruby -cw #{RUBY_SRC_FILES.join(" ")}")
-  standardrb_out = run_command("standardrb --no-fix #{RUBY_SRC_FILES.join(" ")}")
+  ruby_cw_out = cmd_output("ruby -cw #{RUBY_SRC_FILES.join(" ")}")
+  standardrb_out = cmd_output("standardrb --no-fix #{RUBY_SRC_FILES.join(" ")}")
   File.write(t.name, [ruby_cw_out, standardrb_out].join("\n"))
 end
 
@@ -182,7 +205,7 @@ end
 file ".build/lint_shell": [".build"] + SHELL_SCRIPTS do |t|
   puts "--- Linting shell scripts"
   run("shellcheck --version")
-  sc_out = run_command("shellcheck #{SHELL_SCRIPTS.join(" ")}")
+  sc_out = cmd_output("shellcheck #{SHELL_SCRIPTS.join(" ")}")
   File.write(t.name, sc_out)
 end
 
