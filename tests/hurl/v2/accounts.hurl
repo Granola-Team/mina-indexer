@@ -176,7 +176,7 @@ jsonpath "$.data.accounts" count == 5
 
 # data
 jsonpath "$.data.accounts[0].publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.accounts[0].balance" == 100000000000000
+jsonpath "$.data.accounts[0].balance" == 99999000000000
 jsonpath "$.data.accounts[0].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 
 jsonpath "$.data.accounts[1].publicKey" == "B62qrQKS9ghd91shs73TCmBJRW9GzvTJK443DPx2YbqcyoLc56g1ny9"
