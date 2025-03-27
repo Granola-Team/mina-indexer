@@ -430,7 +430,7 @@ namespace :test do
   end
 
   desc "Run the 1st tier of tests"
-  task tier1: [:lint, "test:unit:tier1", "build:dev"] do
+  task tier1: [:lint, "test:unit:tier1"] do
     puts "--- Performing tier 1 regression tests"
     run("#{REGRESSION_TEST} #{BUILD_TYPE} \
       ipc_is_available_immediately \
