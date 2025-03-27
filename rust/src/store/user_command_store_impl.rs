@@ -12,7 +12,7 @@ use crate::{
         BlockComparison,
     },
     command::{
-        signed::{SignedCommand, SignedCommandWithData, TxnHash},
+        signed::{SignedCommandWithData, TxnHash},
         store::UserCommandStore,
         UserCommandWithStatus, UserCommandWithStatusT,
     },
@@ -53,8 +53,8 @@ impl UserCommandStore for IndexerStore {
 
         // per command
         for command in &user_commands {
-            let signed = SignedCommand::from(command.clone());
-            let txn_hash = signed.hash_signed_command()?;
+            let is_zkapp = command.is_zkapp_command();
+            let txn_hash = command.hash()?;
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command
@@ -73,7 +73,7 @@ impl UserCommandStore for IndexerStore {
                 &value,
             );
 
-            if command.is_zkapp_command() {
+            if is_zkapp {
                 batch.put_cf(
                     self.zkapp_commands_cf(),
                     txn_block_key(&txn_hash, &state_hash),
@@ -91,7 +91,7 @@ impl UserCommandStore for IndexerStore {
                 &value,
             );
 
-            if command.is_zkapp_command() {
+            if is_zkapp {
                 batch.put_cf(
                     self.zkapp_commands_height_sort_cf(),
                     txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
@@ -106,7 +106,7 @@ impl UserCommandStore for IndexerStore {
                 &value,
             );
 
-            if command.is_zkapp_command() {
+            if is_zkapp {
                 batch.put_cf(
                     self.zkapp_commands_slot_sort_cf(),
                     txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
@@ -115,8 +115,7 @@ impl UserCommandStore for IndexerStore {
             }
 
             // add per token txns
-            let tokens = signed.tokens();
-            for token in tokens.iter() {
+            for token in command.tokens().iter() {
                 batch.put_cf(
                     self.user_commands_per_token_height_sort_cf(),
                     token_txn_sort_key(token, block.blockchain_length(), &txn_hash, &state_hash),
@@ -138,7 +137,7 @@ impl UserCommandStore for IndexerStore {
             // increment counts
             self.increment_user_commands_counts(command, epoch)?;
 
-            if command.is_zkapp_command() {
+            if is_zkapp {
                 self.increment_zkapp_commands_counts(command, epoch)?;
             }
 

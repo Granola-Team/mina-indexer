@@ -5,18 +5,10 @@ use crate::{
     ledger::token::{TokenAddress, TokenId},
     mina_blocks::v2::{self, staged_ledger_diff::UserCommandData},
     proof_systems::signer::signature::Signature,
-    protocol::{
-        bin_prot,
-        serialization_types::{
-            staged_ledger_diff as mina_rs,
-            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
-        },
-    },
+    protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
 use anyhow::Result;
-use blake2::digest::VariableOutput;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 
 // re-export [txn_hash::TxnHash]
 pub type TxnHash = txn_hash::TxnHash;
@@ -294,45 +286,8 @@ impl SignedCommand {
     /// Returns a user command (transaction) hash
     pub fn hash_signed_command(&self) -> Result<TxnHash> {
         match self {
-            Self::V1(v1) => {
-                // convert versioned signed command to bin_prot bytes
-                let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
-                bin_prot::to_writer(&mut binprot_bytes, v1)?;
-
-                // base58 encode + Blake2b hash
-                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
-                    .with_check_version(USER_COMMAND)
-                    .into_string();
-                let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
-
-                // add length + version bytes
-                let mut hash = hasher.finalize_boxed().to_vec();
-                const VERSION_BYTE: u8 = 1;
-                hash.insert(0, hash.len() as u8);
-                hash.insert(0, VERSION_BYTE);
-
-                // base58 encode txn hash
-                Ok(TxnHash::V1(
-                    bs58::encode(hash)
-                        .with_check_version(V1_TXN_HASH)
-                        .into_string(),
-                ))
-            }
-            Self::V2(data) => {
-                let bytes = serde_json::to_vec(data)?;
-                let mut hasher = blake2::Blake2bVar::new(32)?;
-                hasher.write_all(&bytes[..])?;
-
-                let mut hash = hasher.finalize_boxed().to_vec();
-                hash.insert(0, hash.len() as u8);
-
-                Ok(TxnHash::V2(
-                    bs58::encode(hash)
-                        .with_check_version(V2_TXN_HASH)
-                        .into_string(),
-                ))
-            }
+            Self::V1(v1) => super::hash_command_v1(v1),
+            Self::V2(v2) => super::hash_command_v2(v2),
         }
     }
 

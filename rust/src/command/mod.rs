@@ -15,15 +15,23 @@ use crate::{
             ZkappCommandData,
         },
     },
-    protocol::serialization_types::staged_ledger_diff::{
-        self as mina_rs, TransactionStatus1, TransactionStatusFailedType,
+    protocol::{
+        bin_prot,
+        serialization_types::{
+            staged_ledger_diff::{
+                self as mina_rs, TransactionStatus1, TransactionStatusFailedType, UserCommand1,
+            },
+            version_bytes::{USER_COMMAND, V1_TXN_HASH, V2_TXN_HASH},
+        },
     },
     utility::functions::nanomina_to_mina,
 };
+use blake2::digest::VariableOutput;
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use signed::{SignedCommandWithCreationData, SignedCommandWithKind};
+use std::io::Write;
 
 // re-export types
 pub type TxnHash = signed::TxnHash;
@@ -227,6 +235,8 @@ pub trait UserCommandWithStatusT {
 
     fn signer(&self) -> PublicKey;
 
+    fn hash(&self) -> anyhow::Result<TxnHash>;
+
     fn receiver_account_creation_fee_paid(&self) -> bool;
 }
 
@@ -247,20 +257,18 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         )
     }
 
+    /// All tokens involved in the transaction
     fn tokens(&self) -> Vec<TokenAddress> {
-        match self {
-            Self::V1(_) => vec![TokenAddress::default()],
-            Self::V2(v2) => match &v2.data.1 {
-                v2::staged_ledger_diff::UserCommandData::SignedCommandData(_) => {
-                    vec![TokenAddress::default()]
-                }
-                v2::staged_ledger_diff::UserCommandData::ZkappCommandData(zkapp) => {
-                    let mut tokens = vec![];
-                    zkapp_tokens(zkapp, &mut tokens);
-                    tokens
-                }
-            },
+        if let Self::V2(v2) = self {
+            let mut tokens = vec![];
+
+            if let UserCommandData::ZkappCommandData(data) = &v2.data.1 {
+                zkapp_tokens(data, &mut tokens);
+                return tokens;
+            }
         }
+
+        vec![TokenAddress::default()]
     }
 
     fn receiver_account_creation_fee_paid(&self) -> bool {
@@ -528,6 +536,93 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
             },
         }
     }
+
+    fn hash(&self) -> anyhow::Result<TxnHash> {
+        match self {
+            Self::V1(v1) => {
+                let UserCommand1::SignedCommand(ref signed_cmd) = v1.t.data.t.t;
+                // convert versioned signed command to bin_prot bytes
+                let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
+                bin_prot::to_writer(&mut binprot_bytes, signed_cmd)?;
+
+                // base58 encode + Blake2b hash
+                let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+                    .with_check_version(USER_COMMAND)
+                    .into_string();
+                let mut hasher = blake2::Blake2bVar::new(32)?;
+                hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+
+                // add length + version bytes
+                let mut hash = hasher.finalize_boxed().to_vec();
+                const VERSION_BYTE: u8 = 1;
+                hash.insert(0, hash.len() as u8);
+                hash.insert(0, VERSION_BYTE);
+
+                // base58 encode txn hash
+                Ok(TxnHash::V1(
+                    bs58::encode(hash)
+                        .with_check_version(V1_TXN_HASH)
+                        .into_string(),
+                ))
+            }
+            Self::V2(data) => {
+                let bytes = serde_json::to_vec(&data.data.1)?;
+
+                let mut hasher = blake2::Blake2bVar::new(32)?;
+                hasher.write_all(&bytes[..])?;
+
+                let mut hash = hasher.finalize_boxed().to_vec();
+                hash.insert(0, hash.len() as u8);
+
+                Ok(TxnHash::V2(
+                    bs58::encode(hash)
+                        .with_check_version(V2_TXN_HASH)
+                        .into_string(),
+                ))
+            }
+        }
+    }
+}
+
+pub fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash> {
+    // convert versioned signed command to bin_prot bytes
+    let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
+    bin_prot::to_writer(&mut binprot_bytes, v1)?;
+
+    // base58 encode + Blake2b hash
+    let binprot_bytes_bs58 = bs58::encode(&binprot_bytes[..])
+        .with_check_version(USER_COMMAND)
+        .into_string();
+    let mut hasher = blake2::Blake2bVar::new(32)?;
+    hasher.write_all(binprot_bytes_bs58.as_bytes())?;
+
+    // add length + version bytes
+    let mut hash = hasher.finalize_boxed().to_vec();
+    const VERSION_BYTE: u8 = 1;
+    hash.insert(0, hash.len() as u8);
+    hash.insert(0, VERSION_BYTE);
+
+    // base58 encode txn hash
+    Ok(TxnHash::V1(
+        bs58::encode(hash)
+            .with_check_version(V1_TXN_HASH)
+            .into_string(),
+    ))
+}
+
+pub fn hash_command_v2(v2: &UserCommandData) -> anyhow::Result<TxnHash> {
+    let bytes = serde_json::to_vec(v2)?;
+    let mut hasher = blake2::Blake2bVar::new(32)?;
+    hasher.write_all(&bytes[..])?;
+
+    let mut hash = hasher.finalize_boxed().to_vec();
+    hash.insert(0, hash.len() as u8);
+
+    Ok(TxnHash::V2(
+        bs58::encode(hash)
+            .with_check_version(V2_TXN_HASH)
+            .into_string(),
+    ))
 }
 
 pub const MEMO_LEN: usize = 32;
@@ -763,7 +858,9 @@ impl From<UserCommandWithStatus> for Command {
     }
 }
 
-// debug/display
+///////////////////
+// debug/display //
+///////////////////
 
 impl std::fmt::Debug for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
