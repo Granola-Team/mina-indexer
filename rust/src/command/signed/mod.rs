@@ -388,20 +388,22 @@ impl SignedCommandWithData {
     }
 
     pub fn from(
-        user_cmd: &UserCommandWithStatus,
+        user_cmd: UserCommandWithStatus,
         state_hash: &str,
         blockchain_length: u32,
         date_time: u64,
         global_slot_since_genesis: u32,
     ) -> Self {
-        let command = SignedCommand::from(user_cmd.clone());
+        let status = user_cmd.status_data();
+        let command = SignedCommand::from(user_cmd);
+
         Self {
+            status,
             date_time,
             blockchain_length,
             global_slot_since_genesis,
             nonce: command.nonce(),
             state_hash: state_hash.into(),
-            status: user_cmd.status_data(),
             tx_hash: command
                 .hash_signed_command()
                 .expect("valid transaction hash"),
@@ -412,7 +414,7 @@ impl SignedCommandWithData {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         block
             .commands()
-            .iter()
+            .into_iter()
             .map(|cmd| {
                 Self::from(
                     cmd,
@@ -1109,6 +1111,7 @@ mod tests {
             block
                 .zkapp_commands()
                 .first()
+                .cloned()
                 .map(|cmd| SignedCommandWithData::from(
                     cmd,
                     "3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW",
@@ -1146,7 +1149,7 @@ mod tests {
         assert_eq!(
             block
                 .zkapp_commands()
-                .iter()
+                .into_iter()
                 .map(|cmd| SignedCommandWithData::from(
                     cmd,
                     "3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x",
@@ -1180,7 +1183,7 @@ mod tests {
         assert_eq!(
             block
                 .zkapp_commands()
-                .iter()
+                .into_iter()
                 .map(|cmd| SignedCommandWithData::from(
                     cmd,
                     "3NK6LSkCCBNoHmiRfYhYijDuxwgYQsU5GcdEMbUGhNdHDkJyrh3x",

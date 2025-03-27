@@ -59,7 +59,7 @@ impl UserCommandStore for IndexerStore {
 
             // add signed command
             let signed_command_with_data = SignedCommandWithData::from(
-                command,
+                command.clone(),
                 &state_hash.0,
                 block.blockchain_length(),
                 block.timestamp(),
@@ -213,7 +213,7 @@ impl UserCommandStore for IndexerStore {
                 .filter(|cmd| cmd.contains_public_key(&pk))
                 .map(|c| {
                     SignedCommandWithData::from(
-                        c,
+                        c.clone(),
                         &state_hash.0,
                         block.blockchain_length(),
                         block.timestamp(),
