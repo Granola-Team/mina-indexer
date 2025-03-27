@@ -75,6 +75,8 @@ pub struct StagedLedgerPreDiffJson {
 pub struct UserCommandWithStatus1 {
     pub data: UserCommandV1,
     pub status: TransactionStatusV1,
+
+    #[serde(skip_serializing)]
     pub txn_hash: Option<TxnHash>,
 }
 
@@ -82,6 +84,8 @@ pub struct UserCommandWithStatus1 {
 pub struct UserCommandWithStatus2 {
     pub data: UserCommandV2,
     pub status: TransactionStatusV2,
+
+    #[serde(skip_serializing)]
     pub txn_hash: Option<TxnHash>,
 }
 
@@ -96,6 +100,8 @@ pub type UserCommandWithStatusV2 = Versioned<UserCommandWithStatus2, 2>;
 pub struct UserCommandWithStatusJson {
     pub data: UserCommandJson,
     pub status: TransactionStatusJson,
+
+    #[serde(skip_serializing)]
     pub txn_hash: Option<TxnHash>,
 }
 
