@@ -1,7 +1,8 @@
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(untagged)]
 pub enum TxnHash {
     V1(String),
     V2(String),
@@ -85,6 +86,25 @@ impl TxnHash {
                 bytes
             }
         }
+    }
+}
+
+///////////
+// serde //
+///////////
+
+impl<'de> Deserialize<'de> for TxnHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        crate::utility::serde::from_str::<String, D>(deserializer).map(|txn_hash| {
+            if txn_hash.starts_with(Self::V1_PREFIX) {
+                Self::V1(txn_hash)
+            } else {
+                Self::V2(txn_hash)
+            }
+        })
     }
 }
 
