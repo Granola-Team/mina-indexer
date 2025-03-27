@@ -66,7 +66,7 @@ namespace :bin do
     all_args.concat(args.extras)
 
     # Join with spaces for command line
-    command_args = all_args.join(' ')
+    command_args = all_args.join(" ")
 
     Dir.chdir(BASE_DIR) do
       run("#{idxr_bin} --socket #{SOCKET_FILE} #{command_args}", dir: BASE_DIR)
@@ -103,13 +103,12 @@ namespace :bin do
           puts "Force killing process..."
           system("kill -9 #{pid}")
         end
-
-        # Clean up PID file
-        FileUtils.rm_f(PID_FILE)
       else
         puts "Process #{pid} not running."
-        FileUtils.rm_f(PID_FILE)
       end
+
+      # Clean up PID file
+      FileUtils.rm_f(PID_FILE)
     else
       puts "No PID file found at #{PID_FILE}"
     end

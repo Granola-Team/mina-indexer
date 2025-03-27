@@ -141,7 +141,7 @@ file ".build/clippy": [".build"] + RUST_SRC_FILES do
   # -Dclippy::wildcard_imports
 end
 
-RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + ["Rakefile"]
+RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + Dir.glob("ops/**/*.rake") + ["Rakefile"]
 
 desc "Lint all Ruby code"
 task lint_ruby: [".build/lint_ruby"]
@@ -150,15 +150,52 @@ file ".build/lint_ruby": [".build"] + RUBY_SRC_FILES do |t|
   puts "--- Linting Ruby code"
   run("ruby --version")
   run("standardrb --version")
-  ruby_cw_out = `ruby -cw #{RUBY_SRC_FILES.join(" ")}`
-  standardrb_out = `standardrb --no-fix #{RUBY_SRC_FILES.join(" ")}`
+  ruby_cw_out = run_command("ruby -cw #{RUBY_SRC_FILES.join(" ")}")
+  standardrb_out = run_command("standardrb --no-fix #{RUBY_SRC_FILES.join(" ")}")
   File.write(t.name, [ruby_cw_out, standardrb_out].join("\n"))
 end
 
-desc "Lint all code"
-task lint: [:clippy, :lint_ruby] do
+desc "Lint shell scripts"
+task lint_shell: [".build/lint_shell"]
+
+SHELL_SCRIPTS = %W[
+  ./ops/ci/tier3
+  ./ops/ci/prod
+  ./ops/ci/tier1
+  ./ops/ci/tier2
+  ./tests/regression.bash
+  ./tests/recovery.sh
+]
+#  ./.hooks/pre-push
+#  ./.hooks/pre-commit
+#  ./ops/traverse-canonical-chain.sh
+#  ./ops/correct-file-names.sh
+#  ./ops/minaexplorer/download-staking-ledgers.sh
+#  ./ops/download-snapshot.sh
+#  ./ops/upload-staking-ledgers.sh
+#  ./ops/upload-snapshot.sh
+#  ./ops/upload-mina-blocks.sh
+#  ./ops/calculate-archive-ledgers.sh
+
+def run_command(cmd)
+  output = `#{cmd}`
+
+  unless $?.success?
+    raise "Command '#{cmd}' failed with exit status #{$?.exitstatus} " \
+          "and output:\n#{output}"
+  end
+
+  output
+end
+
+file ".build/lint_shell": [".build"] + SHELL_SCRIPTS do |t|
   puts "--- Linting regression scripts"
-  run("shellcheck tests/regression.bash")
+  sc_out = run_command("shellcheck #{SHELL_SCRIPTS.join(" ")}")
+  File.write(t.name, sc_out)
+end
+
+desc "Lint all code"
+task lint: [:clippy, :lint_ruby, :lint_shell] do
   puts "--- Linting Nix configs"
   run("alejandra --check flake.nix ops/mina/mina_txn_hasher.nix")
   puts "--- Linting Cargo dependencies"
