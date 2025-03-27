@@ -158,13 +158,11 @@ SHELL_SCRIPTS = %W[
   ./ops/ci/tier2
   ./tests/regression.bash
   ./tests/recovery.sh
+  ./ops/download-snapshot.sh
 ]
-#  ./.hooks/pre-push
-#  ./.hooks/pre-commit
 #  ./ops/traverse-canonical-chain.sh
 #  ./ops/correct-file-names.sh
 #  ./ops/minaexplorer/download-staking-ledgers.sh
-#  ./ops/download-snapshot.sh
 #  ./ops/upload-staking-ledgers.sh
 #  ./ops/upload-snapshot.sh
 #  ./ops/upload-mina-blocks.sh

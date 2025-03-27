@@ -11,7 +11,7 @@ exit_handler() {
 }
 trap exit_handler EXIT
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 "$MY_DIR"/granola-rclone.rb copyto linode-granola:granola-mina-indexer-snapshots/mina-indexer-snapshots/"$1" "$2"/"$1"
 RESULT='Success.'
