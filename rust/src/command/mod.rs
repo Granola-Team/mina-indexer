@@ -1525,6 +1525,14 @@ mod test {
         let mina_json: Value = from_slice::<Value>(&contents)?["data"]["staged_ledger_diff"]
             ["diff"][0]["commands"][0]
             .clone();
+
+        let mina_json = if let Value::Object(mut obj) = mina_json {
+            obj.remove("txn_hash");
+            Value::Object(obj)
+        } else {
+            mina_json
+        };
+
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
         let user_cmd_with_status = block.commands()[0].clone();
         let user_cmd_with_status: Value = user_cmd_with_status.into();
@@ -1696,6 +1704,86 @@ mod test {
                 "ukr svin, oink oink",
                 "",
                 ""
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn txn_hashes_v1() -> anyhow::Result<()> {
+        // refer to the hashes on Minascan
+        // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
+        // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
+
+        let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
+        let hashes = precomputed_block.command_hashes();
+        let expect = vec![
+            TxnHash::V1("CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string()),
+            TxnHash::V1("CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj".to_string()),
+        ];
+
+        assert_eq!(hashes, expect);
+        Ok(())
+    }
+
+    #[test]
+    fn txn_hashes_v1_given() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
+        let hashes = pcb.command_hashes();
+        let res: Vec<_> = hashes.iter().map(TxnHash::to_string).collect();
+
+        assert_eq!(
+            res,
+            vec![
+                "CkpYgPbLYw83tNm1wnmfRZUssbKnoVixPFaB3hGVLpuZm9UeHtBFw",
+                "CkpYyMV4jDtgKfbz6hCUVB6J8jYfJd85A7mvtVw7ydKLuoCK5GS25"
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn txn_hash_v2() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let hashes = precomputed_block.command_hashes();
+
+        // see https://minaexplorer.com/block/3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg
+        assert_eq!(
+            hashes,
+            vec![TxnHash::V2(
+                "5JuJ1eRNWdE8jSMmCDoHnAdBGhLyBnCk2gkcvkfCZ7WvrKtGuWHB".to_string()
+            )]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn txn_hash_v2_zkapp_command() -> anyhow::Result<()> {
+        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
+        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
+        let hashes = precomputed_block
+            .commands()
+            .into_iter()
+            .filter_map(|cmd| {
+                if !cmd.is_zkapp_command() {
+                    // filter out non-zkapp commands
+                    return None;
+                }
+
+                cmd.hash().ok()
+            })
+            .collect::<Vec<_>>();
+
+        // see https://minaexplorer.com/block/3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK
+        assert_eq!(
+            hashes,
+            vec![
+                TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string()),
+                TxnHash::V2("5JvQqrHBgDtB7gew76AkFhSkkfUTCtYQhPT53erZZQYibV6ms9YD".to_string()),
             ]
         );
         Ok(())

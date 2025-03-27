@@ -914,69 +914,6 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn txn_hash_v1() -> Result<()> {
-        // refer to the hashes on Minascan
-        // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
-        // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
-
-        let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1).unwrap();
-        let hashes = precomputed_block.command_hashes();
-        let expect = vec![
-            TxnHash::V1("CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX".to_string()),
-            TxnHash::V1("CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj".to_string()),
-        ];
-
-        assert_eq!(hashes, expect);
-        Ok(())
-    }
-
-    #[test]
-    fn txn_hash_signed_command_v2() -> Result<()> {
-        let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
-        let hashes = precomputed_block.command_hashes();
-
-        // see https://minaexplorer.com/block/3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg
-        assert_eq!(
-            hashes,
-            vec![TxnHash::V2(
-                "5JtZ6p9SepL8GeAyjjFVj1JCQUAvSTHwzUQe9fxbNtqkA7X8ZAzf".to_string()
-            )]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn txn_hash_zkapp_command() -> Result<()> {
-        let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
-        let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
-        let hashes = precomputed_block
-            .commands()
-            .into_iter()
-            .filter_map(|cmd| {
-                if !cmd.is_zkapp_command() {
-                    // filter out non-zkapp commands
-                    return None;
-                }
-
-                let cmd: SignedCommand = cmd.into();
-                Some(cmd.hash_signed_command().unwrap())
-            })
-            .collect::<Vec<_>>();
-
-        // see https://minaexplorer.com/block/3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK
-        assert_eq!(
-            hashes,
-            vec![
-                TxnHash::V2("5JtXBs7Xtf2QDgTmd6sdkWPLNxPXT9eu2tBWgihjB35DUZ4o1SwR".to_string()),
-                TxnHash::V2("5JupfF1RRVYXdEW1KGZXad11ugerCagr2K8qjBFq692MRbuDeJCN".to_string()),
-            ]
-        );
-        Ok(())
-    }
-
-    #[test]
     fn signed_command_json_v1() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/sequential_blocks/mainnet-105489-3NK4huLvUDiL4XuCUcyrWCKynmvhqfKsx5h2MfBXVVUq2Qwzi5uT.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V1)?;
