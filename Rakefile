@@ -122,8 +122,9 @@ desc "Lint Rust code with clippy"
 task lint_rust: [:audit, ".build/cargo_clippy"]
 
 RUST_SRC_FILES = Dir.glob("rust/**/*")
+CARGO_DEPS = [".cargo/config.toml"] + RUST_SRC_FILES
 
-file ".build/cargo_clippy": RUST_SRC_FILES do |t|
+file ".build/cargo_clippy": CARGO_DEPS do |t|
   puts "--- Linting Rust code with clippy"
   FileUtils.mkdir_p(".build")
   cargo_output("--version")
@@ -219,7 +220,7 @@ end
 
 task cargo_machete: [".build/cargo_machete"]
 
-file ".build/cargo_machete": RUST_SRC_FILES do |t|
+file ".build/cargo_machete": CARGO_DEPS do |t|
   puts "--- Linting Cargo dependencies"
   FileUtils.mkdir_p(".build")
   cargo_output("--version")
@@ -253,7 +254,7 @@ task :format do
 end
 
 desc "Perform a fast verification of whether the source compiles"
-task :check do
+task check: CARGO_DEPS do
   puts "--- Invoking 'cargo check'"
   cargo_output("check")
 end
@@ -267,7 +268,7 @@ namespace :build do
   end
 
   desc "Perform a dev build"
-  task :dev do
+  task dev: CARGO_DEPS do
     cargo_output("build")
   end
 
@@ -383,7 +384,7 @@ end
 namespace :test do
   namespace :unit do
     desc "Run unit tests"
-    task :tier1, [:test] do |_, args|
+    task :tier1, [:test] => CARGO_DEPS do |_, args|
       test = args[:test] || ""
       puts "--- Invoking 'rspec ops/spec'"
       run("rspec ops/spec/*_spec.rb")
