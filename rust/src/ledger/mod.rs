@@ -227,12 +227,7 @@ impl Ledger {
             let mut accounts = HashMap::new();
 
             for (pk, acct) in token_ledger.accounts.iter() {
-                let acct = if token.0 == MINA_TOKEN_ADDRESS {
-                    acct.clone().display()
-                } else {
-                    acct.clone()
-                };
-                accounts.insert(pk.to_address(), acct);
+                accounts.insert(pk.to_address(), acct.clone().display());
             }
 
             tokens.insert(token.0.to_owned(), accounts);
@@ -388,16 +383,11 @@ impl TokenLedger {
         Ok(ledger)
     }
 
-    pub fn to_string_pretty(&self, token: &TokenAddress) -> String {
+    pub fn to_string_pretty(&self) -> String {
         let mut accounts = HashMap::new();
 
         for (pk, acct) in self.accounts.iter() {
-            if token.0 == MINA_TOKEN_ADDRESS {
-                acct.clone().display()
-            } else {
-                acct.clone()
-            };
-            accounts.insert(pk.to_address(), acct);
+            accounts.insert(pk.to_address(), acct.clone().display());
         }
 
         serde_json::to_string_pretty(&accounts).unwrap()
