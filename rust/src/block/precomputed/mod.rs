@@ -15,10 +15,7 @@ use crate::{
     base::{amount::Amount, blockchain_length::BlockchainLength, public_key::PublicKey},
     canonicity::Canonicity,
     chain::Network,
-    command::{
-        signed::{SignedCommand, TxnHash},
-        UserCommandWithStatus, UserCommandWithStatusT,
-    },
+    command::{signed::TxnHash, UserCommandWithStatus, UserCommandWithStatusT},
     constants::*,
     ledger::{
         coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
@@ -285,13 +282,9 @@ impl PrecomputedBlock {
 
     /// Returns the vector of user command hashes
     pub fn command_hashes(&self) -> Vec<TxnHash> {
-        SignedCommand::from_precomputed(self)
+        self.commands()
             .iter()
-            .map(|cmd| {
-                cmd.signed_command
-                    .hash_signed_command()
-                    .expect("signed command hash")
-            })
+            .map(|cmd| cmd.hash().expect("command hash"))
             .collect()
     }
 
