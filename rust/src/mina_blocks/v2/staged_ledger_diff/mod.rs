@@ -8,7 +8,7 @@ use crate::{
         amount::Amount, nonce::Nonce, numeric::Numeric, public_key::PublicKey,
         scheduled_time::ScheduledTime, Balance,
     },
-    command::{to_mina_format, to_zkapp_json},
+    command::{to_mina_format, to_zkapp_json, TxnHash},
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{token::TokenAddress, LedgerHash},
     protocol::serialization_types::staged_ledger_diff::{
@@ -69,6 +69,7 @@ pub struct UserCommand {
     pub data: (UserCommandKind, UserCommandData),
     #[serde(with = "status_format")]
     pub status: Status,
+    pub txn_hash: Option<TxnHash>,
 }
 
 impl Eq for UserCommand {}

@@ -2,6 +2,7 @@ use crate::{
     base::{
         amount::Amount, nonce::Nonce, public_key::PublicKey, scheduled_time::ScheduledTime, Balance,
     },
+    command::TxnHash,
     ledger::token::TokenId,
 };
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,7 @@ pub struct CompletedWork {
 pub struct Command {
     pub data: Option<(SignedCommandTag, SignedCommandData)>,
     pub status: Option<(SignedCommandStatus, AuxiliaryData, BalanaceData)>,
+    pub txn_hash: Option<TxnHash>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

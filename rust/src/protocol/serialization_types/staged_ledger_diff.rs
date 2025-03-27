@@ -7,11 +7,16 @@
 
 #![allow(missing_docs)] // Don't actually know what many of the types fields are for yet
 
-use crate::protocol::serialization_types::{
-    common::{AmountV1, DecimalJson, ExtendedU32, ExtendedU64_2, ExtendedU64_3, U32Json, U64Json},
-    signatures::{PublicKey2V1, PublicKeyJson, PublicKeyV1, SignatureJson, SignatureV1},
-    snark_work::{TransactionSnarkWorkJson, TransactionSnarkWorkV1},
-    version_bytes,
+use crate::{
+    command::TxnHash,
+    protocol::serialization_types::{
+        common::{
+            AmountV1, DecimalJson, ExtendedU32, ExtendedU64_2, ExtendedU64_3, U32Json, U64Json,
+        },
+        signatures::{PublicKey2V1, PublicKeyJson, PublicKeyV1, SignatureJson, SignatureV1},
+        snark_work::{TransactionSnarkWorkJson, TransactionSnarkWorkV1},
+        version_bytes,
+    },
 };
 use mina_serialization_proc_macros::AutoFrom;
 use mina_serialization_versioned::{
@@ -70,12 +75,14 @@ pub struct StagedLedgerPreDiffJson {
 pub struct UserCommandWithStatus1 {
     pub data: UserCommandV1,
     pub status: TransactionStatusV1,
+    pub txn_hash: Option<TxnHash>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct UserCommandWithStatus2 {
     pub data: UserCommandV2,
     pub status: TransactionStatusV2,
+    pub txn_hash: Option<TxnHash>,
 }
 
 // v1 pre-hardfork
@@ -89,6 +96,7 @@ pub type UserCommandWithStatusV2 = Versioned<UserCommandWithStatus2, 2>;
 pub struct UserCommandWithStatusJson {
     pub data: UserCommandJson,
     pub status: TransactionStatusJson,
+    pub txn_hash: Option<TxnHash>,
 }
 
 // User command versions
