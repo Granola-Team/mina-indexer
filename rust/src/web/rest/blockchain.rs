@@ -35,7 +35,7 @@ pub struct BlockchainSummary {
 
     // ledger hashes
     next_epoch_ledger_hash: String,
-    snarked_ledger_hash: Option<String>,
+    snarked_ledger_hash: String,
     staged_ledger_hash: String,
     staking_epoch_ledger_hash: String,
 
@@ -249,7 +249,7 @@ impl BlockchainSummary {
         let next_epoch_ledger_hash = best_tip.next_epoch_ledger_hash().0;
         let previous_state_hash = best_tip.previous_state_hash().0;
         let slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
-        let snarked_ledger_hash = best_tip.snarked_ledger_hash().map(|hash| hash.0);
+        let snarked_ledger_hash = best_tip.snarked_ledger_hash().0;
         let staged_ledger_hash = best_tip.staged_ledger_hash().0;
         let staking_epoch_ledger_hash = best_tip.staking_epoch_ledger_hash().0;
         let state_hash = best_tip.state_hash().0;

@@ -275,7 +275,7 @@ pub struct BlockchainState {
     pub date: String,
 
     /// Value snarked ledger hash
-    pub snarked_ledger_hash: Option<String>,
+    pub snarked_ledger_hash: String,
 
     /// Value staged ledger hash
     pub staged_ledger_hash: String,
@@ -382,7 +382,7 @@ impl BlockWithoutCanonicity {
         let utc_date = block.timestamp().to_string();
 
         // blockchain state
-        let snarked_ledger_hash = block.snarked_ledger_hash().map(|hash| hash.0);
+        let snarked_ledger_hash = block.snarked_ledger_hash().0;
         let staged_ledger_hash = block.staged_ledger_hash().0;
 
         // consensus state

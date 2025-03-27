@@ -404,9 +404,9 @@ impl PrecomputedBlock {
         }
     }
 
-    pub fn snarked_ledger_hash(&self) -> Option<LedgerHash> {
+    pub fn snarked_ledger_hash(&self) -> LedgerHash {
         match self {
-            Self::V1(v1) => Some(LedgerHash::from_hashv1(
+            Self::V1(v1) => LedgerHash::from_hashv1(
                 v1.protocol_state
                     .body
                     .t
@@ -416,8 +416,14 @@ impl PrecomputedBlock {
                     .t
                     .snarked_ledger_hash
                     .to_owned(),
-            )),
-            Self::V2(_v2) => None,
+            ),
+            Self::V2(v2) => v2
+                .protocol_state
+                .body
+                .blockchain_state
+                .ledger_proof_statement
+                .connecting_ledger_left
+                .to_owned(),
         }
     }
 
