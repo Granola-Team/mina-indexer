@@ -93,17 +93,6 @@ task :list do
   run "rake -T"
 end
 
-# Prerequisite checks
-namespace :prereqs do
-  desc "Check for presence of tier 2 dependencies"
-  task :tier2 do
-    puts "--- Checking for tier-2 prereqs"
-    run("jq --version")
-    run("check-jsonschema --version")
-    run("hurl --version")
-  end
-end
-
 # Audit and linting tasks
 
 desc "Perform Cargo audit"
@@ -366,7 +355,7 @@ namespace :download do
   end
 end
 
-desc "Debug build and run regression tests"
+desc "Dev build and run regression tests"
 task :dev, [:subtest] => "build:dev" do |_, args|
   subtest = args[:subtest] || ""
   run("#{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
@@ -445,8 +434,17 @@ namespace :test do
   end
 
   desc "Run the 2nd tier of tests"
-  task tier2: ["prereqs:tier2", "test:unit:tier2", "build:dev"] +
-    tier2_regression_tests.map { |test| "test:regression:#{test}" }
+  task tier2: ["test:unit:tier2"] do
+    puts "--- Checking for tier-2 prereqs"
+    run("jq --version")
+    run("check-jsonschema --version")
+    run("hurl --version")
+    Rake::Task["build:dev"].invoke
+    puts "--- Running tier-2 tests"
+    tier2_regression_tests.map { |test|
+      Rake::Task["test:regression:#{test}"].invoke
+    }
+  end
 
   namespace :tier3 do
     desc "Run the 3rd tier of tests with Nix-built binary"
