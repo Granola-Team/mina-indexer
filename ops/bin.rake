@@ -1,4 +1,3 @@
-require "socket"
 require "fileutils"
 require "open3"
 
@@ -18,13 +17,7 @@ ENV["RUST_BACKTRACE"] = "full"
 
 # Helper methods
 def find_ephemeral_port
-  (49152..65535).each do |port|
-    s = TCPSocket.new("127.0.0.1", port)
-    s.close
-  rescue Errno::ECONNREFUSED
-    return port
-  end
-  raise "No available ephemeral ports found"
+  rand(49152..65535)
 end
 
 def wait_for_socket(max_retries = 250)
