@@ -110,7 +110,7 @@ end
 desc "Lint Rust code with clippy"
 task lint_rust: [:audit, ".build/cargo_clippy"]
 
-RUST_SRC_FILES = Dir.glob("rust/**/*")
+RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
 CARGO_DEPS = [".cargo/config.toml"] + RUST_SRC_FILES
 
 file ".build/cargo_clippy": CARGO_DEPS do |t|

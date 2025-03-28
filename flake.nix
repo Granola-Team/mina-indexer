@@ -137,9 +137,12 @@
               src = lib.cleanSource ./.;
               filter = path: type:
                 (path != ".direnv")
+                && (path != ".cargo")
                 && (path != ".build")
+                && (path != "rust/target")
                 && (path != "ops")
                 && (path != "Justfile")
+                && (path != "Rakefile")
                 && (path != "tests");
             };
 

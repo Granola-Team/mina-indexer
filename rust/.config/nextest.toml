@@ -1,4 +1,0 @@
-[store]
-# The directory under the workspace root at which nextest-related files are
-# written. Profile-specific storage is currently written to dir/<profile-name>.
-dir = "../.build/nextest"
