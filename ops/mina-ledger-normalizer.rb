@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 require "json"
 
 MINA_TOKEN = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
@@ -19,29 +17,19 @@ result = {}
 # Normalize all token accounts
 accounts.each do |account|
   pk = account["pk"]
-  balance = account["balance"]
-  nonce = account["nonce"] || "0"
-  delegate = account["delegate"] || pk
-  token = account["token"] || MINA_TOKEN
+  raise "Missing public key: #{JSON.pretty_generate(account)}" if pk.nil?
 
-  result[pk] = if token == MINA_TOKEN
-    # don't add MINA token
+  token = account["token"] || MINA_TOKEN
+  result[token] ||= {}
+  result[token][pk] =
     {
-      "nonce" => nonce,
-      "balance" => balance,
-      "delegate" => delegate
+      "nonce" => account["nonce"] || "0",
+      "balance" => account["balance"],
+      "delegate" => account["delegate"] || pk
     }
-  else
-    # add non-MINA token
-    {
-      "nonce" => nonce,
-      "balance" => balance,
-      "delegate" => delegate,
-      "token" => token
-    }
-  end
 end
 
 sorted_result = result.sort.to_h
+final_result = sorted_result.transform_values { |v| v.sort.to_h }
 
-puts JSON.pretty_generate(sorted_result)
+puts JSON.pretty_generate(final_result.sort.to_h)

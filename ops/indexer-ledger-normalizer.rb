@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 require "json"
 
 MINA_TOKEN = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
@@ -11,31 +9,19 @@ data = JSON.parse(File.read(ARGV[0]))
 
 result = {}
 
-# Get all token accounts
 data.keys.each do |token|
   data[token].each_value do |value|
     pk = value["public_key"]
-    balance = value["balance"].to_s
-    nonce = (value["nonce"] || 0).to_s
-    delegate = value["delegate"] || pk
-
-    result[pk] = if token == MINA_TOKEN
-      # don't add MINA token
+    result[token] ||= {}
+    result[token][pk] =
       {
-        "nonce" => nonce,
-        "balance" => balance,
-        "delegate" => delegate
+        "nonce" => (value["nonce"] || 0).to_s,
+        "balance" => value["balance"].to_s,
+        "delegate" => value["delegate"] || pk
       }
-    else
-      # add non-MINA token
-      {
-        "nonce" => nonce,
-        "balance" => balance,
-        "delegate" => delegate,
-        "token" => token
-      }
-    end
   end
 end
 
-puts JSON.pretty_generate(result.sort.to_h)
+sorted_result = result.sort.to_h
+final_result = sorted_result.transform_values { |v| v.sort.to_h }
+puts JSON.pretty_generate(final_result.sort.to_h)
