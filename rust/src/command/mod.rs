@@ -540,10 +540,6 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     fn hash(&self) -> anyhow::Result<TxnHash> {
         match self {
             Self::V1(v1) => {
-                if let Some(txn_hash) = v1.t.txn_hash.to_owned() {
-                    return Ok(txn_hash);
-                }
-
                 let UserCommand1::SignedCommand(ref signed_cmd) = v1.t.data.t.t;
                 hash_command_v1(signed_cmd)
             }

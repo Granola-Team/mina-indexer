@@ -136,7 +136,6 @@ fn test_protocol_state_body_constants() {
     }
 }
 
-#[ignore = "this test fails but we don't need it"]
 #[test]
 #[wasm_bindgen_test]
 fn test_staged_ledger_diff_diff_commands() {
@@ -218,7 +217,6 @@ fn test_staged_ledger_diff_diff_commands_status() {
     }
 }
 
-#[ignore = "this test fails but we don't need it"]
 #[test]
 #[wasm_bindgen_test]
 fn test_staged_ledger_diff_diff_coinbase() {
