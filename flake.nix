@@ -77,7 +77,6 @@
           curl
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
-          git-lfs # Needed because this repo uses Git LFS.
           hurl
           jq
           just

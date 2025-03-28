@@ -3,7 +3,5 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for production deployment.
 
-git lfs pull
-
 # The argument to "just deploy-local-prod" is the number of blocks to use.
 nix develop --command just deploy-local-prod 436391
