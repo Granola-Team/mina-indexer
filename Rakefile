@@ -3,8 +3,9 @@ require "open3"
 
 TOP = __dir__
 
-# Include other rake files (necessary if running using `rake -f`)
-Dir.glob("#{TOP}/ops/*.rake").each { |r| import r }
+# Not working, yet
+# import "ops/bin.rake"
+# import "ops/stage-blocks.rake"
 
 ENV["CARGO_HOME"] = "#{TOP}/.cargo"
 
@@ -102,10 +103,7 @@ task dlp: "deploy:local_prod_dev"
 task tier1: "test:tier1"
 task tier2: "test:tier2"
 
-task default: ["list"]
-
-desc "List available tasks"
-task :list do
+task :default do
   run "rake -T"
 end
 
