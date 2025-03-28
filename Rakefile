@@ -3,9 +3,8 @@ require "open3"
 
 TOP = __dir__
 
-# Not working, yet
-# import "ops/bin.rake"
-# import "ops/stage-blocks.rake"
+import "#{TOP}/ops/bin.rake"
+import "#{TOP}/ops/stage-blocks.rake"
 
 ENV["CARGO_HOME"] = "#{TOP}/.cargo"
 
