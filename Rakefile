@@ -3,14 +3,18 @@ require "open3"
 
 TOP = __dir__
 
-# Environment variables
+# Include other rake files (necessary if running using `rake -f`)
+Dir.glob("#{TOP}/ops/*.rake").each { |r| import r }
+
 ENV["CARGO_HOME"] = "#{TOP}/.cargo"
-# Set GIT_COMMIT_HASH if not already set
-ENV["GIT_COMMIT_HASH"] ||= `git rev-parse --short=8 HEAD 2>/dev/null`.strip.tap { |hash| break "dev" if hash.empty? }
+
+# This required environment variable is used during the Rust compilation.
+ENV["GIT_COMMIT_HASH"] ||= begin
+  git_hash = `git rev-parse --short=8 HEAD 2>/dev/null`.strip
+  git_hash.empty? ? "dev" : git_hash
+end
 
 IMAGE = "mina-indexer:#{ENV["GIT_COMMIT_HASH"]}"
-
-# Constants
 BUILD_TYPE = "dev"
 PROD_MODE = "nix"
 REGRESSION_TEST = "./ops/regression-test.rb"
@@ -18,7 +22,31 @@ DEPLOY_TIER3 = "./ops/deploy-tier3.rb"
 DEPLOY_PROD = "./ops/deploy-prod.rb"
 UTILS = "./ops/utils.rb"
 
-# Helper methods
+RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
+CARGO_DEPS = [".cargo/config.toml"] + RUST_SRC_FILES
+RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + Dir.glob("ops/**/*.rake") + ["Rakefile"]
+NIX_FILES = %W[
+  flake.nix
+  ops/mina/mina_txn_hasher.nix
+]
+SHELL_SCRIPTS = %W[
+  ops/ci/tier3
+  ops/ci/prod
+  ops/ci/tier1
+  ops/ci/tier2
+  tests/regression.bash
+  tests/recovery.sh
+  ops/download-snapshot.sh
+]
+# TODO:
+#  ops/traverse-canonical-chain.sh
+#  ops/correct-file-names.sh
+#  ops/minaexplorer/download-staking-ledgers.sh
+#  ops/upload-staking-ledgers.sh
+#  ops/upload-snapshot.sh
+#  ops/upload-mina-blocks.sh
+#  ops/calculate-archive-ledgers.sh
+
 def is_rustfmt_nightly
   stdout, _, _ = Open3.capture3("rustfmt --version | grep stable || echo \"true\"")
   stdout.strip == "true"
@@ -32,11 +60,6 @@ def run(cmd, *args, dir: TOP)
   success = system(cmd, *args, chdir: dir)
   abort "Command failed: #{cmd} #{args.join(" ")}" unless success
   success
-end
-
-def run_silent(cmd, *args) # standard:disable all
-  _, status = Open3.capture2e(cmd, *args) # standard:disable all
-  status.success?
 end
 
 def cmd_output(cmd)
@@ -61,10 +84,8 @@ def cargo_output(subcmd)
   output
 end
 
-# Include other rake files (necessary if running using `rake -f`)
-Dir.glob(File.join(TOP, "ops", "*.rake")).each { |r| import r }
-
 # Task aliases
+
 task sd: "show:dev"
 task sp: "show:prod"
 task st: "show:test"
@@ -80,10 +101,6 @@ task dlp: "deploy:local_prod_dev"
 
 task tier1: "test:tier1"
 task tier2: "test:tier2"
-
-# for backwards compatibility
-task "build:nix": "build:prod"
-task "test:tier3:nix": "test:tier3:prod"
 
 task default: ["list"]
 
@@ -109,9 +126,6 @@ end
 desc "Lint Rust code with clippy"
 task lint_rust: [:audit, ".build/cargo_clippy"]
 
-RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
-CARGO_DEPS = [".cargo/config.toml"] + RUST_SRC_FILES
-
 file ".build/cargo_clippy": CARGO_DEPS do |t|
   puts "--- Linting Rust code with clippy"
   FileUtils.mkdir_p(".build")
@@ -136,8 +150,6 @@ file ".build/cargo_clippy": CARGO_DEPS do |t|
   # -Dclippy::wildcard_imports
 end
 
-RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + Dir.glob("ops/**/*.rake") + ["Rakefile"]
-
 desc "Lint all Ruby code"
 task lint_ruby: [".build/lint_ruby"]
 
@@ -154,23 +166,6 @@ end
 desc "Lint shell scripts"
 task lint_shell: [".build/lint_shell"]
 
-SHELL_SCRIPTS = %W[
-  ./ops/ci/tier3
-  ./ops/ci/prod
-  ./ops/ci/tier1
-  ./ops/ci/tier2
-  ./tests/regression.bash
-  ./tests/recovery.sh
-  ./ops/download-snapshot.sh
-]
-#  ./ops/traverse-canonical-chain.sh
-#  ./ops/correct-file-names.sh
-#  ./ops/minaexplorer/download-staking-ledgers.sh
-#  ./ops/upload-staking-ledgers.sh
-#  ./ops/upload-snapshot.sh
-#  ./ops/upload-mina-blocks.sh
-#  ./ops/calculate-archive-ledgers.sh
-
 file ".build/lint_shell": SHELL_SCRIPTS do |t|
   puts "--- Linting shell scripts"
   FileUtils.mkdir_p(".build")
@@ -181,11 +176,6 @@ end
 
 desc "Lint Nix code"
 task lint_nix: [".build/lint_nix"]
-
-NIX_FILES = %W[
-  flake.nix
-  ops/mina/mina_txn_hasher.nix
-]
 
 file ".build/lint_nix": NIX_FILES do |t|
   puts "--- Linting Nix configs"
@@ -215,19 +205,19 @@ task :format do
   cargo_output("#{nightly_if_required} fmt --all")
 
   # Format Ruby code
-  run("standardrb --fix \"ops/**/*.rb\" Rakefile rakelib/*.rake")
+  run("standardrb --fix #{RUBY_SRC_FILES.join(" ")}")
 
   # Format GraphQL in Hurl files - run from the toplevel directory
   run("ops/format-graphql-in-hurl-files.rb tests/hurl/")
 
   # Format shell scripts
   run("shfmt --version")
-  run_silent("shfmt --write ops/*.sh")
-  run_silent("shfmt --write tests/*.sh")
-  run_silent("shfmt --write tests/*.bash")
+  run("shfmt --write ops/*.sh")
+  run("shfmt --write tests/*.sh")
+  run("shfmt --write tests/*.bash")
 
   # Format Nix files
-  run_silent("alejandra flake.nix ops/mina/mina_txn_hasher.nix")
+  run("alejandra #{NIX_FILES.join(" ")}")
 end
 
 desc "Perform a fast verification of whether the source compiles"
