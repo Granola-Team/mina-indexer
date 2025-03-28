@@ -2,10 +2,8 @@ require "fileutils"
 require "open3"
 
 # Environment variables
-RAKEFILE_PATH = File.expand_path(__FILE__)
-ENV["TOPLEVEL"] = File.dirname(RAKEFILE_PATH)
+ENV["TOPLEVEL"] = __dir__
 ENV["CARGO_HOME"] = "#{ENV["TOPLEVEL"]}/.cargo"
-RUST_DIR = File.join(ENV["TOPLEVEL"], "rust")
 # Set GIT_COMMIT_HASH if not already set
 ENV["GIT_COMMIT_HASH"] ||= `git rev-parse --short=8 HEAD 2>/dev/null`.strip.tap { |hash| break "dev" if hash.empty? }
 
