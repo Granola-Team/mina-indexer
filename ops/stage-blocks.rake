@@ -1,5 +1,5 @@
 HARDFORK_GENESIS_BLOCK_HEIGHT = "359605"
-STAGE_BLOCKS = "#{ENV["TOPLEVEL"]}/ops/stage-blocks.rb"
+STAGE_BLOCKS = "#{__dir__}/stage-blocks.rb"
 
 task stage_blocks: ["stage_blocks:list"]
 

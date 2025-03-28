@@ -1,9 +1,10 @@
 require "fileutils"
 require "open3"
 
+TOP = __dir__
+
 # Environment variables
-ENV["TOPLEVEL"] = __dir__
-ENV["CARGO_HOME"] = "#{ENV["TOPLEVEL"]}/.cargo"
+ENV["CARGO_HOME"] = "#{TOP}/.cargo"
 # Set GIT_COMMIT_HASH if not already set
 ENV["GIT_COMMIT_HASH"] ||= `git rev-parse --short=8 HEAD 2>/dev/null`.strip.tap { |hash| break "dev" if hash.empty? }
 
@@ -27,7 +28,7 @@ def nightly_if_required
   is_rustfmt_nightly ? "" : "+nightly"
 end
 
-def run(cmd, *args, dir: ENV["TOPLEVEL"])
+def run(cmd, *args, dir: TOP)
   success = system(cmd, *args, chdir: dir)
   abort "Command failed: #{cmd} #{args.join(" ")}" unless success
   success
@@ -61,7 +62,7 @@ def cargo_output(subcmd)
 end
 
 # Include other rake files (necessary if running using `rake -f`)
-Dir.glob(File.join(ENV["TOPLEVEL"], "ops", "*.rake")).each { |r| import r }
+Dir.glob(File.join(TOP, "ops", "*.rake")).each { |r| import r }
 
 # Task aliases
 task sd: "show:dev"

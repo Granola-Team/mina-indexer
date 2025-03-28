@@ -15,9 +15,8 @@ shift
 
 # Collect the binaries under test and the test ledgers.
 SRC="$(git rev-parse --show-toplevel)"
-export TOPLEVEL="$SRC"
-export GIT_COMMIT_HASH
 GIT_COMMIT_HASH="$(git rev-parse --short=8 HEAD)"
+export GIT_COMMIT_HASH
 
 STAKING_LEDGERS="$SRC/tests/data/staking_ledgers"
 SUMMARY_SCHEMA="$SRC/tests/data/json-schemas/summary.json"

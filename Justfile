@@ -6,8 +6,7 @@
 mod bin
 mod stage-blocks
 
-export TOPLEVEL := `pwd`
-export CARGO_HOME := TOPLEVEL + "/.cargo"
+export CARGO_HOME := `pwd` + "/.cargo"
 export GIT_COMMIT_HASH := `git rev-parse --short=8 HEAD`
 IMAGE := "mina-indexer:" + GIT_COMMIT_HASH
 
