@@ -79,7 +79,6 @@
           git # Needed but not declared by Nix's 'stdenv' build.
           hurl
           jq
-          just
           nightlyToolchain.passthru.availableComponents.rustfmt
           nix-output-monitor # Use 'nom' in place of 'nix' to use this.
           openssh # Needed by 'git' but not declared.
