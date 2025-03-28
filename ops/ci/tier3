@@ -3,5 +3,4 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for tier-3 testing.
 
-# The argument to "rake tier3" is the number of blocks to use.
 nix develop --command rake 'test:tier3:prod[436391]'
