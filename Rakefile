@@ -172,17 +172,6 @@ SHELL_SCRIPTS = %W[
 #  ./ops/upload-mina-blocks.sh
 #  ./ops/calculate-archive-ledgers.sh
 
-def run_command(cmd)
-  output = `#{cmd}`
-
-  unless $?.success?
-    raise "Command '#{cmd}' failed with exit status #{$?.exitstatus} " \
-          "and output:\n#{output}"
-  end
-
-  output
-end
-
 file ".build/lint_shell": SHELL_SCRIPTS do |t|
   puts "--- Linting shell scripts"
   FileUtils.mkdir_p(".build")
@@ -203,7 +192,7 @@ file ".build/lint_nix": NIX_FILES do |t|
   puts "--- Linting Nix configs"
   FileUtils.mkdir_p(".build")
   run("alejandra --version")
-  out = run_command("alejandra --check #{NIX_FILES}")
+  out = cmd_output("alejandra --check #{NIX_FILES}")
   File.write(t.name, out)
 end
 
