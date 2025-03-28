@@ -421,10 +421,12 @@ namespace :test do
 
   namespace :tier3 do
     desc "Run the 3rd tier of tests with Nix-built binary"
-    task :prod, [:blocks] => ["build:prod", "build:oci_image", "build:delete_oci_image"] do |_, args|
+    task :prod, [:blocks] => "build:prod" do |_, args|
       blocks = args[:blocks] || "5000"
       puts "--- Performing tier3 regression tests with Nix-built binary"
       run("#{DEPLOY_TIER3} #{PROD_MODE} #{blocks}")
+      Rake::Task["build:oci_image"].invoke
+      Rake::Task["build:delete_oci_image"].invoke
     end
 
     desc "Run the 3rd tier of tests with dev build & no unit tests"

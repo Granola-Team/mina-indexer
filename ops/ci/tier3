@@ -4,4 +4,4 @@
 # (Buildkite) 'command' for tier-3 testing.
 
 # The argument to "just tier3" is the number of blocks to use.
-nix develop --command just tier3 436391
+nix develop --command rake test:tier3:prod 436391
