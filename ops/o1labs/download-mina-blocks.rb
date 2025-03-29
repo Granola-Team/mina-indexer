@@ -8,11 +8,13 @@ require "fileutils"
 require "json"
 require "etc"
 require "optparse"
-require_relative "../remove-proofs-from-pcbs"
+require_relative "../update-pcbs"
 
 BASE_URL = "https://storage.googleapis.com/mina_network_block_data"
 BLOCK_THREADS = Etc.nprocessors * 4
 DOWNLOAD_THREADS_PER_BLOCK = 5
+
+PCB_UPDATER = PcbUpdater.new
 
 def parse_arguments
   options = {
@@ -116,7 +118,8 @@ def download_file(url, target_path)
           end
 
           FileUtils.mv(temp_path, target_path)
-          process_json_file(target_path)
+          update_pcb(target_path)
+
           return true
         else
           puts "Failed to download #{url}: #{response.code} #{response.message}"
@@ -129,6 +132,14 @@ def download_file(url, target_path)
     FileUtils.rm_f(temp_path)
     false
   end
+end
+
+def update_pcb(file_path)
+  # Use the global PCB_UPDATER instance
+
+  PCB_UPDATER.process_file(file_path)
+rescue => e
+  puts "Error updating PCB for #{file_path}: #{e.message}"
 end
 
 def download_single_block(height, state_hash, dir)
