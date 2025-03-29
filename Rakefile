@@ -351,7 +351,7 @@ namespace :test do
     task :tier1, [:test] => CARGO_DEPS do |_, args|
       test = args[:test] || ""
       puts "--- Invoking 'rspec ops/spec'"
-      run("rspec ops/spec/*_spec.rb")
+      run("rspec ops/spec/*-spec.rb")
       puts "--- Performing tier 1 unit test(s)"
       cargo_output("nextest --version")
       cargo_output("nextest run #{test}")
