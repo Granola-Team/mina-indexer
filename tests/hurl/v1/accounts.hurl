@@ -374,9 +374,8 @@ POST {{url}}
 {
   accounts(
     limit: 2000
-    query: {
-    token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
-  }) {
+    query: { token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf" }
+  ) {
     publicKey
   }
 }
