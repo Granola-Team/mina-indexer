@@ -53,10 +53,13 @@ end
 # Executable
 
 EXE_DIR = "#{BASE_DIR}/bin"
-EXE_SRC = if BUILD_TYPE == "nix"
+EXE_SRC = case BUILD_TYPE
+when "nix"
   "#{SRC_TOP}/result/bin/mina-indexer"
-else
+when "dev"
   "#{SRC_TOP}/rust/target/debug/mina-indexer"
+when "release"
+  "#{SRC_TOP}/rust/target/release/mina-indexer"
 end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 

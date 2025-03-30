@@ -15,8 +15,6 @@ ENV["GIT_COMMIT_HASH"] ||= begin
 end
 
 IMAGE = "mina-indexer:#{ENV["GIT_COMMIT_HASH"]}"
-BUILD_TYPE = "dev"
-PROD_MODE = "nix"
 REGRESSION_TEST = "./ops/regression-test.rb"
 DEPLOY_TIER3 = "./ops/deploy-tier3.rb"
 DEPLOY_PROD = "./ops/deploy-prod.rb"
@@ -225,7 +223,7 @@ end
 
 # Build tasks
 namespace :build do
-  desc "Perform a release build"
+  desc "Perform a Nix build"
   task :prod do
     puts "--- Performing release build"
     run("nom build")
@@ -236,6 +234,10 @@ namespace :build do
     cargo_output("build")
   end
 
+  desc "Perform a release build"
+  task release: CARGO_DEPS do
+    cargo_output("build --release")
+  end
   desc "Build OCI images"
   task :oci_image do
     puts "--- Building #{IMAGE}"
@@ -333,14 +335,14 @@ end
 desc "Dev build and run regression tests"
 task :dev, [:subtest] => "build:dev" do |_, args|
   subtest = args[:subtest] || ""
-  run("#{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
+  run("#{REGRESSION_TEST} dev #{subtest}")
 end
 
 namespace :dev do
   desc "Debug build and continue regression tests from given test"
   task :continue, [:subtest] => "build:dev" do |_, args|
     subtest = args[:subtest] || ""
-    run("#{REGRESSION_TEST} #{BUILD_TYPE} continue #{subtest}")
+    run("#{REGRESSION_TEST} dev continue #{subtest}")
   end
 end
 
@@ -370,7 +372,7 @@ namespace :test do
   task :regression, [:subtest] do |_, args|
     subtest = args[:subtest] || ""
     puts "--- Performing regression tests #{subtest}"
-    run("#{REGRESSION_TEST} #{BUILD_TYPE} #{subtest}")
+    run("#{REGRESSION_TEST} release #{subtest}")
   end
 
   # tier 2 regression tests
@@ -396,7 +398,7 @@ namespace :test do
   desc "Run the 1st tier of tests"
   task tier1: [:lint, "test:unit:tier1"] do
     puts "--- Performing tier 1 regression tests"
-    run("#{REGRESSION_TEST} #{BUILD_TYPE} \
+    run("#{REGRESSION_TEST} dev \
       ipc_is_available_immediately \
       clean_shutdown \
       clean_kill \
@@ -412,7 +414,7 @@ namespace :test do
     run("jq --version")
     run("check-jsonschema --version")
     run("hurl --version")
-    Rake::Task["build:dev"].invoke
+    Rake::Task["build:release"].invoke
     puts "--- Running tier-2 tests"
     tier2_regression_tests.map { |test|
       Rake::Task["test:regression:#{test}"].invoke
@@ -424,7 +426,7 @@ namespace :test do
     task :prod, [:blocks] => "build:prod" do |_, args|
       blocks = args[:blocks] || "5000"
       puts "--- Performing tier3 regression tests with Nix-built binary"
-      run("#{DEPLOY_TIER3} #{PROD_MODE} #{blocks}")
+      run("#{DEPLOY_TIER3} nix #{blocks}")
       Rake::Task["build:oci_image"].invoke
       Rake::Task["build:delete_oci_image"].invoke
     end
@@ -445,7 +447,7 @@ namespace :deploy do
     blocks = args[:blocks] || "5000"
     web_port = args[:web_port] || ""
     puts "--- Deploying prod indexer"
-    run("#{DEPLOY_PROD} #{PROD_MODE} #{blocks} #{web_port}")
+    run("#{DEPLOY_PROD} nix #{blocks} #{web_port}")
   end
 
   desc "Run a server as if in production with the dev-built binary"
