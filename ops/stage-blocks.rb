@@ -6,7 +6,6 @@ NETWORK = ARGV[2]
 DEST = ARGV[3]
 
 BUILD_TYPE = "dev"
-DEPLOY_TYPE = "dev"
 REV = "dummy-revision"
 SRC_TOP = "/nowhere"
 require "#{__dir__}/ops-common"

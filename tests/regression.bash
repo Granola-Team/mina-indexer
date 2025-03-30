@@ -26,8 +26,7 @@ RAKEFILE="$SRC/Rakefile"
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
 : "${VOLUMES_DIR:=/mnt}"
-DEV_DIR="$VOLUMES_DIR/mina-indexer-dev"
-BASE_DIR="$DEV_DIR/$GIT_COMMIT_HASH"
+BASE_DIR="$VOLUMES_DIR/mina-indexer-test/$GIT_COMMIT_HASH"
 BLOCKS_DIR="$BASE_DIR/blocks"
 
 mkdir -p "$BASE_DIR"

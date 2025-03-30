@@ -88,7 +88,6 @@ task sd: "show:dev"
 task sp: "show:prod"
 task st: "show:test"
 
-task cd: "clean:dev"
 task cp: "clean:prod"
 task ct: "clean:test"
 
@@ -263,13 +262,6 @@ namespace :show do
     run("#{UTILS} pids show")
   end
 
-  desc "Show the mina-indexer-dev directory"
-  task :dev, [:which] do |_, args|
-    which = args[:which] || "one"
-    puts "Showing dev directory"
-    run("#{UTILS} dev show #{which}")
-  end
-
   desc "Show prod directories"
   task :prod do
     puts "Showing prod directory"
@@ -294,13 +286,6 @@ namespace :clean do
     cargo_output("--version")
     cargo_output("clean")
     puts "Consider also 'git clean -xdfn'"
-  end
-
-  desc "Clean the mina-indexer-dev directory"
-  task :dev, [:which] do |_, args|
-    which = args[:which] || "one"
-    puts "Cleaning dev directory"
-    run("#{UTILS} dev clean #{which}")
   end
 
   desc "Clean mina-indexer-prod subdirectory"
@@ -462,7 +447,7 @@ end
 
 desc "Shutdown a running local test/dev/prod indexer"
 task :shutdown, [:which] do |_, args|
-  which = args[:which] || "dev"
+  which = args[:which] || "test"
   puts "Shutting down #{which} indexer"
   run("#{UTILS} #{which} shutdown")
   puts "Successfully shutdown. You may also want to do 'rake clean:#{which}'"

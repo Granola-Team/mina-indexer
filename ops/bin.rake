@@ -3,8 +3,7 @@ require "open3"
 
 GIT_COMMIT_HASH = ENV["GIT_COMMIT_HASH"].freeze
 VOLUMES_DIR = ENV.fetch("VOLUMES_DIR", "/mnt")
-DEV_DIR = File.join(VOLUMES_DIR, "mina-indexer-dev").freeze
-BASE_DIR = File.join(DEV_DIR, GIT_COMMIT_HASH).freeze
+BASE_DIR = File.join(File.join(VOLUMES_DIR, "mina-indexer-test"), GIT_COMMIT_HASH).freeze
 PID_FILE = File.join(BASE_DIR, "idxr_pid").freeze
 SOCKET_FILE = File.join(BASE_DIR, "mina-indexer.sock").freeze
 BLOCKS_DIR = File.join(BASE_DIR, "blocks").freeze

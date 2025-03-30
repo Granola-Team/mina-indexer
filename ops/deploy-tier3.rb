@@ -3,7 +3,6 @@
 BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
 BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
 
-DEPLOY_TYPE = "test"
 require "#{__dir__}/ops-common"
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."

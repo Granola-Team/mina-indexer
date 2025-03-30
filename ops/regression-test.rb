@@ -1,9 +1,6 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 BUILD_TYPE = ARGV.shift
-DEPLOY_TYPE = "dev"
 
 require "#{__dir__}/ops-common"
 

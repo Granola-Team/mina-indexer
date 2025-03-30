@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
 BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
 BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
