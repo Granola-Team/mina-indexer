@@ -2,8 +2,9 @@
 
 use super::db;
 use crate::{
+    base::state_hash::StateHash,
     canonicity::store::CanonicityStore,
-    ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress},
+    ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress, LedgerHash},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
@@ -118,10 +119,32 @@ impl StagedLedgerQueryRoot {
         // - staged ledger hash
         // - canonical block height
         let staged_ledger =
-            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
-                db.get_staged_ledger_at_state_hash(&state_hash.into(), false)?
-            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-                db.get_staged_ledger_at_ledger_hash(&ledger_hash.into(), false)?
+            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.as_ref()) {
+                // validate state hash
+                let state_hash = match StateHash::new(state_hash) {
+                    Ok(state_hash) => state_hash,
+                    Err(_) => {
+                        return Err(async_graphql::Error::new(format!(
+                            "Invalid state hash: {}",
+                            state_hash
+                        )))
+                    }
+                };
+
+                db.get_staged_ledger_at_state_hash(&state_hash, false)?
+            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.as_ref()) {
+                // validate ledger hash
+                let ledger_hash = match LedgerHash::new(ledger_hash) {
+                    Ok(ledger_hash) => ledger_hash,
+                    Err(_) => {
+                        return Err(async_graphql::Error::new(format!(
+                            "Invalid ledger hash: {}",
+                            ledger_hash
+                        )))
+                    }
+                };
+
+                db.get_staged_ledger_at_ledger_hash(&ledger_hash, false)?
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
                 db.get_staged_ledger_at_block_height(block_height, false)?
             } else {
