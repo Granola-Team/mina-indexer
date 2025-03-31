@@ -179,7 +179,7 @@ impl SnarkQueryRoot {
             query.as_ref().and_then(|q| q.block_height_lte),
         ) {
             // validate prover pk
-            if let Ok(prover) = PublicKey::new(prover) {
+            if let Ok(prover) = PublicKey::new(prover.to_owned()) {
                 let mut start = prover.0.as_bytes().to_vec();
                 let mode = match sort_by {
                     SnarkSortByInput::BlockHeightAsc => {
@@ -233,6 +233,11 @@ impl SnarkQueryRoot {
                         }
                     }
                 }
+            } else {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid prover public key: {}",
+                    prover
+                )));
             }
 
             return Ok(snarks);
@@ -241,7 +246,7 @@ impl SnarkQueryRoot {
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
             // validate prover pk
-            if let Ok(prover) = PublicKey::new(prover) {
+            if let Ok(prover) = PublicKey::new(prover.to_owned()) {
                 let mut start = prover.0.as_bytes().to_vec();
                 let mode = match sort_by {
                     SnarkSortByInput::BlockHeightAsc => {
@@ -296,6 +301,11 @@ impl SnarkQueryRoot {
                         }
                     }
                 }
+            } else {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid prover public key: {}",
+                    prover
+                )));
             }
 
             return Ok(snarks);
