@@ -133,25 +133,31 @@ impl AccountQueryRoot {
             });
 
         // public key query handler
-        if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.clone()) {
-            let pk: PublicKey = public_key.into();
-            return Ok(db
-                .get_best_account_display(&pk, &token)?
-                .iter()
-                .filter_map(|acct| {
-                    let username = match db.get_username(&pk) {
-                        Ok(None) | Err(_) => None,
-                        Ok(Some(username)) => Some(username.0),
-                    };
+        if let Some(public_key) = query.as_ref().and_then(|q| q.public_key.as_ref()) {
+            if let Ok(pk) = PublicKey::new(public_key) {
+                return Ok(db
+                    .get_best_account_display(&pk, &token)?
+                    .iter()
+                    .filter_map(|acct| {
+                        let username = match db.get_username(&pk) {
+                            Ok(None) | Err(_) => None,
+                            Ok(Some(username)) => Some(username.0),
+                        };
 
-                    if query.as_ref().unwrap().matches(acct, username.as_ref()) {
-                        let account = AccountWithMeta::new(db, acct.to_owned());
-                        return Some(account);
-                    }
+                        if query.as_ref().unwrap().matches(acct, username.as_ref()) {
+                            let account = AccountWithMeta::new(db, acct.to_owned());
+                            return Some(account);
+                        }
 
-                    None
-                })
-                .collect());
+                        None
+                    })
+                    .collect());
+            } else {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid public key: {}",
+                    public_key
+                )));
+            }
         }
 
         // token query handler
@@ -302,6 +308,14 @@ impl AccountQueryInput {
         sort_by: AccountSortByInput,
         limit: usize,
     ) -> Result<Vec<AccountWithMeta>> {
+        // validate token
+        if TokenAddress::new(token).is_none() {
+            return Err(async_graphql::Error::new(format!(
+                "Invalid token address: {}",
+                token
+            )));
+        }
+
         // iterator mode
         let mut start = [0u8; TokenAddress::LEN + U64_LEN + 1];
         start[..TokenAddress::LEN].copy_from_slice(token.as_bytes());
