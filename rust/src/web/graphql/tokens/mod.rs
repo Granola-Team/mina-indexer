@@ -211,51 +211,67 @@ impl TokensQueryRoot {
         let mut holders = Vec::with_capacity(limit);
 
         // specific token's holder accounts
-        if let Some(token) = query
-            .as_ref()
-            .and_then(|q| q.token.as_ref().and_then(TokenAddress::new).to_owned())
-        {
-            let direction = match sort_by {
-                Some(TokenHoldersSortByInput::BalanceDesc) | None => speedb::Direction::Reverse,
-                Some(TokenHoldersSortByInput::BalanceAsc) => speedb::Direction::Forward,
-            };
+        if let Some(token) = query.as_ref().and_then(|q| q.token.as_ref()) {
+            // validate token address
+            if let Some(token) = TokenAddress::new(token) {
+                let direction = match sort_by {
+                    Some(TokenHoldersSortByInput::BalanceDesc) | None => speedb::Direction::Reverse,
+                    Some(TokenHoldersSortByInput::BalanceAsc) => speedb::Direction::Forward,
+                };
 
-            let mut start = [0u8; TokenAddress::LEN + U64_LEN + PublicKey::LEN];
-            start[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
+                let mut start = [0u8; TokenAddress::LEN + U64_LEN + PublicKey::LEN];
+                start[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
 
-            if let Direction::Reverse = direction {
-                start[TokenAddress::LEN..][..U64_LEN].copy_from_slice(&u64::MAX.to_be_bytes());
-                start[TokenAddress::LEN..][U64_LEN..]
-                    .copy_from_slice(PublicKey::upper_bound().0.as_bytes());
-            };
+                if let Direction::Reverse = direction {
+                    start[TokenAddress::LEN..][..U64_LEN].copy_from_slice(&u64::MAX.to_be_bytes());
+                    start[TokenAddress::LEN..][U64_LEN..]
+                        .copy_from_slice(PublicKey::upper_bound().0.as_bytes());
+                };
 
-            let mode = speedb::IteratorMode::From(&start, direction);
-            for (key, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
-                if key[..TokenAddress::LEN] != *token.0.as_bytes() || holders.len() >= limit {
-                    // beyond token or limit
-                    break;
+                let mode = speedb::IteratorMode::From(&start, direction);
+                for (key, value) in db.best_ledger_account_balance_iterator(mode).flatten() {
+                    if key[..TokenAddress::LEN] != *token.0.as_bytes() || holders.len() >= limit {
+                        // beyond token or limit
+                        break;
+                    }
+
+                    let account = serde_json::from_slice(&value)?;
+                    let token = db.get_token(&token)?.unwrap_or_default();
+
+                    if TokenHoldersQueryInput::matches(query.as_ref(), &account) {
+                        let account = TokenAccount {
+                            token,
+                            account: AccountWithMeta::new(db, account),
+                        };
+
+                        holders.push(account.into());
+                    }
                 }
-
-                let account = serde_json::from_slice(&value)?;
-                let token = db.get_token(&token)?.unwrap_or_default();
-
-                if TokenHoldersQueryInput::matches(query.as_ref(), &account) {
-                    let account = TokenAccount {
-                        token,
-                        account: AccountWithMeta::new(db, account),
-                    };
-
-                    holders.push(account.into());
-                }
+            } else {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid token address: {}",
+                    token
+                )));
             }
 
             return Ok(holders);
         }
 
         // specific holder's token accounts
-        if let Some(holder) = query.as_ref().and_then(|q| q.holder.to_owned()) {
-            for (key, value) in db.tokens_pk_iterator(&holder.to_owned().into()).flatten() {
-                if key[..PublicKey::LEN] != *holder.as_bytes() || holders.len() >= limit {
+        if let Some(holder) = query.as_ref().and_then(|q| q.holder.as_ref()) {
+            // validate holder pk
+            let holder = match PublicKey::new(holder) {
+                Ok(holder) => holder,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid holder public key: {}",
+                        holder
+                    )))
+                }
+            };
+
+            for (key, value) in db.tokens_pk_iterator(&holder).flatten() {
+                if key[..PublicKey::LEN] != *holder.0.as_bytes() || holders.len() >= limit {
                     // beyond public key or limit
                     break;
                 }
