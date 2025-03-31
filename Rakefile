@@ -11,7 +11,7 @@ ENV["CARGO_HOME"] = "#{TOP}/.cargo"
 # This required environment variable is used during the Rust compilation.
 ENV["GIT_COMMIT_HASH"] ||= begin
   git_hash = `git rev-parse --short=8 HEAD 2>/dev/null`.strip
-  git_hash.empty? ? "dev" : git_hash
+  git_hash || abort("Could not determine the Git hash. Aborting.")
 end
 
 IMAGE = "mina-indexer:#{ENV["GIT_COMMIT_HASH"]}"
@@ -84,7 +84,6 @@ end
 
 # Task aliases
 
-task sd: "show:dev"
 task sp: "show:prod"
 task st: "show:test"
 
@@ -445,7 +444,7 @@ namespace :deploy do
   end
 end
 
-desc "Shutdown a running local test/dev/prod indexer"
+desc "Shutdown a running local test/prod indexer"
 task :shutdown, [:which] do |_, args|
   which = args[:which] || "test"
   puts "Shutting down #{which} indexer"
