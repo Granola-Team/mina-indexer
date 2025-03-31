@@ -60,7 +60,7 @@ class PcbUpdater
     # Read and parse the file
     json_data = JSON.parse(File.read(path))
 
-    # Remove proofs
+    # Remove `proofs`
     remove_proofs(json_data)
 
     # Check blockchain length before adding transaction hashes
@@ -94,7 +94,7 @@ class PcbUpdater
     case obj
     when Hash
       # Remove proof fields
-      obj.delete("proof")
+      obj.delete("proofs")
 
       # Process remaining fields
       obj.each_value { |v| remove_proofs(v) }
