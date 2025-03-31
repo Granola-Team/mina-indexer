@@ -805,6 +805,10 @@ impl ZkappTokenStore for IndexerStore {
     fn get_token_symbol(&self, token: &TokenAddress) -> Result<Option<TokenSymbol>> {
         trace!("Getting symbol for token {}", token);
 
+        if token.0 == MINA_TOKEN_ADDRESS {
+            return Ok(Some(TokenSymbol::mina()));
+        }
+
         Ok(self
             .database
             .get_pinned_cf(self.zkapp_tokens_symbol_cf(), token.0.as_bytes())?
