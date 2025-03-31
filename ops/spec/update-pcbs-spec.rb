@@ -12,7 +12,7 @@ RSpec.describe PcbUpdater do
       "data" => {
         "id" => 1,
         "name" => "example",
-        "proof" => {
+        "proofs" => {
           "signature" => "123abc"
         },
         "protocol_state" => {
@@ -24,7 +24,7 @@ RSpec.describe PcbUpdater do
         },
         "details" => {
           "info" => "some data",
-          "proof" => "another proof"
+          "proofs" => "another proof"
         },
         "data" => [
           "Signed_command",
@@ -109,7 +109,7 @@ RSpec.describe PcbUpdater do
     Dir.rmdir("spec") if Dir.exist?("spec") && Dir.empty?("spec")
   end
 
-  it 'removes all occurrences of "proof" and keeps JSON compact' do
+  it 'removes all occurrences of "proofs" and keeps JSON compact' do
     # Add the test file to the updater
     updater.add_file(test_file)
 
@@ -120,9 +120,9 @@ RSpec.describe PcbUpdater do
     processed_content = File.read(test_file)
     processed_json = JSON.parse(processed_content)
 
-    # Check if the "proof" property is removed
-    expect(processed_json.dig("data", "proof")).to be_nil
-    expect(processed_json.dig("data", "details", "proof")).to be_nil
+    # Check if the "proofs" property is removed
+    expect(processed_json.dig("data", "proofs")).to be_nil
+    expect(processed_json.dig("data", "details", "proofs")).to be_nil
 
     # Check that the JSON remains compact (no new lines or pretty printing)
     expect(processed_content).not_to include("\n")
