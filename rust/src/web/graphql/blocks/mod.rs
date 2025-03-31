@@ -52,11 +52,18 @@ impl BlocksQueryRoot {
 
         // Use constant time access if we have the state hash
         if let Some(state_hash) = query.as_ref().and_then(|input| input.state_hash.as_ref()) {
-            if !StateHash::is_valid(state_hash) {
-                return Ok(None);
-            }
+            // validate state hash
+            let state_hash = match StateHash::new(state_hash) {
+                Ok(state_hash) => state_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid state hash: {}",
+                        state_hash
+                    )))
+                }
+            };
 
-            let pcb = match db.get_block(&state_hash.into())? {
+            let pcb = match db.get_block(&state_hash)? {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
@@ -82,6 +89,7 @@ impl BlocksQueryRoot {
                 return Ok(Some(block));
             }
         }
+
         Ok(None)
     }
 
@@ -116,9 +124,19 @@ impl BlocksQueryRoot {
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
         // state hash query
-        if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
-            let block = db.get_block(&state_hash.into())?;
+        if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.as_ref()) {
+            // validate state hash
+            let state_hash = match StateHash::new(state_hash) {
+                Ok(state_hash) => state_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid state hash: {}",
+                        state_hash
+                    )))
+                }
+            };
 
+            let block = db.get_block(&state_hash)?;
             return Ok(block
                 .iter()
                 .filter_map(|(b, _)| precomputed_matches_query(db, &query, b, counts))
@@ -169,9 +187,20 @@ impl BlocksQueryRoot {
         if let Some(coinbase_receiver) = query.as_ref().and_then(|q| {
             q.coinbase_receiver
                 .as_ref()
-                .and_then(|cb| cb.public_key.clone())
+                .and_then(|cb| cb.public_key.as_ref())
         }) {
-            let start = coinbase_receiver.as_bytes();
+            // validate coinbase receiver
+            let coinbase_receiver = match PublicKey::new(coinbase_receiver) {
+                Ok(coinbase_receiver) => coinbase_receiver,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid coinbase receiver public key: {}",
+                        coinbase_receiver
+                    )))
+                }
+            };
+
+            let start = coinbase_receiver.0.as_bytes();
             let mut end = [0; PublicKey::LEN + U32_LEN];
             end[..PublicKey::LEN].copy_from_slice(start);
             end[PublicKey::LEN..].copy_from_slice(&u32::MAX.to_be_bytes());
@@ -184,7 +213,7 @@ impl BlocksQueryRoot {
             };
 
             for (key, _) in iter.flatten() {
-                if key[..PublicKey::LEN] != *coinbase_receiver.as_bytes() {
+                if key[..PublicKey::LEN] != *coinbase_receiver.0.as_bytes() {
                     break;
                 }
 
@@ -210,11 +239,22 @@ impl BlocksQueryRoot {
         }
 
         // creator account query
-        if let Some(creator_account) = query.as_ref().and_then(|q| {
+        if let Some(creator) = query.as_ref().and_then(|q| {
             q.creator_account
                 .as_ref()
-                .and_then(|cb| cb.public_key.clone())
+                .and_then(|cb| cb.public_key.as_ref())
         }) {
+            // validate creator
+            let creator = match PublicKey::new(creator) {
+                Ok(creator) => creator,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid creator public key: {}",
+                        creator
+                    )))
+                }
+            };
+
             // properly set the upper bound for block height
             let upper_bound = match (
                 query.as_ref().and_then(|q| q.block_height_lt),
@@ -226,7 +266,7 @@ impl BlocksQueryRoot {
                 (None, None) => u32::MAX,
             };
 
-            let start = creator_account.as_bytes();
+            let start = creator.0.as_bytes();
             let mut end = [0; PublicKey::LEN + U32_LEN];
             end[..PublicKey::LEN].copy_from_slice(start);
             end[PublicKey::LEN..].copy_from_slice(&upper_bound.to_be_bytes());
@@ -239,7 +279,7 @@ impl BlocksQueryRoot {
             };
 
             for (key, _) in iter.flatten() {
-                if key[..PublicKey::LEN] != *creator_account.as_bytes() {
+                if key[..PublicKey::LEN] != *creator.0.as_bytes() {
                     break;
                 }
 
