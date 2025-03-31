@@ -197,12 +197,23 @@ impl FeetransferQueryRoot {
         if let Some(state_hash) = query
             .as_ref()
             .and_then(|f| f.block_state_hash.as_ref())
-            .and_then(|f| f.state_hash.clone())
+            .and_then(|f| f.state_hash.as_ref())
         {
+            // validate state hash
+            let state_hash = match StateHash::new(state_hash) {
+                Ok(state_hash) => state_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid state hash: {}",
+                        state_hash
+                    )))
+                }
+            };
+
             return Ok(get_fee_transfers_for_state_hash(
                 db,
                 &query,
-                &state_hash.into(),
+                &state_hash,
                 sort_by,
                 limit,
                 epoch_num_internal_commands,
@@ -289,24 +300,36 @@ impl FeetransferQueryRoot {
                     }
                 }
             }
+
             return Ok(fee_transfers);
         }
 
         // recipient query
         if let Some(recipient) = query.as_ref().and_then(|q| q.recipient.as_ref()) {
+            // validate recipient
+            let recipient = match PublicKey::new(recipient) {
+                Ok(recipient) => recipient,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid recipient public key: {}",
+                        recipient
+                    )))
+                }
+            };
+
             let iter = match sort_by {
                 Some(BlockHeightAsc) => db.internal_commands_pk_block_height_iterator(
-                    recipient.clone().into(),
+                    recipient.clone(),
                     Direction::Forward,
                 ),
                 Some(BlockHeightDesc) | None => db.internal_commands_pk_block_height_iterator(
-                    recipient.clone().into(),
+                    recipient.clone(),
                     Direction::Reverse,
                 ),
             };
 
             for (key, value) in iter.flatten() {
-                if key[..PublicKey::LEN] != *recipient.as_bytes() {
+                if key[..PublicKey::LEN] != *recipient.0.as_bytes() {
                     // we've gone beyond our recipient
                     break;
                 }
@@ -321,10 +344,8 @@ impl FeetransferQueryRoot {
                         }
                     }
 
-                    if block_out_of_bounds(
-                        from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec()),
-                        q,
-                    ) {
+                    let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
+                    if block_out_of_bounds(block_height, q) {
                         break;
                     }
                 }
@@ -349,6 +370,7 @@ impl FeetransferQueryRoot {
                     break;
                 }
             }
+
             return Ok(fee_transfers);
         }
 
