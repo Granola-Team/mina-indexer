@@ -9,6 +9,7 @@ use crate::{
     ledger::{
         staking::{EpochStakeDelegation, StakingAccount, StakingLedger},
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
+        LedgerHash,
     },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
@@ -255,40 +256,57 @@ impl StakesQueryRoot {
         }
 
         // default to best block genesis state hash
-        let genesis_state_hash = query
-            .as_ref()
-            .and_then(|q| q.genesis_state_hash.to_owned())
-            .map(StateHash::from)
-            .unwrap_or_else(|| {
-                db.get_best_block_genesis_hash()
-                    .ok()
-                    .flatten()
-                    .expect("genesis state hash")
-            });
+        let genesis_state_hash = match query.as_ref().and_then(|q| q.genesis_state_hash.as_ref()) {
+            Some(genesis) => match StateHash::new(genesis) {
+                Ok(genesis) => genesis,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid genesis state hash: {}",
+                        genesis
+                    )))
+                }
+            },
+            None => db
+                .get_best_block_genesis_hash()
+                .ok()
+                .flatten()
+                .expect("genesis state hash"),
+        };
 
         // if ledger hash is provided as a query input, use it for the ledger
         // otherwise, use the provided or current epoch number
-        let (ledger_hash, epoch) = match query.as_ref().map(|q| (q.ledger_hash.clone(), q.epoch)) {
-            Some((Some(ledger_hash), Some(query_epoch))) => (ledger_hash, query_epoch),
-            Some((Some(ledger_hash), None)) => (
-                ledger_hash.clone(),
-                db.get_epoch(&ledger_hash.clone().into())?
-                    .unwrap_or_default(),
-            ),
+        let (ledger_hash, epoch) = match query.as_ref().map(|q| (q.ledger_hash.as_ref(), q.epoch)) {
+            Some((Some(ledger_hash), query_epoch)) => {
+                let ledger_hash = match LedgerHash::new(ledger_hash) {
+                    Ok(ledger_hash) => ledger_hash,
+                    Err(_) => {
+                        return Err(async_graphql::Error::new(format!(
+                            "Invalid ledger hash: {}",
+                            ledger_hash
+                        )))
+                    }
+                };
+
+                let epoch = if let Some(epoch) = query_epoch {
+                    epoch
+                } else {
+                    db.get_epoch(&ledger_hash)?.unwrap_or_default()
+                };
+
+                (ledger_hash, epoch)
+            }
             _ => (
                 if let Some(ledger_hash) =
                     db.get_staking_ledger_hash_by_epoch(epoch, Some(&genesis_state_hash))?
                 {
-                    ledger_hash.0
+                    ledger_hash
                 } else {
                     return Ok(vec![]);
                 },
                 epoch,
             ),
         };
-        let total_currency = db
-            .get_total_currency(&ledger_hash.clone().into())?
-            .unwrap_or_default();
+        let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
 
         use StakesSortByInput::*;
 
@@ -343,7 +361,7 @@ impl StakesQueryRoot {
                     account,
                     &delegation,
                     epoch,
-                    ledger_hash.clone(),
+                    ledger_hash.to_owned(),
                     total_currency,
                 );
 
@@ -465,7 +483,7 @@ impl StakesQueryInput {
     pub fn matches_staking_account(
         query: Option<&Self>,
         account: &StakingAccount,
-        ledger_hash: &str,
+        ledger_hash: &LedgerHash,
         genesis_state_hash: &StateHash,
         epoch: u32,
     ) -> bool {
@@ -503,7 +521,7 @@ impl StakesQueryInput {
             }
 
             if let Some(query_ledger_hash) = query_ledger_hash {
-                if query_ledger_hash != ledger_hash {
+                if *query_ledger_hash != ledger_hash.0 {
                     return false;
                 }
             }
@@ -531,7 +549,7 @@ impl StakesLedgerAccountWithMeta {
         account: StakingAccount,
         delegations: &EpochStakeDelegation,
         epoch: u32,
-        ledger_hash: String,
+        ledger_hash: LedgerHash,
         total_currency: u64,
     ) -> Self {
         let pk = account.pk.clone();
@@ -591,14 +609,14 @@ impl StakesLedgerAccountWithMeta {
             Ok(username) => username.map(|u| u.0),
         };
 
-        let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash.to_owned().into());
+        let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash);
         let num_accounts = db
             .get_staking_ledger_accounts_count_epoch(epoch, &genesis_state_hash)
             .expect("epoch staking account count");
 
         Self {
             epoch,
-            ledger_hash,
+            ledger_hash: ledger_hash.0,
             genesis_state_hash: genesis_state_hash.to_string(),
             account: StakesLedgerAccount::from((
                 account,
