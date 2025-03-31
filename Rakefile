@@ -415,18 +415,18 @@ namespace :test do
       Rake::Task["build:delete_oci_image"].invoke
     end
 
-    desc "Run the 3rd tier of tests with dev build & no unit tests"
-    task :dev, [:blocks] => "build:dev" do |_, args|
+    desc "Run the 3rd tier of tests with release build without unit tests"
+    task :dev, [:blocks] => "build:release" do |_, args|
       blocks = args[:blocks] || "5000"
-      puts "--- Performing tier3 regression tests with dev-built binary"
-      run("#{DEPLOY_TIER3} dev #{blocks}")
+      puts "--- Performing tier3 regression tests with release binary"
+      run("#{DEPLOY_TIER3} release #{blocks}")
     end
   end
 end
 
 # Deploy tasks
 namespace :deploy do
-  desc "Run a server as if in production with the release-built binary"
+  desc "Run a server as if in production with the Nix-built binary"
   task :local_prod, [:blocks, :web_port] => "build:prod" do |_, args|
     blocks = args[:blocks] || "5000"
     web_port = args[:web_port] || ""
@@ -434,13 +434,13 @@ namespace :deploy do
     run("#{DEPLOY_PROD} nix #{blocks} #{web_port}")
   end
 
-  desc "Run a server as if in production with the dev-built binary"
+  desc "Run a server as if in production with the release-built binary"
   task :local_prod_dev, [:blocks, :web_port] do |_, args|
     blocks = args[:blocks] || "5000"
     web_port = args[:web_port] || ""
     Rake::Task["test:tier3:dev"].invoke(blocks)
-    puts "--- Deploying dev prod indexer"
-    run("#{DEPLOY_PROD} dev #{blocks} #{web_port}")
+    puts "--- Deploying local prod indexer"
+    run("#{DEPLOY_PROD} release #{blocks} #{web_port}")
   end
 end
 

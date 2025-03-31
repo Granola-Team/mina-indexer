@@ -1,6 +1,6 @@
 #!/usr/bin/env -S ruby -w
 
-BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
+BUILD_TYPE = ARGV[0]        # 'nix' or 'dev' or 'release'
 BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
 WEB_PORT = ARGV[2] || 8080  # optional web port for server
 
@@ -16,16 +16,16 @@ config_exe_dir
 config_log_dir
 
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
-if BUILD_TYPE == "dev"
-  puts "Copying snapshot."
-  system("cp #{base_dir("test")}/#{snapshot_name} #{snapshot_path(BLOCKS_COUNT)}") || abort("Failed to move snapshot file.")
-else
+if BUILD_TYPE == "prod"
   puts "Fetching snapshot."
   system(
     "#{SRC_TOP}/ops/download-snapshot.sh",
     snapshot_name,
     BASE_DIR
   ) || abort("Failed to download snapshot.")
+else
+  puts "Copying snapshot."
+  system("cp #{base_dir("test")}/#{snapshot_name} #{snapshot_path(BLOCKS_COUNT)}") || abort("Failed to move snapshot file.")
 end
 
 # Terminate the current version, if any.

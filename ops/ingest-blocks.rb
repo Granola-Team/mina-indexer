@@ -1,7 +1,7 @@
 #!/usr/bin/env -S ruby -w
 
 DEPLOY_TYPE = ARGV[0]       # 'test' or 'prod'
-BUILD_TYPE = ARGV[1]        # 'nix' or 'debug'
+BUILD_TYPE = ARGV[1]        # 'nix' or 'dev' or 'release'
 BLOCKS_COUNT = ARGV[2]      # number of blocks to deploy
 
 require "#{__dir__}/ops-common"

@@ -1,13 +1,13 @@
 #!/usr/bin/env -S ruby -w
 
-BUILD_TYPE = ARGV[0]        # 'nix' or 'dev'
+BUILD_TYPE = ARGV[0]        # 'nix' or 'dev' or 'release'
 BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
 
 require "#{__dir__}/ops-common"
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
-skippable = File.exist?(snapshot_path(BLOCKS_COUNT)) && BUILD_TYPE == "dev"
+skippable = File.exist?(snapshot_path(BLOCKS_COUNT)) && BUILD_TYPE != "prod"
 if !skippable
 
   # Configure the directories as needed.
@@ -91,7 +91,7 @@ if !skippable
     "--output-path", snapshot_path(BLOCKS_COUNT)
   ) || abort("Snapshot creation failed. Aborting.")
   puts "Snapshot complete."
-  if BUILD_TYPE != "dev"
+  if BUILD_TYPE == "prod"
     puts "Uploading."
     system(
       "#{SRC_TOP}/ops/upload-snapshot.sh",
@@ -199,7 +199,7 @@ if !skippable
   # Delete the snapshot and the database directory restored to.
   #
   FileUtils.rm_rf(restore_path)
-  if BUILD_TYPE != "dev"
+  if BUILD_TYPE == "prod"
     File.unlink(snapshot_path(BLOCKS_COUNT))
   end
 
