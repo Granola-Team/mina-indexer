@@ -5,7 +5,7 @@ require "fileutils"
 require "open3"
 require "etc"
 
-# Class to handle `proofs` removal and adds a v2 hash for any transaction to the PCB.
+# Remove both `proofs` and `protocol_state_proof` and add a v2 hash for any transaction.
 class PcbUpdater
   # Path to the external app for transaction hashing
   MINA_TXN_HASHER = "#{__dir__}/mina/mina_txn_hasher.exe"
@@ -55,13 +55,17 @@ class PcbUpdater
     end
   end
 
-  # Process a single JSON file to remove proofs and add transaction hashes
+  # Process a single JSON file to remove `proofs` and `protocol_state_proof` and add v2 transaction hashes
   def process_file(path)
     # Read and parse the file
     json_data = JSON.parse(File.read(path))
 
     # Remove `proofs`
     remove_proofs(json_data)
+
+    # Remove `protocol_state_proof`
+    json_data.delete("protocol_state_proof")
+    json_data["data"]&.delete("protocol_state_proof")
 
     # Check blockchain length before adding transaction hashes
     blockchain_length = get_blockchain_length(json_data)
