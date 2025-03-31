@@ -59,13 +59,14 @@ impl TopStakersQueryRoot {
         let epoch = query
             .as_ref()
             .map_or(db.get_current_epoch().expect("current epoch"), |q| q.epoch);
+
+        let mut accounts = Vec::new();
         let direction = match sort_by {
             Some(TopStakersSortByInput::NumCanonicalBlocksProducedAsc) => Direction::Forward,
             Some(TopStakersSortByInput::NumCanonicalBlocksProducedDesc) | None => {
                 Direction::Reverse
             }
         };
-        let mut accounts = Vec::new();
 
         for (key, _) in db
             .canonical_epoch_blocks_produced_iterator(Some(epoch), direction)
@@ -99,6 +100,7 @@ impl TopStakersQueryRoot {
             ));
 
             accounts.push(account);
+
             if accounts.len() >= limit {
                 break;
             }

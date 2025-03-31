@@ -147,13 +147,20 @@ impl TransactionsQueryRoot {
             db.get_zkapp_commands_total_count()?,
         ];
 
-        if let Some(hash) = query.hash {
-            let hash = TxnHash::from(hash);
-            if hash.is_valid() {
-                return Ok(db
-                    .get_user_command(&hash, 0)?
-                    .map(|cmd| Transaction::new(cmd, db, num_commands)));
-            }
+        if let Some(hash) = query.hash.as_ref() {
+            let hash = match TxnHash::new(hash) {
+                Ok(txn_hash) => txn_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid txn hash: {}",
+                        hash
+                    )))
+                }
+            };
+
+            return Ok(db
+                .get_user_command(&hash, 0)?
+                .map(|cmd| Transaction::new(cmd, db, num_commands)));
         }
 
         Ok(None)
@@ -181,14 +188,15 @@ impl TransactionsQueryRoot {
         // txn hash query //
         ////////////////////
 
-        if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.clone()) {
-            let txn_hash = if let Ok(txn_hash) = TxnHash::new(txn_hash.to_owned()) {
-                txn_hash
-            } else {
-                return Err(async_graphql::Error::new(format!(
-                    "Invalid txn hash: {}",
-                    txn_hash
-                )));
+        if let Some(txn_hash) = query.as_ref().and_then(|input| input.hash.as_ref()) {
+            let txn_hash = match TxnHash::new(txn_hash) {
+                Ok(txn_hash) => txn_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid txn hash: {}",
+                        txn_hash
+                    )))
+                }
             };
 
             let query = query.expect("query input");
@@ -220,19 +228,22 @@ impl TransactionsQueryRoot {
             .and_then(|input| input.block.as_ref())
             .and_then(|block| block.state_hash.as_ref())
         {
-            if !StateHash::is_valid(state_hash) {
-                return Err(async_graphql::Error::new(format!(
-                    "Invalid state hash {}",
-                    state_hash
-                )));
-            }
+            let state_hash = match StateHash::new(state_hash) {
+                Ok(state_hash) => state_hash,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid state hash {}",
+                        state_hash
+                    )))
+                }
+            };
 
             TransactionQueryInput::state_hash_query_handler(
                 &mut transactions,
                 db,
                 query.as_ref(),
                 sort_by,
-                &state_hash.into(),
+                &state_hash,
                 num_commands,
                 limit,
             )?;
@@ -269,14 +280,14 @@ impl TransactionsQueryRoot {
             if from.or(to).is_some() {
                 if from.map(|pk| !PublicKey::is_valid(pk)).unwrap_or_default() {
                     return Err(async_graphql::Error::new(format!(
-                        "Invalid receiver: {}",
+                        "Invalid receiver public key: {}",
                         from.unwrap()
                     )));
                 }
 
                 if to.map(|pk| !PublicKey::is_valid(pk)).unwrap_or_default() {
                     return Err(async_graphql::Error::new(format!(
-                        "Invalid sender: {}",
+                        "Invalid sender public key: {}",
                         to.unwrap()
                     )));
                 }
@@ -347,13 +358,14 @@ impl TransactionsQueryRoot {
         /////////////////
 
         if let Some(token) = query.as_ref().and_then(|q| q.token.as_ref()) {
-            let token = if let Some(token) = TokenAddress::new(token) {
-                token
-            } else {
-                return Err(async_graphql::Error::new(format!(
-                    "Invalid token address: {}",
-                    token
-                )));
+            let token = match TokenAddress::new(token) {
+                Some(token) => token,
+                None => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid token address: {}",
+                        token
+                    )))
+                }
             };
 
             TransactionQueryInput::token_query_handler(

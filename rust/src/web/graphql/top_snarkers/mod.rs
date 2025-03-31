@@ -58,10 +58,13 @@ impl TopSnarkersQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<TopSnarker>> {
         use TopSnarkersSortByInput::*;
+
         let db = db(ctx);
         let epoch = query
             .as_ref()
             .map_or(db.get_current_epoch().expect("current epoch"), |q| q.epoch);
+
+        let mut snarkers = vec![];
         let iter = match sort_by {
             Some(MaxFeeAsc) => db.snark_prover_max_fee_epoch_iterator(epoch, Direction::Forward),
             Some(MaxFeeDesc) => db.snark_prover_max_fee_epoch_iterator(epoch, Direction::Reverse),
@@ -72,7 +75,6 @@ impl TopSnarkersQueryRoot {
                 db.snark_prover_total_fees_epoch_iterator(epoch, Direction::Reverse)
             }
         };
-        let mut snarkers = vec![];
 
         for (key, _) in iter.flatten() {
             let key_epoch = u32_from_be_bytes(&key[..U32_LEN])?;
