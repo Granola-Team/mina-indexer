@@ -14,6 +14,7 @@ use crate::{
 };
 use async_graphql::{self, Enum, SimpleObject};
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Default, SimpleObject, Serialize)]
 pub struct Block {
@@ -299,7 +300,7 @@ pub struct ProtocolState {
 
 impl Block {
     pub fn from_precomputed(
-        db: &std::sync::Arc<IndexerStore>,
+        db: &Arc<IndexerStore>,
         block: &PrecomputedBlock,
         counts: [u32; 15],
     ) -> Self {
@@ -362,7 +363,7 @@ impl Block {
             block_num_user_commands,
             block_num_zkapp_commands,
             block_num_internal_commands,
-            block: BlockWithoutCanonicity::new(block, canonical, num_commands),
+            block: BlockWithoutCanonicity::new(db, block, canonical, num_commands),
             epoch_num_slots_produced,
             num_unique_block_producers_last_n_blocks: None,
         }
@@ -370,7 +371,12 @@ impl Block {
 }
 
 impl BlockWithoutCanonicity {
-    pub fn new(block: &PrecomputedBlock, canonical: bool, num_commands: [u32; 4]) -> Self {
+    pub fn new(
+        db: &Arc<IndexerStore>,
+        block: &PrecomputedBlock,
+        canonical: bool,
+        num_commands: [u32; 4],
+    ) -> Self {
         let winner_account = block.block_creator().0;
         let date_time = millis_to_iso_date_string(block.timestamp() as i64);
         let creator = block.block_creator().0;
@@ -438,7 +444,7 @@ impl BlockWithoutCanonicity {
         let user_commands: Vec<TransactionWithoutBlock> =
             SignedCommandWithData::from_precomputed(block)
                 .into_iter()
-                .map(|cmd| TransactionWithoutBlock::new(cmd, canonical, num_commands))
+                .map(|cmd| TransactionWithoutBlock::new(db, cmd, canonical, num_commands))
                 .collect();
 
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(block)

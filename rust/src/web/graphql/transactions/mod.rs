@@ -11,7 +11,7 @@ use crate::{
     },
     constants::millis_to_global_slot,
     ledger::token::TokenAddress,
-    store::IndexerStore,
+    store::{zkapp::tokens::ZkappTokenStore, IndexerStore},
     utility::store::{
         command::user::{user_commands_iterator_state_hash, user_commands_iterator_txn_hash},
         common::{state_hash_suffix, U32_LEN},
@@ -101,6 +101,9 @@ struct TokenAccount {
 
     /// Token address
     token: String,
+
+    /// Token symbol
+    symbol: String,
 
     /// Balance change
     #[graphql(name = "balance_change")]
@@ -409,6 +412,7 @@ impl Transaction {
 
         Self {
             transaction: TransactionWithoutBlock::new(
+                db,
                 cmd,
                 get_block_canonicity(db, &block_state_hash),
                 num_commands,
@@ -422,13 +426,20 @@ impl Transaction {
 }
 
 impl TransactionWithoutBlock {
-    pub fn new(cmd: SignedCommandWithData, canonical: bool, num_commands: [u32; 4]) -> Self {
+    pub fn new(
+        db: &Arc<IndexerStore>,
+        cmd: SignedCommandWithData,
+        canonical: bool,
+        num_commands: [u32; 4],
+    ) -> Self {
         let zkapp = if cmd.is_zkapp_command() {
             Some(TransactionZkapp {
                 accounts_updated: cmd
                     .accounts_updated()
                     .into_iter()
-                    .map(TokenAccount::from)
+                    .map(|(pk, token, balance_change, increment_nonce)| {
+                        TokenAccount::from(db, pk, token, balance_change, increment_nonce)
+                    })
                     .collect(),
                 actions: cmd.actions(),
                 events: cmd.events(),
@@ -1388,13 +1399,22 @@ impl TransactionQueryInput {
 // conversions //
 /////////////////
 
-impl From<(PublicKey, TokenAddress, i64, bool)> for TokenAccount {
-    fn from(value: (PublicKey, TokenAddress, i64, bool)) -> Self {
+impl TokenAccount {
+    fn from(
+        db: &Arc<IndexerStore>,
+        pk: PublicKey,
+        token: TokenAddress,
+        balance_change: i64,
+        increment_nonce: bool,
+    ) -> Self {
+        let token_symbol = db.get_token_symbol(&token).unwrap().expect("token symbol");
+
         Self {
-            pk: value.0.to_string(),
-            token: value.1.to_string(),
-            balance_change: value.2,
-            increment_nonce: value.3,
+            balance_change,
+            increment_nonce,
+            pk: pk.to_string(),
+            token: token.to_string(),
+            symbol: token_symbol.to_string(),
         }
     }
 }

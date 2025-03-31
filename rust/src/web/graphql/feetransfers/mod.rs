@@ -99,6 +99,7 @@ impl FeetransferWithMeta {
                 .unwrap_or_default();
             Ok(Some(Block {
                 block: BlockWithoutCanonicity::new(
+                    db,
                     &block,
                     self.canonical,
                     [
