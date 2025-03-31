@@ -113,24 +113,33 @@ impl SnarkQueryRoot {
             .and_then(|q| q.block.as_ref())
             .and_then(|block| block.state_hash.as_ref())
         {
-            snarks = db
-                .get_block_snark_work(&state_hash.clone().into())?
-                .expect("SNARK work")
-                .into_iter()
-                .flat_map(|snark| {
-                    snark_summary_matches_query(
-                        db,
-                        &query,
-                        SnarkWorkSummaryWithStateHash {
-                            fee: snark.fee,
-                            prover: snark.prover,
-                            state_hash: state_hash.clone().into(),
-                        },
-                    )
-                    .ok()
-                    .flatten()
-                })
-                .collect();
+            // validate state hash
+            if !StateHash::is_valid(state_hash) {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid state hash: {}",
+                    state_hash
+                )));
+            }
+
+            let state_hash: StateHash = state_hash.clone().into();
+            if let Some(block_snarks) = db.get_block_snark_work(&state_hash)? {
+                snarks = block_snarks
+                    .into_iter()
+                    .flat_map(|snark| {
+                        snark_summary_matches_query(
+                            db,
+                            &query,
+                            SnarkWorkSummaryWithStateHash {
+                                fee: snark.fee,
+                                prover: snark.prover,
+                                state_hash: state_hash.clone(),
+                            },
+                        )
+                        .ok()
+                        .flatten()
+                    })
+                    .collect();
+            }
 
             match sort_by {
                 SnarkSortByInput::BlockHeightAsc => snarks.reverse(),
@@ -163,117 +172,132 @@ impl SnarkQueryRoot {
             snarks.truncate(limit);
             return Ok(snarks);
         }
+
         // prover query filter and sort by height
         if let (Some(prover), Some(block_height_lte)) = (
             query.as_ref().and_then(|q| q.prover.clone()),
             query.as_ref().and_then(|q| q.block_height_lte),
         ) {
-            let mut start = prover.as_bytes().to_vec();
-            let mode = match sort_by {
-                SnarkSortByInput::BlockHeightAsc => {
-                    speedb::IteratorMode::From(&start, speedb::Direction::Forward)
-                }
-                SnarkSortByInput::BlockHeightDesc => {
-                    start.append(&mut block_height_lte.to_be_bytes().to_vec());
-                    start.append(&mut u32::MAX.to_be_bytes().to_vec());
-                    speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
-                }
-            };
+            // validate prover pk
+            if let Ok(prover) = PublicKey::new(prover) {
+                let mut start = prover.0.as_bytes().to_vec();
+                let mode = match sort_by {
+                    SnarkSortByInput::BlockHeightAsc => {
+                        speedb::IteratorMode::From(&start, speedb::Direction::Forward)
+                    }
+                    SnarkSortByInput::BlockHeightDesc => {
+                        start.append(&mut block_height_lte.to_be_bytes().to_vec());
+                        start.append(&mut u32::MAX.to_be_bytes().to_vec());
+                        speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+                    }
+                };
 
-            // key should be typed
-            'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
-                // exit if prover isn't the same
-                if key[..PublicKey::LEN] != *prover.as_bytes() {
-                    break;
-                }
-                let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
-                let blocks_at_height = db.get_blocks_at_height(block_height)?;
-                for state_hash in blocks_at_height {
-                    // avoid deserializing PCB if possible
-                    let canonical = get_block_canonicity(db, &state_hash);
-                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-                        if canonical != query_canonicity {
-                            continue;
-                        }
+                'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
+                    // exit if prover isn't the same
+                    if key[..PublicKey::LEN] != *prover.0.as_bytes() {
+                        break;
                     }
 
-                    let pcb = get_block(db, &state_hash);
-                    let snark = serde_json::from_slice(&snark)?;
-                    let sw = SnarkWithCanonicity {
-                        canonical,
-                        pcb,
-                        snark: (
-                            snark,
-                            state_hash,
-                            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
-                            db.get_snarks_total_count().expect("total snarks count"),
-                        )
-                            .into(),
-                    };
-                    if query.as_ref().map_or(true, |q| q.matches(&sw)) {
-                        snarks.push(sw);
-                        if snarks.len() >= limit {
-                            break 'outer;
+                    let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
+                    let blocks_at_height = db.get_blocks_at_height(block_height)?;
+
+                    for state_hash in blocks_at_height {
+                        // avoid deserializing PCB if possible
+                        let canonical = get_block_canonicity(db, &state_hash);
+                        if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                            if canonical != query_canonicity {
+                                continue;
+                            }
+                        }
+
+                        let pcb = get_block(db, &state_hash);
+                        let snark = serde_json::from_slice(&snark)?;
+                        let sw = SnarkWithCanonicity {
+                            canonical,
+                            pcb,
+                            snark: (
+                                snark,
+                                state_hash,
+                                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                db.get_snarks_total_count().expect("total snarks count"),
+                            )
+                                .into(),
+                        };
+
+                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                            snarks.push(sw);
+
+                            if snarks.len() >= limit {
+                                break 'outer;
+                            }
                         }
                     }
                 }
             }
+
             return Ok(snarks);
         }
 
         // prover query
         if let Some(prover) = query.as_ref().and_then(|q| q.prover.clone()) {
-            let mut start = prover.as_bytes().to_vec();
-            let mode = match sort_by {
-                SnarkSortByInput::BlockHeightAsc => {
-                    speedb::IteratorMode::From(&start, speedb::Direction::Forward)
-                }
-                SnarkSortByInput::BlockHeightDesc => {
-                    let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
-                    *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
-                    start.append(&mut u32::MAX.to_be_bytes().to_vec());
-                    start.append(&mut pk_prefix);
-                    speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
-                }
-            };
+            // validate prover pk
+            if let Ok(prover) = PublicKey::new(prover) {
+                let mut start = prover.0.as_bytes().to_vec();
+                let mode = match sort_by {
+                    SnarkSortByInput::BlockHeightAsc => {
+                        speedb::IteratorMode::From(&start, speedb::Direction::Forward)
+                    }
+                    SnarkSortByInput::BlockHeightDesc => {
+                        let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
+                        *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
+                        start.append(&mut u32::MAX.to_be_bytes().to_vec());
+                        start.append(&mut pk_prefix);
+                        speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
+                    }
+                };
 
-            'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
-                if key[..PublicKey::LEN] != *prover.as_bytes() {
-                    break;
-                }
-
-                let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
-                let blocks_at_slot = db.get_blocks_at_height(block_height)?;
-                for state_hash in blocks_at_slot {
-                    // avoid deserializing PCB if possible
-                    let canonical = get_block_canonicity(db, &state_hash);
-                    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-                        if canonical != query_canonicity {
-                            continue;
-                        }
+                'outer: for (key, snark) in db.snark_prover_block_height_iterator(mode).flatten() {
+                    if key[..PublicKey::LEN] != *prover.0.as_bytes() {
+                        break;
                     }
 
-                    let pcb = get_block(db, &state_hash);
-                    let snark = serde_json::from_slice(&snark)?;
-                    let sw = SnarkWithCanonicity {
-                        canonical,
-                        pcb,
-                        snark: (
-                            snark,
-                            state_hash,
-                            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
-                            db.get_snarks_total_count().expect("total snarks count"),
-                        )
-                            .into(),
-                    };
-                    if query.as_ref().map_or(true, |q| q.matches(&sw)) {
-                        snarks.push(sw);
-                        if snarks.len() >= limit {
-                            break 'outer;
+                    let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
+                    let blocks_at_slot = db.get_blocks_at_height(block_height)?;
+
+                    for state_hash in blocks_at_slot {
+                        // avoid deserializing PCB if possible
+                        let canonical = get_block_canonicity(db, &state_hash);
+                        if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+                            if canonical != query_canonicity {
+                                continue;
+                            }
+                        }
+
+                        let pcb = get_block(db, &state_hash);
+                        let snark = serde_json::from_slice(&snark)?;
+                        let sw = SnarkWithCanonicity {
+                            canonical,
+                            pcb,
+                            snark: (
+                                snark,
+                                state_hash,
+                                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                db.get_snarks_total_count().expect("total snarks count"),
+                            )
+                                .into(),
+                        };
+
+                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                            snarks.push(sw);
+
+                            if snarks.len() >= limit {
+                                break 'outer;
+                            }
                         }
                     }
                 }
             }
+
             return Ok(snarks);
         }
 
@@ -353,6 +377,7 @@ impl SnarkQueryRoot {
                     }
                 }
             }
+
             return Ok(snarks);
         }
 
@@ -401,6 +426,7 @@ impl SnarkQueryRoot {
                 }
             }
         }
+
         Ok(snarks)
     }
 }
