@@ -14,6 +14,14 @@ impl StateHash {
     pub const LEN: usize = 52;
     pub const PREFIX: &'static str = "3N";
 
+    pub fn new<S>(state_hash: S) -> anyhow::Result<Self>
+    where
+        S: Into<String>,
+    {
+        let state_hash: String = state_hash.into();
+        Self::from_bytes(state_hash.as_bytes())
+    }
+
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
         let res = String::from_utf8(bytes.to_vec())?;
 

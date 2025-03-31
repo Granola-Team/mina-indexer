@@ -31,13 +31,15 @@ impl TxnHash {
         }
     }
 
-    pub fn new(txn_hash: String) -> anyhow::Result<Self> {
+    pub fn new<S: Into<String>>(txn_hash: S) -> anyhow::Result<Self> {
+        let txn_hash: String = txn_hash.into();
+
         if Self::is_valid_v1(&txn_hash) {
-            return Ok(Self::V1(txn_hash.to_string()));
+            return Ok(Self::V1(txn_hash));
         }
 
         if Self::is_valid_v2(&txn_hash) {
-            return Ok(Self::V2(txn_hash.to_string()));
+            return Ok(Self::V2(txn_hash));
         }
 
         bail!("Invalid txn hash: '{txn_hash}'")
@@ -178,12 +180,12 @@ mod test {
     #[test]
     fn round_trip_padding() -> anyhow::Result<()> {
         // v1
-        let v1 = TxnHash::new(V1_TXN_HASH.into())?;
+        let v1 = TxnHash::new(V1_TXN_HASH)?;
         let v1_padded_bytes = v1.right_pad_v2().to_vec();
         assert_eq!(v1, TxnHash::from_bytes(v1_padded_bytes)?);
 
         // v2
-        let v2 = TxnHash::new(V2_TXN_HASH.into())?;
+        let v2 = TxnHash::new(V2_TXN_HASH)?;
         let v2_padded_bytes = v2.right_pad_v2().to_vec();
         assert_eq!(v2, TxnHash::from_bytes(v2_padded_bytes)?);
 
@@ -193,12 +195,12 @@ mod test {
     #[test]
     fn right_pad_txn_hashes() -> anyhow::Result<()> {
         // v1 - no right padding
-        let v1 = TxnHash::new(V1_TXN_HASH.into())?;
+        let v1 = TxnHash::new(V1_TXN_HASH)?;
         assert!(matches!(v1, TxnHash::V1(_)));
         assert_eq!(&v1.right_pad_v2(), v1.to_string().as_bytes());
 
         // v2 - single 0 byte right padding
-        let v2 = TxnHash::new(V2_TXN_HASH.into())?;
+        let v2 = TxnHash::new(V2_TXN_HASH)?;
         assert!(matches!(v2, TxnHash::V2(_)));
 
         let mut v2_right_pad = [0; TxnHash::V1_LEN];
