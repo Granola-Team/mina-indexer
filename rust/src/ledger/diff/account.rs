@@ -77,9 +77,10 @@ pub enum UnapplyAccountDiff {
     ZkappFeePayerNonce(ZkappFeePayerNonceDiff),
 }
 
+/// A debit carries Some(nonce) for a payment/delegation command, None for
+/// internal commands and zkapp account updates
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum UpdateType {
-    /// Carries Some(nonce) for a user command, None for internal command
     Debit(Option<Nonce>),
     Credit,
 }
@@ -1125,35 +1126,22 @@ impl AccountDiff {
                 state_hash: state_hash.to_owned(),
                 payment: PaymentDiff {
                     public_key: fee_payer.to_owned(),
-                    update_type: UpdateType::Debit(Some(nonce + 1)),
+                    update_type: UpdateType::Debit(None),
                     token: token.to_owned(),
                     amount,
                 },
             });
         }
 
-        // increment nonce of receiver
+        // increment nonce of updated account
         let increment_nonce = elt.account_update.body.increment_nonce;
-        if increment_nonce && amount.0 == 0 {
+        if increment_nonce {
             payment_diffs.push(IncrementNonce(ZkappIncrementNonce {
                 state_hash: state_hash.to_owned(),
                 public_key: public_key.to_owned(),
                 token: token.to_owned(),
             }));
         };
-
-        let mut update_type: UpdateType = elt
-            .account_update
-            .body
-            .balance_change
-            .sgn
-            .0
-            .to_owned()
-            .into();
-
-        if matches!(update_type, UpdateType::Debit(_)) {
-            update_type = UpdateType::Debit(Some(nonce + 1))
-        }
 
         // only push non-zero payments
         if amount.0 != 0 {
@@ -1163,7 +1151,14 @@ impl AccountDiff {
                     public_key: public_key.to_owned(),
                     token: token.to_owned(),
                     amount,
-                    update_type,
+                    update_type: elt
+                        .account_update
+                        .body
+                        .balance_change
+                        .sgn
+                        .0
+                        .to_owned()
+                        .into(),
                 },
             });
         }
@@ -1692,7 +1687,7 @@ mod tests {
                         payment: PaymentDiff {
                             public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
                                 .into(),
-                            update_type: UpdateType::Debit(Some(185.into())),
+                            update_type: UpdateType::Debit(None),
                             amount: 2000000000.into(),
                             token: TokenAddress::default(),
                         },
@@ -1731,7 +1726,7 @@ mod tests {
                         payment: PaymentDiff {
                             public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
                                 .into(),
-                            update_type: UpdateType::Debit(Some(186.into())),
+                            update_type: UpdateType::Debit(None),
                             amount: 2000000000.into(),
                             token: TokenAddress::default(),
                         },
@@ -1770,7 +1765,7 @@ mod tests {
                         payment: PaymentDiff {
                             public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
                                 .into(),
-                            update_type: UpdateType::Debit(Some(187.into())),
+                            update_type: UpdateType::Debit(None),
                             amount: 2000000000.into(),
                             token: TokenAddress::default(),
                         },
@@ -1839,6 +1834,11 @@ mod tests {
             }))],
         ];
 
+        for (n, x) in expect.iter().enumerate() {
+            for (m, x) in x.iter().enumerate() {
+                assert_eq!(zkapp_diffs[n][m], *x, "n = {n}, m = {m}")
+            }
+        }
         assert_eq!(zkapp_diffs, expect);
 
         // expected expanded zkapp diffs
@@ -1851,7 +1851,7 @@ mod tests {
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    update_type: UpdateType::Debit(Some(185.into())),
+                    update_type: UpdateType::Debit(None),
                     amount: 2000000000.into(),
                     token: TokenAddress::default(),
                 }),
@@ -1870,7 +1870,7 @@ mod tests {
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    update_type: UpdateType::Debit(Some(186.into())),
+                    update_type: UpdateType::Debit(None),
                     amount: 2000000000.into(),
                     token: TokenAddress::default(),
                 }),
@@ -1889,7 +1889,7 @@ mod tests {
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    update_type: UpdateType::Debit(Some(187.into())),
+                    update_type: UpdateType::Debit(None),
                     amount: 2000000000.into(),
                     token: TokenAddress::default(),
                 }),
@@ -1958,6 +1958,12 @@ mod tests {
         ];
 
         let expanded = AccountDiff::expand(zkapp_diffs);
+
+        for (n, x) in expect.iter().enumerate() {
+            for (m, x) in x.iter().enumerate() {
+                assert_eq!(expanded[n][m], *x, "n = {n}, m = {m}")
+            }
+        }
         assert_eq!(expanded, expect);
 
         Ok(())
@@ -1999,7 +2005,6 @@ mod tests {
         // expected zkapp account diffs
         let state_hash: StateHash = "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi".into();
         let fee_payer: PublicKey = "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into();
-        let nonce = Nonce(1);
         let token =
             TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn").unwrap();
 
@@ -2011,7 +2016,7 @@ mod tests {
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: fee_payer.clone(),
-                update_type: UpdateType::Debit(Some(nonce)),
+                update_type: UpdateType::Debit(None),
                 amount: 1000000000.into(),
                 token: TokenAddress::default(),
             }),
@@ -2033,7 +2038,7 @@ mod tests {
             }),
             AccountDiff::Payment(PaymentDiff {
                 public_key: fee_payer.clone(),
-                update_type: UpdateType::Debit(Some(nonce)),
+                update_type: UpdateType::Debit(None),
                 amount: 19000000000.into(),
                 token: TokenAddress::default(),
             }),
