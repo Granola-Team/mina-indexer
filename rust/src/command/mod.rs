@@ -554,7 +554,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 }
 
-pub fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash> {
+fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash> {
     // convert versioned signed command to bin_prot bytes
     let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
     bin_prot::to_writer(&mut binprot_bytes, v1)?;
@@ -580,7 +580,7 @@ pub fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash>
     ))
 }
 
-pub fn hash_command_v2(v2: &UserCommandData) -> anyhow::Result<TxnHash> {
+fn hash_command_v2(v2: &UserCommandData) -> anyhow::Result<TxnHash> {
     let bytes = serde_json::to_vec(v2)?;
     let mut hasher = blake2::Blake2bVar::new(32)?;
     hasher.write_all(&bytes[..])?;

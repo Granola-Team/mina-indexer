@@ -469,7 +469,7 @@ impl TransactionWithoutBlock {
             global_slot: cmd.global_slot_since_genesis,
             fee: cmd.command.fee(),
             from: cmd.command.source_pk().0,
-            hash: cmd.tx_hash.to_string(),
+            hash: cmd.txn_hash.to_string(),
             kind: cmd.command.kind().to_string(),
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,

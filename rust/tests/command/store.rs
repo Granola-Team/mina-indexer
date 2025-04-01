@@ -5,7 +5,7 @@ use mina_indexer::{
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
     },
-    command::{signed::SignedCommand, store::UserCommandStore},
+    command::{signed::SignedCommand, store::UserCommandStore, UserCommandWithStatusT},
     constants::*,
     ledger::genesis::GenesisLedger,
     server::IndexerVersion,
@@ -83,12 +83,13 @@ async fn add_and_get() -> anyhow::Result<()> {
     }
 
     // check transaction hash key
-    for cmd in SignedCommand::from_precomputed(&block) {
-        let cmd = cmd.signed_command;
+    for cmd in block.commands() {
         let result_cmd: Option<SignedCommand> = indexer_store
-            .get_user_command(&cmd.hash_signed_command()?, 0)?
+            .get_user_command(&cmd.hash()?, 0)?
             .map(|c| c.into());
-        assert_eq!(result_cmd, Some(cmd));
+        let signed: SignedCommand = cmd.into();
+
+        assert_eq!(result_cmd, Some(signed));
     }
 
     // iterate over transactions via block height
@@ -104,12 +105,12 @@ async fn add_and_get() -> anyhow::Result<()> {
             .unwrap();
 
         // txn hashes should match
-        assert_eq!(txn_hash, signed_cmd.tx_hash);
+        assert_eq!(txn_hash, signed_cmd.txn_hash);
 
         // block heights should match
         let cmd_height = user_commands_iterator_u32_prefix(&key);
         assert!(curr_height <= cmd_height);
-        assert_eq!(cmd_height, signed_cmd.blockchain_length,);
+        assert_eq!(cmd_height, signed_cmd.blockchain_length);
 
         // blocks should be present
         let state_hash = signed_cmd.state_hash;
@@ -131,12 +132,12 @@ async fn add_and_get() -> anyhow::Result<()> {
             .unwrap();
 
         // txn hashes should match
-        assert_eq!(user_commands_iterator_txn_hash(&key)?, signed_cmd.tx_hash);
+        assert_eq!(user_commands_iterator_txn_hash(&key)?, signed_cmd.txn_hash);
 
         // global slot numbers should match
         let cmd_slot = user_commands_iterator_u32_prefix(&key);
         assert!(curr_slot <= cmd_slot);
-        assert_eq!(cmd_slot, signed_cmd.global_slot_since_genesis,);
+        assert_eq!(cmd_slot, signed_cmd.global_slot_since_genesis);
 
         // blocks should be present
         let state_hash = signed_cmd.state_hash;

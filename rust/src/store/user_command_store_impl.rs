@@ -1218,7 +1218,7 @@ impl<'a> TxnCsvRecord<'a> {
                 .0
                 .to_owned(),
             nonce: cmd.nonce.0,
-            hash: cmd.tx_hash.ref_inner(),
+            hash: cmd.txn_hash.ref_inner(),
             fee: cmd.command.fee(),
             amount: cmd.command.amount(),
             memo: cmd.command.memo(),

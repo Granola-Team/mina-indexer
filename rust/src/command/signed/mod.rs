@@ -7,7 +7,6 @@ use crate::{
     proof_systems::signer::signature::Signature,
     protocol::serialization_types::staged_ledger_diff as mina_rs,
 };
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 // re-export [txn_hash::TxnHash]
@@ -37,7 +36,7 @@ pub struct SignedCommandWithData {
     pub command: SignedCommand,
     pub state_hash: StateHash,
     pub status: CommandStatusData,
-    pub tx_hash: TxnHash,
+    pub txn_hash: TxnHash,
     pub blockchain_length: u32,
     pub date_time: u64,
     pub nonce: Nonce,
@@ -283,14 +282,6 @@ impl SignedCommand {
         }
     }
 
-    /// Returns a user command (transaction) hash
-    pub fn hash_signed_command(&self) -> Result<TxnHash> {
-        match self {
-            Self::V1(v1) => super::hash_command_v1(v1),
-            Self::V2(v2) => super::hash_command_v2(v2),
-        }
-    }
-
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<SignedCommandWithCreationData> {
         block
             .commands()
@@ -395,6 +386,7 @@ impl SignedCommandWithData {
         global_slot_since_genesis: u32,
     ) -> Self {
         let status = user_cmd.status_data();
+        let txn_hash = user_cmd.hash();
         let command = SignedCommand::from(user_cmd);
 
         Self {
@@ -404,9 +396,7 @@ impl SignedCommandWithData {
             global_slot_since_genesis,
             nonce: command.nonce(),
             state_hash: state_hash.into(),
-            tx_hash: command
-                .hash_signed_command()
-                .expect("valid transaction hash"),
+            txn_hash: txn_hash.expect("valid transaction hash"),
             command,
         }
     }
@@ -604,13 +594,13 @@ impl From<SignedCommandWithData> for serde_json::Value {
         use serde_json::*;
 
         let mut obj = Map::new();
-        let tx_hash = Value::String(value.tx_hash.inner());
+        let txn_hash = Value::String(value.txn_hash.inner());
         let state_hash = Value::String(value.state_hash.0);
         let command = value.command.into();
         let status = value.status.into();
         let blockchain_length = value.blockchain_length.into();
 
-        obj.insert("tx_hash".into(), tx_hash);
+        obj.insert("txn_hash".into(), txn_hash);
         obj.insert("command".into(), command);
         obj.insert("status".into(), status);
         obj.insert("state_hash".into(), state_hash);
@@ -911,6 +901,7 @@ fn recurse_calls_events<'a>(events: &mut Vec<String>, calls: impl Iterator<Item 
 mod tests {
     use super::*;
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
+    use anyhow::Result;
     use std::path::PathBuf;
 
     #[test]

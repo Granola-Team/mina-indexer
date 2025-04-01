@@ -780,14 +780,14 @@ test_transactions() {
 	kind=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.kind)
 	amount=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].command.payload.body.amount)
 	state_hash=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].state_hash)
-	tx_hash=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].tx_hash)
+	txn_hash=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].txn_hash)
 	length=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy --verbose | jq -r .[0].blockchain_length)
 
 	assert 3 $length
 	assert '1000' $amount
 	assert 'Payment' $kind
 	assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
-	assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
+	assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $txn_hash
 
 	# bounded pk transaction queries
 	amount=$(idxr transactions public-key --public-key B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy \
@@ -810,7 +810,7 @@ test_transactions() {
 	kind=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .command.payload.body.kind)
 	amount=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .command.payload.body.amount)
 	status=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .status.kind)
-	tx_hash=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .tx_hash)
+	txn_hash=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .txn_hash)
 	state_hash=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .state_hash)
 	length=$(idxr transactions hash --hash CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa --verbose | jq -r .blockchain_length)
 
@@ -818,7 +818,7 @@ test_transactions() {
 	assert 'Payment' $kind
 	assert '1000' $amount
 	assert 'Failed' $status
-	assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $tx_hash
+	assert 'CkpZirFuoLVVab6x2ry4j8Ld5gMmQdak7VHW6f5C7VJYE34WAEWqa' $txn_hash
 	assert '3NKd5So3VNqGZtRZiWsti4yaEe1fX79yz5TbfG6jBZqgMnCQQp3R' $state_hash
 
 	# state hash query
