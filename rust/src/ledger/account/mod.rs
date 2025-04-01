@@ -364,6 +364,9 @@ impl Account {
         // modify verification key
         zkapp.verification_key = diff.verification_key.to_owned();
 
+        // modify proved state
+        zkapp.proved_state = true;
+
         Self {
             zkapp: Some(zkapp),
             ..self
@@ -697,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn test_non_minaaccount_display() -> anyhow::Result<()> {
+    fn test_non_mina_account_display() -> anyhow::Result<()> {
         let ledger_account = Account {
             balance: Amount::new(100),
             token: Some(
@@ -736,11 +739,12 @@ mod tests {
 
         let diff = ZkappDiff {
             public_key: pk.clone(),
+            nonce: 185.into(),
             payment_diffs: vec![ZkappPaymentDiff::Payment {
                 state_hash: StateHash::default(),
                 payment: PaymentDiff {
                     public_key: pk.clone(),
-                    update_type: UpdateType::Debit(Some(185.into())),
+                    update_type: UpdateType::Debit(None),
                     amount,
                     token: TokenAddress::default(),
                 },
@@ -759,12 +763,11 @@ mod tests {
             after
         };
 
-        // only the balance & nonce change
+        // only the balance changes
         assert_eq!(
             after,
             Account {
                 balance: before.balance - amount,
-                nonce: Some(185.into()),
                 ..before
             }
         );
@@ -807,7 +810,7 @@ mod tests {
             after
         };
 
-        // only the first app state element & nonce are modified
+        // only the first app state element is modified
         let expect = {
             let mut app_state = before.zkapp.clone().unwrap().app_state;
             app_state[0] = app_state_elem;
@@ -854,7 +857,7 @@ mod tests {
             after
         };
 
-        // only the account delegate changes
+        // only the account delegate & nonce changes
         assert_eq!(
             after,
             Account {
@@ -890,12 +893,13 @@ mod tests {
         // account after applying diff
         let after = before.clone().apply_account_diff(&diff);
 
-        // only the zkapp verification key changes
+        // only the zkapp verification key & proved state change
         assert_eq!(
             after,
             Account {
                 zkapp: Some(ZkappAccount {
                     verification_key,
+                    proved_state: true,
                     ..before.zkapp.unwrap()
                 }),
                 ..before
@@ -1097,7 +1101,7 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                voting_for: Some(voting_for.to_owned().into()),
+                voting_for: Some(voting_for.into()),
                 ..before
             }
         );
