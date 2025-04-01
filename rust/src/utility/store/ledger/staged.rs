@@ -6,7 +6,7 @@ use crate::{
 
 /// Key format for storing staged ledger accounts by state hash
 /// ```
-/// {state_hash}{pk}
+/// {state_hash}{token}{pk}
 /// where
 /// - state_hash: [StateHash::LEN] bytes
 /// - token:      [TokenAddress::LEN] bytes
