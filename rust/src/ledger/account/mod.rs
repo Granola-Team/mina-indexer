@@ -338,20 +338,13 @@ impl Account {
     pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
-        let mut zkapp = self
-            .zkapp
-            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
+        let mut zkapp = self.zkapp.unwrap_or_default();
 
         // modify app state
         for (idx, diff) in diff.diffs.iter().enumerate() {
             if let Some(app_state) = diff.to_owned() {
                 zkapp.app_state[idx] = app_state;
             }
-        }
-
-        // modify proved if necessary
-        if diff.proved_state {
-            zkapp.proved_state = true;
         }
 
         Self {
@@ -366,15 +359,10 @@ impl Account {
 
         let mut zkapp = self
             .zkapp
-            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
+            .unwrap_or_else(|| ZkappAccount::from_proved_state(true));
 
         // modify verification key
         zkapp.verification_key = diff.verification_key.to_owned();
-
-        // modify proved if necessary
-        if diff.proved_state {
-            zkapp.proved_state = true;
-        }
 
         Self {
             zkapp: Some(zkapp),
@@ -396,17 +384,10 @@ impl Account {
     pub fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
-        let mut zkapp = self
-            .zkapp
-            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
+        let mut zkapp = self.zkapp.unwrap_or_default();
 
         // modify zkapp uri
         zkapp.zkapp_uri = diff.zkapp_uri.to_owned();
-
-        // modify proved if necessary
-        if diff.proved_state {
-            zkapp.proved_state = true;
-        }
 
         Self {
             zkapp: Some(zkapp),
@@ -448,19 +429,12 @@ impl Account {
     fn zkapp_actions(self, diff: &ZkappActionsDiff) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
-        let mut zkapp = self
-            .zkapp
-            .unwrap_or(ZkappAccount::from_proved_state(diff.proved_state));
+        let mut zkapp = self.zkapp.unwrap_or_default();
 
         // modify action state
         let n = zkapp.action_state.len();
         for (idx, action_state) in diff.actions.iter().enumerate() {
             zkapp.action_state[idx % n] = action_state.to_owned();
-        }
-
-        // modify proved if necessary
-        if diff.proved_state {
-            zkapp.proved_state = true;
         }
 
         Self {
@@ -910,7 +884,6 @@ mod tests {
             state_hash: StateHash::default(),
             token: TokenAddress::default(),
             public_key: pk.clone(),
-            proved_state: false,
             verification_key: verification_key.clone(),
         });
 

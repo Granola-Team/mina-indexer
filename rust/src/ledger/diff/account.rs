@@ -14,7 +14,7 @@ use crate::{
     mina_blocks::v2::{
         self,
         protocol_state::SupplyAdjustmentSign,
-        staged_ledger_diff::{Authorization, Call, Elt, UpdateKind},
+        staged_ledger_diff::{Call, Elt, UpdateKind},
         zkapp::action_state::ActionState,
         AppState, VerificationKey, ZkappEvent, ZkappUri,
     },
@@ -125,7 +125,6 @@ pub struct ZkappDiff {
     pub public_key: PublicKey,
     pub increment_nonce: bool,
     pub payment_diffs: Vec<ZkappPaymentDiff>,
-    pub proved_state: bool,
     pub app_state_diff: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
     pub delegate: Option<PublicKey>,
     pub verification_key: Option<VerificationKey>,
@@ -153,7 +152,6 @@ pub struct ZkappStateDiff {
     pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub proved_state: bool,
     pub diffs: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
 }
 
@@ -162,7 +160,6 @@ pub struct ZkappVerificationKeyDiff {
     pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub proved_state: bool,
     pub verification_key: VerificationKey,
 }
 
@@ -179,7 +176,6 @@ pub struct ZkappUriDiff {
     pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub proved_state: bool,
     pub zkapp_uri: ZkappUri,
 }
 
@@ -212,7 +208,6 @@ pub struct ZkappActionsDiff {
     pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub proved_state: bool,
     pub actions: Vec<ActionState>,
 }
 
@@ -730,7 +725,6 @@ impl ZkappDiff {
             self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
-            self.proved_state,
             self.app_state_diff,
         );
 
@@ -748,7 +742,6 @@ impl ZkappDiff {
             self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
-            self.proved_state,
             self.verification_key,
         );
 
@@ -767,7 +760,6 @@ impl ZkappDiff {
             self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
-            self.proved_state,
             self.zkapp_uri,
         );
 
@@ -804,7 +796,6 @@ impl ZkappDiff {
             self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
-            self.proved_state,
             self.actions,
         );
 
@@ -837,7 +828,6 @@ impl ZkappDiff {
         state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
-        proved_state: bool,
         app_state_diff: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
     ) {
         if !app_state_diff.iter().all(|state| state.is_none()) {
@@ -845,7 +835,6 @@ impl ZkappDiff {
                 state_hash,
                 token,
                 public_key: pk,
-                proved_state,
                 diffs: app_state_diff,
             }));
         }
@@ -871,7 +860,6 @@ impl ZkappDiff {
         state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
-        proved_state: bool,
         verification_key: Option<VerificationKey>,
     ) {
         if let Some(verification_key) = verification_key {
@@ -880,7 +868,6 @@ impl ZkappDiff {
                     state_hash,
                     token,
                     public_key: pk,
-                    proved_state,
                     verification_key,
                 },
             ));
@@ -909,7 +896,6 @@ impl ZkappDiff {
         state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
-        proved_state: bool,
         zkapp_uri: Option<ZkappUri>,
     ) {
         if let Some(zkapp_uri) = zkapp_uri {
@@ -917,7 +903,6 @@ impl ZkappDiff {
                 state_hash,
                 token,
                 public_key: pk,
-                proved_state,
                 zkapp_uri,
             }));
         }
@@ -979,7 +964,6 @@ impl ZkappDiff {
         state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
-        proved_state: bool,
         actions: Vec<ActionState>,
     ) {
         if !actions.is_empty() {
@@ -987,7 +971,6 @@ impl ZkappDiff {
                 state_hash,
                 token,
                 public_key: pk,
-                proved_state,
                 actions,
             }));
         }
@@ -1226,10 +1209,10 @@ impl AccountDiff {
             },
         );
 
-        let proved_state = matches!(
-            elt.account_update.body.authorization_kind,
-            Authorization::Proof(_) | Authorization::Proof_(_)
-        );
+        // let proved_state = matches!(
+        //     elt.account_update.body.authorization_kind,
+        //     Authorization::Proof(_) | Authorization::Proof_(_)
+        // );
 
         Self::Zkapp(Box::new(ZkappDiff {
             state_hash: state_hash.to_owned(),
@@ -1247,7 +1230,6 @@ impl AccountDiff {
             voting_for,
             actions,
             events,
-            proved_state,
             app_state_diff,
         }))
     }
@@ -1915,7 +1897,6 @@ mod tests {
                     state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
-                    proved_state: false,
                     verification_key: VerificationKey {
                         data: "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".into(),
                         hash: "0x1C9320E5FD23AF1F8D8B1145484181C3E6B0F1C8C24FE4BDFFEF4281A61C3EBC".into(),
@@ -1945,7 +1926,6 @@ mod tests {
                     state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
-                    proved_state: false,
                     zkapp_uri: "https://minainu.com".into()
                 }),
                 AccountDiff::ZkappTokenSymbolDiff(ZkappTokenSymbolDiff {
@@ -2067,13 +2047,11 @@ mod tests {
                     Some("0x0000000000000000000000000000000000000000000000000000000000000000".into()),
                     Some("0x000000000000000000000000000000000000000000000001000000174876E800".into()),
                 ],
-                ..Default::default()
             }),
             AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
                 state_hash: state_hash.clone(),
                 token: token.clone(),
                 public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
-                proved_state: false,
                 verification_key: VerificationKey {
                     data: "zBpGMTFexQVgZ8eDUUxauEXpFtAerH9Vq9y7enWrcqJEhmPfMFLcKiu16J3nMcTBaKtAZZEDDcUKLFNCdyhzBsTx2S3zKpjAzM3w5cEVJLUbZsT4UnAZpeiXKpM6qbGbUY6LuWgz6Yn2r5TQA82ojYjFMQHqEJz7koH6iQdbiv1H9TX3ztCR4QVW9vfmF6GpbFNiab14xyDD5t8Wb5ym4od2CwQe6t5ctDSi7h5BgL5xe1Qihk1jXgjYHowErnS9JcU2jsXyNeDrdc2osVuqCL2bhYiuYCzGXed6qqkqqyBckKTYo8UMeoCvyGMxtR5L1kuKAPskEZFE27eCoAQzrKAyqH4tEmMJSJMWZTrdFF6rfvQP3X2JVfk6c3VLXDtQiqJ9YH2Vv6NZ3tCi6evL36CTV3jVyY4qnK2YqLVWcqbUXN2LRVhrpmz8c8VqrKfVvrG1oSGBSPNhnTQeALQVErUZC1xi58TbKfk8BG4vySsPnQLXibXGhYWGRgtzU5Tbg111CBwG3dkzs81HJ5uLwV8A35PtA3kCYxo2eUcvRR5p7QbL5d6RMHLeeKGo5gjyK78oMYmDYgpK3sd5QUw7NbFMzmWTMBhxAhy3NobuhK1SHPWqohozksCod2F52tyjaVhT4qoyjvUDLxd5n5nyG2Xe9n1KcynbZ9B2xK22U7fMRBWJvoQv957K3XrGRFLp8qy6Phgmyo8crWXTrn4veRoWdducAEb39rsoYyxawXQBPsy4WCZLhJ34TMF6KV2EmotigTiW7Vz92W1THgb9qW6rG6Zeb7hWnxBcsjZ3pitcrjZ9Bjyc7gFGfkiTwgm45k9M9aNtg9EuYYZjb2nNy9LBMTCHWWhmFWeNLSRUGYPv5zCyyEw5P8gJsFdPqbcDUPJqq4F9qCTcobTfBt4a9HHc8AExhWzvJuV2AQyvM2KLiPCX93AzvAWehZV2K5qngDtJfFwAFV6PLVBnXPe7jCSBihFy2oDrfkuuAVSgg9DM6rkQAindetWAXTWNRbATv6T7TH4QxAwwsB3Vcw1Dq6EFUhaBdKG3xgv1fSuiNeJMEZCrAVSwR3fKSLuhewiBabEx9pJS7A9K1GVTm8qTrDuVcxrovEiGmLJny6A8Q1G6CyJksbt7LRspBFSq8s3x229AJgJ3XsLn7RW4kUBEWYjEbUH61vQcfcbgCrZsGJtSB8jKgoBR7JfhJe1t3R37wK11weDrZawWcC4zhEgZATr321LFY6gDsaDNruxaMrmUDX1EyP1TtpZgnd4qrSni9cpvceJZxaYkE9wC8uggVRSXc8NgHh2o9ECA6aZHTaGr85uNYis7bLhg7ss7PWzuHsuus1JtXasWMhZa52awY8YXpmuLs1zczpBTA1ZkBh9H3jDkN7eNnpj4gdAmw3rZf3hcQ94p8mvHKNLjJnjZSzy6ovFsVrRc9iyVsfZmwAkhVe9PJVLy9PaRNPn1x3YMLGYvCkw58kxwiZEd549ussEcZsBhpy2RE51jeej5MvT8ruECsqxXVQGeRvaSLWgSgPFwcpW7SMmUTLB9xVb9AMcmPGiADv5UMG7Gw48KxdqdaRUZdaWaFSjUBApRTH7XXa12Jng9UVbgfkRYLYZJfCyZdxBE2uhEMkZh2G81GBLb3N7tnWdf77b6ewef6bEh6mMcJe2bLVuCoNtUbcQsG3CWvPbsEfc47bM42B7Xg3Nc3LmjBHVexLWmch95JjGzYNxUz5t4Nd5oPFSesBwpk6qmLtjkSUR65DzmhbcEN5M7rcDbJXiuWKDwaU5zre2ZfquZQqjzjG3iiaAaaQcUQPPKfjZCetGqXryiJ3i48LgEHvMXqmRxbjtFSHVrgTF4H65qmgDyxHk2QtexLi88X4BeSQP8LeBKkpAKs7e2E4HvsoUACPU1xR2DZxcSJeWnExWZRPEwjXGmp8o1gN6Cjh85xtC1y4ZdwT3ThsG17qoynYsGSRb1MRjBUrs3jWTGjJZoM8Gpm4NAZyBYnGywJRtPJiHHhkx1Adt72bfPRt9kkLsWbniQSL8hJox1z7GT4cVXdxzTn2DTQ5WtkmeNSMFZ1LdJvmGHLekh6sGiifmqQaArG2ZgSPiP6NbtLdkyCQmaJCysv6R3C5ZjTkDx8RSsroBKc2c9RErdjAhSXN7tQrYtgWQGQu1pwT6GK6C492azsuuuNVm2puufuswhXWhLLTR7HmcLiEd3P1DrQvmVcn2KjMmgJVN1EsxVwKtnGTk3kwZYtCLFG5ABddWUpz1o9TdYJGuA2DuoLCM3w9TMwUVGpyvbTNVHDUJjX8MaW7bEzPRRJdMwoEnU2P7mreVa9P4daBEXnYyM1owryckPwD6H2NvkPLFQZo59Dkqdk3iSrp99dxtdLfgLHRdiru8G8sGFP1pGGoZEDhiDBFcenVZYYw1TLwP18pqaEtjgqgTBd13gbM9oVgkasPdq94VGvgp".into(),
                     hash: "0x3ECC0FC66665B96DA4ED0CC9EF3926C359B0EA44D81E537D02051DAD97F49BED".into()
