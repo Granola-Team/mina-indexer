@@ -135,7 +135,8 @@
               src = lib.cleanSource ./.;
               filter = path: type:
                 (path != ".direnv")
-                && (path != ".cargo")
+                && ((path == ".cargo") || (path == ".cargo/config.toml") || (dirOf(path) != ".cargo"))
+                && (path != "result")
                 && (path != ".build")
                 && (path != "rust/target")
                 && (path != "ops")
