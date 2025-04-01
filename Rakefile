@@ -223,7 +223,7 @@ end
 namespace :build do
   desc "Perform a Nix build"
   task :prod do
-    puts "--- Performing release build"
+    puts "--- Performing Nix build"
     run("nom build")
   end
 
@@ -234,8 +234,10 @@ namespace :build do
 
   desc "Perform a release build"
   task release: CARGO_DEPS do
+    puts "--- Performing a release build"
     cargo_output("build --release")
   end
+
   desc "Build OCI images"
   task :oci_image do
     puts "--- Building #{IMAGE}"
