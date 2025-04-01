@@ -118,7 +118,6 @@ impl LedgerDiff {
             .flat_map(|user_cmd_with_status| {
                 if user_cmd_with_status.is_applied() {
                     let command = user_cmd_with_status.to_command(block.state_hash());
-
                     AccountDiff::from_command(command)
                 } else {
                     vec![vec![AccountDiff::FailedTransactionNonce(
@@ -208,9 +207,24 @@ impl LedgerDiff {
             .filter_map(|diffs| {
                 let diffs = diffs
                     .into_iter()
-                    .filter_map(|diff| match diff {
-                        AccountDiff::Zkapp(_) => Some(diff),
-                        _ => None,
+                    .filter_map(|diff| {
+                        use AccountDiff::*;
+                        match diff {
+                            Zkapp(_)
+                            | ZkappStateDiff(_)
+                            | ZkappPermissionsDiff(_)
+                            | ZkappVerificationKeyDiff(_)
+                            | ZkappUriDiff(_)
+                            | ZkappTokenSymbolDiff(_)
+                            | ZkappTimingDiff(_)
+                            | ZkappVotingForDiff(_)
+                            | ZkappActionsDiff(_)
+                            | ZkappEventsDiff(_)
+                            | ZkappIncrementNonce(_)
+                            | ZkappAccountCreationFee(_)
+                            | ZkappFeePayerNonce(_) => Some(diff),
+                            _ => None,
+                        }
                     })
                     .collect::<Vec<_>>();
 

@@ -328,7 +328,8 @@ impl BestLedgerStore for IndexerStore {
                         | ZkappTimingDiff(_)
                         | ZkappVotingForDiff(_)
                         | ZkappIncrementNonce(_)
-                        | ZkappAccountCreationFee(_) => after,
+                        | ZkappAccountCreationFee(_)
+                        | ZkappFeePayerNonce(_) => after,
                         Zkapp(_) => unreachable!(),
                     };
                 }
@@ -388,6 +389,7 @@ impl BestLedgerStore for IndexerStore {
                         ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff),
                         ZkappIncrementNonce(diff) => after.zkapp_nonce(diff),
                         ZkappAccountCreationFee(diff) => after.zkapp_account_creation(diff),
+                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff),
 
                         // these diffs do not modify the account
                         ZkappActionsDiff(diff) => {

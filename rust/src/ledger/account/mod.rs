@@ -5,9 +5,9 @@ use super::{
     diff::{
         account::{
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
-            ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappIncrementNonce,
-            ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff, ZkappTokenSymbolDiff,
-            ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
+            ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff,
+            ZkappIncrementNonce, ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff,
+            ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
         },
         LedgerDiff,
     },
@@ -475,7 +475,7 @@ impl Account {
         self
     }
 
-    /// Apply zkapp increment
+    /// Apply zkapp nonce increment
     pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
@@ -492,6 +492,17 @@ impl Account {
 
         Self {
             balance: self.balance + diff.amount,
+            ..self
+        }
+    }
+
+    /// Apply zkapp fee payer nonce
+    pub fn zkapp_fee_payer_nonce(self, diff: &ZkappFeePayerNonceDiff) -> Self {
+        self.check_pk(&diff.public_key, &diff.state_hash);
+        assert!(self.nonce.as_ref().map_or(true, |n| *n <= diff.nonce));
+
+        Self {
+            nonce: Some(diff.nonce),
             ..self
         }
     }
@@ -519,6 +530,7 @@ impl Account {
             ZkappEventsDiff(diff) => self.zkapp_events(diff),
             ZkappIncrementNonce(diff) => self.zkapp_nonce(diff),
             ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff),
+            ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff),
             Zkapp(_) => unreachable!(),
         }
     }
@@ -550,7 +562,8 @@ impl Account {
             | ZkappActionsDiff(_)
             | ZkappEventsDiff(_)
             | ZkappIncrementNonce(_)
-            | ZkappAccountCreationFee(_) => self,
+            | ZkappAccountCreationFee(_)
+            | ZkappFeePayerNonce(_) => self,
             Zkapp(_) => unreachable!(),
         })
     }
@@ -800,7 +813,7 @@ mod tests {
             Default::default();
         app_state_diff[0] = Some(app_state_elem.clone());
 
-        let diff = ZkappDiff {
+        let zkapp_diff = ZkappDiff {
             nonce: Nonce(1),
             increment_nonce: true,
             public_key: pk.clone(),
@@ -813,8 +826,8 @@ mod tests {
         let after = {
             let mut after = before.clone();
 
-            for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+            for diff in zkapp_diff.clone().expand().iter() {
+                after = after.apply_account_diff(diff);
             }
 
             after
