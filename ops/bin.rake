@@ -234,9 +234,11 @@ namespace :bin do
   end
 
   desc "Stage blocks (up to `block_height`), create a v2 database, and start server with this database"
-  task :stage_and_start_v2, [:idxr_bin, :block_height, *:args] do |_, args|
+  task :stage_and_start_v2, [:idxr_bin, :block_height, :web_port, *:args] do |_, args|
     idxr_bin = args[:idxr_bin]
     block_height = args[:block_height]
+    # Set default web_port if not provided
+    web_port = (args[:web_port].nil? || args[:web_port].empty?) ? 8080 : args[:web_port].to_i
 
     # Get all arguments including the first one
     all_args = []
@@ -249,10 +251,8 @@ namespace :bin do
     Rake::Task["bin:database_create"].reenable
     Rake::Task["bin:database_create"].invoke(idxr_bin, "--genesis-hash", V2_GENESIS_STATE_HASH)
 
-    port = find_ephemeral_port
-
     start_args = [
-      "--web-port", port.to_s,
+      "--web-port", web_port.to_s,
       "--web-hostname", "0.0.0.0",
       "--blocks-dir", BLOCKS_DIR,
       "--staking-ledgers-dir", STAKING_LEDGERS_DIR,
