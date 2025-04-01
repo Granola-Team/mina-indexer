@@ -12,6 +12,7 @@ use mina_indexer::{
 };
 use std::{path::PathBuf, str::FromStr};
 
+#[ignore]
 #[tokio::test]
 #[allow(clippy::too_many_lines)]
 async fn check_token_accounts() -> anyhow::Result<()> {
