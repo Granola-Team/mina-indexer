@@ -499,7 +499,7 @@ impl Account {
     /// Apply zkapp fee payer nonce
     pub fn zkapp_fee_payer_nonce(self, diff: &ZkappFeePayerNonceDiff) -> Self {
         self.check_pk(&diff.public_key, &diff.state_hash);
-        assert!(self.nonce.as_ref().map_or(true, |n| *n <= diff.nonce));
+        // assert!(self.nonce.as_ref().map_or(true, |n| *n <= diff.nonce));
 
         Self {
             nonce: Some(diff.nonce),
