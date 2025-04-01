@@ -234,8 +234,7 @@ namespace :bin do
   end
 
   desc "Stage blocks (up to `block_height`), create a v2 database, and start server with this database"
-  task :stage_and_start_v2, [:idxr_bin, :block_height, :web_port, *:args] do |_, args|
-    idxr_bin = args[:idxr_bin]
+  task :stage_and_start_v2, [:block_height, :web_port, *:args] do |_, args|
     block_height = args[:block_height]
     # Set default web_port if not provided
     web_port = (args[:web_port].nil? || args[:web_port].empty?) ? 8080 : args[:web_port].to_i
@@ -245,11 +244,22 @@ namespace :bin do
     all_args << args[:args] if args[:args]
     all_args.concat(args.extras)
 
-    # Use stage_blocks rake task
-    Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
+    # Run stage_blocks:v2 and build:dev in parallel
+    threads = []
+
+    threads << Thread.new do
+      Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
+    end
+
+    threads << Thread.new do
+      Rake::Task["build:dev"].invoke
+    end
+
+    # Wait for both tasks to complete
+    threads.each(&:join)
 
     Rake::Task["bin:database_create"].reenable
-    Rake::Task["bin:database_create"].invoke(idxr_bin, "--genesis-hash", V2_GENESIS_STATE_HASH)
+    Rake::Task["bin:database_create"].invoke(ENV["EXE_SRC"], "--genesis-hash", V2_GENESIS_STATE_HASH)
 
     start_args = [
       "--web-port", web_port.to_s,
@@ -262,6 +272,6 @@ namespace :bin do
     start_args.concat(all_args)
 
     Rake::Task["bin:start"].reenable
-    Rake::Task["bin:start"].invoke(idxr_bin, *start_args)
+    Rake::Task["bin:start"].invoke(ENV["EXE_SRC"], *start_args)
   end
 end

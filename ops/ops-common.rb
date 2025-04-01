@@ -3,7 +3,15 @@ require "json"
 
 BUILD_TYPE ||= "nix" # standard:disable Lint/OrAssignmentToConstant
 DEPLOY_TYPE ||= "test" # standard:disable Lint/OrAssignmentToConstant
-REV ||= `git rev-parse --short=8 HEAD`.strip # standard:disable Lint/OrAssignmentToConstant
+
+SRC_TOP = File.dirname(__dir__)
+
+ENV["GIT_COMMIT_HASH"] ||= begin
+  git_hash = `git -C #{SRC_TOP} rev-parse --short=8 HEAD 2>/dev/null`.strip
+  git_hash.empty? ? abort("Could not determine the Git hash. Aborting.") : git_hash
+end
+
+REV = ENV["GIT_COMMIT_HASH"]
 VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
 
 def deploy_dir(deploy_type = DEPLOY_TYPE)
@@ -27,7 +35,6 @@ def config_base_dir
   FileUtils.mkdir_p(BASE_DIR)
 end
 
-SRC_TOP ||= `git rev-parse --show-toplevel`.strip # standard:disable Lint/OrAssignmentToConstant
 CURRENT = "#{DEPLOY_DIR}/CURRENT"
 
 # Port
@@ -53,7 +60,7 @@ end
 # Executable
 
 EXE_DIR = "#{BASE_DIR}/bin"
-EXE_SRC = case BUILD_TYPE
+ENV["EXE_SRC"] = case BUILD_TYPE
 when "nix"
   "#{SRC_TOP}/result/bin/mina-indexer"
 when "dev"
@@ -63,15 +70,15 @@ when "release"
 end
 EXE = "#{EXE_DIR}/mina-indexer-#{REV}"
 
-def invoke_mina_indexer(*)
-  system({"RUST_BACKTRACE" => "full"}, EXE, *)
+def invoke_mina_indexer(*args) # standard:disable Style/ArgumentsForwarding
+  system({"RUST_BACKTRACE" => "full"}, EXE, *args) # standard:disable Style/ArgumentsForwarding
 end
 
 def config_exe_dir
   FileUtils.mkdir_p(EXE_DIR)
   return if File.exist?(EXE)
 
-  FileUtils.cp(EXE_SRC, EXE)
+  FileUtils.cp(ENV["EXE_SRC"], EXE)
 end
 
 # Socket

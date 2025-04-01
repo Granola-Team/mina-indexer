@@ -93,7 +93,7 @@ def cleanup_database_pid
 end
 
 def cleanup
-  idxr_shutdown_via_socket(EXE_SRC, "#{BASE_DIR}/mina-indexer.sock")
+  idxr_shutdown_via_socket(ENV["EXE_SRC"], "#{BASE_DIR}/mina-indexer.sock")
   cleanup_idxr_pid
   cleanup_database_pid
   FileUtils.rm_rf(BASE_DIR)
@@ -105,7 +105,7 @@ BASH_TEST_DRIVER = "#{__dir__}/../tests/regression.bash"
 
 tests.each do |tn|
   puts "\nTesting: #{tn}"
-  system(BASH_TEST_DRIVER, EXE_SRC, "test_#{tn}") || abort("Failure from: #{tn}")
+  system(BASH_TEST_DRIVER, ENV["EXE_SRC"], "test_#{tn}") || abort("Failure from: #{tn}")
   cleanup
 end
 

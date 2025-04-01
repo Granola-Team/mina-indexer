@@ -3,26 +3,27 @@ require "open3"
 
 TOP = __dir__
 
-import "#{TOP}/ops/bin.rake"
-import "#{TOP}/ops/stage-blocks.rake"
-
 ENV["CARGO_HOME"] = "#{TOP}/.cargo"
 
 # This required environment variable is used during the Rust compilation.
 ENV["GIT_COMMIT_HASH"] ||= begin
-  git_hash = `git rev-parse --short=8 HEAD 2>/dev/null`.strip
-  git_hash || abort("Could not determine the Git hash. Aborting.")
+  git_hash = `git -C #{TOP} rev-parse --short=8 HEAD 2>/dev/null`.strip
+  git_hash.empty? ? abort("Could not determine the Git hash. Aborting.") : git_hash
 end
 
 IMAGE = "mina-indexer:#{ENV["GIT_COMMIT_HASH"]}"
-REGRESSION_TEST = "./ops/regression-test.rb"
-DEPLOY_TIER3 = "./ops/deploy-tier3.rb"
-DEPLOY_PROD = "./ops/deploy-prod.rb"
-UTILS = "./ops/utils.rb"
+
+import "#{TOP}/ops/bin.rake"
+import "#{TOP}/ops/stage-blocks.rake"
+
+REGRESSION_TEST = "#{TOP}/ops/regression-test.rb"
+DEPLOY_TIER3 = "#{TOP}/ops/deploy-tier3.rb"
+DEPLOY_PROD = "#{TOP}/ops/deploy-prod.rb"
+UTILS = "#{TOP}/ops/utils.rb"
 
 RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
-CARGO_DEPS = [".cargo/config.toml"] + RUST_SRC_FILES
-RUBY_SRC_FILES = Dir.glob("ops/**/*.rb") + Dir.glob("ops/**/*.rake") + ["Rakefile"]
+CARGO_DEPS = ["#{ENV["CARGO_HOME"]}/config.toml"] + RUST_SRC_FILES
+RUBY_SRC_FILES = Dir.glob("#{TOP}/ops/**/*.rb") + Dir.glob("#{TOP}/ops/**/*.rake") + ["Rakefile"]
 NIX_FILES = %W[
   flake.nix
   ops/mina/mina_txn_hasher.nix
@@ -76,7 +77,7 @@ end
 
 def cargo_output(subcmd)
   output = ""
-  Dir.chdir("rust") do
+  Dir.chdir("#{TOP}/rust") do
     output = cmd_output("cargo #{subcmd}")
   end
   output
