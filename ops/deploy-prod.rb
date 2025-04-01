@@ -16,7 +16,7 @@ config_exe_dir
 config_log_dir
 
 snapshot_name = File.basename(snapshot_path(BLOCKS_COUNT))
-if BUILD_TYPE == "prod"
+if BUILD_TYPE == "nix"
   puts "Fetching snapshot."
   system(
     "#{SRC_TOP}/ops/download-snapshot.sh",
