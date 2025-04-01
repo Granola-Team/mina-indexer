@@ -18,7 +18,7 @@ blocks_list = "#{DEST}/../blocks.list"
 unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
 
-  cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
+  cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:blocks.minasearch.com"
   warn "download-mina-blocks issuing: #{cmd}"
 
   contents = `#{cmd}`
@@ -62,7 +62,7 @@ else
   args = [
     "#{__dir__}/granola-rclone.rb",
     "sync",
-    "linode-granola:granola-mina-stripped-blocks/mina-blocks",
+    "linode-granola:blocks.minasearch.com",
     DEST,
     "--files-from-raw", "files-to-fetch.list"
   ]

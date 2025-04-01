@@ -143,7 +143,7 @@ else
   end
 
   granola_thread = Thread.new do
-    granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:granola-mina-stripped-blocks/mina-blocks"
+    granola_cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:blocks.minasearch.com"
     fetch_and_sort_blocks("Granola", granola_cmd)
   end
 
