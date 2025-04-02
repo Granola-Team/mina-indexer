@@ -4,10 +4,13 @@ mod timing;
 use super::{
     diff::{
         account::{
+            zkapp::{
+                ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff,
+                ZkappIncrementNonce, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff,
+                ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
+                ZkappVotingForDiff,
+            },
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
-            ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff,
-            ZkappIncrementNonce, ZkappPermissionsDiff, ZkappStateDiff, ZkappTimingDiff,
-            ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
         },
         LedgerDiff,
     },
@@ -89,11 +92,6 @@ pub enum Permission {
 //////////
 
 impl Account {
-    /// Checks whether account is a zkapp account
-    pub fn is_zkapp_account(&self) -> bool {
-        self.zkapp.is_some()
-    }
-
     /// Display view of account, removes non-genesis account creation fee
     pub fn display(self) -> Self {
         if self
@@ -334,6 +332,15 @@ impl Account {
         Self { nonce, ..self }
     }
 
+    /// Checks whether account is a zkapp account
+    pub fn is_zkapp_account(&self) -> bool {
+        self.zkapp.is_some()
+    }
+
+    /////////////////////////
+    // zkapp account diffs //
+    /////////////////////////
+
     /// Apply zkapp state diff
     pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
@@ -357,15 +364,25 @@ impl Account {
     pub fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
         self.checks(&diff.public_key, &diff.token, &diff.state_hash);
 
-        let mut zkapp = self
-            .zkapp
-            .unwrap_or_else(|| ZkappAccount::from_proved_state(true));
+        let mut zkapp = self.zkapp.unwrap_or_default();
 
         // modify verification key
         zkapp.verification_key = diff.verification_key.to_owned();
 
+        Self {
+            zkapp: Some(zkapp),
+            ..self
+        }
+    }
+
+    /// Apply zkapp verification key diff
+    pub fn zkapp_proved_state(self, diff: &ZkappProvedStateDiff) -> Self {
+        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+
+        let mut zkapp = self.zkapp.unwrap_or_default();
+
         // modify proved state
-        zkapp.proved_state = true;
+        zkapp.proved_state = zkapp.proved_state || diff.proved_state;
 
         Self {
             zkapp: Some(zkapp),
@@ -499,6 +516,7 @@ impl Account {
             ZkappStateDiff(diff) => self.zkapp_state(diff),
             ZkappPermissionsDiff(diff) => self.zkapp_permissions(diff),
             ZkappVerificationKeyDiff(diff) => self.zkapp_verification_key(diff),
+            ZkappProvedStateDiff(diff) => self.zkapp_proved_state(diff),
             ZkappUriDiff(diff) => self.zkapp_uri(diff),
             ZkappTokenSymbolDiff(diff) => self.zkapp_token_symbol(diff),
             ZkappTimingDiff(diff) => self.zkapp_timing(diff),
@@ -532,6 +550,7 @@ impl Account {
             ZkappStateDiff(_)
             | ZkappPermissionsDiff(_)
             | ZkappVerificationKeyDiff(_)
+            | ZkappProvedStateDiff(_)
             | ZkappUriDiff(_)
             | ZkappTokenSymbolDiff(_)
             | ZkappTimingDiff(_)
@@ -586,7 +605,7 @@ impl Account {
             )
         };
 
-        if self.token.is_none() && *token != TokenAddress::default()
+        if self.token.is_none() && token.0 != MINA_TOKEN_ADDRESS
             || self.token.as_ref() != Some(token)
         {
             error!("{}", msg(self.token.as_ref()))
@@ -668,8 +687,11 @@ mod tests {
         ledger::{
             account::{Permission, Permissions, Timing},
             diff::account::{
-                AccountDiff, PaymentDiff, UpdateType, ZkappDiff, ZkappPaymentDiff,
-                ZkappPermissionsDiff, ZkappVerificationKeyDiff,
+                zkapp::{
+                    ZkappDiff, ZkappPaymentDiff, ZkappPermissionsDiff, ZkappProvedStateDiff,
+                    ZkappVerificationKeyDiff,
+                },
+                AccountDiff, PaymentDiff, UpdateType,
             },
             token::{TokenAddress, TokenSymbol},
         },
@@ -739,7 +761,7 @@ mod tests {
 
         let diff = ZkappDiff {
             public_key: pk.clone(),
-            nonce: 185.into(),
+            nonce: Some(185.into()),
             payment_diffs: vec![ZkappPaymentDiff::Payment {
                 state_hash: StateHash::default(),
                 payment: PaymentDiff {
@@ -791,7 +813,7 @@ mod tests {
         app_state_diff[0] = Some(app_state_elem.clone());
 
         let zkapp_diff = ZkappDiff {
-            nonce: Nonce(1),
+            nonce: Some(Nonce(1)),
             increment_nonce: true,
             public_key: pk.clone(),
             payment_diffs: vec![],
@@ -840,7 +862,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce,
+            nonce: Some(nonce),
             delegate: Some(delegate.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -883,15 +905,31 @@ mod tests {
             ..Default::default()
         };
 
-        let diff = AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
-            state_hash: StateHash::default(),
-            token: TokenAddress::default(),
-            public_key: pk.clone(),
-            verification_key: verification_key.clone(),
-        });
+        let diffs = vec![
+            AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
+                state_hash: StateHash::default(),
+                token: TokenAddress::default(),
+                public_key: pk.clone(),
+                verification_key: verification_key.clone(),
+            }),
+            AccountDiff::ZkappProvedStateDiff(ZkappProvedStateDiff {
+                state_hash: StateHash::default(),
+                token: TokenAddress::default(),
+                public_key: pk.clone(),
+                proved_state: true,
+            }),
+        ];
 
-        // account after applying diff
-        let after = before.clone().apply_account_diff(&diff);
+        // account after applying diffs
+        let after = {
+            let mut acct = before.clone();
+
+            for diff in diffs {
+                acct = acct.apply_account_diff(&diff);
+            }
+
+            acct
+        };
 
         // only the zkapp verification key & proved state change
         assert_eq!(
@@ -955,7 +993,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Nonce(1),
+            nonce: Some(Nonce(1)),
             zkapp_uri: Some(zkapp_uri.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -998,7 +1036,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Nonce(1),
+            nonce: Some(Nonce(1)),
             increment_nonce: true,
             token_symbol: Some(token_symbol.clone()),
             public_key: pk.clone(),
@@ -1039,7 +1077,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Nonce(1),
+            nonce: Some(Nonce(1)),
             timing: Some(timing.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -1079,7 +1117,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Nonce(1),
+            nonce: Some(Nonce(1)),
             voting_for: Some(voting_for.to_owned().into()),
             public_key: pk.clone(),
             increment_nonce: true,
