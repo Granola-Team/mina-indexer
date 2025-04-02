@@ -1,52 +1,15 @@
 require "fileutils"
 require "open3"
 
+GIT_COMMIT_HASH = ENV["GIT_COMMIT_HASH"].freeze
+VOLUMES_DIR = ENV.fetch("VOLUMES_DIR", "/mnt")
+BASE_DIR = File.join(File.join(VOLUMES_DIR, "mina-indexer-test"), GIT_COMMIT_HASH).freeze
+PID_FILE = File.join(BASE_DIR, "idxr_pid").freeze
+SOCKET_FILE = File.join(BASE_DIR, "mina-indexer.sock").freeze
+BLOCKS_DIR = File.join(BASE_DIR, "blocks").freeze
+DATABASE_DIR = File.join(BASE_DIR, "database").freeze
+STAKING_LEDGERS_DIR = File.join(BASE_DIR, "staking-ledgers").freeze
 V2_GENESIS_STATE_HASH = "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP".freeze
-
-module LazyConstants
-  def self.included(base)
-    base.extend(ClassMethods)
-  end
-
-  module ClassMethods
-    def const_missing(name)
-      method_name = "initialize_#{name.to_s.downcase}"
-      if respond_to?(method_name, true)
-        const_set(name, send(method_name))
-      else
-        super
-      end
-    end
-  end
-end
-
-# Include the LazyConstants module at the top level
-include LazyConstants # standard:disable Style/MixinUsage
-
-# Define initialization methods for each constant
-def initialize_v2_genesis_state_hash
-  "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP".freeze
-end
-
-def initialize_pid_file
-  File.join(BASE_DIR, "idxr_pid").freeze
-end
-
-def initialize_socket_file
-  File.join(BASE_DIR, "mina-indexer.sock").freeze
-end
-
-def initialize_blocks_dir
-  File.join(BASE_DIR, "blocks").freeze
-end
-
-def initialize_database_dir
-  File.join(BASE_DIR, "database").freeze
-end
-
-def initialize_staking_ledgers_dir
-  File.join(BASE_DIR, "staking-ledgers").freeze
-end
 
 # Set environment variables
 ENV["RUST_BACKTRACE"] = "full"
@@ -56,10 +19,10 @@ def find_ephemeral_port
   rand(49152..65535)
 end
 
-def wait_for_socket(max_seconds)
-  max_seconds = max_seconds.to_i
+def wait_for_socket(max_retries = 250)
+  max_retries = max_retries.to_i
 
-  max_seconds.times do |i|
+  max_retries.times do |i|
     return true if File.socket?(SOCKET_FILE)
     puts "Sleeping (#{i + 1})..."
     sleep(1)
@@ -151,6 +114,12 @@ namespace :bin do
     puts find_ephemeral_port
   end
 
+  desc "Wait for socket with timeout"
+  task :wait_for_socket, [:max_retries] do |_, args|
+    max_retries = args[:max_retries] || 250
+    abort "Socket not available after #{max_retries} retries" unless wait_for_socket(max_retries)
+  end
+
   desc "Wait indefinitely for socket"
   task :wait_forever_for_socket do
     until File.socket?(SOCKET_FILE)
@@ -208,7 +177,7 @@ namespace :bin do
     end
 
     sleep 2  # Add a small delay before checking for socket
-    wait_for_socket(250)
+    Rake::Task["bin:wait_for_socket"].invoke
   end
 
   desc "Start the Indexer server with an ephemeral port"
@@ -279,7 +248,7 @@ namespace :bin do
     threads = []
 
     threads << Thread.new do
-      Rake::Task["stage_blocks:v2"].invoke(block_height)
+      Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
     end
 
     threads << Thread.new do
