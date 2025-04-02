@@ -71,7 +71,7 @@ class PcbUpdater
     blockchain_length = get_blockchain_length(json_data)
 
     if blockchain_length && blockchain_length.to_i >= V2_BLOCKCHAIN_START
-      add_transaction_hashes(json_data)
+      add_transaction_hashes(json_data, File.basename(path))
     end
 
     # Write the modified JSON back to the same file (compact format)
@@ -108,7 +108,7 @@ class PcbUpdater
   end
 
   # Find all transactions and add hashes
-  def add_transaction_hashes(json_data)
+  def add_transaction_hashes(json_data, filename)
     # Find all transactions
     transactions = find_transactions(json_data)
 
@@ -121,7 +121,7 @@ class PcbUpdater
       # Skip if already has a hash
       next if command_obj.key?("txn_hash")
 
-      hash = compute_hash(txn_data)
+      hash = compute_hash(txn_data, filename)
       command_obj["txn_hash"] = hash if hash
     end
   end
@@ -136,8 +136,9 @@ class PcbUpdater
 
       case obj
       when Hash
-        if obj["data"]&.is_a?(Array) && obj["data"][0] == "Signed_command"
-          # Found a transaction
+        if obj["data"]&.is_a?(Array) &&
+            (obj["data"][0] == "Signed_command" || obj["data"][0] == "Zkapp_command")
+          # Found a transaction (either signed_command or zkapp_command)
           transactions[obj] = obj["data"][1]
         else
           # Continue searching in all values
@@ -157,14 +158,16 @@ class PcbUpdater
   end
 
   # Compute hash for a transaction
-  def compute_hash(txn_data)
+  def compute_hash(txn_data, filename)
     cmd = "#{MINA_TXN_HASHER} '#{JSON.generate(txn_data)}'"
     stdout, stderr, status = Open3.capture3(cmd)
 
     if status.success?
       stdout.strip
     else
+      # Report filename when hasher fails
       puts "Error running hasher: #{stderr}"
+      puts "File: #{filename}"
       nil
     end
   end
