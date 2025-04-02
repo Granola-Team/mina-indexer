@@ -7,7 +7,7 @@ require "#{__dir__}/ops-common"
 
 puts "Deploying (#{DEPLOY_TYPE}) with #{BLOCKS_COUNT} blocks."
 
-skippable = File.exist?(snapshot_path(BLOCKS_COUNT)) && BUILD_TYPE != "prod"
+skippable = File.exist?(snapshot_path(BLOCKS_COUNT)) && BUILD_TYPE != "nix"
 if !skippable
 
   # Configure the directories as needed.
@@ -91,7 +91,8 @@ if !skippable
     "--output-path", snapshot_path(BLOCKS_COUNT)
   ) || abort("Snapshot creation failed. Aborting.")
   puts "Snapshot complete."
-  if BUILD_TYPE == "prod"
+
+  if BUILD_TYPE == "nix"
     puts "Uploading."
     system(
       "#{SRC_TOP}/ops/upload-snapshot.sh",
@@ -199,7 +200,7 @@ if !skippable
   # Delete the snapshot and the database directory restored to.
   #
   FileUtils.rm_rf(restore_path)
-  if BUILD_TYPE == "prod"
+  if BUILD_TYPE == "nix"
     File.unlink(snapshot_path(BLOCKS_COUNT))
   end
 
