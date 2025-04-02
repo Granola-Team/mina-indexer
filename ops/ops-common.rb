@@ -12,10 +12,10 @@ ENV["GIT_COMMIT_HASH"] ||= begin
 end
 
 REV = ENV["GIT_COMMIT_HASH"]
-VOLUMES_DIR = ENV["VOLUMES_DIR"] || "/mnt"
+ENV["VOLUMES_DIR"] ||= "/mnt"
 
 def deploy_dir(deploy_type = DEPLOY_TYPE)
-  "#{VOLUMES_DIR}/mina-indexer-#{deploy_type}"
+  "#{ENV["VOLUMES_DIR"]}/mina-indexer-#{deploy_type}"
 end
 
 DEPLOY_DIR ||= deploy_dir # standard:disable Lint/OrAssignmentToConstant
