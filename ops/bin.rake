@@ -1,15 +1,52 @@
 require "fileutils"
 require "open3"
 
-GIT_COMMIT_HASH = ENV["GIT_COMMIT_HASH"].freeze
-VOLUMES_DIR = ENV.fetch("VOLUMES_DIR", "/mnt")
-BASE_DIR = File.join(File.join(VOLUMES_DIR, "mina-indexer-test"), GIT_COMMIT_HASH).freeze
-PID_FILE = File.join(BASE_DIR, "idxr_pid").freeze
-SOCKET_FILE = File.join(BASE_DIR, "mina-indexer.sock").freeze
-BLOCKS_DIR = File.join(BASE_DIR, "blocks").freeze
-DATABASE_DIR = File.join(BASE_DIR, "database").freeze
-STAKING_LEDGERS_DIR = File.join(BASE_DIR, "staking-ledgers").freeze
 V2_GENESIS_STATE_HASH = "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP".freeze
+
+module LazyConstants
+  def self.included(base)
+    base.extend(ClassMethods)
+  end
+
+  module ClassMethods
+    def const_missing(name)
+      method_name = "initialize_#{name.to_s.downcase}"
+      if respond_to?(method_name, true)
+        const_set(name, send(method_name))
+      else
+        super
+      end
+    end
+  end
+end
+
+# Include the LazyConstants module at the top level
+include LazyConstants # standard:disable Style/MixinUsage
+
+# Define initialization methods for each constant
+def initialize_v2_genesis_state_hash
+  "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP".freeze
+end
+
+def initialize_pid_file
+  File.join(BASE_DIR, "idxr_pid").freeze
+end
+
+def initialize_socket_file
+  File.join(BASE_DIR, "mina-indexer.sock").freeze
+end
+
+def initialize_blocks_dir
+  File.join(BASE_DIR, "blocks").freeze
+end
+
+def initialize_database_dir
+  File.join(BASE_DIR, "database").freeze
+end
+
+def initialize_staking_ledgers_dir
+  File.join(BASE_DIR, "staking-ledgers").freeze
+end
 
 # Set environment variables
 ENV["RUST_BACKTRACE"] = "full"
