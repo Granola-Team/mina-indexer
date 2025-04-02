@@ -30,22 +30,21 @@ public APIs and functionalities are subject to change.
 The Mina Indexer uses precomputed blocks (logged by a Mina node) as the source
 of truth for the blockchain.
 
-## Getting Started
-
-### Development Prerequisites
+## Development Prerequisites
 
 1. Install [Nix](https://determinate.systems/nix-installer/).
 2. Install and configure [Direnv](https://direnv.net).
 
-### Execution Environment
+## Execution Environment
 
 Set `ulimit -n` (max open files) to 4096 or more.
 
-### Building the Project
+## Building the Project
 
-Run `rake check` to check for errors.
+Run `rake check` to check for errors. See also the output of `rake` for other
+options.
 
-### Storage
+## Storage
 
 The default storage location is on `/mnt` because the testing code may download
 large volumes of test data, and placing on `/mnt` gives an opportunity to use
@@ -54,9 +53,9 @@ different storage volumes from one's build directory.
 Set the `VOLUMES_DIR` environment variable if you want to replace `/mnt` with
 another path.
 
-### Testing
+## Testing
 
-#### Unit Tests
+### Unit Tests
 
 Execute [unit tests](/rust/tests) to validate code functionality with:
 
@@ -65,7 +64,7 @@ rake test:unit:tier1
 rake test:unit:tier2
 ```
 
-#### Regression Tests
+### Regression Tests
 
 To quickly perform regression tests, which check for new bugs in existing
 features after updates, use:
@@ -80,7 +79,7 @@ To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola
 rake tier1
 ```
 
-### Deployment
+## Deployment
 
 `rake deploy:local_prod` uses the Nix-based release binary
 
