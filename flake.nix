@@ -84,9 +84,6 @@
 
           mina-indexer = rustPlatform.buildRustPackage rec {
             meta = with lib; {
-              description = ''
-                The Mina Indexer is a re-imagined version of the software collectively called the "Mina archive node."
-              '';
               homepage = "https://github.com/Granola-Team/mina-indexer";
               license = licenses.asl20;
               mainProgram = "mina-indexer";
@@ -95,7 +92,6 @@
             };
 
             pname = cargo-toml.package.name;
-
             version = cargo-toml.package.version;
 
             src = lib.cleanSourceWith {

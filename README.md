@@ -24,10 +24,6 @@
 
 Constructs and serves indices of the Mina blockchain.
 
-The Mina Indexer is a redesigned version of the software collectively
-called the "[Mina archive
-node](https://github.com/MinaProtocol/mina/tree/develop/src/app/archive)."
-
 **Note:** As the project is in active development, be aware that the
 public APIs and functionalities are subject to change.
 
@@ -38,7 +34,7 @@ of truth for the blockchain.
 
 ### Development Prerequisites
 
-1. Install [Nix](https://nixos.org/install).
+1. Install [Nix](https://determinate.systems/nix-installer/).
 2. Install and configure [Direnv](https://direnv.net).
 
 ### Execution Environment
@@ -47,8 +43,7 @@ Set `ulimit -n` (max open files) to 4096 or more.
 
 ### Building the Project
 
-Run `rake check` to check that Mina Indexer and all of its dependencies for
-errors.
+Run `rake check` to check for errors.
 
 ### Storage
 
@@ -85,24 +80,9 @@ To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola
 rake tier1
 ```
 
-#### More Tests
-
-Invoke:
-
-```bash
-rake tier2
-```
-
-Or, for even more testing:
-
-```bash
-rake test:tier3:dev
-```
-
 ### Deployment
 
-1. `rake deploy:local_prod` uses the Nix-based release binary
-2. `rake deploy:local_prod_dev` uses the dev binary
+`rake deploy:local_prod` uses the Nix-based release binary
 
 ## Generating OCI Images With Nix
 
