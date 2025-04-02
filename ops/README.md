@@ -22,7 +22,6 @@ Files in this directory:
 - `./rclone.conf`
 - `./recycle-pcbs.rb`
 - `./regression-test.rb`
-- `./stage-blocks.rb`
 - `./traverse-canonical-chain.sh`
 - `./unformat-pcbs.rb`
 - `./update-pcbs.rb`
@@ -103,10 +102,6 @@ A mandatory config file used by `granola-rclone.rb`.
 TBD
 
 ### `./regression-test.rb`
-
-TBD
-
-### `./stage-block.sh`
 
 TBD
 
