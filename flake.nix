@@ -33,7 +33,8 @@
 
       frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-      buildDependencies = with pkgs; [ rustPlatform.bindgenHook ]
+      buildDependencies = with pkgs;
+        [rustPlatform.bindgenHook]
         ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices
