@@ -33,13 +33,7 @@
 
       frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-      buildDependencies = with pkgs;
-        [
-          clang
-          libclang.lib
-          pkg-config
-          rustPlatform.bindgenHook
-        ]
+      buildDependencies = with pkgs; [ rustPlatform.bindgenHook ]
         ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices
@@ -61,6 +55,7 @@
           cargo-audit
           cargo-machete
           cargo-nextest
+          clang # For clang in shell
           curl
           check-jsonschema
           git # Needed but not declared by Nix's 'stdenv' build.
@@ -151,12 +146,9 @@
         };
 
         devShells.default = mkShell {
-          env =
-            {
-              LIBCLANG_PATH = "${libclang.lib}/lib";
-            };
-          # for backwards compatibility
-          buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher;
+          buildInputs =
+            developmentDependencies
+            ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher; # for backwards compatibility
         };
       });
 }
