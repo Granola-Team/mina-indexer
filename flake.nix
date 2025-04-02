@@ -81,20 +81,6 @@
         ]
         ++ buildDependencies;
 
-      # Platform-specific environment setup
-      commonEnv = with pkgs.lib; let
-        linuxEnv = {
-          NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
-          NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
-          LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
-        };
-        darwinEnv = {
-        };
-      in
-        if pkgs.stdenv.isDarwin
-        then darwinEnv
-        else linuxEnv;
-
       cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
     in
       with pkgs; {
@@ -160,7 +146,6 @@
             };
             config = {
               Cmd = ["${pkgs.lib.getExe mina-indexer}"];
-              Env = lib.mapAttrsToList (name: value: "${name}=${value}") commonEnv;
             };
           };
         };
@@ -169,8 +154,7 @@
           env =
             {
               LIBCLANG_PATH = "${libclang.lib}/lib";
-            }
-            // commonEnv;
+            };
           # for backwards compatibility
           buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher;
         };
