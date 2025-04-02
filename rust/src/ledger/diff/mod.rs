@@ -10,7 +10,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, AccountCreated},
     command::UserCommandWithStatusT,
 };
-use account::ZkappAccountCreationFee;
+use account::zkapp::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use token::TokenDiff;

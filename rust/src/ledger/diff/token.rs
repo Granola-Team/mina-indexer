@@ -1,7 +1,7 @@
 //! Token diff type
 
 use super::{
-    account::{ZkappPaymentDiff, ZkappTokenSymbolDiff},
+    account::zkapp::{ZkappPaymentDiff, ZkappTokenSymbolDiff},
     TokenAddress,
 };
 use crate::{

@@ -323,6 +323,7 @@ impl BestLedgerStore for IndexerStore {
                         ZkappStateDiff(_)
                         | ZkappPermissionsDiff(_)
                         | ZkappVerificationKeyDiff(_)
+                        | ZkappProvedStateDiff(_)
                         | ZkappUriDiff(_)
                         | ZkappTokenSymbolDiff(_)
                         | ZkappTimingDiff(_)
@@ -383,6 +384,7 @@ impl BestLedgerStore for IndexerStore {
                         ZkappStateDiff(diff) => after.zkapp_state(diff),
                         ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff),
                         ZkappVerificationKeyDiff(diff) => after.zkapp_verification_key(diff),
+                        ZkappProvedStateDiff(diff) => after.zkapp_proved_state(diff),
                         ZkappUriDiff(diff) => after.zkapp_uri(diff),
                         ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff),
                         ZkappTimingDiff(diff) => after.zkapp_timing(diff),

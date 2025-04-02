@@ -12,6 +12,7 @@ use mina_indexer::{
 use std::{collections::HashMap, path::PathBuf};
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn account_diffs() {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
     let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
@@ -139,6 +140,7 @@ async fn account_diffs() {
             | ZkappStateDiff(_)
             | ZkappPermissionsDiff(_)
             | ZkappVerificationKeyDiff(_)
+            | ZkappProvedStateDiff(_)
             | ZkappUriDiff(_)
             | ZkappTokenSymbolDiff(_)
             | ZkappTimingDiff(_)
