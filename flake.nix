@@ -38,7 +38,6 @@
         ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices
-          zld
         ]
         ++ lib.optionals (!stdenv.isDarwin) [
           mold-wrapped # Linux only - https://github.com/rui314/mold#mold-a-modern-linker
