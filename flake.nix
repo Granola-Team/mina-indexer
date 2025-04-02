@@ -29,19 +29,15 @@
         rustc = rust;
       };
 
-      # Add mina_txn_hasher package
       mina_txn_hasher = pkgs.callPackage ./ops/mina/mina_txn_hasher.nix {};
 
-      # Define common libraries needed for both runtime and development
-      commonLibs = with pkgs; [
+      runtimeDeps = with pkgs; [
         openssl
         zstd
         libffi
         gmp
         jemalloc
       ];
-
-      runtimeDependencies = commonLibs;
 
       frameworks = pkgs.darwin.apple_sdk.frameworks;
 
@@ -52,7 +48,7 @@
           pkg-config
           rustPlatform.bindgenHook
         ]
-        ++ runtimeDependencies
+        ++ runtimeDeps
         ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices
@@ -99,10 +95,10 @@
         linuxEnv = {
           NIX_LD = "/run/current-system/sw/share/nix-ld/lib/ld.so";
           NIX_LD_LIBRARY_PATH = "/run/current-system/sw/share/nix-ld/lib";
-          LD_LIBRARY_PATH = "${makeLibraryPath commonLibs}:/run/current-system/sw/share/nix-ld/lib";
+          LD_LIBRARY_PATH = "${makeLibraryPath runtimeDeps}:/run/current-system/sw/share/nix-ld/lib";
         };
         darwinEnv = {
-          LIBRARY_PATH = "${makeLibraryPath commonLibs}";
+          LIBRARY_PATH = "${makeLibraryPath runtimeDeps}";
         };
       in
         if pkgs.stdenv.isDarwin
@@ -149,7 +145,7 @@
 
             nativeBuildInputs = buildDependencies;
 
-            buildInputs = runtimeDependencies;
+            buildInputs = runtimeDeps;
 
             # This is equivalent to `git rev-parse --short=8 HEAD`
             gitCommitHash = builtins.substring 0 8 (self.rev or (abort "Nix build requires a clean Git repo."));
@@ -170,7 +166,7 @@
             created = "now";
             tag = builtins.substring 0 8 (self.rev or "dev");
             copyToRoot = pkgs.buildEnv {
-              paths = with pkgs; [mina-indexer bash self] ++ commonLibs;
+              paths = with pkgs; [mina-indexer bash self] ++ runtimeDeps;
               name = "mina-indexer-root";
               pathsToLink = ["/bin" "/share" "/lib"];
             };
