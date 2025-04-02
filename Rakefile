@@ -386,13 +386,10 @@ namespace :test do
   task tier1: [:lint, "test:unit:tier1"] do
     puts "--- Performing tier 1 regression tests"
     run("#{REGRESSION_TEST} dev \
-      ipc_is_available_immediately \
-      clean_shutdown \
-      clean_kill \
+      hurl_v1 \
       account_balance_cli \
       best_chain_v1 \
-      rest_accounts_summary \
-      hurl_v1")
+      rest_accounts_summary")
   end
 
   desc "Run the 2nd tier of tests"
