@@ -248,7 +248,7 @@ namespace :bin do
     threads = []
 
     threads << Thread.new do
-      Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
+      Rake::Task["stage_blocks:v2"].invoke(block_height)
     end
 
     threads << Thread.new do

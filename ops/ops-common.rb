@@ -115,10 +115,11 @@ def blocks_dir(block_height)
   "#{DEPLOY_DIR}/blocks-#{block_height}"
 end
 
-def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
+def stage_blocks(end_height, start_height = 1, dest = "")
   end_height = end_height.to_i
   start_height = start_height.to_i
 
+  dest = File.join(BASE_DIR, "blocks") if dest.nil?
   dest = blocks_dir(end_height) if dest == ""
   dest = File.expand_path(dest)
 
@@ -139,12 +140,12 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
 
     FileUtils.mkdir_p(dest)
 
-    print "Staging #{network} blocks #{start_height} to #{end_height} into #{dest}... from #{MASTER_BLOCKS_DIR}"
+    print "Staging blocks #{start_height} to #{end_height} into #{dest}... from #{MASTER_BLOCKS_DIR}"
 
-    # Format of file is: "#{MASTER_BLOCKS_DIR}/#{network}-#{block_height}-#{hash}.json"
+    # Format of file is: "#{MASTER_BLOCKS_DIR}/mainnet-#{block_height}-#{hash}.json"
     #
-    Dir["#{MASTER_BLOCKS_DIR}/#{network}-*.json"].each do |block_file|
-      if block_file =~ /#{Regexp.escape(network)}-(\d+)-/
+    Dir["#{MASTER_BLOCKS_DIR}/mainnet-*.json"].each do |block_file|
+      if block_file =~ /mainnet-(\d+)-/
         height = $1.to_i
         if height.between?(start_height, end_height)
           # Hard link the correct block files into the destination directory.
