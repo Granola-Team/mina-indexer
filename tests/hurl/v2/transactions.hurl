@@ -107,7 +107,7 @@ jsonpath "$.data.transactions" count == 1
 # only datum
 jsonpath "$.data.transactions[0].blockHeight" == 359617
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].hash" == "5JvJ6fA7cL6SoVjKYg6T1W5f6PKWbt9tevpeuVbWBBuKktaL8aJM"
+jsonpath "$.data.transactions[0].hash" == "5Jv8ZMpRwgxuDkXp4fDqRpCSQ1s7k8shGUTMxyPQbS3UJiJvjb3U"
 
 jsonpath "$.data.transactions[0].epoch_num_user_commands" == 155
 jsonpath "$.data.transactions[0].total_num_user_commands" == 155
