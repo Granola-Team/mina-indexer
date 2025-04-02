@@ -56,10 +56,10 @@ def find_ephemeral_port
   rand(49152..65535)
 end
 
-def wait_for_socket(max_retries = 250)
-  max_retries = max_retries.to_i
+def wait_for_socket(max_seconds)
+  max_seconds = max_seconds.to_i
 
-  max_retries.times do |i|
+  max_seconds.times do |i|
     return true if File.socket?(SOCKET_FILE)
     puts "Sleeping (#{i + 1})..."
     sleep(1)
@@ -151,12 +151,6 @@ namespace :bin do
     puts find_ephemeral_port
   end
 
-  desc "Wait for socket with timeout"
-  task :wait_for_socket, [:max_retries] do |_, args|
-    max_retries = args[:max_retries] || 250
-    abort "Socket not available after #{max_retries} retries" unless wait_for_socket(max_retries)
-  end
-
   desc "Wait indefinitely for socket"
   task :wait_forever_for_socket do
     until File.socket?(SOCKET_FILE)
@@ -214,7 +208,7 @@ namespace :bin do
     end
 
     sleep 2  # Add a small delay before checking for socket
-    Rake::Task["bin:wait_for_socket"].invoke
+    wait_for_socket(250)
   end
 
   desc "Start the Indexer server with an ephemeral port"
