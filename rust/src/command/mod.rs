@@ -1244,7 +1244,7 @@ mod test {
     };
     use mina_rs::{TransactionStatus2, TransactionStatusFailedType};
     use serde_json::json;
-    use std::path::PathBuf;
+    use std::{collections::HashSet, path::PathBuf};
     use v2::staged_ledger_diff::Status;
 
     #[test]
@@ -1435,7 +1435,7 @@ mod test {
     }
 
     #[test]
-    fn mainnet_user_command_with_status_json() -> anyhow::Result<()> {
+    fn mainnet_user_command_with_status_json() -> Result<()> {
         use crate::block::precomputed::PrecomputedBlock;
         use serde_json::*;
 
@@ -1688,7 +1688,7 @@ mod test {
     }
 
     #[test]
-    fn txn_memos_v1() -> anyhow::Result<()> {
+    fn txn_memos_v1() -> Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
@@ -1700,7 +1700,7 @@ mod test {
     }
 
     #[test]
-    fn txn_memos_v2() -> anyhow::Result<()> {
+    fn txn_memos_v2() -> Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-425422-3NLhbkx92FD5CETZDBKA4PEXfb2QpVdcrrKdsDEcH2V3DqXkqgZ1.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
 
@@ -1727,7 +1727,7 @@ mod test {
     }
 
     #[test]
-    fn txn_hashes_v1() -> anyhow::Result<()> {
+    fn txn_hashes_v1() -> Result<()> {
         // refer to the hashes on Minascan
         // https://minascan.io/mainnet/tx/CkpZDcqGWQVpckXjcg99hh4EzmCrnPzMM8VzHaLAYxPU5tMubuLaj
         // https://minascan.io/mainnet/tx/CkpZZsSm9hQpGkGzMi8rcsQEWPZwGJXktiqGYADNwLoBeeamhzqnX
@@ -1745,7 +1745,7 @@ mod test {
     }
 
     #[test]
-    fn txn_hashes_v1_given() -> anyhow::Result<()> {
+    fn txn_hashes_v1_given() -> Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-2704-3NLgCqncc6Ct4dcuhaG3ANQbfWwQCxMXu4MJjwGgRKxs6p8vQsZf.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
@@ -1763,7 +1763,7 @@ mod test {
     }
 
     #[test]
-    fn txn_hash_v2() -> anyhow::Result<()> {
+    fn txn_hash_v2() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/hardfork/mainnet-359606-3NKvvtFwjEtQLswWJzXBSxxiKuYVbLJrKXCnmhp6jctYMqAWcftg.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block.command_hashes();
@@ -1779,7 +1779,7 @@ mod test {
     }
 
     #[test]
-    fn txn_hash_v2_zkapp_command() -> anyhow::Result<()> {
+    fn txn_hash_v2_zkapp_command() -> Result<()> {
         let block_file = PathBuf::from("./tests/data/misc_blocks/mainnet-397612-3NLh3tvZpMPXxUhCLz1898BDV6CwtExJqDWpzcZQebVCsZxghoXK.json");
         let precomputed_block = PrecomputedBlock::parse_file(&block_file, PcbVersion::V2).unwrap();
         let hashes = precomputed_block
@@ -1802,6 +1802,25 @@ mod test {
                 TxnHash::V2("5JvH3LEJrazb9DpQb5Wym9Q1ZWyCVJmc9TNgubSjXPCHfSuDc2LL".to_string()),
                 TxnHash::V2("5JvQqrHBgDtB7gew76AkFhSkkfUTCtYQhPT53erZZQYibV6ms9YD".to_string()),
             ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn command_receivers_v2() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-411109-3NLfyFPMhckjLNHNYFzkEAWox7mze9L7ppHAniJMhQJjtgEEWtLQ.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2).unwrap();
+
+        let mut receivers = HashSet::new();
+        block.commands().iter().for_each(|cmd| {
+            for pk in cmd.receiver() {
+                receivers.insert(pk);
+            }
+        });
+
+        assert!(
+            receivers.contains(&"B62qjJaXMmZgaNecUUrDZ384uDQGYAAoTRTX7CAQ1YrBT6yo3gbzCCJ".into()),
+            "{receivers:#?}"
         );
         Ok(())
     }
