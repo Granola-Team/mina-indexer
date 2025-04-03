@@ -489,7 +489,7 @@ impl Account {
         diff: &ZkappAccountCreationFee,
         state_hash: &StateHash,
     ) -> Self {
-        self.checks(&diff.public_key, &diff.token, state_hash);
+        self.checks(&diff.public_key, &TokenAddress::default(), state_hash);
         assert_eq!(diff.amount, MAINNET_ACCOUNT_CREATION_FEE);
 
         Self {

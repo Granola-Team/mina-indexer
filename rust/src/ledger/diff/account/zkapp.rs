@@ -134,7 +134,6 @@ pub struct ZkappIncrementNonce {
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappAccountCreationFee {
     pub public_key: PublicKey,
-    pub token: TokenAddress,
     pub amount: Amount,
 }
 
@@ -440,7 +439,7 @@ impl ZkappPaymentDiff {
         match self {
             Self::Payment(payment) => payment.token.to_owned(),
             Self::IncrementNonce(diff) => diff.token.to_owned(),
-            Self::AccountCreationFee(diff) => diff.token.to_owned(),
+            Self::AccountCreationFee(_) => TokenAddress::default(),
         }
     }
 }
@@ -462,16 +461,14 @@ mod tests {
     use crate::{
         base::{nonce::Nonce, public_key::PublicKey},
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        constants::MAINNET_ACCOUNT_CREATION_FEE,
         ledger::{
             account::{Permission, Permissions},
             diff::{
                 account::{
                     zkapp::{
-                        ZkappAccountCreationFee, ZkappDiff, ZkappEventsDiff,
-                        ZkappFeePayerNonceDiff, ZkappIncrementNonce, ZkappPaymentDiff,
-                        ZkappPermissionsDiff, ZkappStateDiff, ZkappTokenSymbolDiff, ZkappUriDiff,
-                        ZkappVerificationKeyDiff,
+                        ZkappDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonce,
+                        ZkappPaymentDiff, ZkappPermissionsDiff, ZkappStateDiff,
+                        ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
                     },
                     AccountDiff, PaymentDiff, UpdateType,
                 },
@@ -897,17 +894,7 @@ mod tests {
             .filter(|diff| matches!(diff, AccountDiff::ZkappAccountCreationFee(_)))
             .collect();
 
-        assert_eq!(
-            created,
-            vec![AccountDiff::ZkappAccountCreationFee(
-                ZkappAccountCreationFee {
-                    amount: MAINNET_ACCOUNT_CREATION_FEE,
-                    public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
-                    token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn")
-                        .unwrap(),
-                },
-            )]
-        );
+        assert_eq!(created, vec![]);
 
         Ok(())
     }

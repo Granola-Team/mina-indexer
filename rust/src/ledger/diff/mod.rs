@@ -9,6 +9,7 @@ use crate::{
     base::state_hash::StateHash,
     block::{precomputed::PrecomputedBlock, AccountCreated},
     command::UserCommandWithStatusT,
+    constants::MINA_TOKEN_ADDRESS,
 };
 use account::zkapp::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
@@ -53,36 +54,42 @@ impl LedgerDiff {
         let mut account_diffs = AccountDiff::expand(unexpanded.account_diffs);
 
         // v2 account creation fees (via payments & zkapps)
-        let all_accounts_created: BTreeMap<_, _> = block
+        let all_accounts_mina_created: BTreeMap<_, _> = block
             .accounts_created_v2()
             .into_iter()
-            .map(
+            .filter_map(
                 |AccountCreated {
                      public_key,
                      token,
                      creation_fee,
-                 }| ((public_key, token), creation_fee),
+                 }| {
+                    if token.0 == MINA_TOKEN_ADDRESS {
+                        Some((public_key, creation_fee))
+                    } else {
+                        None
+                    }
+                },
             )
             .collect();
 
-        let accounts_created: BTreeSet<_> = all_accounts_created.keys().cloned().collect();
+        let mina_accounts_created: BTreeSet<_> =
+            all_accounts_mina_created.keys().cloned().collect();
 
         // only the zkapp command token accounts
         let mut zkapp_token_accounts = BTreeSet::new();
 
         account_diffs.iter().flatten().for_each(|diff| {
-            diff.add_token_accounts(&mut zkapp_token_accounts);
+            diff.add_mina_token_accounts(&mut zkapp_token_accounts);
         });
 
         // token accounts created via zkapp command
         let zkapp_token_accounts_created: Vec<_> = {
-            accounts_created
+            mina_accounts_created
                 .intersection(&zkapp_token_accounts)
-                .map(|key| {
+                .map(|pk| {
                     AccountDiff::ZkappAccountCreationFee(ZkappAccountCreationFee {
-                        public_key: key.0.to_owned(),
-                        token: key.1.to_owned(),
-                        amount: all_accounts_created.get(key).cloned().unwrap(),
+                        public_key: pk.to_owned(),
+                        amount: all_accounts_mina_created.get(pk).cloned().unwrap(),
                     })
                 })
         }
