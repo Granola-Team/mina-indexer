@@ -11,8 +11,8 @@ use crate::{
     mina_blocks::v2::{
         self,
         staged_ledger_diff::{
-            Call, SignedCommandPayloadBody, StakeDelegationPayload, Status, UserCommandData,
-            ZkappCommandData,
+            AccountUpdates, Call, SignedCommandPayloadBody, StakeDelegationPayload, Status,
+            UserCommandData, ZkappCommandData,
         },
     },
     protocol::{
@@ -26,12 +26,13 @@ use crate::{
     },
     utility::functions::nanomina_to_mina,
 };
+use anyhow::Result;
 use blake2::digest::VariableOutput;
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
 use signed::{SignedCommandWithCreationData, SignedCommandWithKind};
-use std::io::Write;
+use std::{collections::BTreeSet, io::Write};
 
 // re-export types
 pub type TxnHash = signed::TxnHash;
@@ -235,7 +236,7 @@ pub trait UserCommandWithStatusT {
 
     fn signer(&self) -> PublicKey;
 
-    fn hash(&self) -> anyhow::Result<TxnHash>;
+    fn hash(&self) -> Result<TxnHash>;
 
     fn receiver_account_creation_fee_paid(&self) -> bool;
 }
@@ -425,13 +426,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 UserCommandData::ZkappCommandData(zkapp) => zkapp
                     .account_updates
                     .iter()
-                    .flat_map(|update| {
-                        let pk = update.elt.account_update.body.public_key.to_owned();
-                        let mut receivers = vec![pk];
-
-                        recurse_calls_receivers(&mut receivers, update.elt.calls.iter());
-                        receivers
-                    })
+                    .flat_map(recurse_calls_update)
                     .collect(),
             },
         }
@@ -543,7 +538,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         }
     }
 
-    fn hash(&self) -> anyhow::Result<TxnHash> {
+    fn hash(&self) -> Result<TxnHash> {
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(ref signed_cmd) = v1.t.data.t.t;
@@ -560,7 +555,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
     }
 }
 
-fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash> {
+fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> Result<TxnHash> {
     // convert versioned signed command to bin_prot bytes
     let mut binprot_bytes = Vec::with_capacity(TxnHash::V1_LEN * 8); // max number of bits
     bin_prot::to_writer(&mut binprot_bytes, v1)?;
@@ -586,7 +581,7 @@ fn hash_command_v1(v1: &mina_rs::SignedCommandV1) -> anyhow::Result<TxnHash> {
     ))
 }
 
-fn hash_command_v2(v2: &UserCommandData) -> anyhow::Result<TxnHash> {
+fn hash_command_v2(v2: &UserCommandData) -> Result<TxnHash> {
     let bytes = serde_json::to_vec(v2)?;
     let mut hasher = blake2::Blake2bVar::new(32)?;
     hasher.write_all(&bytes[..])?;
@@ -1219,12 +1214,22 @@ fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item =
     }
 }
 
+fn recurse_calls_update(update: &AccountUpdates) -> BTreeSet<PublicKey> {
+    let pk = update.elt.account_update.body.public_key.to_owned();
+    let mut receivers = BTreeSet::from([pk]);
+
+    recurse_calls_receivers(&mut receivers, update.elt.calls.iter());
+    receivers
+}
+
 fn recurse_calls_receivers<'a>(
-    receivers: &mut Vec<PublicKey>,
+    receivers: &mut BTreeSet<PublicKey>,
     calls: impl Iterator<Item = &'a Call>,
 ) {
     for update in calls {
-        receivers.push(update.elt.account_update.body.public_key.to_owned());
+        let pk = update.elt.account_update.body.public_key.to_owned();
+        receivers.insert(pk);
+
         recurse_calls_receivers(receivers, update.elt.calls.iter());
     }
 }
