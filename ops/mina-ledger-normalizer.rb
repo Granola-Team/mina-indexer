@@ -35,7 +35,15 @@ accounts.each do |account|
   pk = account["pk"]
   raise "Missing public key: #{JSON.pretty_generate(account)}" if pk.nil?
 
-  token = account["token"] || MINA_TOKEN
+  token = if account["token"].nil?
+    MINA_TOKEN
+  elsif account["token"] == "1"
+    # The MINA token was, pre-hardfork, token 1.
+    MINA_TOKEN
+  else
+    account["token"]
+  end
+
   result[token] ||= {}
   result[token][pk] =
     {
