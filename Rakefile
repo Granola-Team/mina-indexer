@@ -277,12 +277,12 @@ namespace :show do
   end
 end
 
-task clean: "clean:all"
+desc "Clean the source repo"
+task clean: "clean:source"
 
 # Clean tasks
 namespace :clean do
-  desc "Cargo clean & remove nix build"
-  task :all do
+  task :source do
     FileUtils.rm_rf(".build")
     FileUtils.rm_f("result")
     cargo_output("--version")
