@@ -384,6 +384,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - txn_hash:    [TxnHash::V1_LEN] bytes
     /// - state_hash:  [StateHash] bytes
     /// - amount:      [u64] BE bytes
+    /// ```
+    /// Use with [pk_txn_sort_key]
     fn txn_from_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("txn-from-slot-sort")
@@ -401,6 +403,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - txn_hash:     [TxnHash::V1_LEN] bytes
     /// - state_hash:   [StateHash] bytes
     /// - amount:       [u64] BE bytes
+    /// ```
+    /// Use with [pk_txn_sort_key]
     fn txn_from_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("txn-from-height-sort")
@@ -409,14 +413,17 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{global_slot}{txn_hash}{state_hash}
+    /// - key: {receiver}{global_slot}{nonce}{txn_hash}{state_hash}
     /// - val: amount
     /// where
     /// - receiver:    [PublicKey] bytes
     /// - global_slot: [u32] BE bytes
+    /// - nonce:       [u32] BE bytes
     /// - txn_hash:    [TxnHash::V1_LEN] bytes
     /// - state_hash:  [StateHash] bytes
     /// - amount:      [u64] BE bytes
+    /// ```
+    /// Use with [pk_txn_sort_key]
     fn txn_to_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("txn-to-slot-sort")
@@ -425,14 +432,17 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{block_height}{txn_hash}{state_hash}
+    /// - key: {receiver}{height}{nonce}{txn_hash}{state_hash}
     /// - val: amount
     /// where
-    /// - receiver:     [PublicKey] bytes
-    /// - block_height: [u32] BE bytes
-    /// - txn_hash:     [TxnHash::V1_LEN] bytes
-    /// - state_hash:   [StateHash] bytes
-    /// - amount:       [u64] BE bytes
+    /// - receiver:   [PublicKey] bytes
+    /// - height:     [u32] BE bytes
+    /// - nonce:      [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// - amount:     [u64] BE bytes
+    /// ```
+    /// Use with [pk_txn_sort_key]
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("txn-to-height-sort")
@@ -442,7 +452,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {txn_hash}{state_hash}
-    /// - value: [SignedCommandWithData] serde bytes
+    /// - val: [SignedCommandWithData] serde bytes
     /// where
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (v2 is right-padded)
     /// - state_hash: [StateHash] bytes
@@ -467,7 +477,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {height}{txn_hash}{state_hash}
-    /// - val: b""
+    /// - val: [SignedCommandWithData] serde bytes
     /// where
     /// - height:     [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
@@ -481,7 +491,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: b""
+    /// - val: [SignedCommandWith] serde bytes
     /// where
     /// - slot:       [u32] BE bytes
     /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)

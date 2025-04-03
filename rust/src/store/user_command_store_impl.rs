@@ -21,8 +21,8 @@ use crate::{
     store::zkapp::tokens::ZkappTokenStore,
     utility::store::{
         command::user::{
-            pk_txn_sort_key, pk_txn_sort_key_nonce, pk_txn_sort_key_prefix, token_txn_sort_key,
-            txn_block_key, txn_hash_of_key, txn_sort_key,
+            pk_txn_sort_key, pk_txn_sort_key_nonce, token_txn_sort_key, txn_block_key,
+            txn_hash_of_key, txn_sort_key,
         },
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key, U32_LEN},
     },
@@ -456,11 +456,10 @@ impl UserCommandStore for IndexerStore {
 
     fn write_user_commands_csv(&self, pk: &PublicKey, path: Option<PathBuf>) -> Result<PathBuf> {
         let mut txns = vec![];
-        let start = pk_txn_sort_key_prefix(pk, u32::MAX);
-        let mode = IteratorMode::From(&start, speedb::Direction::Reverse);
+        let direction = Direction::Reverse;
 
         // from txns
-        for (key, _) in self.txn_from_height_iterator(mode).flatten() {
+        for (key, _) in self.txn_from_height_iterator(pk, direction).flatten() {
             let txn_pk = pk_key_prefix(&key);
             if txn_pk != *pk {
                 break;
@@ -474,7 +473,7 @@ impl UserCommandStore for IndexerStore {
         }
 
         // to txns
-        for (key, _) in self.txn_to_height_iterator(mode).flatten() {
+        for (key, _) in self.txn_to_height_iterator(pk, direction).flatten() {
             let txn_pk = pk_key_prefix(&key);
             if txn_pk != *pk {
                 break;
@@ -517,36 +516,46 @@ impl UserCommandStore for IndexerStore {
     // Iterators //
     ///////////////
 
-    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.user_commands_slot_sort_cf(), mode)
-    }
-
+    /// Key-value pairs
+    /// ```
+    /// - key: {height}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [txn_sort_key]
     fn user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.user_commands_height_sort_cf(), mode)
     }
 
-    fn user_commands_per_token_slot_iterator(
-        &self,
-        token: &TokenAddress,
-        direction: Direction,
-    ) -> DBIterator<'_> {
-        let mut start = [0u8; TokenAddress::LEN + U32_LEN + 1];
-        start[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
-
-        if let Direction::Reverse = direction {
-            // need to go beyond all possible keys with this token prefix
-            start[TokenAddress::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[TokenAddress::LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
-        };
-
-        self.database.iterator_cf(
-            self.user_commands_per_token_slot_sort_cf(),
-            IteratorMode::From(&start, direction),
-        )
+    /// Key-value pairs
+    /// ```
+    /// - key: {slot}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [txn_sort_key]
+    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.user_commands_slot_sort_cf(), mode)
     }
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{height}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [token_txn_sort_key]
     fn user_commands_per_token_height_iterator(
         &self,
         token: &TokenAddress,
@@ -567,33 +576,168 @@ impl UserCommandStore for IndexerStore {
         )
     }
 
-    fn txn_from_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+    /// Key-value pairs
+    /// ```
+    /// - key: {token}{slot}{txn_hash}{state_hash}
+    /// - val: [SignedCommandWithData] serde bytes
+    /// where
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// ```
+    /// Use with [token_txn_sort_key]
+    fn user_commands_per_token_slot_iterator(
+        &self,
+        token: &TokenAddress,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        let mut start = [0u8; TokenAddress::LEN + U32_LEN + 1];
+        start[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
+
+        if let Direction::Reverse = direction {
+            // need to go beyond all possible keys with this token prefix
+            start[TokenAddress::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[TokenAddress::LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        };
+
+        self.database.iterator_cf(
+            self.user_commands_per_token_slot_sort_cf(),
+            IteratorMode::From(&start, direction),
+        )
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {sender}{height}{nonce}{txn_hash}{state_hash}
+    /// - val: amount
+    /// where
+    /// - sender:     [PublicKey] bytes
+    /// - height:     [u32] BE bytes
+    /// - nonce:      [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// - amount:     [u64] BE bytes
+    fn txn_from_height_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
+        // set start key
+        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
+        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+
+        // get upper bound if reverse
+        if let Direction::Reverse = direction {
+            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        }
+
+        let mode = IteratorMode::From(&start, direction);
         self.database
             .iterator_cf(self.txn_from_height_sort_cf(), mode)
     }
 
-    fn txn_from_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+    /// Key-value pairs
+    /// ```
+    /// - key: {sender}{slot}{txn_hash}{state_hash}
+    /// - val: amount
+    /// where
+    /// - sender:     [PublicKey] bytes
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// - amount:     [u64] BE bytes
+    fn txn_from_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
+        // set start key
+        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
+        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+
+        // get upper bound if reverse
+        if let Direction::Reverse = direction {
+            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        }
+
+        let mode = IteratorMode::From(&start, direction);
         self.database
             .iterator_cf(self.txn_from_slot_sort_cf(), mode)
     }
 
-    fn txn_to_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+    /// Key-value pairs
+    /// ```
+    /// - key: {receiver}{height}{txn_hash}{state_hash}
+    /// - val: amount
+    /// where
+    /// - receiver:   [PublicKey] bytes
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// - amount:     [u64] BE bytes
+    fn txn_to_height_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
+        // set start key
+        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
+        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+
+        // get upper bound if reverse
+        if let Direction::Reverse = direction {
+            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        }
+
+        let mode = IteratorMode::From(&start, direction);
         self.database
             .iterator_cf(self.txn_to_height_sort_cf(), mode)
     }
 
-    fn txn_to_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+    /// Key-value pairs
+    /// ```
+    /// - key: {receiver}{slot}{txn_hash}{state_hash}
+    /// - val: amount
+    /// where
+    /// - receiver:   [PublicKey] bytes
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes
+    /// - state_hash: [StateHash] bytes
+    /// - amount:     [u64] BE bytes
+    fn txn_to_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
+        // set start key
+        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
+        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
+
+        // get upper bound if reverse
+        if let Direction::Reverse = direction {
+            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        }
+
+        let mode = IteratorMode::From(&start, direction);
         self.database.iterator_cf(self.txn_to_slot_sort_cf(), mode)
     }
 
-    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.zkapp_commands_slot_sort_cf(), mode)
-    }
-
+    /// Key-value pairs
+    /// ```
+    /// - key: {height}{txn_hash}{state_hash}
+    /// - val: b""
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
+    /// - state_hash: [StateHash] bytes
     fn zkapp_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.zkapp_commands_height_sort_cf(), mode)
+    }
+
+    /// Key-value pairs
+    /// ```
+    /// - key: {slot}{txn_hash}{state_hash}
+    /// - val: b""
+    /// where
+    /// - slot:       [u32] BE bytes
+    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
+    /// - state_hash: [StateHash] bytes
+    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
+        self.database
+            .iterator_cf(self.zkapp_commands_slot_sort_cf(), mode)
     }
 
     /////////////////////////

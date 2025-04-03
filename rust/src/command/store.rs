@@ -86,18 +86,11 @@ pub trait UserCommandStore {
     // Iterators //
     ///////////////
 
-    /// Iterator for user commands via global slot
-    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
     /// Iterator for user commands via blockchain length
     fn user_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator for user commands per token via global slot
-    fn user_commands_per_token_slot_iterator(
-        &self,
-        token: &TokenAddress,
-        mode: Direction,
-    ) -> DBIterator<'_>;
+    /// Iterator for user commands via global slot
+    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for user commands per token via blockchain length
     fn user_commands_per_token_height_iterator(
@@ -106,23 +99,30 @@ pub trait UserCommandStore {
         mode: Direction,
     ) -> DBIterator<'_>;
 
+    /// Iterator for user commands per token via global slot
+    fn user_commands_per_token_slot_iterator(
+        &self,
+        token: &TokenAddress,
+        mode: Direction,
+    ) -> DBIterator<'_>;
+
     /// Iterator for user commands by sender via block height
-    fn txn_from_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn txn_from_height_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_>;
 
     /// Iterator for user commands by sender via global slot
-    fn txn_from_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn txn_from_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_>;
 
     /// Iterator for user commands by sender via block height
-    fn txn_to_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn txn_to_height_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_>;
 
     /// Iterator for user commands by receiver via global slot
-    fn txn_to_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
-    /// Iterator for zkapp commands via global slot
-    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+    fn txn_to_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_>;
 
     /// Iterator for zkapp commands via blockchain length
     fn zkapp_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
+
+    /// Iterator for zkapp commands via global slot
+    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /////////////////////////
     // User command counts //
