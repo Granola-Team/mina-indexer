@@ -9,6 +9,7 @@ SOCKET_FILE = File.join(BASE_DIR, "mina-indexer.sock").freeze
 BLOCKS_DIR = File.join(BASE_DIR, "blocks").freeze
 DATABASE_DIR = File.join(BASE_DIR, "database").freeze
 STAKING_LEDGERS_DIR = File.join(BASE_DIR, "staking-ledgers").freeze
+STAKING_LEDGERS_URL = "https://staking-ledgers.minasearch.com"
 V2_GENESIS_STATE_HASH = "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP".freeze
 
 # Set environment variables
@@ -233,8 +234,11 @@ namespace :bin do
     Rake::Task["bin:_start"].invoke(idxr_bin, "--genesis-hash", V2_GENESIS_STATE_HASH)
   end
 
-  desc "Stage blocks (up to `block_height`), create a v2 database, and start server with this database"
+  desc "Stage blocks (up to `block_height`), download staking ledgers, create a v2 database, and start server with this database"
   task :stage_and_start_v2, [:idxr_bin, :block_height, :web_port, *:args] do |_, args|
+    require "net/http"
+    require "uri"
+
     idxr_bin = args[:idxr_bin]
     block_height = args[:block_height]
     # Set default web_port if not provided
@@ -245,7 +249,51 @@ namespace :bin do
     all_args << args[:args] if args[:args]
     all_args.concat(args.extras)
 
-    Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
+    # Create directories if they don't exist
+    FileUtils.mkdir_p(BLOCKS_DIR)
+    FileUtils.mkdir_p(STAKING_LEDGERS_DIR)
+
+    # List of staking ledger filenames to download
+    staking_ledger_files = [
+      "mainnet-0-jxsAidvKvEQJMC7Z2wkLrFGzCqUxpFMRhAj4K5o49eiFLhKSyXL.json",
+      "mainnet-1-jwgzfxD5rEnSP3k4UiZu2569FfhJ1SRUvabfTz21e4btwBHg3jq.json",
+      "mainnet-2-jw8dq1FtwJxbwqU1aYCxjY98fE21CqMDMynsXzRwAHAvM6yhx5A.json",
+      "mainnet-3-jwPSjgLj5AsJtA1oTqMasQrxpeZx7pmGy5HKnAAhPBC4tYYvEj5.json"
+    ]
+
+    # Create threads for parallel execution
+    threads = []
+
+    # Thread for block staging
+    threads << Thread.new do
+      Rake::Task["stage_blocks:v2"].invoke(block_height, BLOCKS_DIR)
+    end
+
+    # Threads for downloading each staking ledger in parallel
+    staking_ledger_files.each do |filename|
+      threads << Thread.new(filename) do |file|
+        url = "#{STAKING_LEDGERS_URL}/#{file}"
+        output_path = File.join(STAKING_LEDGERS_DIR, file)
+
+        puts "Downloading staking ledger from #{url}"
+        begin
+          uri = URI.parse(url)
+          response = Net::HTTP.get_response(uri)
+
+          if response.is_a?(Net::HTTPSuccess)
+            File.binwrite(output_path, response.body)
+          else
+            puts "Error downloading #{url}: HTTP #{response.code} - #{response.message}"
+          end
+        rescue => e
+          puts "Error downloading #{url}: #{e.message}"
+        end
+      end
+    end
+
+    # Wait for all operations to complete
+    threads.each(&:join)
+    puts "All parallel operations completed"
 
     Rake::Task["bin:database_create"].reenable
     Rake::Task["bin:database_create"].invoke(idxr_bin, "--genesis-hash", V2_GENESIS_STATE_HASH)
