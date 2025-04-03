@@ -33,13 +33,13 @@ jsonpath "$.data.transactions" count == 42
 jsonpath "$.data.transactions[0].blockHeight" == 359609
 jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].memo" == "Test ZKApp to Receiver"
-jsonpath "$.data.transactions[0].hash" == "5Jtarnuf2gvYuQsv3HYeDYNLWMb3ZosKubkYYMDxWhaYxojbaDMg"
+jsonpath "$.data.transactions[0].hash" == "5JtvEs11suFcibcz5oSsZrPrtTjxYzFXQ7x1dSc2WKLDnv5fVd8T"
 
 # last datum
 jsonpath "$.data.transactions[41].blockHeight" == 359617
 jsonpath "$.data.transactions[41].canonical" == true
 jsonpath "$.data.transactions[41].memo" == "Test ZKApp to Receiver"
-jsonpath "$.data.transactions[41].hash" == "5Jv8ZMpRwgxuDkXp4fDqRpCSQ1s7k8shGUTMxyPQbS3UJiJvjb3U"
+jsonpath "$.data.transactions[41].hash" == "5JvEi7XR2XBw1nWLeNN5hh31BLZFAaf1ejGV58CYS5xU1BzH6Efp"
 
 duration < 100
 
@@ -70,12 +70,12 @@ jsonpath "$.data.transactions" count == 25
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 359617
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].hash" == "5Jv8ZMpRwgxuDkXp4fDqRpCSQ1s7k8shGUTMxyPQbS3UJiJvjb3U"
+jsonpath "$.data.transactions[0].hash" == "5JvEi7XR2XBw1nWLeNN5hh31BLZFAaf1ejGV58CYS5xU1BzH6Efp"
 
 # last datum
 jsonpath "$.data.transactions[24].blockHeight" == 359613
 jsonpath "$.data.transactions[24].canonical" == true
-jsonpath "$.data.transactions[24].hash" == "5Jtef4ue1udQiniSy2co1LZK3wvoQCAZV6595VSXt4znqq57djpz"
+jsonpath "$.data.transactions[24].hash" == "5Jtfh3jt73pUGJp4eWY7PcrQa8VWfxFHRkPwJRgUyUySyoRPanGb"
 
 duration < 100
 
@@ -107,7 +107,7 @@ jsonpath "$.data.transactions" count == 1
 # only datum
 jsonpath "$.data.transactions[0].blockHeight" == 359617
 jsonpath "$.data.transactions[0].canonical" == true
-jsonpath "$.data.transactions[0].hash" == "5Jv8ZMpRwgxuDkXp4fDqRpCSQ1s7k8shGUTMxyPQbS3UJiJvjb3U"
+jsonpath "$.data.transactions[0].hash" == "5JvEi7XR2XBw1nWLeNN5hh31BLZFAaf1ejGV58CYS5xU1BzH6Efp"
 
 jsonpath "$.data.transactions[0].epoch_num_user_commands" == 155
 jsonpath "$.data.transactions[0].total_num_user_commands" == 155
