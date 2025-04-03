@@ -425,7 +425,13 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                 UserCommandData::ZkappCommandData(zkapp) => zkapp
                     .account_updates
                     .iter()
-                    .map(|update| update.elt.account_update.body.public_key.to_owned())
+                    .flat_map(|update| {
+                        let pk = update.elt.account_update.body.public_key.to_owned();
+                        let mut receivers = vec![pk];
+
+                        recurse_calls_receivers(&mut receivers, update.elt.calls.iter());
+                        receivers
+                    })
                     .collect(),
             },
         }
@@ -1210,6 +1216,16 @@ fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item =
         }
 
         recurse_calls(tokens, update.elt.calls.iter());
+    }
+}
+
+fn recurse_calls_receivers<'a>(
+    receivers: &mut Vec<PublicKey>,
+    calls: impl Iterator<Item = &'a Call>,
+) {
+    for update in calls {
+        receivers.push(update.elt.account_update.body.public_key.to_owned());
+        recurse_calls_receivers(receivers, update.elt.calls.iter());
     }
 }
 
