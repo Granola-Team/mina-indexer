@@ -12,7 +12,7 @@ use crate::{
 };
 use account::zkapp::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet};
 use token::TokenDiff;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -65,22 +65,21 @@ impl LedgerDiff {
             )
             .collect();
 
-        let accounts_created: HashSet<_> = all_accounts_created.keys().cloned().collect();
+        let accounts_created: BTreeSet<_> = all_accounts_created.keys().cloned().collect();
 
         // only the zkapp command token accounts
-        let mut zkapp_token_accounts = HashSet::new();
+        let mut zkapp_token_accounts = BTreeSet::new();
 
         account_diffs.iter().flatten().for_each(|diff| {
             diff.add_token_accounts(&mut zkapp_token_accounts);
         });
 
         // token accounts created via zkapp command
-        let mut zkapp_token_accounts_created: Vec<_> = {
+        let zkapp_token_accounts_created: Vec<_> = {
             accounts_created
                 .intersection(&zkapp_token_accounts)
                 .map(|key| {
                     AccountDiff::ZkappAccountCreationFee(ZkappAccountCreationFee {
-                        state_hash: block.state_hash(),
                         public_key: key.0.to_owned(),
                         token: key.1.to_owned(),
                         amount: all_accounts_created.get(key).cloned().unwrap(),
@@ -88,9 +87,6 @@ impl LedgerDiff {
                 })
         }
         .collect();
-
-        // sort for determinism
-        zkapp_token_accounts_created.sort();
 
         // prepend zkapp account creation fees
         if !zkapp_token_accounts_created.is_empty() {

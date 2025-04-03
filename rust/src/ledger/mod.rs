@@ -11,7 +11,7 @@ pub mod token;
 pub mod username;
 
 use crate::{
-    base::{amount::Amount, nonce::Nonce, public_key::PublicKey},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
     constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
     ledger::{
@@ -131,13 +131,17 @@ impl Ledger {
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
-            self._apply_account_diff(acct_diff)?;
+            self._apply_account_diff(acct_diff, &diff.state_hash)?;
         }
         Ok(())
     }
 
     /// Apply an account diff to a mutable ledger
-    pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
+    pub fn _apply_account_diff(
+        &mut self,
+        acct_diff: &AccountDiff,
+        state_hash: &StateHash,
+    ) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
         let token = acct_diff.token();
 
@@ -147,7 +151,7 @@ impl Ledger {
             .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
             .or(Some(Account::empty(pk, token.to_owned())))
         {
-            self.insert_account(account.apply_account_diff(acct_diff), &token);
+            self.insert_account(account.apply_account_diff(acct_diff, state_hash), &token);
         }
 
         Ok(())
@@ -307,13 +311,17 @@ impl TokenLedger {
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
-            self._apply_account_diff(acct_diff)?;
+            self._apply_account_diff(acct_diff, &diff.state_hash)?;
         }
         Ok(())
     }
 
     /// Apply an account diff to a mutable ledger
-    pub fn _apply_account_diff(&mut self, acct_diff: &AccountDiff) -> anyhow::Result<()> {
+    pub fn _apply_account_diff(
+        &mut self,
+        acct_diff: &AccountDiff,
+        state_hash: &StateHash,
+    ) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
         let token = acct_diff.token();
 
@@ -323,7 +331,7 @@ impl TokenLedger {
             .or(Some(Account::empty(pk.clone(), token)))
         {
             self.accounts
-                .insert(pk, account.apply_account_diff(acct_diff));
+                .insert(pk, account.apply_account_diff(acct_diff, state_hash));
         }
         Ok(())
     }

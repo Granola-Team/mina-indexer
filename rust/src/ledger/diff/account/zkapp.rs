@@ -30,7 +30,6 @@ use serde::{Deserialize, Serialize};
 /// - increment nonces
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappDiff {
-    pub state_hash: StateHash,
     pub nonce: Option<Nonce>,
     pub token: TokenAddress,
     pub public_key: PublicKey,
@@ -53,15 +52,11 @@ pub struct ZkappDiff {
 pub enum ZkappPaymentDiff {
     IncrementNonce(ZkappIncrementNonce),
     AccountCreationFee(ZkappAccountCreationFee),
-    Payment {
-        state_hash: StateHash,
-        payment: PaymentDiff,
-    },
+    Payment(PaymentDiff),
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappStateDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub diffs: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
@@ -69,7 +64,6 @@ pub struct ZkappStateDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappVerificationKeyDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub verification_key: VerificationKey,
@@ -77,7 +71,6 @@ pub struct ZkappVerificationKeyDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappProvedStateDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub proved_state: bool,
@@ -85,7 +78,6 @@ pub struct ZkappProvedStateDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappPermissionsDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub permissions: Permissions,
@@ -93,7 +85,6 @@ pub struct ZkappPermissionsDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappUriDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub zkapp_uri: ZkappUri,
@@ -101,7 +92,6 @@ pub struct ZkappUriDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappTokenSymbolDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub token_symbol: TokenSymbol,
@@ -109,7 +99,6 @@ pub struct ZkappTokenSymbolDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappTimingDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub timing: Timing,
@@ -117,7 +106,6 @@ pub struct ZkappTimingDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappVotingForDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub voting_for: StateHash,
@@ -125,7 +113,6 @@ pub struct ZkappVotingForDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappActionsDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub actions: Vec<ActionState>,
@@ -133,7 +120,6 @@ pub struct ZkappActionsDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappEventsDiff {
-    pub state_hash: StateHash,
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub events: Vec<ZkappEvent>,
@@ -141,14 +127,12 @@ pub struct ZkappEventsDiff {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappIncrementNonce {
-    pub state_hash: StateHash,
     pub public_key: PublicKey,
     pub token: TokenAddress,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappAccountCreationFee {
-    pub state_hash: StateHash,
     pub public_key: PublicKey,
     pub token: TokenAddress,
     pub amount: Amount,
@@ -156,7 +140,6 @@ pub struct ZkappAccountCreationFee {
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappFeePayerNonceDiff {
-    pub state_hash: StateHash,
     pub public_key: PublicKey,
     pub nonce: Nonce,
 }
@@ -177,7 +160,6 @@ impl ZkappDiff {
         // app state
         Self::expand_app_state_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.app_state_diff,
@@ -194,7 +176,6 @@ impl ZkappDiff {
         // verification key
         Self::expand_verification_key_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.verification_key,
@@ -202,7 +183,6 @@ impl ZkappDiff {
 
         Self::expand_proved_state_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.proved_state,
@@ -211,7 +191,6 @@ impl ZkappDiff {
         // permissions
         Self::expand_permissions_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.permissions,
@@ -220,7 +199,6 @@ impl ZkappDiff {
         // zkapp uri
         Self::expand_uri_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.zkapp_uri,
@@ -229,7 +207,6 @@ impl ZkappDiff {
         // token symbol
         Self::expand_symbol_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.token_symbol,
@@ -238,7 +215,6 @@ impl ZkappDiff {
         // timing
         Self::expand_timing_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.timing,
@@ -247,7 +223,6 @@ impl ZkappDiff {
         // voting for
         Self::expand_voting_for_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.voting_for,
@@ -256,7 +231,6 @@ impl ZkappDiff {
         // actions
         Self::expand_actions_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.actions,
@@ -265,7 +239,6 @@ impl ZkappDiff {
         // events
         Self::expand_events_diff(
             &mut account_diffs,
-            self.state_hash.to_owned(),
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.events,
@@ -278,7 +251,7 @@ impl ZkappDiff {
         use ZkappPaymentDiff::*;
 
         let acct_diff = match diff {
-            Payment { payment, .. } => AccountDiff::Payment(payment),
+            Payment(payment) => AccountDiff::Payment(payment),
             IncrementNonce(diff) => AccountDiff::ZkappIncrementNonce(diff),
             AccountCreationFee(diff) => AccountDiff::ZkappAccountCreationFee(diff),
         };
@@ -288,14 +261,12 @@ impl ZkappDiff {
 
     fn expand_app_state_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         app_state_diff: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
     ) {
         if !app_state_diff.iter().all(|state| state.is_none()) {
             account_diffs.push(AccountDiff::ZkappStateDiff(ZkappStateDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 diffs: app_state_diff,
@@ -320,7 +291,6 @@ impl ZkappDiff {
 
     fn expand_verification_key_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         verification_key: Option<VerificationKey>,
@@ -328,7 +298,6 @@ impl ZkappDiff {
         if let Some(verification_key) = verification_key {
             account_diffs.push(AccountDiff::ZkappVerificationKeyDiff(
                 ZkappVerificationKeyDiff {
-                    state_hash,
                     token,
                     public_key: pk,
                     verification_key,
@@ -339,14 +308,12 @@ impl ZkappDiff {
 
     fn expand_proved_state_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         proved_state: bool,
     ) {
         if proved_state {
             account_diffs.push(AccountDiff::ZkappProvedStateDiff(ZkappProvedStateDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 proved_state,
@@ -356,14 +323,12 @@ impl ZkappDiff {
 
     fn expand_permissions_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         permissions: Option<Permissions>,
     ) {
         if let Some(permissions) = permissions {
             account_diffs.push(AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 permissions,
@@ -373,14 +338,12 @@ impl ZkappDiff {
 
     fn expand_uri_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         zkapp_uri: Option<ZkappUri>,
     ) {
         if let Some(zkapp_uri) = zkapp_uri {
             account_diffs.push(AccountDiff::ZkappUriDiff(ZkappUriDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 zkapp_uri,
@@ -390,14 +353,12 @@ impl ZkappDiff {
 
     fn expand_symbol_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         token_symbol: Option<TokenSymbol>,
     ) {
         if let Some(token_symbol) = token_symbol {
             account_diffs.push(AccountDiff::ZkappTokenSymbolDiff(ZkappTokenSymbolDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 token_symbol,
@@ -407,14 +368,12 @@ impl ZkappDiff {
 
     fn expand_timing_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         timing: Option<Timing>,
     ) {
         if let Some(timing) = timing {
             account_diffs.push(AccountDiff::ZkappTimingDiff(ZkappTimingDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 timing,
@@ -424,14 +383,12 @@ impl ZkappDiff {
 
     fn expand_voting_for_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         voting_for: Option<StateHash>,
     ) {
         if let Some(voting_for) = voting_for {
             account_diffs.push(AccountDiff::ZkappVotingForDiff(ZkappVotingForDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 voting_for,
@@ -441,14 +398,12 @@ impl ZkappDiff {
 
     fn expand_actions_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         actions: Vec<ActionState>,
     ) {
         if !actions.is_empty() {
             account_diffs.push(AccountDiff::ZkappActionsDiff(ZkappActionsDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 actions,
@@ -458,14 +413,12 @@ impl ZkappDiff {
 
     fn expand_events_diff(
         account_diffs: &mut Vec<AccountDiff>,
-        state_hash: StateHash,
         token: TokenAddress,
         pk: PublicKey,
         events: Vec<ZkappEvent>,
     ) {
         if !events.is_empty() {
             account_diffs.push(AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
-                state_hash,
                 token,
                 public_key: pk,
                 events,
@@ -477,7 +430,7 @@ impl ZkappDiff {
 impl ZkappPaymentDiff {
     pub fn public_key(&self) -> PublicKey {
         match self {
-            Self::Payment { payment, .. } => payment.public_key.to_owned(),
+            Self::Payment(payment) => payment.public_key.to_owned(),
             Self::IncrementNonce(diff) => diff.public_key.to_owned(),
             Self::AccountCreationFee(diff) => diff.public_key.to_owned(),
         }
@@ -485,7 +438,7 @@ impl ZkappPaymentDiff {
 
     pub fn token(&self) -> TokenAddress {
         match self {
-            Self::Payment { payment, .. } => payment.token.to_owned(),
+            Self::Payment(payment) => payment.token.to_owned(),
             Self::IncrementNonce(diff) => diff.token.to_owned(),
             Self::AccountCreationFee(diff) => diff.token.to_owned(),
         }
@@ -507,7 +460,7 @@ impl ZkappStateDiff {
 #[cfg(test)]
 mod tests {
     use crate::{
-        base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+        base::{nonce::Nonce, public_key::PublicKey},
         block::precomputed::{PcbVersion, PrecomputedBlock},
         constants::MAINNET_ACCOUNT_CREATION_FEE,
         ledger::{
@@ -538,141 +491,115 @@ mod tests {
 
         // zkapp ledger diffs
         let diffs = LedgerDiff::from_precomputed_unexpanded(&pcb);
+        assert_eq!(
+            diffs.state_hash.0,
+            "3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL"
+        );
+
         let zkapp_diffs = diffs.filter_zkapp();
 
         // expected unexpanded zkapp account diffs
-        let state_hash: StateHash = "3NLjRmTyUzeA7meRAT3Yjqxzfe95GKBgkLPD2iLeVE5RMCFcw8eL".into();
         let expect = vec![
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 185.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: Some(185.into()),
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Debit(None),
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned(),
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Debit(None),
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: None,
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Credit,
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned(),
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Credit,
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
             ],
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 186.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: Some(186.into()),
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Debit(None),
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned()
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Debit(None),
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: None,
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Credit,
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned(),
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Credit,
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
             ],
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 187.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: Some(187.into()),
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Debit(None),
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned(),
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Debit(None),
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                     nonce: None,
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    payment_diffs: vec![ZkappPaymentDiff::Payment {
-                        payment: PaymentDiff {
-                            public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
-                                .into(),
-                            update_type: UpdateType::Credit,
-                            amount: 2000000000.into(),
-                            token: TokenAddress::default(),
-                        },
-                        state_hash: state_hash.to_owned(),
-                    }],
+                    payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                        public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+                            .into(),
+                        update_type: UpdateType::Credit,
+                        amount: 2000000000.into(),
+                        token: TokenAddress::default(),
+                    })],
                     ..Default::default()
                 })),
             ],
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qoxZPhqRsKromMF72kjZr6LQnufZ8T2iZuDzCmtuDnnddCRF7fpp".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 5.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
                 nonce: Some(5.into()),
-                state_hash: state_hash.to_owned(),
                 public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                 payment_diffs: vec![
                     ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonce {
-                        state_hash: state_hash.to_owned(),
                         public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
                             .into(),
                         token: TokenAddress::default(),
@@ -716,7 +643,6 @@ mod tests {
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 185.into(),
                 }),
                 AccountDiff::Payment(PaymentDiff {
@@ -735,7 +661,6 @@ mod tests {
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 186.into(),
                 }),
                 AccountDiff::Payment(PaymentDiff {
@@ -754,7 +679,6 @@ mod tests {
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 187.into(),
                 }),
                 AccountDiff::Payment(PaymentDiff {
@@ -773,16 +697,13 @@ mod tests {
             vec![
                 AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
                     public_key: "B62qoxZPhqRsKromMF72kjZr6LQnufZ8T2iZuDzCmtuDnnddCRF7fpp".into(),
-                    state_hash: state_hash.to_owned(),
                     nonce: 5.into(),
                 }),
                 AccountDiff::ZkappIncrementNonce(ZkappIncrementNonce {
-                    state_hash: state_hash.to_owned(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                     token: TokenAddress::default(),
                 }),
                 AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
-                    state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                     verification_key: VerificationKey {
@@ -791,7 +712,6 @@ mod tests {
                     }
                 }),
                 AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
-                    state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                     permissions: Permissions {
@@ -811,13 +731,11 @@ mod tests {
                     }
                 }),
                 AccountDiff::ZkappUriDiff(ZkappUriDiff {
-                    state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                     zkapp_uri: "https://minainu.com".into()
                 }),
                 AccountDiff::ZkappTokenSymbolDiff(ZkappTokenSymbolDiff {
-                    state_hash: state_hash.to_owned(),
                     token: TokenAddress::default(),
                     public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                     token_symbol: "MINU".into()
@@ -871,14 +789,12 @@ mod tests {
         let zkapp_diffs = AccountDiff::expand(zkapp_diffs);
 
         // expected zkapp account diffs
-        let state_hash: StateHash = "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi".into();
         let fee_payer: PublicKey = "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into();
         let token =
             TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn").unwrap();
 
         let expect = vec![vec![
             AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
-                state_hash: state_hash.to_owned(),
                 public_key: fee_payer.to_owned(),
                 nonce: Nonce(1)
             }),
@@ -889,7 +805,6 @@ mod tests {
                 token: TokenAddress::default(),
             }),
             AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
-                state_hash: state_hash.clone(),
                 token: TokenAddress::default(),
                 public_key: "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT".into(),
                 events: vec![
@@ -917,12 +832,10 @@ mod tests {
                 token: TokenAddress::default(),
             }),
             AccountDiff::ZkappIncrementNonce(ZkappIncrementNonce {
-                state_hash: state_hash.clone(),
                 public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
                 token: token.clone(),
             }),
             AccountDiff::ZkappStateDiff(ZkappStateDiff {
-                state_hash: state_hash.clone(),
                 token: token.clone(),
                 public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
                 diffs: [
@@ -937,7 +850,6 @@ mod tests {
                 ],
             }),
             AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
-                state_hash: state_hash.clone(),
                 token: token.clone(),
                 public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
                 verification_key: VerificationKey {
@@ -946,7 +858,6 @@ mod tests {
                 },
             }),
             AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
-                state_hash: state_hash.clone(),
                 token: token.clone(),
                 public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
                 permissions: Permissions {
@@ -990,7 +901,6 @@ mod tests {
             created,
             vec![AccountDiff::ZkappAccountCreationFee(
                 ZkappAccountCreationFee {
-                    state_hash,
                     amount: MAINNET_ACCOUNT_CREATION_FEE,
                     public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
                     token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn")

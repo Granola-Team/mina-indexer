@@ -342,8 +342,8 @@ impl Account {
     /////////////////////////
 
     /// Apply zkapp state diff
-    pub fn zkapp_state(self, diff: &ZkappStateDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_state(self, diff: &ZkappStateDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -361,8 +361,12 @@ impl Account {
     }
 
     /// Apply zkapp verification key diff
-    pub fn zkapp_verification_key(self, diff: &ZkappVerificationKeyDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_verification_key(
+        self,
+        diff: &ZkappVerificationKeyDiff,
+        state_hash: &StateHash,
+    ) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -376,8 +380,8 @@ impl Account {
     }
 
     /// Apply zkapp verification key diff
-    pub fn zkapp_proved_state(self, diff: &ZkappProvedStateDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_proved_state(self, diff: &ZkappProvedStateDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -391,8 +395,8 @@ impl Account {
     }
 
     /// Apply zkapp permissions diff
-    pub fn zkapp_permissions(self, diff: &ZkappPermissionsDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_permissions(self, diff: &ZkappPermissionsDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
             permissions: Some(diff.permissions.to_owned()),
@@ -401,8 +405,8 @@ impl Account {
     }
 
     /// Apply zkapp uri diff
-    pub fn zkapp_uri(self, diff: &ZkappUriDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_uri(self, diff: &ZkappUriDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -416,8 +420,8 @@ impl Account {
     }
 
     /// Apply zkapp token symbol diff
-    pub fn zkapp_token_symbol(self, diff: &ZkappTokenSymbolDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_token_symbol(self, diff: &ZkappTokenSymbolDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
             token_symbol: Some(diff.token_symbol.to_owned()),
@@ -426,8 +430,8 @@ impl Account {
     }
 
     /// Apply zkapp timing diff
-    pub fn zkapp_timing(self, diff: &ZkappTimingDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_timing(self, diff: &ZkappTimingDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
             timing: Some(diff.timing.to_owned()),
@@ -436,8 +440,8 @@ impl Account {
     }
 
     /// Apply zkapp voting for diff
-    pub fn zkapp_voting_for(self, diff: &ZkappVotingForDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_voting_for(self, diff: &ZkappVotingForDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
             voting_for: Some(diff.voting_for.to_owned()),
@@ -446,8 +450,8 @@ impl Account {
     }
 
     /// Apply zkapp actions diff
-    fn zkapp_actions(self, diff: &ZkappActionsDiff) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    fn zkapp_actions(self, diff: &ZkappActionsDiff, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         let mut zkapp = self.zkapp.unwrap_or_default();
 
@@ -464,14 +468,14 @@ impl Account {
     }
 
     /// Apply zkapp events diff
-    fn zkapp_events(self, _diff: &ZkappEventsDiff) -> Self {
+    fn zkapp_events(self, _diff: &ZkappEventsDiff, _state_hash: &StateHash) -> Self {
         // todo!("events diff {:?}", diff)
         self
     }
 
     /// Apply zkapp nonce increment
-    pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce, state_hash: &StateHash) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
             nonce: Some(self.nonce.unwrap_or_default() + 1),
@@ -480,8 +484,12 @@ impl Account {
     }
 
     /// Apply zkapp account creation fee
-    pub fn zkapp_account_creation(self, diff: &ZkappAccountCreationFee) -> Self {
-        self.checks(&diff.public_key, &diff.token, &diff.state_hash);
+    pub fn zkapp_account_creation(
+        self,
+        diff: &ZkappAccountCreationFee,
+        state_hash: &StateHash,
+    ) -> Self {
+        self.checks(&diff.public_key, &diff.token, state_hash);
         assert_eq!(diff.amount, MAINNET_ACCOUNT_CREATION_FEE);
 
         Self {
@@ -491,8 +499,12 @@ impl Account {
     }
 
     /// Apply zkapp fee payer nonce
-    pub fn zkapp_fee_payer_nonce(self, diff: &ZkappFeePayerNonceDiff) -> Self {
-        self.check_pk(&diff.public_key, &diff.state_hash);
+    pub fn zkapp_fee_payer_nonce(
+        self,
+        diff: &ZkappFeePayerNonceDiff,
+        state_hash: &StateHash,
+    ) -> Self {
+        self.check_pk(&diff.public_key, state_hash);
         // assert!(self.nonce.as_ref().map_or(true, |n| *n <= diff.nonce));
 
         Self {
@@ -502,7 +514,7 @@ impl Account {
     }
 
     /// Apply an account diff to an account
-    pub fn apply_account_diff(self, diff: &AccountDiff) -> Self {
+    pub fn apply_account_diff(self, diff: &AccountDiff, state_hash: &StateHash) -> Self {
         use AccountDiff::*;
 
         match diff {
@@ -513,19 +525,19 @@ impl Account {
             }
             Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
             FailedTransactionNonce(failed_diff) => self.failed_transaction(failed_diff.nonce),
-            ZkappStateDiff(diff) => self.zkapp_state(diff),
-            ZkappPermissionsDiff(diff) => self.zkapp_permissions(diff),
-            ZkappVerificationKeyDiff(diff) => self.zkapp_verification_key(diff),
-            ZkappProvedStateDiff(diff) => self.zkapp_proved_state(diff),
-            ZkappUriDiff(diff) => self.zkapp_uri(diff),
-            ZkappTokenSymbolDiff(diff) => self.zkapp_token_symbol(diff),
-            ZkappTimingDiff(diff) => self.zkapp_timing(diff),
-            ZkappVotingForDiff(diff) => self.zkapp_voting_for(diff),
-            ZkappActionsDiff(diff) => self.zkapp_actions(diff),
-            ZkappEventsDiff(diff) => self.zkapp_events(diff),
-            ZkappIncrementNonce(diff) => self.zkapp_nonce(diff),
-            ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff),
-            ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff),
+            ZkappStateDiff(diff) => self.zkapp_state(diff, state_hash),
+            ZkappPermissionsDiff(diff) => self.zkapp_permissions(diff, state_hash),
+            ZkappVerificationKeyDiff(diff) => self.zkapp_verification_key(diff, state_hash),
+            ZkappProvedStateDiff(diff) => self.zkapp_proved_state(diff, state_hash),
+            ZkappUriDiff(diff) => self.zkapp_uri(diff, state_hash),
+            ZkappTokenSymbolDiff(diff) => self.zkapp_token_symbol(diff, state_hash),
+            ZkappTimingDiff(diff) => self.zkapp_timing(diff, state_hash),
+            ZkappVotingForDiff(diff) => self.zkapp_voting_for(diff, state_hash),
+            ZkappActionsDiff(diff) => self.zkapp_actions(diff, state_hash),
+            ZkappEventsDiff(diff) => self.zkapp_events(diff, state_hash),
+            ZkappIncrementNonce(diff) => self.zkapp_nonce(diff, state_hash),
+            ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff, state_hash),
+            ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff, state_hash),
             Zkapp(_) => unreachable!(),
         }
     }
@@ -571,7 +583,7 @@ impl Account {
 
         for acct_diff in diff.account_diffs.iter().flatten() {
             if acct_diff.public_key() == pk {
-                acct = acct.apply_account_diff(acct_diff);
+                acct = acct.apply_account_diff(acct_diff, &diff.state_hash);
             }
         }
 
@@ -750,6 +762,7 @@ mod tests {
     fn zkapp_account_diff_payment() {
         let amount = Amount(2000000000);
         let pk = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
+        let state_hash = StateHash::default();
 
         // account before applying diff
         let before = Account {
@@ -762,15 +775,12 @@ mod tests {
         let diff = ZkappDiff {
             public_key: pk.clone(),
             nonce: Some(185.into()),
-            payment_diffs: vec![ZkappPaymentDiff::Payment {
-                state_hash: StateHash::default(),
-                payment: PaymentDiff {
-                    public_key: pk.clone(),
-                    update_type: UpdateType::Debit(None),
-                    amount,
-                    token: TokenAddress::default(),
-                },
-            }],
+            payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
+                public_key: pk.clone(),
+                update_type: UpdateType::Debit(None),
+                amount,
+                token: TokenAddress::default(),
+            })],
             ..Default::default()
         };
 
@@ -779,7 +789,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &state_hash);
             }
 
             after
@@ -826,7 +836,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in zkapp_diff.clone().expand().iter() {
-                after = after.apply_account_diff(diff);
+                after = after.apply_account_diff(diff, &StateHash::default());
             }
 
             after
@@ -873,7 +883,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &StateHash::default());
             }
 
             after
@@ -907,13 +917,11 @@ mod tests {
 
         let diffs = vec![
             AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
-                state_hash: StateHash::default(),
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 verification_key: verification_key.clone(),
             }),
             AccountDiff::ZkappProvedStateDiff(ZkappProvedStateDiff {
-                state_hash: StateHash::default(),
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 proved_state: true,
@@ -925,7 +933,7 @@ mod tests {
             let mut acct = before.clone();
 
             for diff in diffs {
-                acct = acct.apply_account_diff(&diff);
+                acct = acct.apply_account_diff(&diff, &StateHash::default());
             }
 
             acct
@@ -961,14 +969,15 @@ mod tests {
         };
 
         let diff = AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
-            state_hash: StateHash::default(),
             token: TokenAddress::default(),
             public_key: pk.clone(),
             permissions: permissions.clone(),
         });
 
         // account after applying diff
-        let after = before.clone().apply_account_diff(&diff);
+        let after = before
+            .clone()
+            .apply_account_diff(&diff, &StateHash::default());
 
         // only the account permissions changes
         assert_eq!(
@@ -1004,7 +1013,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &StateHash::default());
             }
 
             after
@@ -1048,7 +1057,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &StateHash::default());
             }
 
             after
@@ -1088,7 +1097,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &StateHash::default());
             }
 
             after
@@ -1129,7 +1138,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff);
+                after = after.apply_account_diff(&diff, &StateHash::default());
             }
 
             after

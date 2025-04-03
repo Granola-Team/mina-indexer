@@ -381,17 +381,21 @@ impl BestLedgerStore for IndexerStore {
                         Coinbase(diff) => after.coinbase(diff.amount),
                         Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
                         FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
-                        ZkappStateDiff(diff) => after.zkapp_state(diff),
-                        ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff),
-                        ZkappVerificationKeyDiff(diff) => after.zkapp_verification_key(diff),
-                        ZkappProvedStateDiff(diff) => after.zkapp_proved_state(diff),
-                        ZkappUriDiff(diff) => after.zkapp_uri(diff),
-                        ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff),
-                        ZkappTimingDiff(diff) => after.zkapp_timing(diff),
-                        ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff),
-                        ZkappIncrementNonce(diff) => after.zkapp_nonce(diff),
-                        ZkappAccountCreationFee(diff) => after.zkapp_account_creation(diff),
-                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff),
+                        ZkappStateDiff(diff) => after.zkapp_state(diff, state_hash),
+                        ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff, state_hash),
+                        ZkappVerificationKeyDiff(diff) => {
+                            after.zkapp_verification_key(diff, state_hash)
+                        }
+                        ZkappProvedStateDiff(diff) => after.zkapp_proved_state(diff, state_hash),
+                        ZkappUriDiff(diff) => after.zkapp_uri(diff, state_hash),
+                        ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff, state_hash),
+                        ZkappTimingDiff(diff) => after.zkapp_timing(diff, state_hash),
+                        ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff, state_hash),
+                        ZkappIncrementNonce(diff) => after.zkapp_nonce(diff, state_hash),
+                        ZkappAccountCreationFee(diff) => {
+                            after.zkapp_account_creation(diff, state_hash)
+                        }
+                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff, state_hash),
 
                         // these diffs do not modify the account
                         ZkappActionsDiff(diff) => {
