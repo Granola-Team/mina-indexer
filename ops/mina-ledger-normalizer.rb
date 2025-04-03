@@ -13,12 +13,12 @@ accounts = accounts["ledger"]["accounts"] if !accounts.instance_of?(Array)
 
 def normalize_zkapp(data)
   return data if data.nil?
-  
+
   result = data
 
   # convert integers to hex strings
-  result["app_state"] = data["app_state"].map{ |app| normalize_hex(app) }
-  result["action_state"] = data["action_state"].map{ |action| normalize_hex(action) }
+  result["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
+  result["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
 
   result
 end
