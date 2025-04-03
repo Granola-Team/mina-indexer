@@ -177,13 +177,6 @@ impl UserCommandStore for IndexerStore {
 
             // add receiver index
             for receiver in command.receiver() {
-                if receiver.0 == "B62qjJaXMmZgaNecUUrDZ384uDQGYAAoTRTX7CAQ1YrBT6yo3gbzCCJ" {
-                    warn!(
-                        "Adding sorted txn for B62qjJaXMmZgaNecUUrDZ384uDQGYAAoTRTX7CAQ1YrBT6yo3gbzCCJ:\n  {:?}",
-                        command
-                    );
-                }
-
                 batch.put_cf(
                     self.txn_to_height_sort_cf(),
                     pk_txn_sort_key(
