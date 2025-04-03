@@ -8,9 +8,25 @@ filename = ARGV[0]
 file = File.read(filename)
 accounts = JSON.parse(file)
 
-# for genesis ledgers
-# data = JSON.parse(file)
-# accounts = data["ledger"]["accounts"]
+# Handle both ledger styles
+accounts = accounts["ledger"]["accounts"] if !accounts.instance_of?(Array)
+
+def normalize_zkapp(data)
+  return data if data.nil?
+  
+  result = data
+
+  # convert integers to hex strings
+  result["app_state"] = data["app_state"].map{ |app| normalize_hex(app) }
+  result["action_state"] = data["action_state"].map{ |action| normalize_hex(action) }
+
+  result
+end
+
+def normalize_hex(data)
+  hex_str = data.to_i.to_s(16)
+  "0x" + hex_str.ljust(64, "0")
+end
 
 result = {}
 
@@ -25,7 +41,8 @@ accounts.each do |account|
     {
       "nonce" => account["nonce"] || "0",
       "balance" => account["balance"],
-      "delegate" => account["delegate"] || pk
+      "delegate" => account["delegate"] || pk,
+      "zkapp" => normalize_zkapp(account["zkapp"])
     }
 end
 
