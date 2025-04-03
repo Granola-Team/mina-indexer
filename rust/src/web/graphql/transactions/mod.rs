@@ -235,7 +235,7 @@ impl TransactionsQueryRoot {
                 Ok(state_hash) => state_hash,
                 Err(_) => {
                     return Err(async_graphql::Error::new(format!(
-                        "Invalid state hash {}",
+                        "Invalid state hash: {}",
                         state_hash
                     )))
                 }
@@ -1225,31 +1225,29 @@ impl TransactionQueryInput {
             .as_ref()
             .or(query.to.as_ref())
             .expect("pk to exist");
+        let pk: PublicKey = (pk as &str).into();
 
         // make the iterator
-        let iter = {
-            // set start key
-            let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
-            start[..PublicKey::LEN].copy_from_slice(pk.as_bytes());
-
-            // get upper bound if reverse
-            if let Direction::Reverse = direction {
-                start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-                start[PublicKey::LEN..][U32_LEN..][..U32_LEN]
-                    .copy_from_slice(&u32::MAX.to_be_bytes());
-                start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
+        let iter = match sort_by {
+            BlockHeightAsc | BlockHeightDesc => {
+                if query.from.is_some() {
+                    db.txn_from_height_iterator(&pk, direction)
+                } else {
+                    db.txn_to_height_iterator(&pk, direction)
+                }
             }
-
-            if query.from.is_some() {
-                db.txn_from_height_iterator(IteratorMode::From(&start, direction))
-            } else {
-                db.txn_to_height_iterator(IteratorMode::From(&start, direction))
+            _ => {
+                if query.from.is_some() {
+                    db.txn_from_slot_iterator(&pk, direction)
+                } else {
+                    db.txn_to_slot_iterator(&pk, direction)
+                }
             }
         };
 
         // iterate
         for (key, value) in iter.flatten() {
-            if key[..PublicKey::LEN] != *pk.as_bytes() || txns.len() >= limit {
+            if key[..PublicKey::LEN] != *pk.0.as_bytes() || txns.len() >= limit {
                 // beyond the desired public key or limit
                 break;
             }
