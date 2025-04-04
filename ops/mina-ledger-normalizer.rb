@@ -22,7 +22,7 @@ def normalize_zkapp(data)
 end
 
 def normalize_hex(data)
-  hex_str = data.to_i.to_s(16)
+  hex_str = data.to_i.to_s(16).upcase
   "0x" + hex_str.ljust(64, "0")
 end
 
