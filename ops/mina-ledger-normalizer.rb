@@ -11,20 +11,22 @@ accounts = JSON.parse(file)
 # Handle both ledger styles
 accounts = accounts["ledger"]["accounts"] if !accounts.instance_of?(Array)
 
-def normalize_zkapp(data)
-  return data if data.nil?
-
-  zkapp = data
-  zkapp["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
-  zkapp["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
-  zkapp["last_action_slot"] = data["last_action_slot"].to_s
-  zkapp
-end
-
-def normalize_hex(data)
-  hex_str = data.to_i.to_s(16).upcase
-  "0x" + hex_str.ljust(64, "0")
-end
+# TODO: employ the below to check against zkApp ledger data.
+#
+# def normalize_zkapp(data)
+#   return data if data.nil?
+#
+#   zkapp = data
+#   zkapp["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
+#   zkapp["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
+#   zkapp["last_action_slot"] = data["last_action_slot"].to_s
+#   zkapp
+# end
+#
+# def normalize_hex(data)
+#   hex_str = data.to_i.to_s(16).upcase
+#   "0x" + hex_str.ljust(64, "0")
+# end
 
 result = {}
 
@@ -33,11 +35,10 @@ accounts.each do |account|
   pk = account["pk"]
   raise "Missing public key: #{JSON.pretty_generate(account)}" if pk.nil?
 
-  token = if account["token"].nil? || account["token"] == "1"
+  token = account["token"]
+  if token.nil? || token == "1"
     # The MINA token was, pre-hardfork, token 1.
-    MINA_TOKEN
-  else
-    account["token"]
+    token = MINA_TOKEN
   end
 
   result[token] ||= {}
@@ -45,8 +46,10 @@ accounts.each do |account|
     {
       "nonce" => account["nonce"] || "0",
       "balance" => account["balance"],
-      "delegate" => account["delegate"] || pk,
-      "zkapp" => normalize_zkapp(account["zkapp"])
+      "delegate" => account["delegate"] || pk
+
+      # TODO: check against zkApp ledger data.
+      # "zkapp" => normalize_zkapp(account["zkapp"])
     }
 end
 

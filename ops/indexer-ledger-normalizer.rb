@@ -15,8 +15,10 @@ data.keys.each do |token|
       {
         "nonce" => (account["nonce"] || 0).to_s,
         "balance" => account["balance"].to_s,
-        "delegate" => account["delegate"] || pk,
-        "zkapp" => account["zkapp"]
+        "delegate" => account["delegate"] || pk
+
+        # TODO: compare zkApp data with Mina node.
+        # "zkapp" => account["zkapp"]
       }
   end
 end
