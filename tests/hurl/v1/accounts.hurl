@@ -386,3 +386,31 @@ HTTP 200
 jsonpath "$.data.accounts" count == 1705
 
 duration < 1000
+
+#
+# Genesis account query
+#
+
+POST {{url}}
+```graphql
+{
+  accounts(
+    query: {
+      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+      publicKey: "B62qrBYNNHZSLNZwaY4FZVNkesEPkFbZfq3YUTa4ZyqRkz1aN86BUFN"
+    }
+  ) {
+    genesis_account
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# only datum
+jsonpath "$.data.accounts[0].genesis_account" == 222221235183807
+
+duration < 100
