@@ -5,18 +5,20 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    rust-overlay,
-    flake-utils,
-    ...
-  }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      flake-utils,
+      ...
+    }:
     flake-utils.lib.eachDefaultSystem (
-      system: let
-        overlays = [(import rust-overlay)];
+      system:
+      let
+        overlays = [ (import rust-overlay) ];
 
-        pkgs = import nixpkgs {inherit system overlays;};
+        pkgs = import nixpkgs { inherit system overlays; };
 
         rust = pkgs.rust-bin.fromRustupToolchainFile ./rust/rust-toolchain.toml;
 
@@ -25,12 +27,13 @@
           rustc = rust;
         };
 
-        mina_txn_hasher = pkgs.callPackage ./ops/mina/mina_txn_hasher.nix {};
+        mina_txn_hasher = pkgs.callPackage ./ops/mina/mina_txn_hasher.nix { };
 
         frameworks = pkgs.darwin.apple_sdk.frameworks;
 
-        buildDependencies = with pkgs;
-          [rustPlatform.bindgenHook]
+        buildDependencies =
+          with pkgs;
+          [ rustPlatform.bindgenHook ]
           ++ lib.optionals stdenv.isDarwin [
             frameworks.Security
             frameworks.CoreServices
@@ -41,13 +44,13 @@
           ];
 
         # used to ensure rustfmt is nightly version to support unstable features
-        nightlyToolchain =
-          pkgs.rust-bin.selectLatestNightlyWith (toolchain:
-            toolchain.minimal.override {extensions = ["rustfmt"];});
+        nightlyToolchain = pkgs.rust-bin.selectLatestNightlyWith (
+          toolchain: toolchain.minimal.override { extensions = [ "rustfmt" ]; }
+        );
 
-        developmentDependencies = with pkgs;
+        developmentDependencies =
+          with pkgs;
           [
-            alejandra
             biome
             cargo-audit
             cargo-machete
@@ -60,6 +63,7 @@
             jq
             nightlyToolchain.passthru.availableComponents.rustfmt
             nix-output-monitor # Use 'nom' in place of 'nix' to use this.
+            nixfmt-rfc-style # For formatting Nix code.
             openssh # Needed by 'git' but not declared.
             rclone
             ruby
@@ -75,74 +79,84 @@
 
         cargo-toml = builtins.fromTOML (builtins.readFile ./rust/Cargo.toml);
       in
-        with pkgs; {
-          packages = flake-utils.lib.flattenTree rec {
-            inherit mina_txn_hasher;
+      with pkgs;
+      {
+        packages = flake-utils.lib.flattenTree rec {
+          inherit mina_txn_hasher;
 
-            mina-indexer = rustPlatform.buildRustPackage rec {
-              meta = with lib; {
-                homepage = "https://github.com/Granola-Team/mina-indexer";
-                license = licenses.asl20;
-                mainProgram = "mina-indexer";
-                platforms = platforms.all;
-                maintainers = [];
-              };
-
-              pname = cargo-toml.package.name;
-              version = cargo-toml.package.version;
-
-              src = lib.cleanSourceWith {
-                src = lib.cleanSource ./.;
-                filter = path: type:
-                  (path != ".direnv")
-                  && ((path == ".cargo") || (path == ".cargo/config.toml") || (dirOf path != ".cargo"))
-                  && (path != "result")
-                  && (path != ".build")
-                  && (path != "rust/target")
-                  && (path != "ops")
-                  && (path != "Justfile")
-                  && (path != "Rakefile")
-                  && (path != "tests");
-              };
-
-              cargoLock = {lockFile = ./rust/Cargo.lock;};
-
-              nativeBuildInputs = buildDependencies;
-
-              # This is equivalent to `git rev-parse --short=8 HEAD`
-              gitCommitHash = builtins.substring 0 8 (self.rev or (abort "Nix build requires a clean Git repo."));
-
-              postPatch = ''ln -s "${./rust/Cargo.lock}" Cargo.lock'';
-              preBuild = ''
-                export GIT_COMMIT_HASH=${gitCommitHash}
-                cd rust
-              '';
-              doCheck = false;
-              preInstall = "mkdir -p $out/var/log/mina-indexer";
+          mina-indexer = rustPlatform.buildRustPackage rec {
+            meta = with lib; {
+              homepage = "https://github.com/Granola-Team/mina-indexer";
+              license = licenses.asl20;
+              mainProgram = "mina-indexer";
+              platforms = platforms.all;
+              maintainers = [ ];
             };
 
-            default = mina-indexer;
+            pname = cargo-toml.package.name;
+            version = cargo-toml.package.version;
 
-            dockerImage = pkgs.dockerTools.buildImage {
-              name = "mina-indexer";
-              created = "now";
-              tag = builtins.substring 0 8 (self.rev or "dev");
-              copyToRoot = pkgs.buildEnv {
-                paths = with pkgs; [mina-indexer bash self];
-                name = "mina-indexer-root";
-                pathsToLink = ["/bin" "/share" "/lib"];
-              };
-              config = {
-                Cmd = ["${pkgs.lib.getExe mina-indexer}"];
-              };
+            src = lib.cleanSourceWith {
+              src = lib.cleanSource ./.;
+              filter =
+                path: type:
+                (path != ".direnv")
+                && ((path == ".cargo") || (path == ".cargo/config.toml") || (dirOf path != ".cargo"))
+                && (path != "result")
+                && (path != ".build")
+                && (path != "rust/target")
+                && (path != "ops")
+                && (path != "Justfile")
+                && (path != "Rakefile")
+                && (path != "tests");
+            };
+
+            cargoLock = {
+              lockFile = ./rust/Cargo.lock;
+            };
+
+            nativeBuildInputs = buildDependencies;
+
+            # This is equivalent to `git rev-parse --short=8 HEAD`
+            gitCommitHash = builtins.substring 0 8 (self.rev or (abort "Nix build requires a clean Git repo."));
+
+            postPatch = ''ln -s "${./rust/Cargo.lock}" Cargo.lock'';
+            preBuild = ''
+              export GIT_COMMIT_HASH=${gitCommitHash}
+              cd rust
+            '';
+            doCheck = false;
+            preInstall = "mkdir -p $out/var/log/mina-indexer";
+          };
+
+          default = mina-indexer;
+
+          dockerImage = pkgs.dockerTools.buildImage {
+            name = "mina-indexer";
+            created = "now";
+            tag = builtins.substring 0 8 (self.rev or "dev");
+            copyToRoot = pkgs.buildEnv {
+              paths = with pkgs; [
+                mina-indexer
+                bash
+                self
+              ];
+              name = "mina-indexer-root";
+              pathsToLink = [
+                "/bin"
+                "/share"
+                "/lib"
+              ];
+            };
+            config = {
+              Cmd = [ "${pkgs.lib.getExe mina-indexer}" ];
             };
           };
+        };
 
-          devShells.default = mkShell {
-            buildInputs =
-              developmentDependencies
-              ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher; # for backwards compatibility
-          };
-        }
+        devShells.default = mkShell {
+          buildInputs = developmentDependencies ++ lib.optional (!stdenv.isDarwin) mina_txn_hasher; # for backwards compatibility
+        };
+      }
     );
 }

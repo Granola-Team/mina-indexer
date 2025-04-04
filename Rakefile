@@ -174,8 +174,8 @@ task lint_nix: [".build/lint_nix"]
 file ".build/lint_nix": NIX_FILES do |t|
   puts "--- Linting Nix configs"
   FileUtils.mkdir_p(".build")
-  run("alejandra --version")
-  out = cmd_output("alejandra --check #{NIX_FILES}")
+  run("nixfmt --version")
+  out = cmd_output("nixfmt --check #{NIX_FILES.join(" ")}")
   File.write(t.name, out)
 end
 
@@ -211,7 +211,7 @@ task :format do
   run("shfmt --write tests/*.bash")
 
   # Format Nix files
-  run("alejandra #{NIX_FILES.join(" ")}")
+  run("nixfmt #{NIX_FILES.join(" ")}")
 end
 
 desc "Perform a fast verification of whether the source compiles"
