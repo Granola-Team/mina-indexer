@@ -213,7 +213,7 @@ impl GenesisLedger {
                     receipt_chain_hash: account.receipt_chain_hash,
                     voting_for: account.voting_for.map(Into::into),
                     timing: account.timing.map(Into::into),
-                    genesis_account: true,
+                    genesis_account: Some(balance),
                     token_symbol: None,
                     permissions: None,
                     username: None,

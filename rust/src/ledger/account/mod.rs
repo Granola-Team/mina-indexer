@@ -37,7 +37,7 @@ pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,
     pub delegate: PublicKey,
-    pub genesis_account: bool,
+    pub genesis_account: Option<Amount>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<Nonce>,
@@ -656,12 +656,13 @@ impl From<GenesisBlock> for Account {
     /// Magic mina for genesis block creator
     fn from(value: GenesisBlock) -> Self {
         let block_creator = value.0.block_creator();
+        let balance = Amount(1000_u64);
 
         Self {
+            balance,
             public_key: block_creator.clone(),
-            balance: Amount(1000_u64),
             delegate: block_creator,
-            genesis_account: true,
+            genesis_account: Some(balance),
             ..Default::default()
         }
     }

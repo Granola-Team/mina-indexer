@@ -26,7 +26,7 @@ impl From<(u64, v2::AccountAccessed)> for AccountAccessed {
             balance: value.1.balance.0.into(),
             nonce: Some(value.1.nonce),
             delegate: value.1.delegate.unwrap_or(public_key),
-            genesis_account: false,
+            genesis_account: None,
             token: Some(value.1.token_id),
             token_symbol: Some(value.1.token_symbol),
             receipt_chain_hash: Some(value.1.receipt_chain_hash),
