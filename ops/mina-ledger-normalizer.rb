@@ -14,13 +14,11 @@ accounts = accounts["ledger"]["accounts"] if !accounts.instance_of?(Array)
 def normalize_zkapp(data)
   return data if data.nil?
 
-  result = data
-
-  # convert integers to hex strings
-  result["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
-  result["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
-
-  result
+  zkapp = data
+  zkapp["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
+  zkapp["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
+  zkapp["last_action_slot"] = data["last_action_slot"].to_s
+  zkapp
 end
 
 def normalize_hex(data)
@@ -35,9 +33,7 @@ accounts.each do |account|
   pk = account["pk"]
   raise "Missing public key: #{JSON.pretty_generate(account)}" if pk.nil?
 
-  token = if account["token"].nil?
-    MINA_TOKEN
-  elsif account["token"] == "1"
+  token = if account["token"].nil? || account["token"] == "1"
     # The MINA token was, pre-hardfork, token 1.
     MINA_TOKEN
   else
