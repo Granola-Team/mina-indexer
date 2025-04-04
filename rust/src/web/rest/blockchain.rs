@@ -1,7 +1,7 @@
 use crate::{
-    base::amount::Amount,
+    base::{amount::Amount, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
-    chain::store::ChainStore,
+    chain::{store::ChainStore, ChainId},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::{MAINNET_EPOCH_SLOT_COUNT, VERSION},
     ledger::store::best::BestLedgerStore,
@@ -24,6 +24,7 @@ use std::sync::Arc;
 #[serde(rename_all = "camelCase")]
 pub struct BlockchainSummary {
     chain_id: String,
+    genesis_state_hash: String,
 
     blockchain_length: u32,
     date_time: String,
@@ -133,7 +134,9 @@ fn millis_to_date_string(millis: i64) -> String {
 }
 
 struct SummaryInput {
-    chain_id: String,
+    chain_id: ChainId,
+    genesis_state_hash: StateHash,
+
     best_tip: PrecomputedBlock,
     locked_balance: Option<Amount>,
 
@@ -199,6 +202,8 @@ impl BlockchainSummary {
     fn calculate_summary(input: SummaryInput) -> Option<Self> {
         let SummaryInput {
             chain_id,
+            genesis_state_hash,
+
             best_tip,
             locked_balance,
 
@@ -241,6 +246,8 @@ impl BlockchainSummary {
             indexer_version,
         } = input;
 
+        let chain_id = chain_id.to_string();
+        let genesis_state_hash = genesis_state_hash.to_string();
         let blockchain_length = best_tip.blockchain_length();
         let date_time = millis_to_date_string(best_tip.timestamp() as i64);
         let epoch = best_tip.epoch_count();
@@ -262,13 +269,13 @@ impl BlockchainSummary {
 
         Some(Self {
             chain_id,
+            genesis_state_hash,
 
             date_time,
             epoch,
             blockchain_length,
             slot,
             global_slot,
-
             min_window_density,
 
             next_epoch_ledger_hash,
@@ -344,7 +351,12 @@ pub async fn get_blockchain_summary(
             .unwrap_or_default();
 
         // aggregated on-chain & off-chain time-locked tokens
-        let chain_id = store.get_chain_id().expect("chain id").0;
+        let chain_id = store.get_chain_id().expect("chain id");
+        let genesis_state_hash = store
+            .get_block_genesis_state_hash(&best_tip.state_hash())
+            .unwrap()
+            .expect("genesis state hash");
+
         let global_slot = best_tip.global_slot_since_genesis();
         let locked_balance = locked_balances.get_locked_amount(global_slot);
 
@@ -452,6 +464,8 @@ pub async fn get_blockchain_summary(
 
         if let Some(ref summary) = BlockchainSummary::calculate_summary(SummaryInput {
             chain_id,
+            genesis_state_hash,
+
             best_tip,
             locked_balance,
             db_version,
