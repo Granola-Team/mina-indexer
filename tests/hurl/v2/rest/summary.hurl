@@ -7,6 +7,10 @@ GET {{url}}
 HTTP 200
 [Asserts]
 
+# chain
+jsonpath "$.chainId" == "a7351abc7ddf2ea92d1b38cc8e636c271c1dfd2c081c637f62ebc2af34eb7cc1"
+jsonpath "$.genesisStateHash" == "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP"
+
 jsonpath "$.blockchainLength" == 359617
 
 # accounts
