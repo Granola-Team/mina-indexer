@@ -38,6 +38,7 @@
         ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices
+          lld_20 # A faster linker
         ]
         ++ lib.optionals (!stdenv.isDarwin) [
           mold-wrapped # Linux only - https://github.com/rui314/mold#mold-a-modern-linker

@@ -3,3 +3,6 @@ linker = "clang"
 rustflags = ["-C", "link-arg=-fuse-ld=mold"]
 # ^ https://github.com/rui314/mold#mold-a-modern-linker
 #   Desired, also in rustflags: "-Zshare-generics=y"
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]
