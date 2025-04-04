@@ -71,6 +71,9 @@ pub struct AccountWithMeta {
     #[graphql(name = "is_genesis_account")]
     is_genesis_account: bool,
 
+    #[graphql(name = "genesis_account")]
+    genesis_account: Option<u64>,
+
     #[graphql(name = "pk_epoch_num_blocks")]
     pk_epoch_num_blocks: u32,
 
@@ -371,7 +374,8 @@ impl AccountWithMeta {
         let pk = account.public_key.to_owned();
 
         Self {
-            is_genesis_account: account.genesis_account,
+            is_genesis_account: account.genesis_account.is_some(),
+            genesis_account: account.genesis_account.map(|amt| amt.0),
             pk_epoch_num_blocks: db
                 .get_block_production_pk_epoch_count(&pk, None)
                 .expect("pk epoch block count"),
