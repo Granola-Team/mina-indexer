@@ -187,6 +187,7 @@ impl Coinbase {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::block::precomputed::PcbVersion;
 
     #[test]
     fn test_coinbase_fee_transfer() {
@@ -286,8 +287,6 @@ mod tests {
 
     #[test]
     fn coinbase_from_precomputed_v1() -> anyhow::Result<()> {
-        use crate::block::precomputed::PcbVersion;
-
         let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let expect = Coinbase {
@@ -304,25 +303,43 @@ mod tests {
 
     #[test]
     fn coinbase_from_precomputed_v2() -> anyhow::Result<()> {
-        use crate::block::precomputed::PcbVersion;
-
-        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-419989-3NKhZKc1HrEexmpvcbx4eqAtrsbwmfLXcjukF9CJ8Y2y7FEjFWg5.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
         let expect = Coinbase {
-            kind: CoinbaseKind::Zero,
-            receiver: PublicKey::from("B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"),
+            kind: CoinbaseKind::One(None),
+            receiver: PublicKey::from("B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw"),
             supercharge: false,
             is_new_account: false,
             receiver_balance: None,
         };
 
         assert_eq!(Coinbase::from_precomputed(&block), expect);
+        Ok(())
+    }
 
-        let path = std::path::PathBuf::from("./tests/data/misc_blocks/mainnet-419989-3NKhZKc1HrEexmpvcbx4eqAtrsbwmfLXcjukF9CJ8Y2y7FEjFWg5.json");
+    #[test]
+    fn gensis_coinbase_v1() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let expect = Coinbase {
+            kind: CoinbaseKind::Zero,
+            receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
+            supercharge: true,
+            is_new_account: false,
+            receiver_balance: None,
+        };
+
+        assert_eq!(Coinbase::from_precomputed(&block), expect);
+        Ok(())
+    }
+
+    #[test]
+    fn gensis_coinbase_v2() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
         let expect = Coinbase {
-            kind: CoinbaseKind::One(None),
-            receiver: PublicKey::from("B62qospDjUj43x2yMKiNehojWWRUsE1wpdUDVpfxH8V3n5Y1QgJKFfw"),
+            kind: CoinbaseKind::Zero,
+            receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
             supercharge: false,
             is_new_account: false,
             receiver_balance: None,
