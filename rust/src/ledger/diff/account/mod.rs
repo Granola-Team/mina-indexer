@@ -816,6 +816,43 @@ impl std::fmt::Debug for FailedTransactionNonceDiff {
     }
 }
 
+impl std::fmt::Display for AccountDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Payment(diff) => write!(f, "PAYMENT: {diff:?}"),
+            Self::Delegation(diff) => write!(f, "DELEGATION: {diff:?}"),
+            Self::Coinbase(diff) => write!(f, "COINBASE: {diff:?}"),
+            Self::FeeTransfer(diff) => write!(f, "FEE_TRANSFER: {diff:?}"),
+            Self::FeeTransferViaCoinbase(diff) => {
+                write!(f, "FEE_TRANSFER_VIA_COINBASE: {diff:?}")
+            }
+            Self::FailedTransactionNonce(diff) => {
+                write!(f, "FAILED_TXN: {diff:?}")
+            }
+            Self::Zkapp(diff) => write!(f, "ZKAPP: {diff:?}"),
+            Self::ZkappStateDiff(diff) => write!(f, "ZKAPP_STATE: {diff:?}"),
+            Self::ZkappPermissionsDiff(diff) => write!(f, "ZKAPP_PERMISSIONS: {diff:?}"),
+            Self::ZkappVerificationKeyDiff(diff) => write!(f, "ZKAPP_VK: {diff:?}"),
+            Self::ZkappProvedStateDiff(diff) => write!(f, "ZKAPP_PROVED_STATE: {diff:?}"),
+            Self::ZkappUriDiff(diff) => write!(f, "ZKAPP_URI: {diff:?}"),
+            Self::ZkappTokenSymbolDiff(diff) => {
+                write!(f, "ZKAPP_TOKEN_SYMBOL: {diff:?}")
+            }
+            Self::ZkappTimingDiff(diff) => write!(f, "ZKAPP_TIMING: {diff:?}"),
+            Self::ZkappVotingForDiff(diff) => write!(f, "ZKAPP_VOTING_FOR: {diff:?}"),
+            Self::ZkappActionsDiff(diff) => write!(f, "ZKAPP_ACTIONS: {diff:?}"),
+            Self::ZkappEventsDiff(diff) => write!(f, "ZKAPP_EVENTS: {diff:?}"),
+            Self::ZkappIncrementNonce(diff) => {
+                write!(f, "ZKAPP_INCREMENT_NONCE {}", diff.public_key)
+            }
+            Self::ZkappAccountCreationFee(diff) => {
+                write!(f, "ZKAPP_ACCOUNT_CREATION_FEE: {diff:?}")
+            }
+            Self::ZkappFeePayerNonce(diff) => write!(f, "ZKAPP_FEE_PAYER_NONCE: {diff:?}"),
+        }
+    }
+}
+
 impl std::fmt::Debug for AccountDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use AccountDiff::*;
