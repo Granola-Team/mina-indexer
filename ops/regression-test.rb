@@ -5,7 +5,6 @@ BUILD_TYPE = ARGV.shift
 require "#{__dir__}/ops-common"
 
 # TODO add these back once fixed
-# missing_block_recovery
 # fetch_new_blocks
 
 test_names = %w[
@@ -25,6 +24,7 @@ test_names = %w[
   blocks
   block_copy
   missing_blocks
+  missing_block_recovery
   best_chain_v1
   best_chain_v2
   block_children
