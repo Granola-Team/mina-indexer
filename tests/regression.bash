@@ -1854,6 +1854,21 @@ test_do_not_ingest_orphan_blocks() {
 	rm -f $no_orphan_ledger $orphan_ledger
 }
 
+test_check_mode() {
+	stage_blocks v2 370000 "$BLOCKS_DIR"
+
+	port=$(ephemeral_port)
+	idxr database create \
+		--blocks-dir ./blocks \
+		--database-dir ./database \
+		--genesis-hash $HARDFORK_GENESIS_STATE_HASH
+	start \
+		--web-port "$port" \
+		--web-hostname "0.0.0.0" \
+		--database-dir ./database \
+		--genesis-hash $HARDFORK_GENESIS_STATE_HASH
+}
+
 # ----
 # Main
 # ----
@@ -1904,6 +1919,8 @@ for test_name in "$@"; do
 	"test_clean_kill") test_clean_kill ;;
 	"test_version_file") test_version_file ;;
 	"test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
+	# Checked mode
+	"test_check_mode") test_check_mode ;;
 	# Tier 2 tests:
 	"test_best_chain_many_blocks") test_best_chain_many_blocks ;;
 	"test_load_v1") test_load_v1 ;;

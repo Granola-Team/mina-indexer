@@ -4,12 +4,11 @@ pub mod epoch_data;
 pub mod genesis;
 pub mod genesis_state_hash;
 pub mod parser;
+pub mod post_hardfork;
 pub mod precomputed;
 pub mod previous_state_hash;
 pub mod store;
 pub mod vrf_output;
-
-mod post_hardfork;
 
 use self::{precomputed::PrecomputedBlock, vrf_output::VrfOutput};
 use crate::{

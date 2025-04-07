@@ -451,3 +451,9 @@ task :shutdown, [:which] do |_, args|
   run("#{UTILS} #{which} shutdown")
   puts "Successfully shutdown. You may also want to do 'rake clean:#{which}'"
 end
+
+# Check mode
+desc "Dev build and run in check mode"
+task check_mode: "build:dev" do |_, args|
+  run("#{REGRESSION_TEST} dev check_mode")
+end

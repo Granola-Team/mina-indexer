@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 pub type ReceiptChainHash = receipt_chain_hash::ReceiptChainHash;
 pub type Timing = timing::Timing;
 
-#[derive(Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,

@@ -12,7 +12,7 @@ pub mod username;
 
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
-    block::precomputed::PrecomputedBlock,
+    block::{post_hardfork::account_accessed::AccountAccessed, precomputed::PrecomputedBlock},
     constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
     ledger::{
         account::Account,
@@ -20,6 +20,7 @@ use crate::{
         token::{account::TokenAccount, TokenAddress},
     },
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
 
@@ -133,6 +134,7 @@ impl Ledger {
         for acct_diff in diff.account_diffs.iter().flatten() {
             self._apply_account_diff(acct_diff, &diff.state_hash)?;
         }
+
         Ok(())
     }
 
@@ -149,9 +151,40 @@ impl Ledger {
             .tokens
             .get_mut(&token)
             .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
-            .or(Some(Account::empty(pk, token.to_owned())))
+            .or_else(|| Some(Account::empty(pk, token.to_owned())))
         {
             self.insert_account(account.apply_account_diff(acct_diff, state_hash), &token);
+        }
+
+        Ok(())
+    }
+
+    pub fn _apply_diff_check(
+        &mut self,
+        diff: &LedgerDiff,
+        accounts_accessed: &[AccountAccessed],
+    ) -> anyhow::Result<()> {
+        info!("Checking {}", diff.summary());
+        self._apply_diff(diff)?;
+
+        // check accessed accounts
+        for accessed_account in accounts_accessed {
+            let pk = &accessed_account.account.public_key;
+            let token = accessed_account.account.token.clone().unwrap_or_default();
+
+            // check ledger account
+            let account = self.get_account(pk, &token).cloned().unwrap();
+            let expect = account.display();
+
+            accessed_account.assert_eq_account(
+                &expect,
+                &format!(
+                    "Error applying {}\n     pk: {}\n  token: {}",
+                    diff.summary(),
+                    pk,
+                    token
+                ),
+            );
         }
 
         Ok(())
@@ -167,7 +200,7 @@ impl Ledger {
                 .tokens
                 .get_mut(&token)
                 .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
-                .or(Some(Account::empty(pk.clone(), token.clone())))
+                .or_else(|| Some(Account::empty(pk.clone(), token.clone())))
             {
                 if let Some(account) = account_after
                     .unapply_account_diff(acct_diff, diff.new_pk_balances.contains_key(&pk))
@@ -511,6 +544,7 @@ mod tests {
     };
     use crate::{
         base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+        block::post_hardfork::account_accessed::AccountAccessed,
         constants::MINA_SCALE,
         ledger::{token::TokenAddress, TokenLedger},
         utility::functions::nanomina_to_mina,
@@ -562,6 +596,13 @@ mod tests {
             },
         );
 
+        let account_accessed = AccountAccessed {
+            index: 0,
+            account: Account {
+                balance: account_before.balance + amount,
+                ..account_before.clone()
+            },
+        };
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
             state_hash: StateHash::default(),
@@ -590,14 +631,7 @@ mod tests {
         let ledger = TokenLedger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
 
-        assert_eq!(
-            *account_after,
-            Account {
-                balance: account_before.balance + amount,
-                ..account_before
-            }
-        );
-
+        account_accessed.assert_eq_account(account_after, "");
         Ok(())
     }
 
@@ -611,6 +645,14 @@ mod tests {
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account_before.clone());
 
+        let account_accessed = AccountAccessed {
+            index: 0,
+            account: Account {
+                nonce: Some(prev_nonce + 1),
+                delegate: delegate.clone(),
+                ..account_before
+            },
+        };
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
             state_hash: StateHash::default(),
@@ -620,7 +662,7 @@ mod tests {
             public_keys_seen: vec![],
             account_diffs: vec![vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
-                delegate: delegate.clone(),
+                delegate,
                 nonce: prev_nonce + 1,
             })]],
             token_diffs: vec![],
@@ -632,15 +674,7 @@ mod tests {
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
-        assert_eq!(
-            *account_after,
-            Account {
-                nonce: Some(prev_nonce + 1),
-                delegate,
-                ..account_before
-            }
-        );
-
+        account_accessed.assert_eq_account(account_after, "");
         Ok(())
     }
 }
