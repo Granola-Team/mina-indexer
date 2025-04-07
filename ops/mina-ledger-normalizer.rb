@@ -1,6 +1,7 @@
 #!/usr/bin/env -S ruby -w
 
 require "json"
+require "#{__dir__}/recursive-sort-hash.rb"
 
 MINA_TOKEN = "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 
@@ -53,7 +54,4 @@ accounts.each do |account|
     }
 end
 
-sorted_result = result.sort.to_h
-final_result = sorted_result.transform_values { |v| v.sort.to_h }
-
-puts JSON.pretty_generate(final_result.sort.to_h)
+puts JSON.pretty_generate(sort_recursively(result))

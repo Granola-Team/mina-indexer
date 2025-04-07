@@ -1,8 +1,8 @@
 #!/usr/bin/env -S ruby -w
 
 require "json"
+require "#{__dir__}/recursive-sort-hash.rb"
 
-# All token ledgers
 data = JSON.parse(File.read(ARGV[0]))
 
 result = {}
@@ -23,6 +23,4 @@ data.keys.each do |token|
   end
 end
 
-sorted_result = result.sort.to_h
-final_result = sorted_result.transform_values { |v| v.sort.to_h }
-puts JSON.pretty_generate(final_result.sort.to_h)
+puts JSON.pretty_generate(sort_recursively(result))
