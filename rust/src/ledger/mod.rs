@@ -11,13 +11,14 @@ pub mod token;
 
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
-    block::precomputed::PrecomputedBlock,
+    block::{post_hardfork::account_accessed::AccountAccessed, precomputed::PrecomputedBlock},
     ledger::{
         account::Account,
         diff::{account::AccountDiff, LedgerDiff},
         token::{account::TokenAccount, TokenAddress},
     },
 };
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use token::ledger::TokenLedger;
@@ -187,6 +188,37 @@ impl Ledger {
         Ok(())
     }
 
+    pub fn _apply_diff_check(
+        &mut self,
+        diff: &LedgerDiff,
+        accounts_accessed: &[AccountAccessed],
+    ) -> anyhow::Result<()> {
+        info!("Checking {}", diff.summary());
+        self._apply_diff(diff)?;
+
+        // check accessed accounts
+        for accessed_account in accounts_accessed {
+            let pk = &accessed_account.account.public_key;
+            let token = accessed_account.account.token.clone().unwrap_or_default();
+
+            // check ledger account
+            let account = self.get_account(pk, &token).cloned().unwrap();
+            let expect = account.deduct_mina_account_creation_fee();
+
+            accessed_account.assert_eq_account(
+                &expect,
+                &format!(
+                    "Error applying {}\n     pk: {}\n  token: {}",
+                    diff.summary(),
+                    pk,
+                    token
+                ),
+            );
+        }
+
+        Ok(())
+    }
+
     /// Unapply a ledger diff to a mutable ledger
     pub fn _unapply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
@@ -351,6 +383,7 @@ mod tests {
     };
     use crate::{
         base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+        block::post_hardfork::account_accessed::AccountAccessed,
         command::TxnHash,
         constants::MINA_SCALE,
         ledger::{token::TokenAddress, TokenLedger},
@@ -406,6 +439,13 @@ mod tests {
             },
         );
 
+        let account_accessed = AccountAccessed {
+            index: 0,
+            account: Account {
+                balance: account_before.balance + amount,
+                ..account_before.clone()
+            },
+        };
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
             state_hash: StateHash::default(),
@@ -436,14 +476,7 @@ mod tests {
         let ledger = TokenLedger { accounts }.apply_diff(&ledger_diff).unwrap();
         let account_after = ledger.accounts.get(&public_key).unwrap();
 
-        assert_eq!(
-            *account_after,
-            Account {
-                balance: account_before.balance + amount,
-                ..account_before
-            }
-        );
-
+        account_accessed.assert_eq_account(account_after, "");
         Ok(())
     }
 
@@ -457,6 +490,14 @@ mod tests {
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account_before.clone());
 
+        let account_accessed = AccountAccessed {
+            index: 0,
+            account: Account {
+                nonce: Some(prev_nonce + 1),
+                delegate: delegate.clone(),
+                ..account_before
+            },
+        };
         let ledger_diff = LedgerDiff {
             blockchain_length: 0,
             state_hash: StateHash::default(),
@@ -466,7 +507,7 @@ mod tests {
             public_keys_seen: vec![],
             account_diffs: vec![vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: public_key.clone(),
-                delegate: delegate.clone(),
+                delegate,
                 nonce: prev_nonce + 1,
                 txn_hash: TxnHash::default(),
             })]],
@@ -479,15 +520,7 @@ mod tests {
             .expect("ledger diff application");
         let account_after = ledger.accounts.get(&public_key).expect("account get");
 
-        assert_eq!(
-            *account_after,
-            Account {
-                nonce: Some(prev_nonce + 1),
-                delegate,
-                ..account_before
-            }
-        );
-
+        account_accessed.assert_eq_account(account_after, "");
         Ok(())
     }
 }

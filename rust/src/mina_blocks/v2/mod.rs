@@ -126,7 +126,7 @@ pub enum PermissionKind {
     Impossible,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ZkappAccount {
     pub app_state: ZkappState,
     pub action_state: [ActionState; 5],

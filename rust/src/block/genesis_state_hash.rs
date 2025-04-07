@@ -10,7 +10,7 @@ pub struct GenesisStateHash(StateHash);
 
 impl GenesisStateHash {
     pub fn from_path(path: &Path) -> anyhow::Result<StateHash> {
-        const BUFFER_CAPACITY: usize = 400;
+        const BUFFER_CAPACITY: usize = 500;
 
         let file = File::open(path)?;
         let reader = BufReader::new(file);

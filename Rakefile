@@ -358,3 +358,9 @@ task :kill do
   puts "Killing all running Indexers"
   run("#{UTILS} kill")
 end
+
+# Check mode
+desc "Dev build and run in check mode"
+task check_mode: "build:dev" do |_, args|
+  run("#{REGRESSION_TEST} dev check_mode")
+end

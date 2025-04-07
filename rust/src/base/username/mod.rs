@@ -6,7 +6,7 @@ use crate::{command::MEMO_LEN, constants::NAME_SERVICE_MEMO_PREFIX};
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct Username(pub String);
 
 //////////

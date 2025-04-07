@@ -46,6 +46,10 @@ pub struct LedgerDiff {
 }
 
 impl LedgerDiff {
+    pub fn summary(&self) -> String {
+        format!("mainnet-{}-{}", self.blockchain_length, self.state_hash)
+    }
+
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
         let unexpanded = Self::from_precomputed_unexpanded(block);

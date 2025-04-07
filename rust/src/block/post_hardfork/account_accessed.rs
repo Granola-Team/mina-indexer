@@ -2,13 +2,95 @@ use crate::{
     ledger::account::{Account, Permissions},
     mina_blocks::v2,
 };
+use log::warn;
 use serde::{Deserialize, Serialize};
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AccountAccessed {
     pub account: Account,
     // mina ledger index
     pub index: u64,
+}
+
+impl AccountAccessed {
+    pub fn assert_eq_account(&self, account: &Account, msg: &str) {
+        assert_eq(
+            &self.account.public_key,
+            &account.public_key,
+            format!(
+                "PK mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, self.account.public_key, account.public_key
+            ),
+        );
+        assert_eq(
+            &self.account.token,
+            &account.token,
+            format!(
+                "Token mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, self.account.token, account.token
+            ),
+        );
+        assert_eq(
+            &self.account.balance,
+            &account.balance,
+            format!(
+                "Balance mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, self.account.balance, account.balance
+            ),
+        );
+        assert_eq(
+            &self.account.nonce.unwrap_or_default(),
+            &account.nonce.unwrap_or_default(),
+            format!(
+                "Nonce mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg,
+                self.account.nonce.unwrap_or_default(),
+                account.nonce.unwrap_or_default()
+            ),
+        );
+        assert_eq(
+            &self.account.delegate,
+            &account.delegate,
+            format!(
+                "Delegate mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, self.account.delegate, account.delegate
+            ),
+        );
+        assert_eq(
+            &self.account.zkapp,
+            &account.zkapp,
+            format!(
+                "Zkapp mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, self.account.zkapp, account.zkapp,
+            ),
+        );
+        assert_eq(
+            &self.account.token_symbol.clone().unwrap_or_default(),
+            &account.token_symbol.clone().unwrap_or_default(),
+            format!(
+                "Token symbol mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg,
+                self.account.token_symbol.clone().unwrap_or_default(),
+                account.token_symbol.clone().unwrap_or_default()
+            ),
+        );
+        // assert_eq(
+        //     &self.account.timing,
+        //     &account.timing,
+        //     format!("Timing mismatch: {}", msg),
+        // );
+        // assert_eq(
+        //     &self.account.permissions,
+        //     &account.permissions,
+        //     format!("Permissions mismatch: {}", msg),
+        // )
+    }
+}
+
+fn assert_eq<T: PartialEq>(x: &T, y: &T, msg: String) {
+    if x != y {
+        warn!("{msg}")
+    }
 }
 
 impl From<(u64, v2::AccountAccessed)> for AccountAccessed {

@@ -7,6 +7,7 @@ use crate::{
         genesis::GenesisBlock,
         genesis_state_hash::GenesisStateHash,
         parser::{BlockParser, ParsedBlock},
+        post_hardfork::account_accessed::AccountAccessed,
         precomputed::{PcbVersion, PrecomputedBlock},
         store::BlockStore,
         Block, BlockWithoutHeight,
@@ -70,7 +71,7 @@ pub struct IndexerState {
     pub ledger_cadence: u32,
 
     /// Map of ledger diffs following the canonical root
-    pub diffs_map: HashMap<StateHash, LedgerDiff>,
+    pub diffs_map: HashMap<StateHash, (LedgerDiff, Vec<AccountAccessed>)>,
 
     /// Append-only tree of blocks built from genesis, each containing a ledger
     pub root_branch: Branch,
@@ -336,7 +337,10 @@ impl IndexerState {
             ledger: genesis_ledger.apply_diff_from_precomputed(&genesis_block)?,
             diffs_map: HashMap::from([(
                 genesis_block.state_hash(),
-                LedgerDiff::from_precomputed(&genesis_block),
+                (
+                    LedgerDiff::from_precomputed(&genesis_block),
+                    genesis_block.accounts_accessed(),
+                ),
             )]),
             canonical_root: tip.clone(),
             best_tip: tip,
@@ -440,7 +444,10 @@ impl IndexerState {
                 .unwrap_or_default(),
             diffs_map: HashMap::from([(
                 root_block.state_hash(),
-                LedgerDiff::from_precomputed(root_block),
+                (
+                    LedgerDiff::from_precomputed(root_block),
+                    root_block.accounts_accessed(),
+                ),
             )]),
             canonical_root: tip.clone(),
             best_tip: tip,
@@ -503,7 +510,7 @@ impl IndexerState {
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
                     if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
-                        ledger_diffs.push(diff.clone());
+                        ledger_diffs.push((diff.clone(), block.accounts_accessed()));
                     }
 
                     indexer_store.add_block(&block, block_bytes)?;
@@ -518,8 +525,8 @@ impl IndexerState {
 
                     // compute and store ledger at specified cadence
                     if self.blocks_processed % self.ledger_cadence == 0 {
-                        for diff in ledger_diffs.iter() {
-                            self.ledger._apply_diff(diff)?;
+                        for (diff, accounts_accessed) in ledger_diffs.iter() {
+                            self.ledger._apply_diff_check(diff, accounts_accessed)?;
                         }
 
                         ledger_diffs.clear();
@@ -533,7 +540,9 @@ impl IndexerState {
                     // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
                         self.root_branch = Branch::new(&block)?;
-                        self.ledger._apply_diff(&diff)?;
+                        self.ledger
+                            ._apply_diff_check(&diff, &block.accounts_accessed())?;
+
                         self.best_tip = Tip {
                             state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
@@ -680,24 +689,28 @@ impl IndexerState {
     /// Adds the block to the witness tree & skips store operations
     pub fn add_block_to_witness_tree(
         &mut self,
-        precomputed_block: &PrecomputedBlock,
+        block: &PrecomputedBlock,
         increment_blocks: bool,
         insert_diff: bool,
-    ) -> Result<(ExtensionType, Option<WitnessTreeEvent>)> {
-        let incoming_length = precomputed_block.blockchain_length();
+    ) -> anyhow::Result<(ExtensionType, Option<WitnessTreeEvent>)> {
+        let incoming_length = block.blockchain_length();
         if self.root_branch.root_block().blockchain_length > incoming_length {
             error!(
                 "Block {} is too low to be added to the witness tree",
-                precomputed_block.summary()
+                block.summary()
             );
+
             return Ok((ExtensionType::BlockNotAdded, None));
         }
 
         // put the pcb's ledger diff in the map
         if insert_diff {
             self.diffs_map.insert(
-                precomputed_block.state_hash(),
-                LedgerDiff::from_precomputed(precomputed_block),
+                block.state_hash(),
+                (
+                    LedgerDiff::from_precomputed(block),
+                    block.accounts_accessed(),
+                ),
             );
         }
 
@@ -706,8 +719,8 @@ impl IndexerState {
         }
 
         // forward extension on root branch
-        if self.is_length_within_root_bounds(precomputed_block) {
-            if let Some(root_extension) = self.root_extension(precomputed_block)? {
+        if self.is_length_within_root_bounds(block) {
+            if let Some(root_extension) = self.root_extension(block)? {
                 let best_tip = match &root_extension {
                     ExtensionType::RootSimple(block) => block.clone(),
                     ExtensionType::RootComplex(block) => block.clone(),
@@ -727,19 +740,14 @@ impl IndexerState {
         // if a dangling branch has been extended (forward or reverse) check for new
         // connections to other dangling branches
         if let Some((extended_branch_index, new_node_id, direction)) =
-            self.dangling_extension(precomputed_block)?
+            self.dangling_extension(block)?
         {
             return self
-                .update_dangling(
-                    precomputed_block,
-                    extended_branch_index,
-                    new_node_id,
-                    direction,
-                )
+                .update_dangling(block, extended_branch_index, new_node_id, direction)
                 .map(|ext| (ext, None));
         }
 
-        self.new_dangling(precomputed_block).map(|ext| (ext, None))
+        self.new_dangling(block).map(|ext| (ext, None))
     }
 
     /// Extends the root branch forward, potentially causing dangling branches
@@ -1017,18 +1025,18 @@ impl IndexerState {
             .skip_while(|b| *b != self.canonical_root_block())
             .skip(1)
         {
-            if let Some(ledger_diff) =
+            if let Some((diff, accounts_accessed)) =
                 self.diffs_map.get(&block.state_hash).cloned().or_else(|| {
                     if let Some(store) = self.indexer_store.as_ref() {
                         if let Ok(diff) = store.get_block_ledger_diff(&block.state_hash) {
-                            return diff;
+                            return diff.map(|d| (d, vec![]));
                         }
                     }
 
                     None
                 })
             {
-                if let Err(err) = best_ledger._apply_diff(&ledger_diff) {
+                if let Err(err) = best_ledger._apply_diff_check(&diff, &accounts_accessed) {
                     panic!("Error applying ledger diff: {err}");
                 }
             } else {
@@ -1238,7 +1246,10 @@ impl IndexerState {
 
                     self.diffs_map.insert(
                         tip.state_hash.clone(),
-                        LedgerDiff::from_precomputed(&root_block),
+                        (
+                            LedgerDiff::from_precomputed(&root_block),
+                            root_block.accounts_accessed(),
+                        ),
                     );
                     self.canonical_root = tip.clone();
                     self.best_tip = tip;
@@ -1589,7 +1600,7 @@ impl IndexerState {
         let mut ledger_diff = LedgerDiff::default();
 
         for canonical_block in canonical_blocks {
-            if let Some(diff) = self.diffs_map.get(&canonical_block.state_hash) {
+            if let Some((diff, _)) = self.diffs_map.get(&canonical_block.state_hash) {
                 ledger_diff.append(diff.clone());
             } else {
                 error!(
