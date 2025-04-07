@@ -22,10 +22,6 @@ impl PublicKey {
         }
     }
 
-    pub fn to_address(&self) -> String {
-        self.0.to_owned()
-    }
-
     /// Convert to bytes (length [Self::LEN])
     pub fn to_bytes(self) -> [u8; Self::LEN] {
         let mut res = [0u8; PublicKey::LEN];

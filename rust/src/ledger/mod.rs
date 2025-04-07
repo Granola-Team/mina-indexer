@@ -231,10 +231,10 @@ impl Ledger {
             let mut accounts = HashMap::new();
 
             for (pk, acct) in token_ledger.accounts.iter() {
-                accounts.insert(pk.to_address(), acct.clone().display());
+                accounts.insert(pk.to_string(), acct.clone().display());
             }
 
-            tokens.insert(token.0.to_owned(), accounts);
+            tokens.insert(token.to_string(), accounts);
         }
 
         serde_json::to_string_pretty(&tokens).unwrap()
