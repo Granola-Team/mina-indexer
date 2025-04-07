@@ -1174,7 +1174,28 @@ mod tests {
                 ledger_diff.account_diffs, expect_diffs,
             );
         }
+
         assert_eq!(ledger_diff.account_diffs, expect_diffs);
+        Ok(())
+    }
+
+    #[test]
+    fn gensis_v1() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+        let diff = LedgerDiff::from_precomputed(&block);
+
+        assert!(diff.account_diffs.is_empty(), "{:#?}", diff.account_diffs);
+        Ok(())
+    }
+
+    #[test]
+    fn gensis_v2() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let diff = LedgerDiff::from_precomputed(&block);
+
+        assert!(diff.account_diffs.is_empty(), "{:#?}", diff.account_diffs);
         Ok(())
     }
 }
