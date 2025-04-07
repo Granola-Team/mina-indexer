@@ -27,10 +27,10 @@ while read -r HASH; do
 		# A corrected file name exists. Verify that it uses the correct height.
 		if [ "$FILE" = "$DESIRED" ]; then
 			# It uses the correct height. Ensure contents match.
-			if ! diff -pwu "$NAKED_FN" "$DESIRED" >/dev/null 2>&1 ; then
+			if ! diff -pwu "$NAKED_FN" "$DESIRED" >/dev/null 2>&1; then
 				echo "Contents did not match. Record diff."
-				jq <"$NAKED_FN" > '1'
-				jq <"$DESIRED" > '2'
+				jq <"$NAKED_FN" >'1'
+				jq <"$DESIRED" >'2'
 				diff -pwu 1 2 >"${HASH}.diff" || true
 				rm 1 2
 			fi
