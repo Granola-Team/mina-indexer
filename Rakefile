@@ -36,10 +36,10 @@ SHELL_SCRIPTS = %W[
   tests/regression.bash
   tests/recovery.sh
   ops/download-snapshot.sh
+  ops/traverse-canonical-chain.sh
+  ops/correct-file-names.sh
 ]
 # TODO:
-#  ops/traverse-canonical-chain.sh
-#  ops/correct-file-names.sh
 #  ops/minaexplorer/download-staking-ledgers.sh
 #  ops/upload-staking-ledgers.sh
 #  ops/upload-snapshot.sh

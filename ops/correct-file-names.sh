@@ -3,7 +3,7 @@
 set -eux
 
 DIR="${1:-./mina_network_block_data}"
-CDPATH= cd "$DIR"
+CDPATH='' cd "$DIR"
 
 get_height() {
 	HASH="$1"
@@ -18,7 +18,7 @@ get_corrected_file_name() {
 
 # Check all hashes for existence of the correct file.
 #
-while read HASH; do
+while read -r HASH; do
 	HEIGHT="$(get_height "$HASH")"
 	FILE="$(get_corrected_file_name "$HASH")"
 	DESIRED="./mainnet-${HEIGHT}-${HASH}.json"
@@ -27,10 +27,10 @@ while read HASH; do
 		# A corrected file name exists. Verify that it uses the correct height.
 		if [ "$FILE" = "$DESIRED" ]; then
 			# It uses the correct height. Ensure contents match.
-			if ! diff -pwu "$NAKED_FN" "$DESIRED" 2>&1 >/dev/null; then
+			if ! diff -pwu "$NAKED_FN" "$DESIRED" >/dev/null 2>&1 ; then
 				echo "Contents did not match. Record diff."
-				jq <"$NAKED_FN" >1
-				jq <"$DESIRED" >2
+				jq <"$NAKED_FN" > '1'
+				jq <"$DESIRED" > '2'
 				diff -pwu 1 2 >"${HASH}.diff" || true
 				rm 1 2
 			fi
