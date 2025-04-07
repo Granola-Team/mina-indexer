@@ -1,7 +1,7 @@
 //! Indexer amount type
 
 use crate::{
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE, MINA_SCALE_DEC},
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE, MINA_SCALE_DEC, MINA_TOKEN_ADDRESS},
     utility::functions::nanomina_to_mina,
 };
 use anyhow::anyhow;
@@ -21,9 +21,13 @@ impl Amount {
         Self(amount * MINA_SCALE)
     }
 
-    /// Deduct [MAINNET_ACCOUNT_CREATION_FEE] MINA for display
-    pub fn display(self) -> Self {
-        self - MAINNET_ACCOUNT_CREATION_FEE
+    /// Deduct [MAINNET_ACCOUNT_CREATION_FEE] MINA for from MINA accounts
+    pub fn display(self, token: &TokenAddress) -> Self {
+        if token.0 == MINA_TOKEN_ADDRESS {
+            self - MAINNET_ACCOUNT_CREATION_FEE
+        } else {
+            self
+        }
     }
 
     pub fn to_f64(&self) -> f64 {

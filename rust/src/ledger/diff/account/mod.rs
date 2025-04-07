@@ -93,9 +93,9 @@ pub enum UpdateType {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct PaymentDiff {
+    pub amount: Amount,
     pub update_type: UpdateType,
     pub public_key: PublicKey,
-    pub amount: Amount,
     pub token: TokenAddress,
 }
 
@@ -167,7 +167,8 @@ impl TokenAccount for AccountDiff {
             | Self::FeeTransferViaCoinbase(_)
             | Self::FeeTransfer(_)
             | Self::FailedTransactionNonce(_)
-            | Self::ZkappFeePayerNonce(_) => TokenAddress::default(),
+            | Self::ZkappFeePayerNonce(_)
+            | Self::ZkappAccountCreationFee(_) => TokenAddress::default(),
             Self::Payment(diff) => diff.token.clone(),
             Self::Zkapp(diff) => diff.token.clone(),
             Self::ZkappStateDiff(diff) => diff.token.clone(),
@@ -181,7 +182,6 @@ impl TokenAccount for AccountDiff {
             Self::ZkappActionsDiff(diff) => diff.token.clone(),
             Self::ZkappEventsDiff(diff) => diff.token.clone(),
             Self::ZkappIncrementNonce(diff) => diff.token.clone(),
-            Self::ZkappAccountCreationFee(_) => TokenAddress::default(),
         }
     }
 }
