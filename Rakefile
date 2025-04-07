@@ -38,11 +38,11 @@ SHELL_SCRIPTS = %W[
   ops/download-snapshot.sh
   ops/traverse-canonical-chain.sh
   ops/correct-file-names.sh
+  ops/minaexplorer/download-staking-ledgers.sh
+  ops/upload-staking-ledgers.sh
+  ops/upload-snapshot.sh
 ]
 # TODO:
-#  ops/minaexplorer/download-staking-ledgers.sh
-#  ops/upload-staking-ledgers.sh
-#  ops/upload-snapshot.sh
 #  ops/upload-mina-blocks.sh
 #  ops/calculate-archive-ledgers.sh
 
