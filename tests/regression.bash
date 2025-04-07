@@ -1685,17 +1685,18 @@ test_fetch_new_blocks() {
 	idxr database create \
 		--blocks-dir ./blocks \
 		--database-dir ./database
+
 	start \
 		--blocks-dir ./blocks \
 		--database-dir ./database \
 		--fetch-new-blocks-exe "$SRC"/tests/recovery.sh \
-		--fetch-new-blocks-delay 3
+		--fetch-new-blocks-delay 20
 
 	# after blocks are added, check dangling branches
 	assert 9 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
 	# wait for block fetching to work its magic
-	sleep 5
+	sleep 30
 
 	# check that all dangling branches have resolved & the best block has the right height
 	best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)

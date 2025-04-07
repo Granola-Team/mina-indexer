@@ -4,9 +4,6 @@ BUILD_TYPE = ARGV.shift
 
 require "#{__dir__}/ops-common"
 
-# TODO add these back once fixed
-# fetch_new_blocks
-
 test_names = %w[
   indexer_cli_reports
   server_startup_v1
@@ -25,6 +22,7 @@ test_names = %w[
   block_copy
   missing_blocks
   missing_block_recovery
+  fetch_new_blocks
   best_chain_v1
   best_chain_v2
   block_children
