@@ -36,15 +36,14 @@ SHELL_SCRIPTS = %W[
   tests/regression.bash
   tests/recovery.sh
   ops/download-snapshot.sh
+  ops/traverse-canonical-chain.sh
+  ops/correct-file-names.sh
+  ops/minaexplorer/download-staking-ledgers.sh
+  ops/upload-staking-ledgers.sh
+  ops/upload-snapshot.sh
+  ops/upload-mina-blocks.sh
+  ops/calculate-archive-ledgers.sh
 ]
-# TODO:
-#  ops/traverse-canonical-chain.sh
-#  ops/correct-file-names.sh
-#  ops/minaexplorer/download-staking-ledgers.sh
-#  ops/upload-staking-ledgers.sh
-#  ops/upload-snapshot.sh
-#  ops/upload-mina-blocks.sh
-#  ops/calculate-archive-ledgers.sh
 
 def is_rustfmt_nightly
   stdout, _, _ = Open3.capture3("rustfmt --version | grep stable || echo \"true\"")

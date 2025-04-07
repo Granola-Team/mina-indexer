@@ -13,15 +13,14 @@ use std::{collections::HashMap, path::PathBuf};
 
 #[tokio::test]
 #[allow(clippy::too_many_lines)]
-async fn account_diffs() {
+async fn account_diffs() -> anyhow::Result<()> {
     let log_dir = PathBuf::from("./tests/data/sequential_blocks");
-    let mut block_parser = BlockParser::new_testing(&log_dir).unwrap();
+    let mut block_parser = BlockParser::new_testing(&log_dir)?;
 
     // mainnet-105490-3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC.json
     let (block, _) = block_parser
         .get_precomputed_block("3NKxEA9gztvEGxL4uk4eTncZAxuRmMsB8n81UkeAMevUjMbLHmkC")
-        .await
-        .unwrap();
+        .await?;
     let diff = LedgerDiff::from_precomputed(&block);
     let mut ledger: HashMap<PublicKey, (i64, u32)> = HashMap::from(
         [
@@ -188,11 +187,13 @@ async fn account_diffs() {
         let nonce_diff = ledger.get(pk).unwrap().1 - initial_ledger.get(pk).unwrap().1;
 
         if delta.get(pk).unwrap() != &(balance_diff, nonce_diff) {
-            println!("Incorrect delta for {}", pk.to_address());
+            println!("Incorrect delta for {}", pk);
             println!("Final:   {:?}", ledger.get(pk).unwrap());
             println!("Initial: {:?}", initial_ledger.get(pk).unwrap());
         }
 
         assert_eq!(delta.get(pk).unwrap(), &(balance_diff, nonce_diff));
     }
+
+    Ok(())
 }

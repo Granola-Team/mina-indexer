@@ -915,8 +915,8 @@ impl From<Command> for serde_json::Value {
             }) => {
                 let mut payment = Map::new();
 
-                payment.insert("source".into(), Value::String(source.to_address()));
-                payment.insert("receiver".into(), Value::String(receiver.to_address()));
+                payment.insert("source".into(), Value::String(source.to_string()));
+                payment.insert("receiver".into(), Value::String(receiver.to_string()));
                 payment.insert("amount".into(), Value::Number(amount.0.into()));
                 payment.insert("nonce".into(), Value::Number(nonce.0.into()));
                 json.insert("Payment".into(), Value::Object(payment));
@@ -931,8 +931,8 @@ impl From<Command> for serde_json::Value {
             }) => {
                 let mut delegation = Map::new();
 
-                delegation.insert("delegate".into(), Value::String(delegate.to_address()));
-                delegation.insert("delegator".into(), Value::String(delegator.to_address()));
+                delegation.insert("delegate".into(), Value::String(delegate.to_string()));
+                delegation.insert("delegator".into(), Value::String(delegator.to_string()));
                 delegation.insert("nonce".into(), Value::Number(nonce.0.into()));
                 json.insert("Stake_delegation".into(), Value::Object(delegation));
 
@@ -1400,7 +1400,7 @@ mod test {
                 expected_payments,
                 payments
                     .iter()
-                    .map(|(s, r, a)| (s.to_address(), r.to_address(), a.0))
+                    .map(|(s, r, a)| (s.to_string(), r.to_string(), a.0))
                     .collect::<Vec<(String, String, u64)>>()
             );
         }
@@ -1428,8 +1428,8 @@ mod test {
                 expected_delegations,
                 delegations
                     .iter()
-                    .map(|(d, t)| (d.to_address(), t.to_address()))
-                    .collect::<Vec<(String, String)>>()
+                    .map(|(d, t)| (d.to_string(), t.to_string()))
+                    .collect::<Vec<_>>()
             );
         }
     }

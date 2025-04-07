@@ -7,6 +7,7 @@ pub mod account;
 mod address;
 pub mod holder;
 mod id;
+pub mod ledger;
 mod symbol;
 
 use super::diff::token::{TokenDiff, TokenDiffType};

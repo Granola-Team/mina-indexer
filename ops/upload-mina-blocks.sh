@@ -14,7 +14,7 @@ exit_handler() {
 }
 trap exit_handler EXIT
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 # Perform the download.
 "$MY_DIR"/granola-rclone.rb sync "$1" linode-granola:blocks.minasearch.com

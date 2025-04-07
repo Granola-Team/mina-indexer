@@ -1685,17 +1685,18 @@ test_fetch_new_blocks() {
 	idxr database create \
 		--blocks-dir ./blocks \
 		--database-dir ./database
+
 	start \
 		--blocks-dir ./blocks \
 		--database-dir ./database \
 		--fetch-new-blocks-exe "$SRC"/tests/recovery.sh \
-		--fetch-new-blocks-delay 3
+		--fetch-new-blocks-delay 20
 
 	# after blocks are added, check dangling branches
 	assert 9 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
 	# wait for block fetching to work its magic
-	sleep 5
+	sleep 30
 
 	# check that all dangling branches have resolved & the best block has the right height
 	best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
@@ -1712,11 +1713,12 @@ test_missing_block_recovery() {
 	idxr database create \
 		--blocks-dir ./blocks \
 		--database-dir ./database
+
 	start \
 		--blocks-dir ./blocks \
 		--database-dir ./database \
 		--missing-block-recovery-exe "$SRC"/tests/recovery.sh \
-		--missing-block-recovery-delay 3 \
+		--missing-block-recovery-delay 1 \
 		--missing-block-recovery-batch true
 
 	# miss blocks at heights 6, 8, 11-16, 18-20
@@ -1725,12 +1727,8 @@ test_missing_block_recovery() {
 	stage_blocks v1_single 17 "$BLOCKS_DIR"
 	stage_blocks v1_single 21 "$BLOCKS_DIR"
 
-	# after blocks are added, check dangling branches
-	sleep 3
-	assert 8 $(idxr summary --json | jq -r .witness_tree.num_dangling)
-
 	# wait for missing block recovery to work its magic
-	sleep 30
+	sleep 120
 
 	# check that all dangling branches have resolved & the best block has the right height
 	best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)

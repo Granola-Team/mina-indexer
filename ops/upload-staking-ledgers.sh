@@ -3,7 +3,6 @@
 # Uploads Mina staking ledger logs to the Granola bucket.
 # $1 = source directory
 
-set -x
 set -eu
 
 RESULT='Failure.'
@@ -12,7 +11,7 @@ exit_handler() {
 }
 trap exit_handler EXIT
 
-MY_DIR="$(CDPATH= cd "$(dirname "$0")" && pwd)"
+MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
 # Perform the upload.
 "$MY_DIR"/granola-rclone.rb \

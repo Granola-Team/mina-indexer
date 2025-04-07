@@ -700,7 +700,7 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
     );
     common.insert(
         "fee_payer_pk".into(),
-        Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_address()),
+        Value::String(PublicKey::from(fee_payer_pk.to_owned()).to_string()),
     );
     common.insert("nonce".into(), Value::Number(Number::from(nonce.t.t)));
     common.insert(
@@ -722,11 +722,11 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
 
             body_obj.insert(
                 "source_pk".into(),
-                Value::String(PublicKey::from(source_pk.to_owned()).to_address()),
+                Value::String(PublicKey::from(source_pk.to_owned()).to_string()),
             );
             body_obj.insert(
                 "receiver_pk".into(),
-                Value::String(PublicKey::from(receiver_pk.to_owned()).to_address()),
+                Value::String(PublicKey::from(receiver_pk.to_owned()).to_string()),
             );
             body_obj.insert(
                 "token_id".into(),
@@ -746,11 +746,11 @@ fn payload_json_v1(value: &mina_rs::SignedCommand1) -> serde_json::Value {
 
             body_obj.insert(
                 "delegator".into(),
-                Value::String(PublicKey::from(delegator).to_address()),
+                Value::String(PublicKey::from(delegator).to_string()),
             );
             body_obj.insert(
                 "new_delegate".into(),
-                Value::String(PublicKey::from(new_delegate).to_address()),
+                Value::String(PublicKey::from(new_delegate).to_string()),
             );
             body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));
 
@@ -782,7 +782,7 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
     common.insert("fee".into(), Value::Number(fee.0.into()));
     common.insert(
         "fee_payer_pk".into(),
-        Value::String(fee_payer_pk.to_owned().to_address()),
+        Value::String(fee_payer_pk.to_owned().to_string()),
     );
     common.insert("nonce".into(), Value::Number(nonce.0.into()));
     common.insert("valid_until".into(), Value::Number(valid_until.0.into()));
@@ -801,7 +801,7 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
 
             body_obj.insert(
                 "receiver_pk".into(),
-                Value::String(receiver_pk.to_owned().to_address()),
+                Value::String(receiver_pk.to_owned().to_string()),
             );
             body_obj.insert("amount".into(), Value::Number(amount.0.into()));
             body_obj.insert("kind".into(), Value::String("Payment".into()));
@@ -814,7 +814,7 @@ fn payload_json_v2(value: &v2::staged_ledger_diff::SignedCommandData) -> serde_j
             let mut set_delegate = Map::new();
             set_delegate.insert(
                 "new_delegate".into(),
-                Value::String(new_delegate.to_owned().to_address()),
+                Value::String(new_delegate.to_owned().to_string()),
             );
 
             body_obj.insert("kind".into(), Value::String("Stake_delegation".into()));

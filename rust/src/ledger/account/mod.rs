@@ -24,7 +24,7 @@ use crate::{
     ledger::diff::account::PaymentDiff,
     mina_blocks::v2::{self, ZkappAccount},
 };
-use log::error;
+use log::{error, warn};
 use mina_serialization_proc_macros::AutoFrom;
 use serde::{Deserialize, Serialize};
 
@@ -514,10 +514,22 @@ impl Account {
     }
 
     /// Apply an account diff to an account
-    pub fn apply_account_diff(self, diff: &AccountDiff, state_hash: &StateHash) -> Self {
+    pub fn apply_account_diff(
+        self,
+        diff: &AccountDiff,
+        block_height: u32,
+        state_hash: &StateHash,
+    ) -> Self {
         use AccountDiff::*;
 
-        match diff {
+        let pk = diff.public_key();
+
+        if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
+            let summary = format!("mainnet-{}-{}", block_height, state_hash);
+            warn!("APPLY {}\nDIFF: {}\nBEFORE: {}", summary, diff, self)
+        }
+
+        let after = match diff {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => self.payment(diff),
             Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
@@ -539,18 +551,38 @@ impl Account {
             ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff, state_hash),
             ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff, state_hash),
             Zkapp(_) => unreachable!(),
+        };
+
+        if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
+            warn!("AFTER: {}", after)
         }
+
+        after
     }
 
     /// Unapply an account diff to an account
-    pub fn unapply_account_diff(self, diff: &AccountDiff, remove: bool) -> Option<Self> {
+    pub fn unapply_account_diff(
+        self,
+        diff: &AccountDiff,
+        block_height: u32,
+        state_hash: &StateHash,
+        remove: bool,
+    ) -> Option<Self> {
+        use AccountDiff::*;
+
+        let pk = diff.public_key();
+        let before = self.clone();
+
         if remove {
+            if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
+                let summary = format!("mainnet-{}-{}", block_height, state_hash);
+                warn!("UNAPPLY {}\nDIFF: {}\nREMOVE {}", summary, diff, pk)
+            }
+
             return None;
         }
 
-        use AccountDiff::*;
-
-        Some(match diff {
+        let after = match diff {
             Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
                 self.payment_unapply(diff)
             }
@@ -571,9 +603,26 @@ impl Account {
             | ZkappEventsDiff(_)
             | ZkappIncrementNonce(_)
             | ZkappAccountCreationFee(_)
-            | ZkappFeePayerNonce(_) => self,
+            | ZkappFeePayerNonce(_) => {
+                if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
+                    let summary = format!("mainnet-{}-{}", block_height, state_hash);
+                    warn!("UNIMPLEMENTED UNAPPLY {}\nDIFF: {}", summary, diff)
+                }
+
+                self
+            }
             Zkapp(_) => unreachable!(),
-        })
+        };
+
+        if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
+            let summary = format!("mainnet-{}-{}", block_height, state_hash);
+            warn!(
+                "UNAPPLY {}\nDIFF: {}\nBEFORE: {}\nAFTER: {}",
+                summary, diff, before, after
+            )
+        }
+
+        Some(after)
     }
 
     /// Apply a ledger diff to an account
@@ -583,7 +632,7 @@ impl Account {
 
         for acct_diff in diff.account_diffs.iter().flatten() {
             if acct_diff.public_key() == pk {
-                acct = acct.apply_account_diff(acct_diff, &diff.state_hash);
+                acct = acct.apply_account_diff(acct_diff, diff.blockchain_length, &diff.state_hash);
             }
         }
 
@@ -691,6 +740,16 @@ impl std::fmt::Debug for Account {
     }
 }
 
+const PKS_OF_INTEREST: [&str; 7] = [
+    "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
+    "B62qmYFLwGSjQuWdnygPLw5TvrMENrLEFQmTow8RhSUw6MCm2sjQEn9",
+    "B62qpRMGRzqFVACxPS5AozHp3HxPqwkfrqjJFaPk6KL6Kf9PpaLoXvY",
+    "B62qpSSC6FUVbMCBzY69JqxtMM52dWzHaFRHTZY7BQrA9X59e2cAPXH",
+    "B62qrYu6vakNxZQH6FeQxBoGNgME7u35Wswqh53YEFPUVr7HwNrhiQC",
+    "B62qnUmeSPTktwags2faJTo48nTa4h8yU1cpEuagX3Mb4M74NLi2x9m",
+    "B62qp7u4rgGLz35bSpNRWW74DmEjeWQG5jG9BGzjfa4t5KBevGY6GAh",
+];
+
 #[cfg(test)]
 mod tests {
     use super::{Account, Amount};
@@ -763,6 +822,8 @@ mod tests {
     fn zkapp_account_diff_payment() {
         let amount = Amount(2000000000);
         let pk = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
+
+        let block_height = 0;
         let state_hash = StateHash::default();
 
         // account before applying diff
@@ -790,7 +851,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &state_hash);
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after
@@ -811,6 +872,9 @@ mod tests {
         let pk = PublicKey::default();
         let app_state_elem: AppState =
             "0x1FFF56AAB5D3A09432146BC335714ABF14AA6DCCC2603B793E403E868B3383A4".into();
+
+        let block_height = 0;
+        let state_hash = StateHash::default();
 
         // account before applying diff
         let before = Account {
@@ -837,7 +901,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in zkapp_diff.clone().expand().iter() {
-                after = after.apply_account_diff(diff, &StateHash::default());
+                after = after.apply_account_diff(diff, block_height, &state_hash);
             }
 
             after
@@ -865,6 +929,9 @@ mod tests {
         let delegate = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
         let nonce = Nonce(1);
 
+        let block_height = 0;
+        let state_hash = StateHash::default();
+
         // account before applying diff
         let before = Account {
             public_key: pk.clone(),
@@ -884,7 +951,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &StateHash::default());
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after
@@ -908,6 +975,9 @@ mod tests {
             data: "VERIFICATION_KEY_DATA".into(),
             hash: "0xVDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULTDEFAULT".into(),
         };
+
+        let block_height = 0;
+        let state_hash = StateHash::default();
 
         // account before applying diff
         let before = Account {
@@ -934,7 +1004,7 @@ mod tests {
             let mut acct = before.clone();
 
             for diff in diffs {
-                acct = acct.apply_account_diff(&diff, &StateHash::default());
+                acct = acct.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             acct
@@ -962,6 +1032,9 @@ mod tests {
             ..Default::default()
         };
 
+        let block_height = 0;
+        let state_hash = StateHash::default();
+
         // account before applying diff
         let before = Account {
             public_key: pk.clone(),
@@ -978,7 +1051,7 @@ mod tests {
         // account after applying diff
         let after = before
             .clone()
-            .apply_account_diff(&diff, &StateHash::default());
+            .apply_account_diff(&diff, block_height, &state_hash);
 
         // only the account permissions changes
         assert_eq!(
@@ -994,6 +1067,9 @@ mod tests {
     fn zkapp_account_diff_zkapp_uri() {
         let pk = PublicKey::default();
         let zkapp_uri = ZkappUri("ZKAPP_URI".to_string());
+
+        let block_height = 0;
+        let state_hash = StateHash::default();
 
         // account before applying diff
         let before = Account {
@@ -1014,7 +1090,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &StateHash::default());
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after
@@ -1038,6 +1114,9 @@ mod tests {
         let pk = PublicKey::default();
         let token_symbol = TokenSymbol::from("TOKEN_SYMBOL");
 
+        let block_height = 0;
+        let state_hash = StateHash::default();
+
         // account before applying diff
         let before = Account {
             public_key: pk.clone(),
@@ -1058,7 +1137,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &StateHash::default());
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after
@@ -1079,6 +1158,9 @@ mod tests {
         let pk = PublicKey::default();
         let timing = Timing::default();
 
+        let block_height = 0;
+        let state_hash = StateHash::default();
+
         // account before applying diff
         let before = Account {
             public_key: pk.clone(),
@@ -1098,7 +1180,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &StateHash::default());
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after
@@ -1118,6 +1200,9 @@ mod tests {
     fn zkapp_account_diff_voting_for() {
         let pk = PublicKey::default();
         let voting_for = String::new();
+
+        let block_height = 0;
+        let state_hash = StateHash::default();
 
         // account before applying diff
         let before = Account {
@@ -1139,7 +1224,7 @@ mod tests {
             let mut after = before.clone();
 
             for diff in diff.expand() {
-                after = after.apply_account_diff(&diff, &StateHash::default());
+                after = after.apply_account_diff(&diff, block_height, &state_hash);
             }
 
             after

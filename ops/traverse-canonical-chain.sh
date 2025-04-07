@@ -15,7 +15,7 @@ current_file="$directory/$starting_file"
 
 while [ -f "$current_file" ]; do
 	# Print the current file name
-	echo "$(basename "$current_file")"
+	basename "$current_file"
 
 	# Extract the previous state hash
 	previous_hash=$(jq -r '.protocol_state.previous_state_hash' "$current_file")

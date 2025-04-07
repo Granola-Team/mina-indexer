@@ -93,9 +93,9 @@ pub enum UpdateType {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct PaymentDiff {
+    pub amount: Amount,
     pub update_type: UpdateType,
     pub public_key: PublicKey,
-    pub amount: Amount,
     pub token: TokenAddress,
 }
 
@@ -167,7 +167,8 @@ impl TokenAccount for AccountDiff {
             | Self::FeeTransferViaCoinbase(_)
             | Self::FeeTransfer(_)
             | Self::FailedTransactionNonce(_)
-            | Self::ZkappFeePayerNonce(_) => TokenAddress::default(),
+            | Self::ZkappFeePayerNonce(_)
+            | Self::ZkappAccountCreationFee(_) => TokenAddress::default(),
             Self::Payment(diff) => diff.token.clone(),
             Self::Zkapp(diff) => diff.token.clone(),
             Self::ZkappStateDiff(diff) => diff.token.clone(),
@@ -181,7 +182,6 @@ impl TokenAccount for AccountDiff {
             Self::ZkappActionsDiff(diff) => diff.token.clone(),
             Self::ZkappEventsDiff(diff) => diff.token.clone(),
             Self::ZkappIncrementNonce(diff) => diff.token.clone(),
-            Self::ZkappAccountCreationFee(_) => TokenAddress::default(),
         }
     }
 }
@@ -813,6 +813,43 @@ impl std::fmt::Debug for CoinbaseDiff {
 impl std::fmt::Debug for FailedTransactionNonceDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} | Nonce {}", self.public_key, self.nonce)
+    }
+}
+
+impl std::fmt::Display for AccountDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Payment(diff) => write!(f, "PAYMENT: {diff:?}"),
+            Self::Delegation(diff) => write!(f, "DELEGATION: {diff:?}"),
+            Self::Coinbase(diff) => write!(f, "COINBASE: {diff:?}"),
+            Self::FeeTransfer(diff) => write!(f, "FEE_TRANSFER: {diff:?}"),
+            Self::FeeTransferViaCoinbase(diff) => {
+                write!(f, "FEE_TRANSFER_VIA_COINBASE: {diff:?}")
+            }
+            Self::FailedTransactionNonce(diff) => {
+                write!(f, "FAILED_TXN: {diff:?}")
+            }
+            Self::Zkapp(diff) => write!(f, "ZKAPP: {diff:?}"),
+            Self::ZkappStateDiff(diff) => write!(f, "ZKAPP_STATE: {diff:?}"),
+            Self::ZkappPermissionsDiff(diff) => write!(f, "ZKAPP_PERMISSIONS: {diff:?}"),
+            Self::ZkappVerificationKeyDiff(diff) => write!(f, "ZKAPP_VK: {diff:?}"),
+            Self::ZkappProvedStateDiff(diff) => write!(f, "ZKAPP_PROVED_STATE: {diff:?}"),
+            Self::ZkappUriDiff(diff) => write!(f, "ZKAPP_URI: {diff:?}"),
+            Self::ZkappTokenSymbolDiff(diff) => {
+                write!(f, "ZKAPP_TOKEN_SYMBOL: {diff:?}")
+            }
+            Self::ZkappTimingDiff(diff) => write!(f, "ZKAPP_TIMING: {diff:?}"),
+            Self::ZkappVotingForDiff(diff) => write!(f, "ZKAPP_VOTING_FOR: {diff:?}"),
+            Self::ZkappActionsDiff(diff) => write!(f, "ZKAPP_ACTIONS: {diff:?}"),
+            Self::ZkappEventsDiff(diff) => write!(f, "ZKAPP_EVENTS: {diff:?}"),
+            Self::ZkappIncrementNonce(diff) => {
+                write!(f, "ZKAPP_INCREMENT_NONCE {}", diff.public_key)
+            }
+            Self::ZkappAccountCreationFee(diff) => {
+                write!(f, "ZKAPP_ACCOUNT_CREATION_FEE: {diff:?}")
+            }
+            Self::ZkappFeePayerNonce(diff) => write!(f, "ZKAPP_FEE_PAYER_NONCE: {diff:?}"),
+        }
     }
 }
 
