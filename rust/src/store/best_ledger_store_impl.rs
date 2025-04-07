@@ -14,8 +14,8 @@ use crate::{
             best::{AccountUpdate, BestLedgerStore, DbAccountUpdate},
             staged::StagedLedgerStore,
         },
-        token::{account::TokenAccount, Token, TokenAddress},
-        Ledger, TokenLedger,
+        token::{account::TokenAccount, ledger::TokenLedger, Token, TokenAddress},
+        Ledger,
     },
     store::{
         zkapp::{actions::ZkappActionStore, events::ZkappEventStore, tokens::ZkappTokenStore},
