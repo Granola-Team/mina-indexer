@@ -52,7 +52,7 @@ impl InternalCommand {
             coinbase.account_diffs_coinbase_mut(&mut all_account_diff_fees);
         }
 
-        let mut internal_cmds: Vec<Self> = Vec::new();
+        let mut internal_cmds = vec![];
         for account_diff_pairs in all_account_diff_fees {
             if let [credit, debit] = &account_diff_pairs[..] {
                 if debit.amount() + credit.amount() != 0 {
@@ -61,6 +61,7 @@ impl InternalCommand {
                         debit, credit, block.blockchain_length()
                     )
                 }
+
                 match (credit, debit) {
                     (
                         AccountDiff::FeeTransfer(fee_transfer_receiver),
@@ -123,9 +124,10 @@ impl InternalCommand {
             }
         }
 
-        if coinbase.is_coinbase_applied() {
+        if coinbase.is_applied() {
             internal_cmds.insert(0, coinbase.as_internal_cmd());
         }
+
         internal_cmds
     }
 }
@@ -213,40 +215,29 @@ impl DbInternalCommandWithData {
 
     pub fn public_keys(&self) -> PublicKey {
         match self {
-            Self::Coinbase { receiver, .. } => receiver.clone(),
-            Self::FeeTransfer { receiver, .. } => receiver.clone(),
+            Self::Coinbase { receiver, .. } | Self::FeeTransfer { receiver, .. } => {
+                receiver.clone()
+            }
         }
     }
 
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {
         match self {
-            Self::Coinbase { receiver, .. } => pk == receiver,
-            Self::FeeTransfer { receiver, .. } => pk == receiver,
+            Self::Coinbase { receiver, .. } | Self::FeeTransfer { receiver, .. } => pk == receiver,
         }
     }
 
     pub fn recipient(&self) -> PublicKey {
-        use DbInternalCommandWithData::*;
         match self {
-            Coinbase { receiver, .. } | FeeTransfer { receiver, .. } => receiver.clone(),
+            DbInternalCommandWithData::Coinbase { receiver, .. }
+            | DbInternalCommandWithData::FeeTransfer { receiver, .. } => receiver.clone(),
         }
     }
 
     pub fn kind(&self) -> u8 {
-        use DbInternalCommandWithData::*;
         match self {
-            Coinbase { .. } => 1,
-            FeeTransfer { .. } => 0,
-        }
-    }
-}
-
-impl std::fmt::Display for InternalCommandKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            InternalCommandKind::Coinbase => write!(f, "Coinbase"),
-            InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
-            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
+            DbInternalCommandWithData::FeeTransfer { .. } => 0,
+            DbInternalCommandWithData::Coinbase { .. } => 1,
         }
     }
 }
@@ -254,9 +245,11 @@ impl std::fmt::Display for InternalCommandKind {
 impl DbInternalCommand {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
         let internal_cmd_parts = InternalCommand::from_precomputed(block);
+
         let mut coinbase: Option<Self> = None;
         let mut fee_transfers = <HashMap<PublicKey, Self>>::new();
         let mut fee_transfers_via_coinbase = <HashMap<PublicKey, Self>>::new();
+
         for cmd in internal_cmd_parts {
             match cmd {
                 InternalCommand::Coinbase { .. } => {
@@ -300,31 +293,50 @@ impl DbInternalCommand {
         // fee transfers via coinbase
         let mut ftvc = fee_transfers_via_coinbase.into_values().collect::<Vec<_>>();
         ftvc.sort();
-        internal_commands.append(&mut ftvc);
 
         // fee transfers
         let mut ft = fee_transfers.into_values().collect::<Vec<_>>();
         ft.sort();
+
+        internal_commands.append(&mut ftvc);
         internal_commands.append(&mut ft);
+
         internal_commands
     }
 }
 
+/////////////////
+// conversions //
+/////////////////
+
 impl From<InternalCommand> for DbInternalCommand {
     fn from(value: InternalCommand) -> Self {
-        use InternalCommand::*;
         match value {
-            Coinbase { receiver, amount } => Self::Coinbase { receiver, amount },
-            FeeTransfer {
+            InternalCommand::Coinbase { receiver, amount } => Self::Coinbase { receiver, amount },
+            InternalCommand::FeeTransfer {
                 receiver,
                 amount,
                 sender: _,
             } => Self::FeeTransfer { receiver, amount },
-            FeeTransferViaCoinbase {
+            InternalCommand::FeeTransferViaCoinbase {
                 receiver,
                 amount,
                 sender: _,
             } => Self::FeeTransferViaCoinbase { receiver, amount },
+        }
+    }
+}
+
+/////////////
+// dispaly //
+/////////////
+
+impl std::fmt::Display for InternalCommandKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            InternalCommandKind::Coinbase => write!(f, "Coinbase"),
+            InternalCommandKind::FeeTransfer => write!(f, "Fee_transfer"),
+            InternalCommandKind::FeeTransferViaCoinbase => write!(f, "Fee_transfer_via_coinbase"),
         }
     }
 }
@@ -335,7 +347,7 @@ mod tests {
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
 
     #[test]
-    fn from_precomputed() -> anyhow::Result<()> {
+    fn from_precomputed_v1() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./tests/data/canonical_chain_discovery/contiguous/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
@@ -401,6 +413,23 @@ mod tests {
                 }
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn from_genesis_v2() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        // empty internal commands
+        assert_eq!(InternalCommand::from_precomputed(&block), vec![]);
+
+        // empty db internal commands
+        assert_eq!(DbInternalCommand::from_precomputed(&block), vec![]);
+
+        // empty db internal commands with metadata
+        assert_eq!(DbInternalCommandWithData::from_precomputed(&block), vec![]);
 
         Ok(())
     }

@@ -135,20 +135,7 @@ async fn account_diffs() -> anyhow::Result<()> {
                     *nonce += new_nonce.0;
                 }
             }
-            Zkapp(_)
-            | ZkappStateDiff(_)
-            | ZkappPermissionsDiff(_)
-            | ZkappVerificationKeyDiff(_)
-            | ZkappProvedStateDiff(_)
-            | ZkappUriDiff(_)
-            | ZkappTokenSymbolDiff(_)
-            | ZkappTimingDiff(_)
-            | ZkappVotingForDiff(_)
-            | ZkappActionsDiff(_)
-            | ZkappEventsDiff(_)
-            | ZkappIncrementNonce(_)
-            | ZkappAccountCreationFee(_)
-            | ZkappFeePayerNonce(_) => unimplemented!(),
+            _ => unimplemented!(),
         }
     }
 

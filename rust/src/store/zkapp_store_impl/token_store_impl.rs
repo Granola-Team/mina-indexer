@@ -73,7 +73,7 @@ impl ZkappTokenStore for IndexerStore {
                     .unwrap_or_else(|| {
                         let token_account = Account {
                             balance: token.supply,
-                            ..Account::empty(owner.to_owned(), token.token.to_owned())
+                            ..Account::empty(owner.to_owned(), token.token.to_owned(), true)
                         };
 
                         self.update_best_account(
@@ -268,7 +268,7 @@ impl ZkappTokenStore for IndexerStore {
                     .unwrap_or_else(|| {
                         let token_account = Account {
                             balance: token.supply,
-                            ..Account::empty(diff_pk.to_owned(), diff_token.to_owned())
+                            ..Account::empty(diff_pk.to_owned(), diff_token.to_owned(), true)
                         };
 
                         self.update_best_account(

@@ -213,6 +213,7 @@ if !skippable
   ##############
 
   # TODO: uncomment this!
+  # https://github.com/Granola-Team/mina-indexer/issues/1852
   #
   # puts 'Initiating self-check...'
   # pid = spawn EXE +

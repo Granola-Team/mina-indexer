@@ -1,18 +1,13 @@
-//! Store of the best ledger
+//! Best ledger store trait
 
+use super::update::DbAccountUpdate;
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::store::DbBlockUpdate,
-    ledger::{
-        account::Account,
-        diff::{account::AccountDiff, token::TokenDiff},
-        token::TokenAddress,
-        Ledger,
-    },
-    store::{DbUpdate, Result},
+    ledger::{account::Account, diff::token::TokenDiff, token::TokenAddress, Ledger},
+    store::Result,
 };
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashSet;
 
 pub trait BestLedgerStore {
     /////////////////////////
@@ -166,20 +161,4 @@ pub trait BestLedgerStore {
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey] bytes
     fn zkapp_best_ledger_account_balance_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-}
-
-#[derive(Debug, Clone)]
-pub struct AccountUpdate {
-    pub account_diffs: Vec<AccountDiff>,
-    pub token_diffs: Vec<TokenDiff>,
-    pub new_accounts: HashSet<(PublicKey, TokenAddress)>,
-    pub new_zkapp_accounts: HashSet<(PublicKey, TokenAddress)>,
-}
-
-pub type DbAccountUpdate = DbUpdate<AccountUpdate>;
-
-impl DbAccountUpdate {
-    pub fn new(apply: Vec<AccountUpdate>, unapply: Vec<AccountUpdate>) -> Self {
-        Self { apply, unapply }
-    }
 }

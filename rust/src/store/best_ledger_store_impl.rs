@@ -9,18 +9,16 @@ use crate::{
     constants::MINA_TOKEN_ADDRESS,
     ledger::{
         account::Account,
-        diff::{account::AccountDiff, token::TokenDiff},
+        diff::token::TokenDiff,
         store::{
-            best::{AccountUpdate, BestLedgerStore, DbAccountUpdate},
+            best::BestLedgerStore,
             staged::StagedLedgerStore,
+            update::{AccountUpdate, DbAccountUpdate},
         },
-        token::{account::TokenAccount, ledger::TokenLedger, Token, TokenAddress},
+        token::{ledger::TokenLedger, Token, TokenAddress},
         Ledger,
     },
-    store::{
-        zkapp::{actions::ZkappActionStore, events::ZkappEventStore, tokens::ZkappTokenStore},
-        Result,
-    },
+    store::{zkapp::tokens::ZkappTokenStore, Result},
     utility::store::{
         common::{from_be_bytes, pk_index_key},
         ledger::best::*,
@@ -28,7 +26,7 @@ use crate::{
 };
 use log::trace;
 use speedb::{DBIterator, IteratorMode};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>> {
@@ -228,25 +226,22 @@ impl BestLedgerStore for IndexerStore {
     }
 
     fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()> {
-        use AccountDiff::*;
         trace!("Updating best ledger accounts for block {state_hash}");
 
-        // count newly applied & unapplied accounts
-
-        // all accounts
+        // count all accounts
         let apply_acc = updates
             .apply
             .iter()
             .fold(0, |acc, update| acc + update.new_accounts.len() as i32);
-        let adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
+        let all_adjust = updates.unapply.iter().fold(apply_acc, |acc, update| {
             acc - update.new_accounts.len() as i32
         });
 
-        if adjust != 0 {
-            self.update_num_accounts(adjust)?;
+        if all_adjust != 0 {
+            self.update_num_accounts(all_adjust)?;
         }
 
-        // mina accounts
+        // count mina accounts
         let mina_accounts = |update: &AccountUpdate| -> i32 {
             update
                 .new_accounts
@@ -267,7 +262,7 @@ impl BestLedgerStore for IndexerStore {
             self.update_num_mina_accounts(mina_adjust)?;
         }
 
-        // zkapp accounts
+        // count zkapp accounts
         let apply_acc = updates.apply.iter().fold(0, |acc, update| {
             acc + update.new_zkapp_accounts.len() as i32
         });
@@ -279,155 +274,8 @@ impl BestLedgerStore for IndexerStore {
             self.update_num_zkapp_accounts(zkapp_adjust)?;
         }
 
-        // unapply account & token diffs, remove accounts
-        for AccountUpdate {
-            account_diffs,
-            token_diffs,
-            new_accounts,
-            new_zkapp_accounts,
-            ..
-        } in updates.unapply
-        {
-            let token_account_diffs = aggregate_token_account_diffs(account_diffs);
-
-            for ((pk, token), diffs) in token_account_diffs {
-                let before = self.get_best_account(&pk, &token)?;
-                let (before_values, mut after) = (
-                    before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or_else(|| Account::empty(pk.clone(), token.clone())),
-                );
-
-                for diff in diffs.iter() {
-                    after = match diff {
-                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                            after.payment_unapply(diff)
-                        }
-                        Coinbase(diff) => after.coinbase_unapply(diff),
-                        Delegation(diff) => {
-                            self.remove_pk_delegate(pk.clone())?;
-                            after.delegation_unapply(diff)
-                        }
-                        FailedTransactionNonce(diff) => after.failed_transaction_unapply(diff),
-
-                        // zkapp diffs
-                        ZkappActionsDiff(diff) => {
-                            self.remove_actions(&pk, &token, diff.actions.len() as u32)?;
-                            after
-                        }
-                        ZkappEventsDiff(diff) => {
-                            self.remove_events(&pk, &token, diff.events.len() as u32)?;
-                            after
-                        }
-
-                        // TODO zkapp unapply
-                        ZkappStateDiff(_)
-                        | ZkappPermissionsDiff(_)
-                        | ZkappVerificationKeyDiff(_)
-                        | ZkappProvedStateDiff(_)
-                        | ZkappUriDiff(_)
-                        | ZkappTokenSymbolDiff(_)
-                        | ZkappTimingDiff(_)
-                        | ZkappVotingForDiff(_)
-                        | ZkappIncrementNonce(_)
-                        | ZkappAccountCreationFee(_)
-                        | ZkappFeePayerNonce(_) => after,
-                        Zkapp(_) => unreachable!(),
-                    };
-                }
-
-                self.update_best_account(&pk, &token, before_values, Some(after))?;
-            }
-
-            // unapply token diffs
-            for diffs in aggregate_token_diffs(token_diffs).values() {
-                if !diffs.is_empty() {
-                    self.unapply_best_token_diffs(diffs)?;
-                }
-            }
-
-            // remove accounts
-            for (pk, token) in new_accounts.iter().chain(new_zkapp_accounts.iter()) {
-                self.update_best_account(pk, token, None, None)?;
-            }
-
-            // adjust MINA token supply
-            if let Some(supply) = self.get_block_total_currency(state_hash)? {
-                self.set_token(&Token::mina_with_supply(supply))?;
-            }
-        }
-
-        // apply account & token diffs
-        for AccountUpdate {
-            account_diffs,
-            token_diffs,
-            ..
-        } in updates.apply.into_iter()
-        {
-            let token_account_diffs = aggregate_token_account_diffs(account_diffs);
-
-            // apply account diffs
-            for ((pk, token), diffs) in token_account_diffs {
-                let before = self.get_best_account(&pk, &token)?;
-                let (before_values, mut after) = (
-                    before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or_else(|| Account::empty(pk.clone(), token.clone())),
-                );
-
-                for diff in diffs.iter() {
-                    after = match diff {
-                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                            after.payment(diff)
-                        }
-                        Coinbase(diff) => after.coinbase(diff.amount),
-                        Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
-                        FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
-                        ZkappStateDiff(diff) => after.zkapp_state(diff, state_hash),
-                        ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff, state_hash),
-                        ZkappVerificationKeyDiff(diff) => {
-                            after.zkapp_verification_key(diff, state_hash)
-                        }
-                        ZkappProvedStateDiff(diff) => after.zkapp_proved_state(diff, state_hash),
-                        ZkappUriDiff(diff) => after.zkapp_uri(diff, state_hash),
-                        ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff, state_hash),
-                        ZkappTimingDiff(diff) => after.zkapp_timing(diff, state_hash),
-                        ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff, state_hash),
-                        ZkappIncrementNonce(diff) => after.zkapp_nonce(diff, state_hash),
-                        ZkappAccountCreationFee(diff) => {
-                            after.zkapp_account_creation(diff, state_hash)
-                        }
-                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff, state_hash),
-
-                        // these diffs do not modify the account
-                        ZkappActionsDiff(diff) => {
-                            self.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
-                            after
-                        }
-                        ZkappEventsDiff(diff) => {
-                            self.add_events(&diff.public_key, &diff.token, &diff.events)?;
-                            after
-                        }
-                        // zkapp account diffs should be expanded
-                        Zkapp(_) => unreachable!(),
-                    };
-                }
-
-                self.update_best_account(&pk, &token, before_values, Some(after))?;
-            }
-
-            // apply token diffs
-            for diffs in aggregate_token_diffs(token_diffs).values() {
-                if !diffs.is_empty() {
-                    self.apply_best_token_diffs(state_hash, diffs)?;
-                }
-            }
-        }
-
-        // adjust MINA token supply
-        if let Some(supply) = self.get_block_total_currency(state_hash)? {
-            self.set_token(&Token::mina_with_supply(supply))?;
-        }
-
-        Ok(())
+        DbAccountUpdate::unapply_updates(self, updates.unapply, state_hash)?;
+        DbAccountUpdate::apply_updates(self, updates.apply, state_hash)
     }
 
     fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> Result<()> {
@@ -746,47 +594,6 @@ impl BestLedgerStore for IndexerStore {
         self.database
             .iterator_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), mode)
     }
-}
-
-use std::collections::HashMap;
-
-/// Aggregate diffs per token account
-fn aggregate_token_account_diffs(
-    account_diffs: Vec<AccountDiff>,
-) -> HashMap<(PublicKey, TokenAddress), Vec<AccountDiff>> {
-    let mut token_account_diffs = <HashMap<(_, _), Vec<_>>>::with_capacity(account_diffs.len());
-
-    for diff in account_diffs {
-        let pk = diff.public_key();
-        let token = diff.token();
-
-        if let Some(mut diffs) = token_account_diffs.remove(&(pk.to_owned(), token.to_owned())) {
-            diffs.push(diff);
-            token_account_diffs.insert((pk, token), diffs);
-        } else {
-            token_account_diffs.insert((pk, token), vec![diff]);
-        }
-    }
-
-    token_account_diffs
-}
-
-/// Aggregate token diffs per token
-fn aggregate_token_diffs(token_diffs: Vec<TokenDiff>) -> HashMap<TokenAddress, Vec<TokenDiff>> {
-    let mut acc = <HashMap<TokenAddress, Vec<TokenDiff>>>::with_capacity(token_diffs.len());
-
-    for diff in token_diffs {
-        let token = diff.token.to_owned();
-
-        if let Some(mut diffs) = acc.remove(&token) {
-            diffs.push(diff);
-            acc.insert(token, diffs);
-        } else {
-            acc.insert(token, vec![diff]);
-        }
-    }
-
-    acc
 }
 
 use std::collections::BTreeMap;

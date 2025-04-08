@@ -97,7 +97,8 @@ impl FeetransferWithMeta {
             let block_num_internal_commands = db
                 .get_block_internal_commands_count(&block.state_hash())?
                 .unwrap_or_default();
-            Ok(Some(Block {
+
+            return Ok(Some(Block {
                 block: BlockWithoutCanonicity::new(
                     db,
                     &block,
@@ -122,10 +123,10 @@ impl FeetransferWithMeta {
                 block_num_internal_commands,
                 epoch_num_slots_produced,
                 num_unique_block_producers_last_n_blocks: None,
-            }))
-        } else {
-            Ok(None)
+            }));
         }
+
+        Ok(None)
     }
 }
 
@@ -166,17 +167,22 @@ pub struct FeetransferQueryInput {
     or: Option<Vec<FeetransferQueryInput>>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum FeetransferSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
 
+    #[default]
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
 
 #[derive(Default)]
 pub struct FeetransferQueryRoot;
+
+///////////
+// impls //
+///////////
 
 #[Object]
 impl FeetransferQueryRoot {
@@ -187,18 +193,17 @@ impl FeetransferQueryRoot {
         sort_by: Option<FeetransferSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<FeetransferWithMeta>> {
-        use FeetransferSortByInput::*;
-
         let db = db(ctx);
+        let sort_by = sort_by.unwrap_or_default();
+
         let epoch_num_internal_commands = db.get_internal_commands_epoch_count(None)?;
         let total_num_internal_commands = db.get_internal_commands_total_count()?;
-        let mut fee_transfers = vec![];
 
         // state_hash query
         if let Some(state_hash) = query
             .as_ref()
-            .and_then(|f| f.block_state_hash.as_ref())
-            .and_then(|f| f.state_hash.as_ref())
+            .and_then(|q| q.block_state_hash.as_ref())
+            .and_then(|q| q.state_hash.as_ref())
         {
             // validate state hash
             let state_hash = match StateHash::new(state_hash) {
@@ -224,85 +229,20 @@ impl FeetransferQueryRoot {
 
         // block height bounded query
         if query.as_ref().map_or(false, |q| {
-            q.block_height_gt.is_some()
+            q.block_height.is_some()
+                || q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
                 || q.block_height_lt.is_some()
                 || q.block_height_lte.is_some()
         }) {
-            let (min, max) = {
-                let FeetransferQueryInput {
-                    block_height_gt,
-                    block_height_gte,
-                    block_height_lt,
-                    block_height_lte,
-                    ..
-                } = query.as_ref().expect("query will contain a value");
-                let min_bound = match (*block_height_gte, *block_height_gt) {
-                    (Some(gte), Some(gt)) => gte.max(gt + 1),
-                    (Some(gte), None) => gte,
-                    (None, Some(gt)) => gt + 1,
-                    (None, None) => 1,
-                };
-
-                let max_bound = match (*block_height_lte, *block_height_lt) {
-                    (Some(lte), Some(lt)) => lte.min(lt - 1),
-                    (Some(lte), None) => lte,
-                    (None, Some(lt)) => lt - 1,
-                    (None, None) => db.get_best_block_height()?.unwrap(),
-                };
-                (min_bound, max_bound + 1)
-            };
-            let iter = match sort_by {
-                Some(BlockHeightAsc) => db.internal_commands_block_height_iterator(
-                    IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
-                ),
-                Some(BlockHeightDesc) | None => db.internal_commands_block_height_iterator(
-                    IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
-                ),
-            };
-
-            for (key, value) in iter.flatten() {
-                let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
-
-                // avoid deserializing internal command & PCB if possible
-                let canonical = get_block_canonicity(db, &state_hash);
-                if let Some(q) = query.as_ref() {
-                    if let Some(query_canonicity) = q.canonical {
-                        if canonical != query_canonicity {
-                            continue;
-                        }
-                    }
-
-                    if block_out_of_bounds(from_be_bytes(key[..U32_LEN].to_vec()), q) {
-                        break;
-                    }
-                }
-
-                let internal_cmd: DbInternalCommandWithData = serde_json::from_slice(&value)?;
-                let ft = Feetransfer::from((
-                    internal_cmd,
-                    epoch_num_internal_commands,
-                    total_num_internal_commands,
-                ));
-                let feetransfer_with_meta = FeetransferWithMeta {
-                    canonical,
-                    feetransfer: ft,
-                    block: Some(get_block(db, &state_hash)),
-                };
-
-                if query
-                    .as_ref()
-                    .map_or(true, |q| q.matches(&feetransfer_with_meta))
-                {
-                    fee_transfers.push(feetransfer_with_meta);
-
-                    if fee_transfers.len() >= limit {
-                        break;
-                    }
-                }
-            }
-
-            return Ok(fee_transfers);
+            return Ok(block_height_bound_query_handler(
+                db,
+                query.as_ref(),
+                sort_by,
+                limit,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
+            )?);
         }
 
         // recipient query
@@ -318,64 +258,18 @@ impl FeetransferQueryRoot {
                 }
             };
 
-            let iter = match sort_by {
-                Some(BlockHeightAsc) => db.internal_commands_pk_block_height_iterator(
-                    recipient.clone(),
-                    Direction::Forward,
-                ),
-                Some(BlockHeightDesc) | None => db.internal_commands_pk_block_height_iterator(
-                    recipient.clone(),
-                    Direction::Reverse,
-                ),
-            };
-
-            for (key, value) in iter.flatten() {
-                if key[..PublicKey::LEN] != *recipient.0.as_bytes() {
-                    // we've gone beyond our recipient
-                    break;
-                }
-
-                let state_hash =
-                    StateHash::from_bytes(&key[PublicKey::LEN..][U32_LEN..][..StateHash::LEN])?;
-                let canonical = get_block_canonicity(db, &state_hash);
-                if let Some(q) = query.as_ref() {
-                    if let Some(query_canonicity) = q.canonical {
-                        if canonical != query_canonicity {
-                            continue;
-                        }
-                    }
-
-                    let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
-                    if block_out_of_bounds(block_height, q) {
-                        break;
-                    }
-                }
-
-                let internal_command: DbInternalCommandWithData = serde_json::from_slice(&value)?;
-                let pcb = get_block(db, &state_hash);
-                let ft = FeetransferWithMeta {
-                    canonical,
-                    block: Some(pcb),
-                    feetransfer: Feetransfer::from((
-                        internal_command,
-                        epoch_num_internal_commands,
-                        total_num_internal_commands,
-                    )),
-                };
-
-                if query.as_ref().map_or(true, |q| q.matches(&ft)) {
-                    fee_transfers.push(ft);
-                }
-
-                if fee_transfers.len() >= limit {
-                    break;
-                }
-            }
-
-            return Ok(fee_transfers);
+            return Ok(recipient_query_handler(
+                db,
+                query.as_ref(),
+                recipient,
+                sort_by,
+                limit,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
+            )?);
         }
 
-        get_default_fee_transfers(
+        default_query_handler(
             db,
             query,
             sort_by,
@@ -386,119 +280,94 @@ impl FeetransferQueryRoot {
     }
 }
 
-fn get_default_fee_transfers(
-    db: &Arc<IndexerStore>,
-    query: Option<FeetransferQueryInput>,
-    sort_by: Option<FeetransferSortByInput>,
-    limit: usize,
-    epoch_num_internal_commands: u32,
-    total_num_internal_commands: u32,
-) -> Result<Vec<FeetransferWithMeta>> {
-    let mut fee_transfers = Vec::new();
-    let mode = if let Some(FeetransferSortByInput::BlockHeightAsc) = sort_by {
-        IteratorMode::Start
-    } else {
-        IteratorMode::End
-    };
-
-    for (key, value) in db.internal_commands_block_height_iterator(mode).flatten() {
-        let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
-        let canonical = get_block_canonicity(db, &state_hash);
-        if let Some(q) = query.as_ref() {
-            if let Some(query_canonicity) = q.canonical {
-                if canonical != query_canonicity {
-                    continue;
-                }
-            }
-
-            if block_out_of_bounds(from_be_bytes(key[..U32_LEN].to_vec()), q) {
-                break;
-            }
-        }
-
-        let ft = Feetransfer::from((
-            serde_json::from_slice::<DbInternalCommandWithData>(&value)?,
-            epoch_num_internal_commands,
-            total_num_internal_commands,
-        ));
-        let pcb = get_block(db, &state_hash);
-        let feetransfer_with_meta = FeetransferWithMeta {
+impl FeetransferQueryInput {
+    pub fn matches(&self, ft: &FeetransferWithMeta) -> bool {
+        let Self {
+            block_height_gt,
+            block_height_gte,
+            block_height_lt,
+            block_height_lte,
+            block_height,
+            block_state_hash,
             canonical,
-            feetransfer: ft,
-            block: Some(pcb),
-        };
+            recipient,
+            and,
+            or,
+        } = self;
 
-        if query
-            .as_ref()
-            .map_or(true, |q| q.matches(&feetransfer_with_meta))
-        {
-            fee_transfers.push(feetransfer_with_meta);
+        if let Some(canonical) = canonical.as_ref() {
+            if ft.canonical != *canonical {
+                return false;
+            }
         }
 
-        if fee_transfers.len() >= limit {
-            break;
+        if let Some(recipient) = recipient.as_ref() {
+            if ft.feetransfer.recipient != *recipient {
+                return false;
+            }
         }
-    }
-    Ok(fee_transfers)
-}
 
-fn get_fee_transfers_for_state_hash(
-    db: &Arc<IndexerStore>,
-    query: &Option<FeetransferQueryInput>,
-    state_hash: &StateHash,
-    sort_by: Option<FeetransferSortByInput>,
-    limit: usize,
-    epoch_num_internal_commands: u32,
-    total_num_internal_commands: u32,
-) -> Vec<FeetransferWithMeta> {
-    let canonical = get_block_canonicity(db, state_hash);
-    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
-        if canonical != query_canonicity {
-            return vec![];
+        let pcb = ft.block.as_ref().expect("block will exist");
+        let blockchain_length = pcb.blockchain_length();
+
+        if let Some(height) = block_height.as_ref() {
+            if blockchain_length != *height {
+                return false;
+            }
         }
-    }
 
-    let pcb = match db.get_block(state_hash) {
-        Ok(Some(pcb)) => pcb.0,
-        _ => return vec![],
-    };
-    match db.get_internal_commands(state_hash) {
-        Ok(internal_commands) => {
-            let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
-                .into_iter()
-                .map(|ft| FeetransferWithMeta {
-                    canonical,
-                    feetransfer: Feetransfer::from((
-                        ft,
-                        epoch_num_internal_commands,
-                        total_num_internal_commands,
-                    )),
-                    block: Some(pcb.clone()),
-                })
-                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
-                .collect();
+        // block_height_gt(e) & block_height_lt(e)
+        if let Some(height) = block_height_gt {
+            if blockchain_length <= *height {
+                return false;
+            }
+        }
 
-            if let Some(sort_by) = sort_by {
-                match sort_by {
-                    FeetransferSortByInput::BlockHeightAsc => {
-                        internal_commands.sort_by(|a, b| {
-                            a.feetransfer.block_height.cmp(&b.feetransfer.block_height)
-                        });
-                    }
-                    FeetransferSortByInput::BlockHeightDesc => {
-                        internal_commands.sort_by(|a, b| {
-                            b.feetransfer.block_height.cmp(&a.feetransfer.block_height)
-                        });
-                    }
+        if let Some(height) = block_height_gte {
+            if blockchain_length < *height {
+                return false;
+            }
+        }
+
+        if let Some(height) = block_height_lt {
+            if blockchain_length >= *height {
+                return false;
+            }
+        }
+
+        if let Some(height) = block_height_lte {
+            if blockchain_length > *height {
+                return false;
+            }
+        }
+
+        if let Some(block_query_input) = block_state_hash.as_ref() {
+            if let Some(state_hash) = block_query_input.state_hash.as_ref() {
+                if ft.feetransfer.state_hash != *state_hash {
+                    return false;
                 }
             }
-
-            internal_commands.truncate(limit);
-            internal_commands
         }
-        Err(_) => vec![],
+
+        if let Some(query) = and.as_ref() {
+            if !(query.iter().all(|and| and.matches(ft))) {
+                return false;
+            }
+        }
+
+        if let Some(query) = or.as_ref() {
+            if !query.is_empty() && !(query.iter().any(|or| or.matches(ft))) {
+                return false;
+            }
+        }
+
+        true
     }
 }
+
+/////////////////
+// conversions //
+/////////////////
 
 impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
     fn from(int_cmd: (DbInternalCommandWithData, u32, u32)) -> Self {
@@ -542,86 +411,288 @@ impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
     }
 }
 
-impl FeetransferQueryInput {
-    pub fn matches(&self, ft: &FeetransferWithMeta) -> bool {
-        let Self {
+/////////////
+// helpers //
+/////////////
+
+fn default_query_handler(
+    db: &Arc<IndexerStore>,
+    query: Option<FeetransferQueryInput>,
+    sort_by: FeetransferSortByInput,
+    limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+) -> Result<Vec<FeetransferWithMeta>> {
+    let mut fee_transfers = vec![];
+    let mode = match sort_by {
+        FeetransferSortByInput::BlockHeightAsc => IteratorMode::Start,
+        FeetransferSortByInput::BlockHeightDesc => IteratorMode::End,
+    };
+
+    for (key, value) in db.internal_commands_block_height_iterator(mode).flatten() {
+        if fee_transfers.len() >= limit {
+            break;
+        }
+
+        let height = from_be_bytes(key[..U32_LEN].to_vec());
+        let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
+        let canonical = get_block_canonicity(db, &state_hash);
+
+        if let Some(q) = query.as_ref() {
+            if block_out_of_bounds(height, q) {
+                break;
+            }
+
+            if let Some(query_canonicity) = q.canonical {
+                if canonical != query_canonicity {
+                    continue;
+                }
+            }
+        }
+
+        let pcb = get_block(db, &state_hash);
+        let ft = Feetransfer::from((
+            serde_json::from_slice::<DbInternalCommandWithData>(&value)?,
+            epoch_num_internal_commands,
+            total_num_internal_commands,
+        ));
+        let feetransfer_with_meta = FeetransferWithMeta {
+            canonical,
+            feetransfer: ft,
+            block: Some(pcb),
+        };
+
+        if query
+            .as_ref()
+            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+        {
+            fee_transfers.push(feetransfer_with_meta);
+        }
+    }
+
+    Ok(fee_transfers)
+}
+
+fn get_fee_transfers_for_state_hash(
+    db: &Arc<IndexerStore>,
+    query: &Option<FeetransferQueryInput>,
+    state_hash: &StateHash,
+    sort_by: FeetransferSortByInput,
+    limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+) -> Vec<FeetransferWithMeta> {
+    let canonical = get_block_canonicity(db, state_hash);
+    if let Some(query_canonicity) = query.as_ref().and_then(|q| q.canonical) {
+        if canonical != query_canonicity {
+            return vec![];
+        }
+    }
+
+    match db.get_internal_commands(state_hash) {
+        Ok(internal_commands) => {
+            let pcb = match db.get_block(state_hash) {
+                Ok(Some(pcb)) => pcb.0,
+                _ => return vec![],
+            };
+
+            let mut internal_commands: Vec<FeetransferWithMeta> = internal_commands
+                .into_iter()
+                .map(|ft| FeetransferWithMeta {
+                    canonical,
+                    feetransfer: Feetransfer::from((
+                        ft,
+                        epoch_num_internal_commands,
+                        total_num_internal_commands,
+                    )),
+                    block: Some(pcb.clone()),
+                })
+                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
+                .collect();
+
+            match sort_by {
+                FeetransferSortByInput::BlockHeightAsc => {
+                    internal_commands.sort_by(|a, b| {
+                        a.feetransfer.block_height.cmp(&b.feetransfer.block_height)
+                    });
+                }
+                FeetransferSortByInput::BlockHeightDesc => {
+                    internal_commands.sort_by(|a, b| {
+                        b.feetransfer.block_height.cmp(&a.feetransfer.block_height)
+                    });
+                }
+            }
+
+            internal_commands.truncate(limit);
+            internal_commands
+        }
+        Err(_) => vec![],
+    }
+}
+
+fn block_height_bound_query_handler(
+    db: &Arc<IndexerStore>,
+    query: Option<&FeetransferQueryInput>,
+    sort_by: FeetransferSortByInput,
+    limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+) -> anyhow::Result<Vec<FeetransferWithMeta>> {
+    // height bounds
+    let (min, max) = {
+        let FeetransferQueryInput {
             block_height_gt,
             block_height_gte,
             block_height_lt,
             block_height_lte,
             block_height,
-            block_state_hash,
-            canonical,
-            recipient,
-            and,
-            or,
-        } = self;
+            ..
+        } = query.expect("query will contain a value");
 
-        if let Some(canonical) = canonical.as_ref() {
-            if ft.canonical != *canonical {
-                return false;
-            }
+        if let Some(block_height) = block_height {
+            (*block_height, *block_height + 1)
+        } else {
+            let min_bound = match (*block_height_gte, *block_height_gt) {
+                (Some(gte), Some(gt)) => gte.max(gt + 1),
+                (Some(gte), None) => gte,
+                (None, Some(gt)) => gt + 1,
+                (None, None) => 1,
+            };
+
+            let max_bound = match (*block_height_lte, *block_height_lt) {
+                (Some(lte), Some(lt)) => lte.min(lt - 1),
+                (Some(lte), None) => lte,
+                (None, Some(lt)) => lt - 1,
+                (None, None) => db.get_best_block_height()?.unwrap(),
+            };
+
+            (min_bound, max_bound + 1)
         }
-        if let Some(recipient) = recipient.as_ref() {
-            if ft.feetransfer.recipient != *recipient {
-                return false;
-            }
+    };
+
+    // iterator
+    let iter = match sort_by {
+        FeetransferSortByInput::BlockHeightAsc => db.internal_commands_block_height_iterator(
+            IteratorMode::From(&min.to_be_bytes(), Direction::Forward),
+        ),
+        FeetransferSortByInput::BlockHeightDesc => db.internal_commands_block_height_iterator(
+            IteratorMode::From(&max.to_be_bytes(), Direction::Reverse),
+        ),
+    };
+
+    // iterate
+    let mut fee_transfers = vec![];
+    for (key, value) in iter.flatten() {
+        if fee_transfers.len() >= limit {
+            break;
         }
 
-        let pcb = ft.block.as_ref().expect("block will exist");
-        let blockchain_length = pcb.blockchain_length();
-        if let Some(height) = block_height.as_ref() {
-            if blockchain_length != *height {
-                return false;
-            }
-        }
+        // avoid deserializing internal command & PCB if possible
+        let state_hash = StateHash::from_bytes(&key[U32_LEN..][..StateHash::LEN])?;
+        let canonical = get_block_canonicity(db, &state_hash);
 
-        // block_height_gt(e) & block_height_lt(e)
-        if let Some(height) = block_height_gt {
-            if blockchain_length <= *height {
-                return false;
+        if let Some(q) = query.as_ref() {
+            if block_out_of_bounds(from_be_bytes(key[..U32_LEN].to_vec()), q) {
+                break;
             }
-        }
-        if let Some(height) = block_height_gte {
-            if blockchain_length < *height {
-                return false;
-            }
-        }
-        if let Some(height) = block_height_lt {
-            if blockchain_length >= *height {
-                return false;
-            }
-        }
-        if let Some(height) = block_height_lte {
-            if blockchain_length > *height {
-                return false;
-            }
-        }
-        if let Some(block_query_input) = block_state_hash.as_ref() {
-            if let Some(state_hash) = block_query_input.state_hash.as_ref() {
-                if ft.feetransfer.state_hash != *state_hash {
-                    return false;
+
+            if let Some(query_canonicity) = q.canonical {
+                if canonical != query_canonicity {
+                    continue;
                 }
             }
         }
-        if let Some(query) = and.as_ref() {
-            if !(query.iter().all(|and| and.matches(ft))) {
-                return false;
-            }
+
+        let feetransfer_with_meta = FeetransferWithMeta {
+            canonical,
+            block: Some(get_block(db, &state_hash)),
+            feetransfer: Feetransfer::from((
+                serde_json::from_slice(&value)?,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
+            )),
+        };
+
+        if query
+            .as_ref()
+            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+        {
+            fee_transfers.push(feetransfer_with_meta);
         }
-        if let Some(query) = or.as_ref() {
-            if !query.is_empty() && !(query.iter().any(|or| or.matches(ft))) {
-                return false;
-            }
-        }
-        true
     }
+
+    Ok(fee_transfers)
+}
+
+fn recipient_query_handler(
+    db: &Arc<IndexerStore>,
+    query: Option<&FeetransferQueryInput>,
+    recipient: PublicKey,
+    sort_by: FeetransferSortByInput,
+    limit: usize,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+) -> anyhow::Result<Vec<FeetransferWithMeta>> {
+    let pk_bytes = recipient.0.as_bytes().to_vec();
+
+    // iterator
+    let iter = match sort_by {
+        FeetransferSortByInput::BlockHeightAsc => {
+            db.internal_commands_pk_block_height_iterator(recipient, Direction::Forward)
+        }
+        FeetransferSortByInput::BlockHeightDesc => {
+            db.internal_commands_pk_block_height_iterator(recipient, Direction::Reverse)
+        }
+    };
+
+    // iterate
+    let mut fee_transfers = vec![];
+    for (key, value) in iter.flatten() {
+        if key[..PublicKey::LEN] != pk_bytes || fee_transfers.len() >= limit {
+            // we've gone beyond our recipient or limit
+            break;
+        }
+
+        let state_hash =
+            StateHash::from_bytes(&key[PublicKey::LEN..][U32_LEN..][..StateHash::LEN])?;
+        let canonical = get_block_canonicity(db, &state_hash);
+
+        if let Some(q) = query.as_ref() {
+            let block_height = from_be_bytes(key[PublicKey::LEN..][..U32_LEN].to_vec());
+            if block_out_of_bounds(block_height, q) {
+                break;
+            }
+
+            if let Some(query_canonicity) = q.canonical {
+                if canonical != query_canonicity {
+                    continue;
+                }
+            }
+        }
+
+        let ft = FeetransferWithMeta {
+            canonical,
+            block: Some(get_block(db, &state_hash)),
+            feetransfer: Feetransfer::from((
+                serde_json::from_slice(&value)?,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
+            )),
+        };
+
+        if query.as_ref().map_or(true, |q| q.matches(&ft)) {
+            fee_transfers.push(ft);
+        }
+    }
+
+    Ok(fee_transfers)
 }
 
 fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) -> bool {
-    query
-        .block_height_gt
-        .map_or(false, |gt| blockchain_length <= gt)
+    query.block_height.map_or(false, |h| blockchain_length == h)
+        || query
+            .block_height_gt
+            .map_or(false, |gt| blockchain_length <= gt)
         || query
             .block_height_gte
             .map_or(false, |gte| blockchain_length < gte)
@@ -632,6 +703,7 @@ fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) ->
             .block_height_lte
             .map_or(false, |lte| blockchain_length > lte)
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

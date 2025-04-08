@@ -2,7 +2,6 @@ use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
     block::parser::BlockParser,
-    constants::*,
     ledger::{
         account::{Account, Permission, Permissions},
         store::best::BestLedgerStore,
@@ -96,17 +95,9 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             Account {
                 balance: 100000000000000.into(),
                 public_key: pk.clone(),
-                nonce: None,
                 delegate: pk.clone(),
-                genesis_account: None,
                 token: Some(minu_token.clone()),
-                token_symbol: None,
-                receipt_chain_hash: None,
-                voting_for: None,
-                permissions: None,
-                timing: None,
-                zkapp: None,
-                username: None,
+                ..Default::default()
             }
         );
     } else {
@@ -117,14 +108,12 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
             public_key: pk.clone(),
-            balance: MAINNET_ACCOUNT_CREATION_FEE,
+            balance: 0.into(),
             nonce: Some(1.into()),
             delegate: pk,
-            genesis_account: None,
             token: Some(mina_token.clone()),
             token_symbol: Some("MINU".into()),
-            receipt_chain_hash: None,
-            voting_for: None,
+            created_by_zkapp: true,
             permissions: Some(Permissions {
                 edit_state: Permission::Proof,
                 access: Permission::None,
@@ -140,7 +129,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 set_voting_for: Permission::Signature,
                 set_timing: Permission::Signature,
             }),
-            timing: None,
             zkapp: Some(ZkappAccount {
                 proved_state: true,
                 verification_key: VerificationKey {
@@ -149,17 +137,11 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 },
                 ..Default::default()
             }),
-            username: None,
+            ..Default::default()
         };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(
-            mina_account.clone().display(),
-            Account {
-                balance: 0.into(),
-                ..expect
-            }
-        );
+        assert_eq!(mina_account.clone().display(), expect);
     } else {
         panic!("MINA zkapp account does not exist");
     }
@@ -169,10 +151,11 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
                 public_key: pk.clone(),
-                balance: (1e9 as u64).into(),
+                balance: 0.into(),
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token.clone()),
+                created_by_zkapp: true,
                 permissions: Some(Permissions {
                     edit_state: Permission::Proof,
                     access: Permission::None,
@@ -209,13 +192,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(
-            mina_account.clone().display(),
-            Account {
-                balance: 0.into(),
-                ..expect
-            }
-        );
+        assert_eq!(mina_account.clone().display(), expect);
     } else {
         panic!(
             "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P zkapp account does not exist"

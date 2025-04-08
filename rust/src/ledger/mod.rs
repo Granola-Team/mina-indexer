@@ -151,7 +151,13 @@ impl Ledger {
             .tokens
             .get_mut(&token)
             .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
-            .or_else(|| Some(Account::empty(pk, token.to_owned())))
+            .or_else(|| {
+                Some(Account::empty(
+                    pk,
+                    token.to_owned(),
+                    acct_diff.is_zkapp_diff(),
+                ))
+            })
         {
             self.insert_account(
                 account.apply_account_diff(acct_diff, block_height, state_hash),
@@ -203,7 +209,13 @@ impl Ledger {
                 .tokens
                 .get_mut(&token)
                 .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
-                .or_else(|| Some(Account::empty(pk.to_owned(), token.to_owned())))
+                .or_else(|| {
+                    Some(Account::empty(
+                        pk.to_owned(),
+                        token.to_owned(),
+                        acct_diff.is_zkapp_diff(),
+                    ))
+                })
             {
                 if let Some(account) = account_after.unapply_account_diff(
                     acct_diff,
@@ -330,7 +342,8 @@ impl std::fmt::Debug for Ledger {
                                 .token
                                 .clone()
                                 .or_else(|| Some(TokenAddress::default()))
-                                .unwrap()
+                                .unwrap(),
+                            acct.created_by_zkapp
                         )
                         .0
                 )?;
@@ -392,7 +405,7 @@ mod tests {
     fn apply_diff_payment() -> anyhow::Result<()> {
         let amount = Amount(42 * MINA_SCALE);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")?;
-        let account_before = Account::empty(public_key.clone(), TokenAddress::default());
+        let account_before = Account::empty(public_key.clone(), TokenAddress::default(), false);
 
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account_before.clone());
@@ -450,7 +463,7 @@ mod tests {
         let prev_nonce = Nonce(42);
         let public_key = PublicKey::new("B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy")?;
         let delegate = PublicKey::new("B62qmMypEDCchUgPD6RU99gVKXJcY46urKdjbFmG5cYtaVpfKysXTz6")?;
-        let account_before = Account::empty(public_key.clone(), TokenAddress::default());
+        let account_before = Account::empty(public_key.clone(), TokenAddress::default(), true);
 
         let mut accounts = HashMap::new();
         accounts.insert(public_key.clone(), account_before.clone());

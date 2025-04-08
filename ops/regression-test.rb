@@ -38,7 +38,8 @@ test_names = %w[
   snapshot_database_dir
   rest_accounts_summary
   rest_blocks
-  genesis_block_creator
+  genesis_block_creator_v1
+  genesis_block_creator_v2
   txn_nonces
   startup_staking_ledgers
   watch_staking_ledgers

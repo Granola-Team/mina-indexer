@@ -2,10 +2,7 @@
 
 pub mod block;
 
-use super::{
-    db, get_block_canonicity, millis_to_iso_date_string, MAINNET_COINBASE_REWARD,
-    MAINNET_EPOCH_SLOT_COUNT, PK,
-};
+use super::{db, get_block_canonicity, millis_to_iso_date_string, MAINNET_EPOCH_SLOT_COUNT, PK};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
@@ -43,7 +40,7 @@ impl BlocksQueryRoot {
 
         // no query filters => get the best block
         if query.is_none() {
-            let counts = get_counts(db).await?;
+            let counts = get_counts(db)?;
 
             return Ok(db
                 .get_best_block()
@@ -67,7 +64,7 @@ impl BlocksQueryRoot {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
-            let block = Block::from_precomputed(db, &pcb, get_counts(db).await?);
+            let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
 
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
@@ -83,7 +80,7 @@ impl BlocksQueryRoot {
         {
             let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
-            let block = Block::from_precomputed(db, &pcb, get_counts(db).await?);
+            let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
 
             if query.as_ref().map_or(true, |q| q.matches(&block)) {
                 return Ok(Some(block));
@@ -119,7 +116,7 @@ impl BlocksQueryRoot {
             };
         }
 
-        let counts = get_counts(db).await?;
+        let counts = get_counts(db)?;
         let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
@@ -747,7 +744,7 @@ fn precomputed_matches_query(
     }
 }
 
-pub async fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
+pub fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
     let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
     let total_num_blocks = db.get_block_production_total_count()?;
 

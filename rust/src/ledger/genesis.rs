@@ -185,12 +185,11 @@ impl GenesisLedger {
 
     /// This is the only way to construct a genesis ledger
     pub fn new(genesis: GenesisAccounts) -> GenesisLedger {
-        let mut accounts = HashMap::new();
-
         // Add genesis block winner
-        let block_creator = Account::from(GenesisBlock::new_v1().unwrap());
-        accounts.insert(block_creator.public_key.clone(), block_creator);
+        let block_creator = Account::from_genesis(GenesisBlock::new_v1().unwrap());
+        let mut accounts = HashMap::from([(block_creator.public_key.clone(), block_creator)]);
 
+        // add genesis ledger accounts
         for account in genesis.accounts {
             let balance = account
                 .balance
@@ -214,10 +213,7 @@ impl GenesisLedger {
                     voting_for: account.voting_for.map(Into::into),
                     timing: account.timing.map(Into::into),
                     genesis_account: Some(balance),
-                    token_symbol: None,
-                    permissions: None,
-                    username: None,
-                    zkapp: None,
+                    ..Default::default()
                 },
             );
         }
@@ -306,7 +302,15 @@ impl From<GenesisLedger> for TokenLedger {
                         pk,
                         Account {
                             // add display fee
-                            balance: acct.balance + MAINNET_ACCOUNT_CREATION_FEE,
+                            balance: if acct
+                                .token
+                                .as_ref()
+                                .map_or(false, |t| t.0 != MINA_TOKEN_ADDRESS)
+                            {
+                                acct.balance
+                            } else {
+                                acct.balance + MAINNET_ACCOUNT_CREATION_FEE
+                            },
                             ..acct
                         },
                     )

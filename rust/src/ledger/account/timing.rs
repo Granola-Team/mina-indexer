@@ -1,3 +1,5 @@
+//! Account timing representation
+
 use crate::{
     base::{numeric::Numeric, Balance},
     mina_blocks::v2,
