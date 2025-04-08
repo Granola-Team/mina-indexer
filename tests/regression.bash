@@ -1964,12 +1964,6 @@ for test_name in "$@"; do
 	"test_clean_kill") test_clean_kill ;;
 	"test_version_file") test_version_file ;;
 	"test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
-<<<<<<< HEAD
-=======
-	# Checked mode
-	"test_check_mode") test_check_mode ;;
-	# Tier 2 tests:
->>>>>>> 625f6a1d (feat: add check mode)
 	"test_best_chain_many_blocks") test_best_chain_many_blocks ;;
 	"test_check_mode") test_check_mode ;;
 	*)
