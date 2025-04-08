@@ -1,3 +1,5 @@
+//! Indexer internal coinbase representation
+
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::internal::InternalCommand,
@@ -27,76 +29,42 @@ pub enum CoinbaseKind {
     Two(Option<CoinbaseFeeTransfer>, Option<CoinbaseFeeTransfer>),
 }
 
-impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
-    fn from(value: v2::staged_ledger_diff::Coinbase) -> Self {
-        match value {
-            v2::staged_ledger_diff::Coinbase::Zero(_) => Self::Zero,
-            v2::staged_ledger_diff::Coinbase::One(_, one) => {
-                Self::One(one.map(|o| CoinbaseFeeTransfer {
-                    receiver_pk: o.receiver_pk,
-                    fee: o.fee.0,
-                }))
-            }
-            v2::staged_ledger_diff::Coinbase::Two(_, two) => match two {
-                None => Self::Two(None, None),
-                Some((fst, snd)) => Self::Two(
-                    Some(CoinbaseFeeTransfer {
-                        receiver_pk: fst.receiver_pk,
-                        fee: fst.fee.0,
-                    }),
-                    snd.map(|s| CoinbaseFeeTransfer {
-                        receiver_pk: s.receiver_pk,
-                        fee: s.fee.0,
-                    }),
-                ),
-            },
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
 pub struct CoinbaseFeeTransfer {
     pub receiver_pk: PublicKey,
     pub fee: u64,
 }
 
-impl From<staged_ledger_diff::CoinBaseFeeTransfer> for CoinbaseFeeTransfer {
-    fn from(value: staged_ledger_diff::CoinBaseFeeTransfer) -> Self {
-        Self {
-            receiver_pk: PublicKey::from(value.receiver_pk),
-            fee: value.fee.inner().inner(),
-        }
-    }
-}
+///////////
+// impls //
+///////////
 
 impl CoinbaseKind {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Vec<Self> {
-        let mut res = vec![];
-        let pre_diff_coinbase = precomputed_block.pre_diff_coinbase();
-        let post_diff_coinbase = precomputed_block.post_diff_coinbase();
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
+        let mut kind = vec![block.pre_diff_coinbase()];
 
-        res.push(pre_diff_coinbase);
-        if let Some(post_diff_coinbase) = post_diff_coinbase {
-            res.push(post_diff_coinbase);
+        if let Some(post_diff_coinbase) = block.post_diff_coinbase() {
+            kind.push(post_diff_coinbase);
         }
-        res
+
+        kind.into_iter().max().expect("max coinbase")
     }
 }
 
 impl Coinbase {
     pub fn amount(&self) -> u64 {
-        if self.supercharge {
-            2 * MAINNET_COINBASE_REWARD
-        } else {
+        if matches!(self.kind, CoinbaseKind::Zero) {
+            0
+        } else if !self.supercharge {
             MAINNET_COINBASE_REWARD
+        } else {
+            2 * MAINNET_COINBASE_REWARD
         }
     }
 
     pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
-        let kind = CoinbaseKind::from_precomputed(block);
-        let kind = kind.iter().max().expect("max coinbase").clone();
         Self {
-            kind,
+            kind: CoinbaseKind::from_precomputed(block),
             receiver: block.coinbase_receiver(),
             receiver_balance: block.coinbase_receiver_balance(),
             is_new_account: block.accounts_created().1.is_some(),
@@ -115,6 +83,7 @@ impl Coinbase {
 
     pub fn account_diffs_coinbase_mut(&self, account_diffs: &mut [Vec<AccountDiff>]) {
         let fee_transfer = self.fee_transfer();
+
         if let Some(fee_transfer_pair) = account_diffs.iter_mut().find(|pair| {
             matches!(pair.as_slice(),
                 [AccountDiff::FeeTransfer(fee_transfer_credit), AccountDiff::FeeTransfer(fee_transfer_debit)]
@@ -153,10 +122,11 @@ impl Coinbase {
                 vec![coinbase.as_ref(), fee_transfer_via_coinbase.as_ref()]
             }
         };
+
         transfers.into_iter().flatten().collect::<Vec<_>>()
     }
 
-    pub fn is_coinbase_applied(&self) -> bool {
+    pub fn is_applied(&self) -> bool {
         !matches!(self.kind, CoinbaseKind::Zero)
     }
 
@@ -166,20 +136,57 @@ impl Coinbase {
 
     // only apply if "coinbase" =/= [ "Zero" ]
     pub fn as_account_diff(self) -> Vec<Vec<AccountDiff>> {
-        if self.is_coinbase_applied() {
+        if self.is_applied() {
             return AccountDiff::from_coinbase(self);
         }
+
         vec![]
     }
 
     pub fn as_internal_cmd(&self) -> InternalCommand {
         InternalCommand::Coinbase {
             receiver: self.receiver.clone(),
-            amount: if self.supercharge {
-                2 * MAINNET_COINBASE_REWARD
-            } else {
-                MAINNET_COINBASE_REWARD
+            amount: self.amount(),
+        }
+    }
+}
+
+/////////////////
+// conversions //
+/////////////////
+
+impl From<v2::staged_ledger_diff::Coinbase> for CoinbaseKind {
+    fn from(value: v2::staged_ledger_diff::Coinbase) -> Self {
+        match value {
+            v2::staged_ledger_diff::Coinbase::Zero(_) => Self::Zero,
+            v2::staged_ledger_diff::Coinbase::One(_, one) => {
+                Self::One(one.map(|o| CoinbaseFeeTransfer {
+                    receiver_pk: o.receiver_pk,
+                    fee: o.fee.0,
+                }))
+            }
+            v2::staged_ledger_diff::Coinbase::Two(_, two) => match two {
+                None => Self::Two(None, None),
+                Some((fst, snd)) => Self::Two(
+                    Some(CoinbaseFeeTransfer {
+                        receiver_pk: fst.receiver_pk,
+                        fee: fst.fee.0,
+                    }),
+                    snd.map(|s| CoinbaseFeeTransfer {
+                        receiver_pk: s.receiver_pk,
+                        fee: s.fee.0,
+                    }),
+                ),
             },
+        }
+    }
+}
+
+impl From<staged_ledger_diff::CoinBaseFeeTransfer> for CoinbaseFeeTransfer {
+    fn from(value: staged_ledger_diff::CoinBaseFeeTransfer) -> Self {
+        Self {
+            receiver_pk: PublicKey::from(value.receiver_pk),
+            fee: value.fee.inner().inner(),
         }
     }
 }
@@ -203,6 +210,7 @@ mod tests {
             receiver_balance: Some(0),
         };
         let payment_diffs = coinbase.fee_transfer();
+
         assert_eq!(payment_diffs[0].len(), 2);
 
         if let [credit, debit] = &payment_diffs[0][..] {
@@ -226,13 +234,13 @@ mod tests {
             is_new_account: false,
             receiver_balance: Some(0),
         };
-        assert!(!coinbase.is_coinbase_applied());
+        assert!(!coinbase.is_applied());
 
         let coinbase = Coinbase {
             kind: CoinbaseKind::One(None),
             ..coinbase
         };
-        assert!(coinbase.is_coinbase_applied());
+        assert!(coinbase.is_applied());
     }
 
     #[test]

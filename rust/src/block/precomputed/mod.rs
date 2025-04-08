@@ -121,7 +121,7 @@ impl PrecomputedBlock {
         contents: Vec<u8>,
         version: PcbVersion,
     ) -> anyhow::Result<Self> {
-        let precomputed_block = PrecomputedBlock::from_file_contents(
+        Self::from_file_contents(
             BlockFileContents {
                 contents,
                 network,
@@ -129,8 +129,7 @@ impl PrecomputedBlock {
                 blockchain_length,
             },
             version,
-        )?;
-        Ok(precomputed_block)
+        )
     }
 
     /// Parses the precomputed block if the path is a valid block file and
@@ -139,6 +138,7 @@ impl PrecomputedBlock {
         let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
         let version: PcbVersion = blockchain_length.into();
         let contents = std::fs::read(path)?;
+
         Self::new(network, blockchain_length, state_hash, contents, version)
     }
 
@@ -146,6 +146,7 @@ impl PrecomputedBlock {
     pub fn parse_file(path: &Path, version: PcbVersion) -> anyhow::Result<Self> {
         let (network, blockchain_length, state_hash) = extract_network_height_hash(path);
         let contents = std::fs::read(path)?;
+
         Self::new(network, blockchain_length, state_hash, contents, version)
     }
 
@@ -664,7 +665,7 @@ impl PrecomputedBlock {
             HashSet::from([self.block_creator(), self.block_stake_winner()]);
 
         // coinbase receiver if coinbase is applied
-        if Coinbase::from_precomputed(self).is_coinbase_applied() {
+        if Coinbase::from_precomputed(self).is_applied() {
             public_keys.insert(self.coinbase_receiver());
         }
 
@@ -674,12 +675,14 @@ impl PrecomputedBlock {
             .filter(|cmd| cmd.is_applied())
             .for_each(|command| {
                 let mut pks = vec![command.sender(), command.fee_payer_pk(), command.signer()];
+
                 pks.append(&mut command.receiver());
                 add_keys(&mut public_keys, pks);
             });
 
         let mut pks: Vec<PublicKey> = public_keys.into_iter().collect();
         pks.sort();
+
         pks
     }
 
@@ -690,6 +693,7 @@ impl PrecomputedBlock {
 
         let mut public_keys: Vec<PublicKey> = public_keys.into_iter().collect();
         public_keys.sort();
+
         public_keys
     }
 
@@ -1418,6 +1422,7 @@ fn add_keys(pks: &mut HashSet<PublicKey>, new_pks: Vec<PublicKey>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::bail;
     use hex_literal::hex;
     use std::path::PathBuf;
 
@@ -1453,7 +1458,7 @@ mod tests {
     }
 
     #[test]
-    fn accounts_created() -> anyhow::Result<()> {
+    fn accounts_created_v2() -> anyhow::Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-360930-3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi.json");
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
 
@@ -1556,7 +1561,7 @@ mod tests {
         );
 
         if errors > 0 {
-            Err(anyhow::anyhow!("{} files failed to parse", errors))
+            bail!("{} files failed to parse", errors)
         } else {
             Ok(())
         }

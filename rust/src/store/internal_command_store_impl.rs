@@ -1,3 +1,5 @@
+//! Internal command store impl
+
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
@@ -5,16 +7,14 @@ use crate::{
         precomputed::PrecomputedBlock,
         store::{BlockStore, DbBlockUpdate},
     },
-    command::internal::{
-        store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData,
-    },
+    command::internal::{store::InternalCommandStore, DbInternalCommandWithData},
     constants::millis_to_iso_date_string,
     utility::store::{
         command::internal::*,
         common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key, U32_LEN},
     },
 };
-use anyhow::bail;
+use anyhow::{bail, Context};
 use log::trace;
 use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 use std::path::PathBuf;
@@ -26,26 +26,16 @@ impl InternalCommandStore for IndexerStore {
         block: &PrecomputedBlock,
         batch: &mut WriteBatch,
     ) -> anyhow::Result<()> {
+        trace!("Adding internal commands for block {}", block.summary());
+
+        // block data
         let epoch = block.epoch_count();
         let state_hash = block.state_hash();
         let global_slot = block.global_slot_since_genesis();
         let block_height = block.blockchain_length();
-        let date_time = block.timestamp() as i64;
-        trace!("Adding internal commands for block {}", block.summary());
 
-        // add cmds with data to public keys
-        let internal_cmds_with_data: Vec<DbInternalCommandWithData> =
-            DbInternalCommand::from_precomputed(block)
-                .into_iter()
-                .map(|c| {
-                    DbInternalCommandWithData::from_internal_cmd(
-                        c,
-                        state_hash.clone(),
-                        block_height,
-                        date_time,
-                    )
-                })
-                .collect();
+        // internal commands
+        let internal_cmds_with_data = DbInternalCommandWithData::from_precomputed(block);
 
         // per block internal command count
         self.set_block_internal_commands_count_batch(
@@ -53,6 +43,7 @@ impl InternalCommandStore for IndexerStore {
             internal_cmds_with_data.len() as u32,
             batch,
         )?;
+
         self.database.put_cf(
             self.internal_commands_block_num_cf(),
             state_hash.0.as_bytes(),
@@ -62,8 +53,10 @@ impl InternalCommandStore for IndexerStore {
         // increment internal command counts &
         // sort by pk, block height & global slot
         self.increment_internal_commands_total_count(internal_cmds_with_data.len() as u32)?;
+
         for (i, int_cmd) in internal_cmds_with_data.iter().enumerate() {
             let pk = int_cmd.recipient();
+
             self.increment_internal_commands_counts(int_cmd, epoch)?;
             self.set_block_internal_command(block, i as u32, int_cmd)?;
             self.set_pk_internal_command(&pk, int_cmd)?;
@@ -105,10 +98,12 @@ impl InternalCommandStore for IndexerStore {
         internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()> {
         let state_hash = block.state_hash();
-        let global_slot = block.global_slot_since_genesis();
-        let block_height = block.blockchain_length();
         trace!("Setting block internal command {state_hash} index {index}");
 
+        let global_slot = block.global_slot_since_genesis();
+        let block_height = block.blockchain_length();
+
+        // value
         let value = serde_json::to_vec(internal_command)?;
 
         // store
@@ -118,13 +113,14 @@ impl InternalCommandStore for IndexerStore {
             &value,
         )?;
 
-        // sort
+        // sort by block height
         self.database.put_cf(
             self.internal_commands_block_height_sort_cf(),
             internal_commmand_sort_key(block_height, &state_hash, index),
             &value,
         )?;
 
+        // sort by global slot
         self.database.put_cf(
             self.internal_commands_global_slot_sort_cf(),
             internal_commmand_sort_key(global_slot, &state_hash, index),
@@ -140,13 +136,18 @@ impl InternalCommandStore for IndexerStore {
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         trace!("Getting internal command block {state_hash} index {index}");
+
         Ok(self
             .database
             .get_cf(
                 self.internal_commands_cf(),
                 internal_commmand_block_key(state_hash, index),
             )?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .and_then(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("block {} index {}", state_hash, index))
+                    .expect("internal command")
+            }))
     }
 
     fn set_pk_internal_command(
@@ -154,17 +155,21 @@ impl InternalCommandStore for IndexerStore {
         pk: &PublicKey,
         internal_command: &DbInternalCommandWithData,
     ) -> anyhow::Result<()> {
-        let n = self.get_pk_num_internal_commands(pk)?.unwrap_or(0);
+        let n = self.get_pk_num_internal_commands(pk)?.unwrap_or_default();
+        trace!("Setting internal command pk {pk} index {n}");
+
         self.database.put_cf(
             self.internal_commands_pk_cf(),
             internal_command_pk_key(pk, n),
             serde_json::to_vec(internal_command)?,
         )?;
+
         self.database.put_cf(
             self.internal_commands_pk_num_cf(),
             pk.0.as_bytes(),
             (n + 1).to_be_bytes(),
         )?;
+
         Ok(())
     }
 
@@ -174,13 +179,18 @@ impl InternalCommandStore for IndexerStore {
         index: u32,
     ) -> anyhow::Result<Option<DbInternalCommandWithData>> {
         trace!("Getting internal command pk {pk} index {index}");
+
         Ok(self
             .database
             .get_cf(
                 self.internal_commands_pk_cf(),
                 internal_commmand_pk_key(pk, index),
             )?
-            .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
+            .and_then(|bytes| {
+                serde_json::from_slice(&bytes)
+                    .with_context(|| format!("pk {} index {}", pk, index))
+                    .expect("pk internal command")
+            }))
     }
 
     fn get_internal_commands(
@@ -189,6 +199,7 @@ impl InternalCommandStore for IndexerStore {
     ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands in block {state_hash}");
         let mut res = vec![];
+
         if let Some(num) = self.get_block_internal_commands_count(state_hash)? {
             for n in 0..num {
                 res.push(
@@ -197,6 +208,7 @@ impl InternalCommandStore for IndexerStore {
                 );
             }
         }
+
         Ok(res)
     }
 
@@ -208,6 +220,7 @@ impl InternalCommandStore for IndexerStore {
     ) -> anyhow::Result<Vec<DbInternalCommandWithData>> {
         trace!("Getting internal commands for public key {pk}");
         let mut internal_cmds = vec![];
+
         if let Some(n) = self.get_pk_num_internal_commands(pk)? {
             for m in offset as u32..std::cmp::min(limit as u32, n) {
                 if let Some(internal_command) = self.get_pk_internal_command(pk, m)? {
@@ -218,6 +231,7 @@ impl InternalCommandStore for IndexerStore {
                 }
             }
         }
+
         Ok(internal_cmds)
     }
 
@@ -244,10 +258,12 @@ impl InternalCommandStore for IndexerStore {
             if cmd_pk != pk {
                 break;
             }
+
             let height = pk_txn_sort_key_sort(&key);
             let state_hash = internal_command_pk_sort_key_state_hash(&key);
             let index = internal_command_pk_sort_key_index(&key);
             let kind = internal_command_pk_sort_key_kind(&key);
+
             cmds.push((height, kind, index, state_hash));
         }
 
@@ -263,11 +279,14 @@ impl InternalCommandStore for IndexerStore {
             } else {
                 "/mnt".into()
             };
+
             format!("{dir}/mina-indexer-internal-commands/{pk}.csv")
         };
+
         let mut csv_writer = csv::WriterBuilder::new()
             .has_headers(true)
             .from_path(path.clone())?;
+
         for (_, _, index, state_hash) in cmds {
             if let Some(cmd) = self
                 .get_block_internal_command(&state_hash, index)?
@@ -287,16 +306,49 @@ impl InternalCommandStore for IndexerStore {
     // Iterators //
     ///////////////
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {height}{state_hash}{index}{kind}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - height:     [u32] BE bytes
+    /// - state_hash: [StateHash] bytes
+    /// - index:      [u32] BE bytes
+    /// - kind:       0, 1, or 2
+    /// ```
+    /// Use with [internal_commmand_sort_key]
     fn internal_commands_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.internal_commands_block_height_sort_cf(), mode)
     }
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {global_slot}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - global_slot: [u32] BE bytes
+    /// - state_hash:  [StateHash] bytes
+    /// - index:       [u32] BE bytes
+    /// - kind:        0, 1, or 2
+    /// ```
+    /// Use with [internal_commmand_sort_key]
     fn internal_commands_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.internal_commands_global_slot_sort_cf(), mode)
     }
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {recipient}{height}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - recipient:  [PublicKey] bytes
+    /// - height:     [u32] BE bytes
+    /// - state_hash: [StateHash] bytes
+    /// - index:      [u32] BE bytes
+    /// ```
+    /// Use with [internal_commmand_pk_sort_key]
     fn internal_commands_pk_block_height_iterator(
         &self,
         pk: PublicKey,
@@ -319,6 +371,17 @@ impl InternalCommandStore for IndexerStore {
             .iterator_cf(self.internal_commands_pk_block_height_sort_cf(), mode)
     }
 
+    /// Key-value pairs
+    /// ```
+    /// - key: {recipient}{global_slot}{state_hash}{index}
+    /// - val: [InternalCommandWithData] serde bytes
+    /// where
+    /// - recipient:   [PublicKey] bytes
+    /// - global_slot: [u32] BE bytes
+    /// - state_hash:  [StateHash] bytes
+    /// - index:       [u32] BE bytes
+    /// ```
+    /// Use with [internal_commmand_pk_sort_key]
     fn internal_commands_pk_global_slot_iterator(
         &self,
         pk: PublicKey,

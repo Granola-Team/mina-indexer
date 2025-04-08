@@ -706,6 +706,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - pk:    [PublicKey] bytes
     /// - index: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_pk_key]
     fn zkapp_tokens_pk_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-pk")
@@ -733,6 +735,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token: [TokenAdress] bytes
     /// - pk:    [PublicKey] bytes
+    /// ```
+    /// Use with [zkapp_tokens_pk_index_key]
     fn zkapp_tokens_pk_index_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-pk-index")
@@ -760,6 +764,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token: [TokenAdress] bytes
     /// - index: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_historical_diffs_key]
     fn zkapp_tokens_historical_diffs_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-diffs")
@@ -770,11 +776,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     ///
     /// Key-value pairs
     /// ```
-    /// - key: {token}{index}
-    /// - val: [TokenDiff] serde bytes
-    /// where
-    /// - token: [TokenAdress] bytes
-    /// - index: [u32] BE bytes
+    /// - key: [TokenAdress] bytes
+    /// - val: [u32] BE bytes
     fn zkapp_tokens_historical_diffs_num_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-diffs-num")
@@ -790,6 +793,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token: [TokenAdress] bytes
     /// - index: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_historical_owners_key]
     fn zkapp_tokens_historical_owners_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-owners")
@@ -817,6 +822,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token: [TokenAdress] bytes
     /// - index: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_historical_symbols_key]
     fn zkapp_tokens_historical_symbols_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-symbols")
@@ -844,6 +851,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token: [TokenAdress] bytes
     /// - index: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_historical_supplies_key]
     fn zkapp_tokens_historical_supplies_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-supplies")
@@ -883,6 +892,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// ```
     /// - key: [PublicKey] bytes
     /// - val: [u32] BE bytes
+    /// ```
+    /// Use with [zkapp_tokens_historical_pk_diffs_key]
     fn zkapp_tokens_historical_pk_diffs_num_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-tokens-historical-pk-diffs-num")
@@ -900,6 +911,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - state_hash: [StateHash] bytes
     /// - index:      [u32] BE bytes
+    /// ```
+    /// Use with [internal_commmand_block_key]
     fn internal_commands_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands")
@@ -923,6 +936,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - receiver: [PublicKey] bytes
     /// - index:    [u32] BE bytes
+    /// ```
+    /// Use with [internal_command_pk_key]
     fn internal_commands_pk_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk")
@@ -941,13 +956,15 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {block_height}{state_hash}{index}{kind}
+    /// - key: {height}{state_hash}{index}{kind}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - block_height: [u32] BE bytes
-    /// - state_hash:   [StateHash] bytes
-    /// - index:        [u32] BE bytes
-    /// - kind:         0, 1, or 2
+    /// - height:     [u32] BE bytes
+    /// - state_hash: [StateHash] bytes
+    /// - index:      [u32] BE bytes
+    /// - kind:       0, 1, or 2
+    /// ```
+    /// Use with [internal_commmand_sort_key]
     fn internal_commands_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-block-height-sort")
@@ -963,6 +980,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - state_hash:  [StateHash] bytes
     /// - index:       [u32] BE bytes
     /// - kind:        0, 1, or 2
+    /// ```
+    /// Use with [internal_commmand_sort_key]
     fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-global-slot-sort")
@@ -971,13 +990,15 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{block_height}{state_hash}{index}
+    /// - key: {recipient}{height}{state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - receiver:     [PublicKey] bytes
-    /// - block_height: [u32] BE bytes
-    /// - state_hash:   [StateHash] bytes
-    /// - index:        [u32] BE bytes
+    /// - recipient:  [PublicKey] bytes
+    /// - height:     [u32] BE bytes
+    /// - state_hash: [StateHash] bytes
+    /// - index:      [u32] BE bytes
+    /// ```
+    /// Use with [internal_commmand_pk_sort_key]
     fn internal_commands_pk_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-block-height-sort")
@@ -986,13 +1007,15 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{global_slot}{state_hash}{index}
+    /// - key: {recipient}{global_slot}{state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
-    /// - receiver:    [PublicKey] bytes
+    /// - recipient:   [PublicKey] bytes
     /// - global_slot: [u32] BE bytes
     /// - state_hash:  [StateHash] bytes
     /// - index:       [u32] BE bytes
+    /// ```
+    /// Use with [internal_commmand_pk_sort_key]
     fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-global-slot-sort")
@@ -1026,6 +1049,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token:   [TokenAddress] bytes
     /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [best_account_key]
     fn best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("best-ledger-accounts")
@@ -1041,7 +1066,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - balance: [u64] BE bytes
     /// - pk:      [PublicKey] bytes
     /// ```
-    /// Use []
+    /// Use with [best_account_sort_key]
     fn best_ledger_accounts_balance_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("best-ledger-account-balance-sort")
@@ -1055,6 +1080,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - token:   [TokenAddress] bytes
     /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [best_account_key]
     fn zkapp_best_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-best-ledger-accounts")

@@ -1,3 +1,5 @@
+//! Receipt chain hash representation
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

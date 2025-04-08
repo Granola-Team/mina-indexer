@@ -1,3 +1,5 @@
+//! Ledger account representation
+
 mod receipt_chain_hash;
 mod timing;
 
@@ -5,10 +7,9 @@ use super::{
     diff::{
         account::{
             zkapp::{
-                ZkappAccountCreationFee, ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff,
-                ZkappIncrementNonce, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff,
-                ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
-                ZkappVotingForDiff,
+                ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonce,
+                ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff, ZkappTimingDiff,
+                ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
             },
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
         },
@@ -38,6 +39,7 @@ pub struct Account {
     pub balance: Amount,
     pub delegate: PublicKey,
     pub genesis_account: Option<Amount>,
+    pub created_by_zkapp: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<Nonce>,
@@ -98,6 +100,7 @@ impl Account {
             .token
             .as_ref()
             .map_or(true, |t| t.0 == MINA_TOKEN_ADDRESS)
+            && !self.created_by_zkapp
         {
             return Self {
                 balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
@@ -136,11 +139,12 @@ impl Account {
     ///
     /// A new `Account` instance with the specified public key and token,
     /// default values for other fields.
-    pub fn empty(public_key: PublicKey, token: TokenAddress) -> Self {
+    pub fn empty(public_key: PublicKey, token: TokenAddress, created_by_zkapp: bool) -> Self {
         Self {
             public_key: public_key.clone(),
             delegate: public_key,
             token: Some(token),
+            created_by_zkapp,
             ..Default::default()
         }
     }
@@ -483,21 +487,6 @@ impl Account {
         }
     }
 
-    /// Apply zkapp account creation fee
-    pub fn zkapp_account_creation(
-        self,
-        diff: &ZkappAccountCreationFee,
-        state_hash: &StateHash,
-    ) -> Self {
-        self.checks(&diff.public_key, &TokenAddress::default(), state_hash);
-        assert_eq!(diff.amount, MAINNET_ACCOUNT_CREATION_FEE);
-
-        Self {
-            balance: self.balance + diff.amount,
-            ..self
-        }
-    }
-
     /// Apply zkapp fee payer nonce
     pub fn zkapp_fee_payer_nonce(
         self,
@@ -526,7 +515,7 @@ impl Account {
 
         if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
             let summary = format!("mainnet-{}-{}", block_height, state_hash);
-            warn!("APPLY {}\nDIFF: {}\nBEFORE: {}", summary, diff, self)
+            warn!("APPLY {}\n{}\nBEFORE: {}", summary, diff, self)
         }
 
         let after = match diff {
@@ -548,7 +537,6 @@ impl Account {
             ZkappActionsDiff(diff) => self.zkapp_actions(diff, state_hash),
             ZkappEventsDiff(diff) => self.zkapp_events(diff, state_hash),
             ZkappIncrementNonce(diff) => self.zkapp_nonce(diff, state_hash),
-            ZkappAccountCreationFee(diff) => self.zkapp_account_creation(diff, state_hash),
             ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff, state_hash),
             Zkapp(_) => unreachable!(),
         };
@@ -602,7 +590,6 @@ impl Account {
             | ZkappActionsDiff(_)
             | ZkappEventsDiff(_)
             | ZkappIncrementNonce(_)
-            | ZkappAccountCreationFee(_)
             | ZkappFeePayerNonce(_) => {
                 if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
                     let summary = format!("mainnet-{}-{}", block_height, state_hash);
@@ -701,17 +688,18 @@ impl Ord for Account {
 // conversions //
 /////////////////
 
-impl From<GenesisBlock> for Account {
+impl Account {
     /// Magic mina for genesis block creator
-    fn from(value: GenesisBlock) -> Self {
-        let block_creator = value.0.block_creator();
-        let balance = Amount(1000_u64);
+    pub fn from_genesis(block: GenesisBlock) -> Self {
+        let block_creator = block.0.block_creator();
+        let balance = 1000.into();
 
         Self {
             balance,
             public_key: block_creator.clone(),
             delegate: block_creator,
             genesis_account: Some(balance),
+            token: Some(TokenAddress::default()),
             ..Default::default()
         }
     }

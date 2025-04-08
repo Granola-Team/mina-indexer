@@ -9,11 +9,9 @@ use crate::{
     base::state_hash::StateHash,
     block::{precomputed::PrecomputedBlock, AccountCreated},
     command::UserCommandWithStatusT,
-    constants::MINA_TOKEN_ADDRESS,
 };
-use account::zkapp::ZkappAccountCreationFee;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use token::TokenDiff;
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -51,57 +49,9 @@ impl LedgerDiff {
     /// Compute a ledger diff from the given precomputed block
     pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
         let unexpanded = Self::from_precomputed_unexpanded(block);
-        let mut account_diffs = AccountDiff::expand(unexpanded.account_diffs);
-
-        // v2 account creation fees (via payments & zkapps)
-        let all_accounts_mina_created: BTreeMap<_, _> = block
-            .accounts_created_v2()
-            .into_iter()
-            .filter_map(
-                |AccountCreated {
-                     public_key,
-                     token,
-                     creation_fee,
-                 }| {
-                    if token.0 == MINA_TOKEN_ADDRESS {
-                        Some((public_key, creation_fee))
-                    } else {
-                        None
-                    }
-                },
-            )
-            .collect();
-
-        let mina_accounts_created: BTreeSet<_> =
-            all_accounts_mina_created.keys().cloned().collect();
-
-        // only the zkapp command token accounts
-        let mut zkapp_token_accounts = BTreeSet::new();
-
-        account_diffs.iter().flatten().for_each(|diff| {
-            diff.add_mina_token_accounts(&mut zkapp_token_accounts);
-        });
-
-        // token accounts created via zkapp command
-        let zkapp_token_accounts_created: Vec<_> = {
-            mina_accounts_created
-                .intersection(&zkapp_token_accounts)
-                .map(|pk| {
-                    AccountDiff::ZkappAccountCreationFee(ZkappAccountCreationFee {
-                        public_key: pk.to_owned(),
-                        amount: all_accounts_mina_created.get(pk).cloned().unwrap(),
-                    })
-                })
-        }
-        .collect();
-
-        // prepend zkapp account creation fees
-        if !zkapp_token_accounts_created.is_empty() {
-            account_diffs.insert(0, zkapp_token_accounts_created)
-        }
 
         Self {
-            account_diffs,
+            account_diffs: AccountDiff::expand(unexpanded.account_diffs),
             ..unexpanded
         }
     }
@@ -142,7 +92,7 @@ impl LedgerDiff {
             coinbase.account_diffs_coinbase_mut(&mut account_diff_fees);
         }
 
-        if coinbase.is_coinbase_applied() {
+        if coinbase.is_applied() {
             account_diffs.push(coinbase.as_account_diff()[0].clone());
         }
         account_diffs.append(&mut account_diff_fees);
@@ -213,6 +163,7 @@ impl LedgerDiff {
                     .filter_map(|diff| {
                         use AccountDiff::*;
                         match diff {
+                            // zkapp
                             Zkapp(_)
                             | ZkappStateDiff(_)
                             | ZkappPermissionsDiff(_)
@@ -224,9 +175,16 @@ impl LedgerDiff {
                             | ZkappActionsDiff(_)
                             | ZkappEventsDiff(_)
                             | ZkappIncrementNonce(_)
-                            | ZkappAccountCreationFee(_)
+                            | ZkappProvedStateDiff(_)
                             | ZkappFeePayerNonce(_) => Some(diff),
-                            _ => None,
+
+                            // non-zkapp
+                            Payment(_)
+                            | Delegation(_)
+                            | Coinbase(_)
+                            | FeeTransfer(_)
+                            | FeeTransferViaCoinbase(_)
+                            | FailedTransactionNonce(_) => None,
                         }
                     })
                     .collect::<Vec<_>>();
@@ -259,6 +217,7 @@ impl LedgerDiff {
         // update new data
         self.blockchain_length = other.blockchain_length;
         self.new_coinbase_receiver = other.new_coinbase_receiver;
+
         for (pk, bal) in other.new_pk_balances {
             self.new_pk_balances.insert(pk, bal);
         }
@@ -266,7 +225,8 @@ impl LedgerDiff {
 
     pub fn append_vec(diffs: Vec<Self>) -> Self {
         let mut acc = Self::default();
-        diffs.iter().for_each(|diff| acc.append(diff.clone()));
+        diffs.into_iter().for_each(|diff| acc.append(diff));
+
         acc
     }
 
@@ -1225,8 +1185,10 @@ mod tests {
                 10000000,
             ),
         ]);
+
         ledger_diff.account_diffs.sort();
         expect_diffs.sort();
+
         for (i, diff) in ledger_diff.account_diffs.iter().enumerate() {
             assert_eq!(
                 *diff, expect_diffs[i],
@@ -1234,6 +1196,7 @@ mod tests {
                 ledger_diff.account_diffs, expect_diffs,
             );
         }
+
         Ok(())
     }
 }

@@ -1586,6 +1586,7 @@ impl IndexerState {
     fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
         // apply the new canonical diffs and store each nth resulting ledger
         let mut ledger_diff = LedgerDiff::default();
+
         for canonical_block in canonical_blocks {
             if let Some(diff) = self.diffs_map.get(&canonical_block.state_hash) {
                 ledger_diff.append(diff.clone());

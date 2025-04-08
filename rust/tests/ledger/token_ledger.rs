@@ -96,17 +96,10 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             Account {
                 balance: 100000000000000.into(),
                 public_key: pk.clone(),
-                nonce: None,
                 delegate: pk.clone(),
-                genesis_account: None,
                 token: Some(minu_token.clone()),
-                token_symbol: None,
-                receipt_chain_hash: None,
-                voting_for: None,
-                permissions: None,
-                timing: None,
-                zkapp: None,
-                username: None,
+                created_by_zkapp: true,
+                ..Default::default()
             }
         );
     } else {
@@ -120,11 +113,9 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             balance: MAINNET_ACCOUNT_CREATION_FEE,
             nonce: Some(1.into()),
             delegate: pk,
-            genesis_account: None,
             token: Some(mina_token.clone()),
             token_symbol: Some("MINU".into()),
-            receipt_chain_hash: None,
-            voting_for: None,
+            created_by_zkapp: true,
             permissions: Some(Permissions {
                 edit_state: Permission::Proof,
                 access: Permission::None,
@@ -140,7 +131,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 set_voting_for: Permission::Signature,
                 set_timing: Permission::Signature,
             }),
-            timing: None,
             zkapp: Some(ZkappAccount {
                 proved_state: true,
                 verification_key: VerificationKey {
@@ -149,7 +139,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 },
                 ..Default::default()
             }),
-            username: None,
+            ..Default::default()
         };
 
         assert_eq!(*mina_account, expect);
@@ -173,6 +163,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token.clone()),
+                created_by_zkapp: true,
                 permissions: Some(Permissions {
                     edit_state: Permission::Proof,
                     access: Permission::None,

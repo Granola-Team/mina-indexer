@@ -72,14 +72,14 @@ mod test {
     #[test]
     fn parse_genesis_block_v1() -> anyhow::Result<()> {
         let block = GenesisBlock::new_v1()?;
-        assert_eq!(block.0.state_hash().0, MAINNET_GENESIS_HASH,);
+        assert_eq!(block.0.state_hash().0, MAINNET_GENESIS_HASH);
         Ok(())
     }
 
     #[test]
     fn parse_genesis_block_v2() -> anyhow::Result<()> {
         let block = GenesisBlock::new_v2()?;
-        assert_eq!(block.0.state_hash().0, HARDFORK_GENESIS_HASH,);
+        assert_eq!(block.0.state_hash().0, HARDFORK_GENESIS_HASH);
         Ok(())
     }
 }

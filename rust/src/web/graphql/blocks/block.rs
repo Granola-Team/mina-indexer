@@ -1,13 +1,14 @@
 //! GraphQL block representation
 
-use super::{millis_to_iso_date_string, MAINNET_COINBASE_REWARD, MAINNET_EPOCH_SLOT_COUNT, PK};
+use super::{millis_to_iso_date_string, MAINNET_EPOCH_SLOT_COUNT, PK};
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{
-        internal::{store::InternalCommandStore, DbInternalCommand, DbInternalCommandWithData},
+        internal::{store::InternalCommandStore, DbInternalCommandWithData},
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
+    ledger::coinbase::Coinbase,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
     web::graphql::{get_block_canonicity, transactions::TransactionWithoutBlock},
@@ -159,14 +160,14 @@ pub struct Transactions {
     pub coinbase_receiver_account: PK,
 
     /// Value fee transfer
-    pub fee_transfer: Vec<BlockFeetransfer>,
+    pub fee_transfer: Vec<BlockFeeTransfer>,
 
     /// Value user commands
     pub user_commands: Vec<TransactionWithoutBlock>,
 }
 
 #[derive(Default, SimpleObject, Serialize)]
-pub struct BlockFeetransfer {
+pub struct BlockFeeTransfer {
     pub fee: String,
     pub recipient: String,
 
@@ -419,34 +420,23 @@ impl BlockWithoutCanonicity {
         let staking_epoch_ledger_hash = block.staking_epoch_ledger_hash().0;
         let staking_epoch_total_currency = block.staking_epoch_total_currency();
 
-        let coinbase_receiver_account = block.coinbase_receiver().0;
-        let supercharged = block.supercharge_coinbase();
-        let coinbase: u64 = if supercharged {
-            2 * MAINNET_COINBASE_REWARD
-        } else {
-            MAINNET_COINBASE_REWARD
-        };
+        // internal commands
+        let coinbase = Coinbase::from_precomputed(block);
+        let fee_transfers: Vec<BlockFeeTransfer> =
+            DbInternalCommandWithData::from_precomputed(block)
+                .into_iter()
+                .filter(|x| matches!(x, DbInternalCommandWithData::FeeTransfer { .. }))
+                .map(|ft| ft.into())
+                .collect();
 
-        let fee_transfers: Vec<BlockFeetransfer> = DbInternalCommand::from_precomputed(block)
-            .into_iter()
-            .map(|cmd| {
-                DbInternalCommandWithData::from_internal_cmd(
-                    cmd,
-                    block.state_hash(),
-                    block.blockchain_length(),
-                    block.timestamp() as i64,
-                )
-            })
-            .filter(|x| matches!(x, DbInternalCommandWithData::FeeTransfer { .. }))
-            .map(|ft| ft.into())
-            .collect();
-
+        // user commands
         let user_commands: Vec<TransactionWithoutBlock> =
             SignedCommandWithData::from_precomputed(block)
                 .into_iter()
                 .map(|cmd| TransactionWithoutBlock::new(db, cmd, canonical, num_commands))
                 .collect();
 
+        // SNARKs
         let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(block)
             .into_iter()
             .map(|snark| (snark, block.state_hash().0, block_height, date_time.clone()).into())
@@ -513,9 +503,9 @@ impl BlockWithoutCanonicity {
             tx_fees: tx_fees.to_string(),
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
-                coinbase: coinbase.to_string(),
+                coinbase: coinbase.amount().to_string(),
                 coinbase_receiver_account: PK {
-                    public_key: coinbase_receiver_account,
+                    public_key: coinbase.receiver.to_string(),
                 },
                 fee_transfer: fee_transfers,
                 user_commands,
@@ -528,7 +518,7 @@ impl BlockWithoutCanonicity {
 // conversions //
 /////////////////
 
-impl From<DbInternalCommandWithData> for BlockFeetransfer {
+impl From<DbInternalCommandWithData> for BlockFeeTransfer {
     fn from(int_cmd: DbInternalCommandWithData) -> Self {
         match int_cmd {
             DbInternalCommandWithData::FeeTransfer {

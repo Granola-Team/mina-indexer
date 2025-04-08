@@ -76,7 +76,7 @@ impl TokenLedger {
         if let Some(account) = self
             .accounts
             .remove(&pk)
-            .or_else(|| Some(Account::empty(pk.clone(), token)))
+            .or_else(|| Some(Account::empty(pk.clone(), token, acct_diff.is_zkapp_diff())))
         {
             self.accounts.insert(
                 pk,
@@ -101,7 +101,7 @@ impl TokenLedger {
             if let Some(account_after) = self
                 .accounts
                 .remove(&pk)
-                .or_else(|| Some(Account::empty(pk.clone(), token)))
+                .or_else(|| Some(Account::empty(pk.clone(), token, acct_diff.is_zkapp_diff())))
             {
                 if let Some(account) = account_after.unapply_account_diff(
                     acct_diff,

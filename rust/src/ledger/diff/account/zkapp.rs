@@ -7,7 +7,7 @@ use crate::{
     ledger::{
         account::{Permissions, Timing},
         token::{TokenAddress, TokenSymbol},
-        Amount, PublicKey,
+        PublicKey,
     },
     mina_blocks::v2::{
         zkapp::action_state::ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri,
@@ -50,9 +50,8 @@ pub struct ZkappDiff {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub enum ZkappPaymentDiff {
-    IncrementNonce(ZkappIncrementNonce),
-    AccountCreationFee(ZkappAccountCreationFee),
     Payment(PaymentDiff),
+    IncrementNonce(ZkappIncrementNonce),
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -131,13 +130,7 @@ pub struct ZkappIncrementNonce {
     pub token: TokenAddress,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct ZkappAccountCreationFee {
-    pub public_key: PublicKey,
-    pub amount: Amount,
-}
-
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappFeePayerNonceDiff {
     pub public_key: PublicKey,
     pub nonce: Nonce,
@@ -252,7 +245,6 @@ impl ZkappDiff {
         let acct_diff = match diff {
             Payment(payment) => AccountDiff::Payment(payment),
             IncrementNonce(diff) => AccountDiff::ZkappIncrementNonce(diff),
-            AccountCreationFee(diff) => AccountDiff::ZkappAccountCreationFee(diff),
         };
 
         account_diffs.push(acct_diff)
@@ -431,7 +423,6 @@ impl ZkappPaymentDiff {
         match self {
             Self::Payment(payment) => payment.public_key.to_owned(),
             Self::IncrementNonce(diff) => diff.public_key.to_owned(),
-            Self::AccountCreationFee(diff) => diff.public_key.to_owned(),
         }
     }
 
@@ -439,7 +430,6 @@ impl ZkappPaymentDiff {
         match self {
             Self::Payment(payment) => payment.token.to_owned(),
             Self::IncrementNonce(diff) => diff.token.to_owned(),
-            Self::AccountCreationFee(_) => TokenAddress::default(),
         }
     }
 }
@@ -453,6 +443,16 @@ impl ZkappStateDiff {
             public_key: public_key.into(),
             ..Default::default()
         }
+    }
+}
+
+///////////
+// debug //
+///////////
+
+impl std::fmt::Debug for ZkappFeePayerNonceDiff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} | {}", self.public_key, self.nonce)
     }
 }
 
@@ -503,7 +503,7 @@ mod tests {
                     nonce: 185.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
-                    nonce: Some(185.into()),
+                    nonce: None,
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
                     payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
                         public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
@@ -533,7 +533,7 @@ mod tests {
                     nonce: 186.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
-                    nonce: Some(186.into()),
+                    nonce: None,
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
                     payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
                         public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
@@ -563,7 +563,7 @@ mod tests {
                     nonce: 187.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
-                    nonce: Some(187.into()),
+                    nonce: None,
                     public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
                     payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
                         public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
@@ -593,7 +593,7 @@ mod tests {
                     nonce: 5.into(),
                 }),
                 AccountDiff::Zkapp(Box::new(ZkappDiff {
-                nonce: Some(5.into()),
+                nonce: None,
                 public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
                 payment_diffs: vec![
                     ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonce {
@@ -885,16 +885,6 @@ mod tests {
             assert_eq!(zkapp_diffs[0][n], *x, "n = {n}")
         }
         assert_eq!(zkapp_diffs, expect);
-
-        // zkapp accounts created
-        let created: Vec<_> = ledger_diff
-            .account_diffs
-            .into_iter()
-            .flatten()
-            .filter(|diff| matches!(diff, AccountDiff::ZkappAccountCreationFee(_)))
-            .collect();
-
-        assert_eq!(created, vec![]);
 
         Ok(())
     }

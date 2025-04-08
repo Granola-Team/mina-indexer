@@ -43,7 +43,7 @@ pub async fn get_blocks(
     // Check for height query parameter
     if let Some(height) = params.height {
         if let Ok(blocks) = db.get_blocks_at_height(height) {
-            let counts = get_counts(db).await.expect("counts");
+            let counts = get_counts(db).expect("counts");
 
             let blocks = blocks
                 .iter()
@@ -66,7 +66,7 @@ pub async fn get_blocks(
         best_chain.push(Block::from_precomputed(
             db,
             &best_tip,
-            get_counts(db).await.expect("counts"),
+            get_counts(db).expect("counts"),
         ));
 
         let mut parent_state_hash = best_tip.previous_state_hash();
@@ -76,7 +76,7 @@ pub async fn get_blocks(
                 best_chain.push(Block::from_precomputed(
                     db,
                     &block,
-                    get_counts(db).await.expect("counts"),
+                    get_counts(db).expect("counts"),
                 ));
                 parent_state_hash = block.previous_state_hash();
             } else {
@@ -101,7 +101,7 @@ pub async fn get_block_by_state_hash(
 
     if StateHash::is_valid(&state_hash) {
         if let Ok(Some((ref block, _))) = db.get_block(&state_hash.clone().into()) {
-            let block = Block::from_precomputed(db, block, get_counts(db).await.expect("counts"));
+            let block = Block::from_precomputed(db, block, get_counts(db).expect("counts"));
             return HttpResponse::Ok()
                 .content_type(ContentType::json())
                 .body(format!("{block:?}"));
