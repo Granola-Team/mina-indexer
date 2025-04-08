@@ -18,6 +18,7 @@ use crate::{
         token::{account::TokenAccount, TokenAddress},
     },
 };
+use anyhow::Context;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -202,7 +203,11 @@ impl Ledger {
             let token = accessed_account.account.token.clone().unwrap_or_default();
 
             // check ledger account
-            let account = self.get_account(pk, &token).cloned().unwrap();
+            let account = self
+                .get_account(pk, &token)
+                .cloned()
+                .with_context(|| format!("account {} token {}", pk, token))
+                .unwrap();
             let expect = account.deduct_mina_account_creation_fee();
 
             accessed_account.assert_eq_account(
