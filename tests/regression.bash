@@ -36,6 +36,7 @@ cd "$BASE_DIR"
 # Helpers #
 ###########
 
+MINA_TOKEN_ID=wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf
 MAINNET_GENESIS_STATE_HASH=3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ
 HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
 
@@ -649,14 +650,14 @@ test_ledgers() {
 	canonical_hash=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
 	canonical_height=$(idxr summary --json | jq -r .witness_tree.canonical_root_length)
 
-	hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-	height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	hash_balance=$(idxr ledgers hash --hash $canonical_hash --memoize | jq -r .$MINA_TOKEN_ID.${pk}.balance)
+	height_balance=$(idxr ledgers height --height $canonical_height | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '607904.75' $hash_balance
 	assert '607904.75' $height_balance
 
 	# genesis ledger account
-	hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
-	height_balance=$(idxr ledgers height --height $canonical_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
+	hash_balance=$(idxr ledgers hash --hash $canonical_hash | jq -r .$MINA_TOKEN_ID.${pk0}.balance)
+	height_balance=$(idxr ledgers height --height $canonical_height | jq -r .$MINA_TOKEN_ID.${pk0}.balance)
 	assert '502777.775' $hash_balance
 	assert '502777.775' $height_balance
 
@@ -664,18 +665,18 @@ test_ledgers() {
 	best_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
 	best_height=$(idxr summary --json | jq -r .witness_tree.best_tip_length)
 
-	best_balance=$(idxr ledgers best --memoize | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-	hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
-	height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	best_balance=$(idxr ledgers best --memoize | jq -r .$MINA_TOKEN_ID.${pk}.balance)
+	hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .$MINA_TOKEN_ID.${pk}.balance)
+	height_balance=$(idxr ledgers height --height $best_height | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 
 	assert '607904.75' $best_balance
 	assert '607904.75' $hash_balance
 	assert '607904.75' $height_balance
 
 	# genesis ledger account
-	best_balance=$(idxr ledgers best | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
-	hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
-	height_balance=$(idxr ledgers height --height $best_height | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.balance)
+	best_balance=$(idxr ledgers best | jq -r .$MINA_TOKEN_ID.${pk0}.balance)
+	hash_balance=$(idxr ledgers hash --hash $best_hash | jq -r .$MINA_TOKEN_ID.${pk0}.balance)
+	height_balance=$(idxr ledgers height --height $best_height | jq -r .$MINA_TOKEN_ID.${pk0}.balance)
 	assert '502777.775' $best_balance
 	assert '502777.775' $hash_balance
 	assert '502777.775' $height_balance
@@ -684,21 +685,21 @@ test_ledgers() {
 	file=./ledgers/best-block-$best_height-$best_hash.json
 	idxr ledgers best --path $file
 
-	file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	file_result=$(cat $file | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '607904.75' $file_result
 	rm -f $file
 
 	file=./ledgers/best-ledger-$best_height-$best_hash.json
 	idxr ledgers hash --hash $best_hash --path $file
 
-	file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	file_result=$(cat $file | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '607904.75' $file_result
 	rm -f $file
 
 	file=./ledgers/ledger-height-$best_height-$best_hash.json
 	idxr ledgers height --height $best_height --path $file
 
-	file_result=$(cat $file | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	file_result=$(cat $file | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '607904.75' $file_result
 	rm -f $file
 
@@ -1211,21 +1212,31 @@ test_best_chain_many_blocks() {
 
 	# check ledgers are present
 	# mainnet-100-3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4.json
-	balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	balance=$(idxr ledgers hash --hash 3NKLtRnMaWAAfRvdizaeaucDPBePPKGbKw64RVcuRFtMMkE8aAD4 | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '502777.775' $balance
 
 	# mainnet-900-3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh.json
-	balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	balance=$(idxr ledgers hash --hash 3NLHqp2mkmWbf4o69J4hg5cftRAAvZ5Edy7uqvJUUVvZWtD1xRrh | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 	assert '502777.775' $balance
 }
 
-test_genesis_block_creator() {
+# verify the v1 genesis block winner account only has 1000 magic nanomina
+test_genesis_block_creator_v1() {
 	start_v1
 
 	pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
-	balance=$(idxr ledgers height --height 1 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk}.balance)
+	balance=$(idxr ledgers height --height 1 | jq -r .$MINA_TOKEN_ID.${pk}.balance)
 
-	# verify that the genesis block winner account gets 1000 magic nanomina
+	assert '0.000001' $balance
+}
+
+# verify the v2 genesis block winner account only has 1000 magic nanomina
+test_genesis_block_creator_v2() {
+	start_v2
+
+	pk=B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg
+	balance=$(idxr ledgers height --height 359605 | jq -r .$MINA_TOKEN_ID.${pk}.balance)
+
 	assert '0.000001' $balance
 }
 
@@ -1236,19 +1247,19 @@ test_txn_nonces() {
 
 	# after block 3
 	pk0=B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy
-	assert 4 $(idxr ledgers height --height 3 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.nonce)
+	assert 4 $(idxr ledgers height --height 3 | jq -r .$MINA_TOKEN_ID.${pk0}.nonce)
 
 	# after block 11
 	pk1=B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM
-	assert 'null' $(idxr ledgers height --height 11 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk1}.nonce)
+	assert 'null' $(idxr ledgers height --height 11 | jq -r .$MINA_TOKEN_ID.${pk1}.nonce)
 
 	# after block 100
 	## pk0
-	assert 150 $(idxr ledgers height --height 100 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk0}.nonce)
+	assert 150 $(idxr ledgers height --height 100 | jq -r .$MINA_TOKEN_ID.${pk0}.nonce)
 	assert 150 $(idxr accounts public-key --public-key $pk0 | jq -r .nonce)
 
 	## pk1
-	assert 'null' $(idxr ledgers height --height 100 | jq -r .wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf.${pk1}.nonce)
+	assert 'null' $(idxr ledgers height --height 100 | jq -r .$MINA_TOKEN_ID.${pk1}.nonce)
 	assert 'null' $(idxr accounts public-key --public-key $pk1 | jq -r .nonce)
 }
 
@@ -1265,23 +1276,24 @@ test_startup_staking_ledgers() {
 	epoch0=jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee
 
 	# check epoch 0 staking ledger values are correct
-	voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
-	receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
-
 	assert 0 $(cat ./epoch_0_ledger.json | jq -r .epoch)
 	assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.pk)
 	assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
 	assert '1000' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
+	assert $MINA_TOKEN_ID $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
+	
 	assert $epoch0 $(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
 	assert 'mainnet' $(cat ./epoch_0_ledger.json | jq -r .network)
-	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
+	
+	voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
+	receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
 	# check summary staking epoch info
 	max_staking_ledger_hash=$(idxr summary --json | jq -r .max_staking_ledger_hash)
-	assert 42 $(idxr summary --json | jq -r .max_staking_ledger_epoch)
 	assert 'jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH' $max_staking_ledger_hash
+	assert 42 $(idxr summary --json | jq -r .max_staking_ledger_epoch)
 }
 
 test_watch_staking_ledgers() {
@@ -1314,7 +1326,7 @@ test_watch_staking_ledgers() {
 	assert '1000' $balance
 	assert 'mainnet' $network
 	assert $epoch0 $ledger_hash
-	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $token
+	assert $MINA_TOKEN_ID $token
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 
@@ -1345,7 +1357,7 @@ test_watch_staking_ledgers() {
 	assert '1000' $balance
 	assert 'mainnet' $network
 	assert $epoch42 $ledger_hash
-	assert 'wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf' $token
+	assert $MINA_TOKEN_ID $token
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
 	assert '2mzbV7WevxLuchs2dAMY4vQBS6XttnCUF8Hvks4XNBQ5qiSGGBQe' $receipt_chain_hash
 }
@@ -1889,7 +1901,8 @@ for test_name in "$@"; do
 	"test_restore_snapshot_failure_returns_proper_code") test_restore_snapshot_failure_returns_proper_code ;;
 	"test_rest_accounts_summary") test_rest_accounts_summary ;;
 	"test_rest_blocks") test_rest_blocks ;;
-	"test_genesis_block_creator") test_genesis_block_creator ;;
+	"test_genesis_block_creator_v1") test_genesis_block_creator_v1 ;;
+	"test_genesis_block_creator_v2") test_genesis_block_creator_v2 ;;
 	"test_txn_nonces") test_txn_nonces ;;
 	"test_startup_staking_ledgers") test_startup_staking_ledgers ;;
 	"test_watch_staking_ledgers") test_watch_staking_ledgers ;;

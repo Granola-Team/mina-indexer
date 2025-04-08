@@ -367,6 +367,7 @@ impl InternalCommandStore for IndexerStore {
                 IteratorMode::From(&start, direction)
             }
         };
+
         self.database
             .iterator_cf(self.internal_commands_pk_block_height_sort_cf(), mode)
     }
@@ -400,6 +401,7 @@ impl InternalCommandStore for IndexerStore {
                 IteratorMode::From(&start, direction)
             }
         };
+
         self.database
             .iterator_cf(self.internal_commands_pk_global_slot_sort_cf(), mode)
     }
@@ -639,6 +641,7 @@ impl<'a> CsvRecordInternalCommand<'a> {
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::*;
+    use crate::block::precomputed::PcbVersion;
     use anyhow::Result;
     use std::env;
     use tempfile::TempDir;
@@ -651,27 +654,64 @@ mod tests {
 
     #[test]
     fn test_incr_dec_canonical_internal_commands_count() -> Result<()> {
-        let indexer = create_indexer_store()?;
+        let store = create_indexer_store()?;
 
         // Test incrementing canonical internal commands count
-        indexer.increment_canonical_internal_commands_count(1)?;
-        assert_eq!(indexer.get_canonical_internal_commands_count()?, 1);
+        store.increment_canonical_internal_commands_count(1)?;
+        assert_eq!(store.get_canonical_internal_commands_count()?, 1);
 
         // Increment again
-        indexer.increment_canonical_internal_commands_count(1)?;
-        assert_eq!(indexer.get_canonical_internal_commands_count()?, 2);
+        store.increment_canonical_internal_commands_count(1)?;
+        assert_eq!(store.get_canonical_internal_commands_count()?, 2);
 
         // Test decrementing canonical internal commands count
-        indexer.decrement_canonical_internal_commands_count(1)?;
-        assert_eq!(indexer.get_canonical_internal_commands_count()?, 1);
+        store.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(store.get_canonical_internal_commands_count()?, 1);
 
         // Decrement to 0
-        indexer.decrement_canonical_internal_commands_count(1)?;
-        assert_eq!(indexer.get_canonical_internal_commands_count()?, 0);
+        store.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(store.get_canonical_internal_commands_count()?, 0);
 
         // Ensure count does not go below 0
-        indexer.decrement_canonical_internal_commands_count(1)?;
-        assert_eq!(indexer.get_canonical_internal_commands_count()?, 0);
+        store.decrement_canonical_internal_commands_count(1)?;
+        assert_eq!(store.get_canonical_internal_commands_count()?, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn genesis_v2() -> Result<()> {
+        let store = create_indexer_store()?;
+
+        let path = PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        let pk: PublicKey = "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into();
+        let state_hash = block.state_hash();
+
+        // add the block
+        store.add_block(&block, 0)?;
+
+        // check block internal commands
+        let block_internal_cmds = store.get_internal_commands(&state_hash)?;
+        assert_eq!(block_internal_cmds, vec![]);
+
+        // check pk internal commands
+        let pk_internal_cmds: Vec<_> = store
+            .internal_commands_pk_block_height_iterator(pk.clone(), Direction::Reverse)
+            .flatten()
+            .collect();
+        assert_eq!(pk_internal_cmds, vec![]);
+
+        let pk_internal_cmds: Vec<_> = store
+            .internal_commands_pk_global_slot_iterator(pk.clone(), Direction::Reverse)
+            .flatten()
+            .collect();
+        assert_eq!(pk_internal_cmds, vec![]);
+
+        // check coinbase receiver
+        let receiver = store.get_coinbase_receiver(&state_hash)?.unwrap();
+        assert_eq!(receiver, pk);
 
         Ok(())
     }

@@ -2,7 +2,6 @@ use crate::helpers::{state::*, store::*};
 use anyhow::Context;
 use mina_indexer::{
     block::parser::BlockParser,
-    constants::*,
     ledger::{
         account::{Account, Permission, Permissions},
         store::best::BestLedgerStore,
@@ -98,7 +97,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 public_key: pk.clone(),
                 delegate: pk.clone(),
                 token: Some(minu_token.clone()),
-                created_by_zkapp: true,
                 ..Default::default()
             }
         );
@@ -110,7 +108,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
             public_key: pk.clone(),
-            balance: MAINNET_ACCOUNT_CREATION_FEE,
+            balance: 0.into(),
             nonce: Some(1.into()),
             delegate: pk,
             token: Some(mina_token.clone()),
@@ -143,13 +141,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(
-            mina_account.clone().display(),
-            Account {
-                balance: 0.into(),
-                ..expect
-            }
-        );
+        assert_eq!(mina_account.clone().display(), expect);
     } else {
         panic!("MINA zkapp account does not exist");
     }
@@ -159,7 +151,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     if let Some(mina_account) = best_ledger.get_account(&pk, &mina_token) {
         let expect = Account {
                 public_key: pk.clone(),
-                balance: (1e9 as u64).into(),
+                balance: 0.into(),
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token.clone()),
@@ -200,13 +192,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(
-            mina_account.clone().display(),
-            Account {
-                balance: 0.into(),
-                ..expect
-            }
-        );
+        assert_eq!(mina_account.clone().display(), expect);
     } else {
         panic!(
             "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P zkapp account does not exist"

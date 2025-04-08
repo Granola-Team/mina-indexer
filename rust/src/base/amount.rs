@@ -23,8 +23,8 @@ impl Amount {
     }
 
     /// Deduct [MAINNET_ACCOUNT_CREATION_FEE] MINA for from MINA accounts
-    pub fn display(self, token: &TokenAddress) -> Self {
-        if token.0 == MINA_TOKEN_ADDRESS {
+    pub fn display(self, token: &TokenAddress, created_by_zkapp: bool) -> Self {
+        if token.0 == MINA_TOKEN_ADDRESS && !created_by_zkapp {
             self - MAINNET_ACCOUNT_CREATION_FEE
         } else {
             self

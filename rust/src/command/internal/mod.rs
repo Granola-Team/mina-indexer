@@ -347,7 +347,7 @@ mod tests {
     use crate::block::precomputed::{PcbVersion, PrecomputedBlock};
 
     #[test]
-    fn from_precomputed() -> anyhow::Result<()> {
+    fn from_precomputed_v1() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./tests/data/canonical_chain_discovery/contiguous/mainnet-11-3NLMeYAFXxsmhSFtLHFxdtjGcfHTVFmBmBF8uTJvP4Ve5yEmxYeA.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
 
@@ -413,6 +413,23 @@ mod tests {
                 }
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn from_genesis_v2() -> anyhow::Result<()> {
+        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        // empty internal commands
+        assert_eq!(InternalCommand::from_precomputed(&block), vec![]);
+
+        // empty db internal commands
+        assert_eq!(DbInternalCommand::from_precomputed(&block), vec![]);
+
+        // empty db internal commands with metadata
+        assert_eq!(DbInternalCommandWithData::from_precomputed(&block), vec![]);
 
         Ok(())
     }

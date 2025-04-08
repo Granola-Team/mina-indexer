@@ -310,7 +310,8 @@ impl std::fmt::Debug for Ledger {
                                 .token
                                 .clone()
                                 .or_else(|| Some(TokenAddress::default()))
-                                .unwrap()
+                                .unwrap(),
+                            acct.created_by_zkapp
                         )
                         .0
                 )?;

@@ -326,34 +326,44 @@ mod tests {
     }
 
     #[test]
-    fn gensis_coinbase_v1() -> anyhow::Result<()> {
+    fn genesis_v1() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
-        let expect = Coinbase {
-            kind: CoinbaseKind::Zero,
-            receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
-            supercharge: true,
-            is_new_account: false,
-            receiver_balance: None,
-        };
+        let coinbase = Coinbase::from_precomputed(&block);
 
-        assert_eq!(Coinbase::from_precomputed(&block), expect);
+        assert_eq!(
+            coinbase,
+            Coinbase {
+                kind: CoinbaseKind::Zero,
+                receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
+                supercharge: true,
+                is_new_account: false,
+                receiver_balance: None,
+            }
+        );
         Ok(())
     }
 
     #[test]
-    fn gensis_coinbase_v2() -> anyhow::Result<()> {
+    fn genesis_v2() -> anyhow::Result<()> {
         let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
-        let expect = Coinbase {
-            kind: CoinbaseKind::Zero,
-            receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
-            supercharge: false,
-            is_new_account: false,
-            receiver_balance: None,
-        };
+        let coinbase = Coinbase::from_precomputed(&block);
 
-        assert_eq!(Coinbase::from_precomputed(&block), expect);
+        assert_eq!(
+            coinbase,
+            Coinbase {
+                kind: CoinbaseKind::Zero,
+                receiver: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg".into(),
+                supercharge: false,
+                is_new_account: false,
+                receiver_balance: None,
+            }
+        );
+
+        assert!(!coinbase.is_applied());
+        assert!(!coinbase.has_fee_transfer());
+
         Ok(())
     }
 }

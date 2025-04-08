@@ -1157,14 +1157,17 @@ mod tests {
         };
         let account_diff = AccountDiff::Delegation(delegation_diff);
         let result = account_diff.public_key();
+
         assert_eq!(result, delegator);
     }
 
     #[test]
     fn test_snark_account_creation_deduction() -> anyhow::Result<()> {
         use crate::ledger::diff::AccountDiffType::*;
+
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
+
         let mut ledger_diff = LedgerDiff::from_precomputed(&block);
         let mut expect_diffs = LedgerDiff::from(&[
             (
@@ -1198,6 +1201,7 @@ mod tests {
                 1e9 as u64,
             ),
         ]);
+
         expect_diffs.sort();
         ledger_diff.account_diffs.sort();
 
@@ -1214,8 +1218,8 @@ mod tests {
     }
 
     #[test]
-    fn gensis_v1() -> anyhow::Result<()> {
-        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
+    fn genesis_v1() -> anyhow::Result<()> {
+        let path = PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let diff = LedgerDiff::from_precomputed(&block);
 
@@ -1224,8 +1228,8 @@ mod tests {
     }
 
     #[test]
-    fn gensis_v2() -> anyhow::Result<()> {
-        let path = std::path::PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
+    fn genesis_v2() -> anyhow::Result<()> {
+        let path = PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
         let diff = LedgerDiff::from_precomputed(&block);
 
