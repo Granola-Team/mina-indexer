@@ -12,46 +12,47 @@ accounts = JSON.parse(file)
 # Handle both ledger styles
 accounts = accounts["ledger"]["accounts"] if !accounts.instance_of?(Array)
 
-# TODO: employ the below to check against zkApp ledger data.
-#
-# def normalize_zkapp(data)
-#   return data if data.nil?
-#
-#   zkapp = data
-#   zkapp["app_state"] = data["app_state"].map { |app| normalize_hex(app) }
-#   zkapp["action_state"] = data["action_state"].map { |action| normalize_hex(action) }
-#   zkapp["last_action_slot"] = data["last_action_slot"].to_s
-#   zkapp
-# end
-#
-# def normalize_hex(data)
-#   hex_str = data.to_i.to_s(16).upcase
-#   "0x" + hex_str.ljust(64, "0")
-# end
-
-result = {}
-
-# Normalize all token accounts
-accounts.each do |account|
-  pk = account["pk"]
-  raise "Missing public key: #{JSON.pretty_generate(account)}" if pk.nil?
-
-  token = account["token"]
-  if token.nil? || token == "1"
-    # The MINA token was, pre-hardfork, token 1.
-    token = MINA_TOKEN
-  end
-
-  result[token] ||= {}
-  result[token][pk] =
-    {
-      "nonce" => account["nonce"] || "0",
-      "balance" => account["balance"],
-      "delegate" => account["delegate"] || pk
-
-      # TODO: check against zkApp ledger data.
-      # "zkapp" => normalize_zkapp(account["zkapp"])
-    }
+def normalize_hex(data)
+  hex_str = data.to_i.to_s(16).upcase
+  "0x" + hex_str.rjust(64, "0")
 end
 
-puts JSON.pretty_generate(sort_recursively(result))
+def normalize_zkapp(zkapp)
+  unless zkapp.nil?
+    zkapp["app_state"] = zkapp["app_state"].map { |app| normalize_hex(app) }
+    zkapp["action_state"] = zkapp["action_state"].map { |action| normalize_hex(action) }
+    zkapp["last_action_slot"] = zkapp["last_action_slot"].to_s
+  end
+  zkapp
+end
+
+result = {}
+accounts.each do |account|
+  pk = account["pk"]
+  raise "Missing public key: #{JSON.pretty_generate(account)}" unless pk
+
+  token = account["token"]
+  # The MINA token was, pre-hardfork, token 1.
+  token = MINA_TOKEN if token.nil? || token == "1"
+
+  result[token] ||= {}
+  result[token][pk] = {
+    "nonce" => account["nonce"] || "0",
+    "balance" => account["balance"],
+    "delegate" => account["delegate"] || pk,
+    "zkapp" => normalize_zkapp(account["zkapp"])
+  }
+end
+
+def remove_verification_keys(obj)
+  case obj
+  when Hash
+    obj.delete("verification_key")
+    obj.each_value { |v| remove_verification_keys(v) }
+  when Array
+    obj.each { |item| remove_verification_keys(item) }
+  end
+  obj
+end
+
+puts JSON.pretty_generate(sort_recursively(remove_verification_keys(result)))
