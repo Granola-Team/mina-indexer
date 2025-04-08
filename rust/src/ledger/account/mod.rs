@@ -108,7 +108,9 @@ impl Account {
             && !self.created_by_zkapp
         {
             return Self {
-                balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
+                // TODO:
+                // balance: (self.balance - MAINNET_ACCOUNT_CREATION_FEE).unwrap_or_else(|| panic!("Underflow in Account::display. pk: {:?}", self.public_key)),
+                balance: (self.balance - MAINNET_ACCOUNT_CREATION_FEE).unwrap_or(Amount(0)),
                 ..self
             };
         }
@@ -183,7 +185,7 @@ impl Account {
     /// Unapply a coinbase
     pub fn coinbase_unapply(self, diff: &CoinbaseDiff) -> Self {
         Self {
-            balance: self.balance - diff.amount,
+            balance: (self.balance - diff.amount).unwrap_or_else(|| panic!("Underflow in coinbase_unapply. CoinbaseDiff: {:?}", diff)),
             ..self
         }
     }
@@ -219,7 +221,7 @@ impl Account {
     pub fn payment_unapply(self, diff: &PaymentDiff) -> Self {
         match diff.update_type {
             UpdateType::Credit => Self {
-                balance: self.balance - diff.amount,
+                balance: (self.balance - diff.amount).unwrap_or_else(|| panic!("Underflow in payment_unapply. PaymentDiff: {:?}", diff)),
                 ..self
             },
             UpdateType::Debit(nonce) => Self {
@@ -253,7 +255,8 @@ impl Account {
     /// balance.
     fn debit(self, amount: Amount, nonce: Option<Nonce>) -> Self {
         Self {
-            balance: self.balance - amount,
+            balance: (self.balance - amount).unwrap_or_else(||
+                panic!("Underflow in Account::debit. pk: {} balance: {} amount: {}", self.public_key, self.balance, amount)),
             nonce: nonce.or(self.nonce),
             ..self
         }
@@ -825,7 +828,7 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                balance: before.balance - amount,
+                balance: (before.balance - amount).unwrap_or_else(|| panic!("Underflow in zkapp_account_diff_payment. pk: {}", pk)),
                 ..before
             }
         );
