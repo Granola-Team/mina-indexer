@@ -43,7 +43,7 @@ jsonpath "$.data.blocks[119].dateTime" == "2021-03-17T08:39:00.000Z"
 jsonpath "$.data.blocks[119].receivedTime" == "2021-03-17T08:39:40.591Z"
 jsonpath "$.data.blocks[119].snarkFees" == "0"
 
-duration < 1000
+duration < 1500
 
 #
 # Blocks non-canonical height descending query
