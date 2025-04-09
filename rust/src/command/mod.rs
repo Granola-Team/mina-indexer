@@ -207,6 +207,14 @@ pub enum UserCommandWithStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappCommand(v2::staged_ledger_diff::ZkappCommandData);
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountUpdate {
+    pub public_key: PublicKey,
+    pub token: TokenAddress,
+    pub balance_change: i64,
+    pub increment_nonce: bool,
+}
+
 pub trait UserCommandWithStatusT {
     fn to_command(&self, state_hash: StateHash) -> CommandWithStateHash;
 
@@ -239,6 +247,8 @@ pub trait UserCommandWithStatusT {
     fn hash(&self) -> Result<TxnHash>;
 
     fn receiver_account_creation_fee_paid(&self) -> bool;
+
+    fn accounts_updated(&self) -> Vec<AccountUpdate>;
 }
 
 impl UserCommandWithStatusT for UserCommandWithStatus {
@@ -256,6 +266,31 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                         ..
             })
         )
+    }
+
+    /// Only called on zkapp commands
+    fn accounts_updated(&self) -> Vec<AccountUpdate> {
+        let mut updated = vec![];
+
+        if let UserCommandWithStatus::V2(v2::staged_ledger_diff::UserCommand {
+            data: (_, UserCommandData::ZkappCommandData(data)),
+            ..
+        }) = self
+        {
+            for update in &data.account_updates {
+                let account_update = AccountUpdate {
+                    public_key: update.elt.account_update.body.public_key.to_owned(),
+                    token: update.elt.account_update.body.token_id.to_owned(),
+                    balance_change: (&update.elt.account_update.body.balance_change).into(),
+                    increment_nonce: update.elt.account_update.body.increment_nonce,
+                };
+
+                updated.push(account_update);
+                recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
+            }
+        }
+
+        updated
     }
 
     /// All tokens involved in the transaction
@@ -778,6 +813,29 @@ impl StakeDelegation {
 // Conversions //
 /////////////////
 
+impl From<v2::staged_ledger_diff::AccountUpdate> for AccountUpdate {
+    fn from(value: v2::staged_ledger_diff::AccountUpdate) -> Self {
+        Self {
+            public_key: value.body.public_key,
+            token: value.body.token_id,
+            balance_change: (&value.body.balance_change).into(),
+            increment_nonce: value.body.increment_nonce,
+        }
+    }
+}
+
+impl From<v2::staged_ledger_diff::AccountUpdates> for Vec<AccountUpdate> {
+    fn from(value: v2::staged_ledger_diff::AccountUpdates) -> Vec<AccountUpdate> {
+        let mut updates = vec![value.elt.account_update.into()];
+
+        for call in value.elt.calls {
+            updates.push(call.elt.account_update.into());
+        }
+
+        updates
+    }
+}
+
 impl From<(UserCommand, bool)> for Command {
     fn from(value: (UserCommand, bool)) -> Self {
         let value: SignedCommandWithCreationData = value.into();
@@ -1214,6 +1272,26 @@ fn recurse_calls<'a>(tokens: &mut Vec<TokenAddress>, calls: impl Iterator<Item =
     }
 }
 
+/////////////
+// helpers //
+/////////////
+
+fn recurse_calls_accounts_updated<'a>(
+    accounts: &mut Vec<AccountUpdate>,
+    calls: impl Iterator<Item = &'a Call>,
+) {
+    for update in calls {
+        accounts.push(AccountUpdate {
+            public_key: update.elt.account_update.body.public_key.to_owned(),
+            token: update.elt.account_update.body.token_id.to_owned(),
+            balance_change: (&update.elt.account_update.body.balance_change).into(),
+            increment_nonce: update.elt.account_update.body.increment_nonce,
+        });
+
+        recurse_calls_accounts_updated(accounts, update.elt.calls.iter());
+    }
+}
+
 fn recurse_calls_update(update: &AccountUpdates) -> BTreeSet<PublicKey> {
     let pk = update.elt.account_update.body.public_key.to_owned();
     let mut receivers = BTreeSet::from([pk]);
@@ -1227,8 +1305,7 @@ fn recurse_calls_receivers<'a>(
     calls: impl Iterator<Item = &'a Call>,
 ) {
     for update in calls {
-        let pk = update.elt.account_update.body.public_key.to_owned();
-        receivers.insert(pk);
+        receivers.insert(update.elt.account_update.body.public_key.to_owned());
 
         recurse_calls_receivers(receivers, update.elt.calls.iter());
     }

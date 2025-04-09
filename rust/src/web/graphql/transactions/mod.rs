@@ -7,7 +7,7 @@ use crate::{
     command::{
         signed::{SignedCommandWithData, TxnHash},
         store::UserCommandStore,
-        CommandStatusData,
+        AccountUpdate, CommandStatusData,
     },
     constants::millis_to_global_slot,
     ledger::token::TokenAddress,
@@ -437,9 +437,16 @@ impl TransactionWithoutBlock {
                 accounts_updated: cmd
                     .accounts_updated()
                     .into_iter()
-                    .map(|(pk, token, balance_change, increment_nonce)| {
-                        TokenAccount::from(db, pk, token, balance_change, increment_nonce)
-                    })
+                    .map(
+                        |AccountUpdate {
+                             public_key: pk,
+                             token,
+                             balance_change,
+                             increment_nonce,
+                         }| {
+                            TokenAccount::from(db, pk, token, balance_change, increment_nonce)
+                        },
+                    )
                     .collect(),
                 actions: cmd.actions(),
                 events: cmd.events(),
