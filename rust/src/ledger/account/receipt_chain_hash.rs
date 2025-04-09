@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Hash, Serialize)]
 pub struct ReceiptChainHash(pub String);
 
 impl<T> From<T> for ReceiptChainHash

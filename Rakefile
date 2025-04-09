@@ -455,6 +455,12 @@ task :shutdown, [:which] do |_, args|
   puts "Successfully shutdown. You may also want to do 'rake clean:#{which}'"
 end
 
+desc "Kill all running local test/prod indexers"
+task :kill do
+  puts "Killing indexer PID(s)"
+  run("#{UTILS} kill")
+end
+
 # Check mode
 desc "Dev build and run in check mode"
 task check_mode: "build:dev" do |_, args|

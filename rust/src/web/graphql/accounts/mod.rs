@@ -8,7 +8,11 @@ use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::MINA_TOKEN_ADDRESS,
-    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{
+        account::{self, Permission},
+        store::best::BestLedgerStore,
+        token::TokenAddress,
+    },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
     utility::store::common::U64_LEN,
@@ -53,6 +57,57 @@ pub struct Account {
     timing: Option<Timing>,
     token: String,
     zkapp: Option<ZkappAccount>,
+    receipt_chain_hash: String,
+    voting_for: String,
+    permissions: Option<Permissions>,
+}
+
+#[derive(SimpleObject, Default, Debug, Clone, PartialEq, Eq)]
+struct Permissions {
+    #[graphql(name = "edit_state")]
+    edit_state: String,
+
+    #[graphql(name = "access")]
+    access: String,
+
+    #[graphql(name = "send")]
+    send: String,
+
+    #[graphql(name = "receive")]
+    receive: String,
+
+    #[graphql(name = "set_delegate")]
+    set_delegate: String,
+
+    #[graphql(name = "set_permissions")]
+    set_permissions: String,
+
+    #[graphql(name = "set_verification_key")]
+    set_verification_key: PermissionVk,
+
+    #[graphql(name = "set_zkapp_uri")]
+    set_zkapp_uri: String,
+
+    #[graphql(name = "edit_action_state")]
+    edit_action_state: String,
+
+    #[graphql(name = "set_token_symbol")]
+    set_token_symbol: String,
+
+    #[graphql(name = "increment_nonce")]
+    increment_nonce: String,
+
+    #[graphql(name = "set_voting_for")]
+    set_voting_for: String,
+
+    #[graphql(name = "set_timing")]
+    set_timing: String,
+}
+
+#[derive(SimpleObject, Default, Debug, Clone, PartialEq, Eq)]
+struct PermissionVk {
+    permission: String,
+    number: String,
 }
 
 #[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
@@ -425,15 +480,27 @@ impl AccountWithMeta {
 
 impl From<account::Account> for Account {
     fn from(value: account::Account) -> Self {
+        let account = value.deduct_mina_account_creation_fee();
+        let permissions = if account.is_zkapp_account() {
+            account.permissions.map(Into::into)
+        } else {
+            None
+        };
+
         Self {
-            public_key: value.public_key.0,
-            delegate: value.delegate.0,
-            nonce: value.nonce.map_or(0, |n| n.0),
-            balance: value.balance.0,
-            time_locked: value.timing.is_some(),
-            timing: value.timing.map(Into::into),
-            token: value.token.map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
-            zkapp: value.zkapp.map(Into::into),
+            public_key: account.public_key.0,
+            delegate: account.delegate.0,
+            nonce: account.nonce.map_or(0, |n| n.0),
+            balance: account.balance.0,
+            time_locked: account.timing.is_some(),
+            timing: account.timing.map(Into::into),
+            token: account
+                .token
+                .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
+            zkapp: account.zkapp.map(Into::into),
+            receipt_chain_hash: account.receipt_chain_hash.unwrap_or_default().0,
+            voting_for: account.voting_for.unwrap_or_default().0,
+            permissions,
         }
     }
 }
@@ -449,6 +516,9 @@ impl From<AccountWithMeta> for Account {
             timing: value.account.timing,
             token: value.account.token,
             zkapp: value.account.zkapp,
+            receipt_chain_hash: value.account.receipt_chain_hash,
+            voting_for: value.account.voting_for,
+            permissions: value.account.permissions,
         }
     }
 }
@@ -461,6 +531,35 @@ impl From<account::Timing> for Timing {
             cliff_amount: Some(timing.cliff_amount.0),
             vesting_period: Some(timing.vesting_period.0),
             vesting_increment: Some(timing.vesting_increment.0),
+        }
+    }
+}
+
+impl From<account::Permissions> for Permissions {
+    fn from(value: account::Permissions) -> Self {
+        Self {
+            edit_state: value.edit_state.to_string(),
+            access: value.access.to_string(),
+            send: value.send.to_string(),
+            receive: value.receive.to_string(),
+            set_delegate: value.set_delegate.to_string(),
+            set_permissions: value.set_permissions.to_string(),
+            set_verification_key: value.set_verification_key.into(),
+            set_zkapp_uri: value.set_zkapp_uri.to_string(),
+            edit_action_state: value.edit_action_state.to_string(),
+            set_token_symbol: value.set_token_symbol.to_string(),
+            increment_nonce: value.increment_nonce.to_string(),
+            set_voting_for: value.set_voting_for.to_string(),
+            set_timing: value.set_timing.to_string(),
+        }
+    }
+}
+
+impl From<(Permission, String)> for PermissionVk {
+    fn from(value: (Permission, String)) -> Self {
+        Self {
+            permission: value.0.to_string(),
+            number: value.1,
         }
     }
 }
