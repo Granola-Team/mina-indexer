@@ -346,7 +346,7 @@ namespace :test do
       run("rspec ops/spec/*-spec.rb")
       puts "--- Performing tier 1 unit test(s)"
       cargo_output("nextest --version")
-      cargo_output("nextest run #{test} --no-capture")
+      cargo_output("nextest run #{test} --failure-output immediate")
     end
 
     desc "Run all feature unit tests (debug build)"
