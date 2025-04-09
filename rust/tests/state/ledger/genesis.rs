@@ -2,7 +2,6 @@ use mina_indexer::{
     base::public_key::PublicKey,
     block::genesis::GenesisBlock,
     chain::Network,
-    constants::MAINNET_ACCOUNT_CREATION_FEE,
     ledger::{
         genesis::{GenesisLedger, GenesisRoot},
         token::TokenAddress,
@@ -23,7 +22,8 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     // Ledger account balances are in nanomina
     let total_supply: u64 = mina_accounts
         .values()
-        .map(|account| (account.balance - MAINNET_ACCOUNT_CREATION_FEE).0)
+        .cloned()
+        .map(|account| account.display().balance.0)
         .sum();
 
     assert_eq!(

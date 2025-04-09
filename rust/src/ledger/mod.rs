@@ -300,21 +300,7 @@ impl std::fmt::Debug for Ledger {
             writeln!(f, "{token}:")?;
 
             for (pk, acct) in token_ledger.accounts.iter() {
-                writeln!(
-                    f,
-                    "  {pk} -> {}",
-                    acct.clone()
-                        .balance
-                        .display(
-                            &acct
-                                .token
-                                .clone()
-                                .or_else(|| Some(TokenAddress::default()))
-                                .unwrap(),
-                            acct.created_by_zkapp
-                        )
-                        .0
-                )?;
+                writeln!(f, "  {pk} -> {}", acct.clone().display().balance)?;
             }
         }
 

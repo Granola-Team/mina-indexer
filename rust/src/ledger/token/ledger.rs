@@ -183,12 +183,12 @@ impl std::str::FromStr for TokenLedger {
                     balance: if acct
                         .token
                         .as_ref()
-                        .map_or(true, |t| t.0 == MINA_TOKEN_ADDRESS)
+                        .map_or(false, |t| t.0 != MINA_TOKEN_ADDRESS)
                     {
+                        acct.balance
+                    } else {
                         // compensate for MINA display deduction
                         acct.balance + MAINNET_ACCOUNT_CREATION_FEE
-                    } else {
-                        acct.balance
                     },
                     ..acct.clone()
                 },

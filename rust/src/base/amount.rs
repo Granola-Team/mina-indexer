@@ -1,8 +1,7 @@
 //! Indexer amount type
 
 use crate::{
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE, MINA_SCALE_DEC, MINA_TOKEN_ADDRESS},
-    ledger::token::TokenAddress,
+    constants::{MINA_SCALE, MINA_SCALE_DEC},
     utility::functions::nanomina_to_mina,
 };
 use anyhow::anyhow;
@@ -20,15 +19,6 @@ pub struct Amount(pub u64);
 impl Amount {
     pub fn new(amount: u64) -> Self {
         Self(amount * MINA_SCALE)
-    }
-
-    /// Deduct [MAINNET_ACCOUNT_CREATION_FEE] MINA for from MINA accounts
-    pub fn display(self, token: &TokenAddress, created_by_zkapp: bool) -> Self {
-        if token.0 == MINA_TOKEN_ADDRESS && !created_by_zkapp {
-            self - MAINNET_ACCOUNT_CREATION_FEE
-        } else {
-            self
-        }
     }
 
     pub fn to_f64(&self) -> f64 {
