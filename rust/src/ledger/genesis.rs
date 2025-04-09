@@ -1,5 +1,5 @@
 use super::{
-    account::{Account, ReceiptChainHash, Timing},
+    account::{Account, ReceiptChainHash, Timing, VotingFor},
     token::{TokenAddress, TokenId},
     Ledger, TokenLedger,
 };
@@ -57,7 +57,7 @@ pub struct GenesisAccount {
     pub delegate: Option<String>,
     pub token_permissions: Option<TokenPermissions>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<StateHash>,
+    pub voting_for: Option<VotingFor>,
     pub permissions: Option<Permissions>,
     pub timing: Option<GenesisAccountTiming>,
 

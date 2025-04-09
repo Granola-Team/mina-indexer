@@ -2,10 +2,10 @@
 
 use super::{AccountDiff, DelegationDiff, PaymentDiff};
 use crate::{
-    base::{nonce::Nonce, state_hash::StateHash},
+    base::nonce::Nonce,
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
-        account::{Permissions, Timing},
+        account::{Permissions, Timing, VotingFor},
         token::{TokenAddress, TokenSymbol},
         PublicKey,
     },
@@ -43,7 +43,7 @@ pub struct ZkappDiff {
     pub zkapp_uri: Option<ZkappUri>,
     pub token_symbol: Option<TokenSymbol>,
     pub timing: Option<Timing>,
-    pub voting_for: Option<StateHash>,
+    pub voting_for: Option<VotingFor>,
     pub actions: Vec<ActionState>,
     pub events: Vec<ZkappEvent>,
 }
@@ -107,7 +107,7 @@ pub struct ZkappTimingDiff {
 pub struct ZkappVotingForDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
-    pub voting_for: StateHash,
+    pub voting_for: VotingFor,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -376,7 +376,7 @@ impl ZkappDiff {
         account_diffs: &mut Vec<AccountDiff>,
         token: TokenAddress,
         pk: PublicKey,
-        voting_for: Option<StateHash>,
+        voting_for: Option<VotingFor>,
     ) {
         if let Some(voting_for) = voting_for {
             account_diffs.push(AccountDiff::ZkappVotingForDiff(ZkappVotingForDiff {

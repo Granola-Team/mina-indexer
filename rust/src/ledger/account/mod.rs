@@ -2,6 +2,7 @@
 
 mod receipt_chain_hash;
 mod timing;
+mod voting_for;
 
 use super::{
     diff::{
@@ -31,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 // re-export types
 pub type ReceiptChainHash = receipt_chain_hash::ReceiptChainHash;
+pub type VotingFor = voting_for::VotingFor;
 pub type Timing = timing::Timing;
 
 #[derive(Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,7 +49,7 @@ pub struct Account {
     // optional
     pub token: Option<TokenAddress>,
     pub receipt_chain_hash: Option<ReceiptChainHash>,
-    pub voting_for: Option<StateHash>,
+    pub voting_for: Option<VotingFor>,
     pub permissions: Option<Permissions>,
     pub timing: Option<Timing>,
     pub token_symbol: Option<TokenSymbol>,
