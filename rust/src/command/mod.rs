@@ -201,7 +201,7 @@ impl CommandStatusData {
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum UserCommandWithStatus {
     V1(Box<mina_rs::UserCommandWithStatusV1>),
-    V2(v2::staged_ledger_diff::UserCommand),
+    V2(Box<v2::staged_ledger_diff::UserCommand>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,9 +251,9 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
         matches!(
             self,
-            UserCommandWithStatus::V2(v2::UserCommand {
-                data: (_, v2::UserCommandData::ZkappCommandData { .. }),
-                ..
+            UserCommandWithStatus::V2(box_cmd) if matches!(**box_cmd, v2::UserCommand {
+                    data: (_, v2::UserCommandData::ZkappCommandData { .. }),
+                        ..
             })
         )
     }
@@ -787,7 +787,7 @@ impl From<(UserCommand, bool)> for Command {
 
 impl From<v2::staged_ledger_diff::UserCommand> for UserCommandWithStatus {
     fn from(value: v2::staged_ledger_diff::UserCommand) -> Self {
-        Self::V2(value)
+        Self::V2(Box::new(value))
     }
 }
 
@@ -824,7 +824,7 @@ impl From<UserCommandWithStatus> for Command {
             UserCommandWithStatus::V1(v1) => {
                 (v1.t.data.t.t.to_owned().into(), account_creation_fee_paid).into()
             }
-            UserCommandWithStatus::V2(v2) => (v2.into(), account_creation_fee_paid).into(),
+            UserCommandWithStatus::V2(v2) => ((*v2).into(), account_creation_fee_paid).into(),
         }
     }
 }
