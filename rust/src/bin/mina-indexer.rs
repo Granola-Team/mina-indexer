@@ -133,7 +133,10 @@ pub async fn main() -> anyhow::Result<()> {
                 IndexerCommand::Server { server_command } => {
                     server_command.run(s, domain_socket_path).await
                 }
-                IndexerCommand::Version => Ok(println!("{VERSION}")),
+                IndexerCommand::Version => {
+                   println!("{VERSION}");
+                   Ok(())
+                }
             }
         }));
     })

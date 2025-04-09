@@ -16,9 +16,9 @@ pub struct StakingLedgerParser {
     pub ledger_paths: IntoIter<PathBuf>,
 }
 
-/// Staking ledgers have one of these formats:
-/// - <network_name>-<epoch_number>-<ledger_hash>.json
-/// - <network_name>-<epoch_number>-<ledger_hash>.json.gz (compressed)
+// Staking ledgers have one of these formats:
+// - <network_name>-<epoch_number>-<ledger_hash>.json
+// - <network_name>-<epoch_number>-<ledger_hash>.json.gz (compressed)
 
 impl StakingLedgerParser {
     pub fn new(ledgers_dir: &Path) -> anyhow::Result<Self> {

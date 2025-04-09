@@ -423,7 +423,6 @@ where
 }
 
 /// For [UserCommandStore]
-
 const COMMAND_KEY_PREFIX: &str = "user-";
 
 /// Creates a new user command (transaction) database key for a public key

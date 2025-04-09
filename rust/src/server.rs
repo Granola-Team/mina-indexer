@@ -516,10 +516,11 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
 
                         // check if the block is already in the witness tree
                         if state.diffs_map.contains_key(&block.state_hash()) {
-                            return Ok(info!(
+                            info!(
                                 "Block is already present in the witness tree {}",
                                 block.summary()
-                            ));
+                            );
+                            return Ok(());
                         }
 
                         // if the block isn't in the witness tree, pipeline it
