@@ -1195,43 +1195,57 @@ mod tests {
         let zkapps = block.zkapp_commands();
         let zkapp_cmd = zkapps.first().unwrap();
 
-        if let UserCommandWithStatus::V2(UserCommand {
-            data: (_, UserCommandData::ZkappCommandData(ZkappCommandData { .. })),
-            ..
-        }) = zkapp_cmd
-        {
-            let expect = vec![
-                AccountUpdate {
-                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
-                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+        if let UserCommandWithStatus::V2(box_cmd) = zkapp_cmd {
+            if let UserCommand {
+                data: (_, UserCommandData::ZkappCommandData(ZkappCommandData { .. })),
+                ..
+            } = box_cmd.as_ref()
+            {
+                let expect = vec![
+                    AccountUpdate {
+                        public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
+                            .into(),
+                        token: TokenAddress::new(
+                            "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                        )
                         .unwrap(),
-                    balance_change: -1000000000,
-                    increment_nonce: false,
-                },
-                AccountUpdate {
-                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
-                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                        balance_change: -1000000000,
+                        increment_nonce: false,
+                    },
+                    AccountUpdate {
+                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                            .into(),
+                        token: TokenAddress::new(
+                            "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf",
+                        )
                         .unwrap(),
-                    balance_change: 0,
-                    increment_nonce: false,
-                },
-                AccountUpdate {
-                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
-                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        balance_change: 0,
+                        increment_nonce: false,
+                    },
+                    AccountUpdate {
+                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                            .into(),
+                        token: TokenAddress::new(
+                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                        )
                         .unwrap(),
-                    balance_change: -10000000000,
-                    increment_nonce: false,
-                },
-                AccountUpdate {
-                    public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba".into(),
-                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        balance_change: -10000000000,
+                        increment_nonce: false,
+                    },
+                    AccountUpdate {
+                        public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba"
+                            .into(),
+                        token: TokenAddress::new(
+                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                        )
                         .unwrap(),
-                    balance_change: 10000000000,
-                    increment_nonce: false,
-                },
-            ];
+                        balance_change: 10000000000,
+                        increment_nonce: false,
+                    },
+                ];
 
-            assert_eq!(zkapp_cmd.accounts_updated(), expect);
+                assert_eq!(zkapp_cmd.accounts_updated(), expect);
+            }
         } else {
             panic!("Expected a zkapp command")
         }
@@ -1248,57 +1262,74 @@ mod tests {
         let zkapps = block.zkapp_commands();
         let zkapp_cmd = zkapps.first().unwrap();
 
-        if let UserCommandWithStatus::V2(UserCommand {
-            data: (_, UserCommandData::ZkappCommandData(zkapp)),
-            ..
-        }) = zkapp_cmd
-        {
-            let expect = vec![vec![
-                AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
-                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
-                    nonce: 59.into(),
-                }),
-                AccountDiff::Payment(PaymentDiff {
-                    amount: 1000000000.into(),
-                    update_type: UpdateType::Debit(None),
-                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
-                    token: TokenAddress::default(),
-                }),
-                AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
-                    token: TokenAddress::default(),
-                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
-                    events: vec![
-                        "0x0000000000000000000000000000000000000000000000000000000000000002".into(),
-                        "0x01B2700CB8B5AB3EA1E6901ED662EDBD45F1FADEDFDA70A406F2E36F7A902F2C".into(),
-                        "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
-                        "0x3D76374FA52F749B664DB992AF45C57F92535C1CDAED68867781673A7E278F78".into(),
-                        "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
-                        "0x00000000000000000000000000000000000000000000000000000002540BE400".into(),
-                    ],
-                }),
-                AccountDiff::Payment(PaymentDiff {
-                    amount: 10000000000.into(),
-                    update_type: UpdateType::Debit(None),
-                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
-                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+        if let UserCommandWithStatus::V2(box_cmd) = zkapp_cmd {
+            if let UserCommand {
+                data: (_, UserCommandData::ZkappCommandData(zkapp)),
+                ..
+            } = box_cmd.as_ref()
+            {
+                let expect = vec![vec![
+                    AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
+                        public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
+                            .into(),
+                        nonce: 59.into(),
+                    }),
+                    AccountDiff::Payment(PaymentDiff {
+                        amount: 1000000000.into(),
+                        update_type: UpdateType::Debit(None),
+                        public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
+                            .into(),
+                        token: TokenAddress::default(),
+                    }),
+                    AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
+                        token: TokenAddress::default(),
+                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                            .into(),
+                        events: vec![
+                            "0x0000000000000000000000000000000000000000000000000000000000000002"
+                                .into(),
+                            "0x01B2700CB8B5AB3EA1E6901ED662EDBD45F1FADEDFDA70A406F2E36F7A902F2C"
+                                .into(),
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                .into(),
+                            "0x3D76374FA52F749B664DB992AF45C57F92535C1CDAED68867781673A7E278F78"
+                                .into(),
+                            "0x0000000000000000000000000000000000000000000000000000000000000001"
+                                .into(),
+                            "0x00000000000000000000000000000000000000000000000000000002540BE400"
+                                .into(),
+                        ],
+                    }),
+                    AccountDiff::Payment(PaymentDiff {
+                        amount: 10000000000.into(),
+                        update_type: UpdateType::Debit(None),
+                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                            .into(),
+                        token: TokenAddress::new(
+                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                        )
                         .unwrap(),
-                }),
-                AccountDiff::Payment(PaymentDiff {
-                    amount: 10000000000.into(),
-                    update_type: UpdateType::Credit,
-                    public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba".into(),
-                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                    }),
+                    AccountDiff::Payment(PaymentDiff {
+                        amount: 10000000000.into(),
+                        update_type: UpdateType::Credit,
+                        public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba"
+                            .into(),
+                        token: TokenAddress::new(
+                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                        )
                         .unwrap(),
-                }),
-            ]];
+                    }),
+                ]];
 
-            let diffs = AccountDiff::from_command(CommandWithStateHash {
-                command: Command::Zkapp(zkapp.clone()),
-                state_hash,
-            });
+                let diffs = AccountDiff::from_command(CommandWithStateHash {
+                    command: Command::Zkapp(zkapp.clone()),
+                    state_hash,
+                });
 
-            assert_eq!(AccountDiff::expand(diffs), expect);
-            return Ok(());
+                assert_eq!(AccountDiff::expand(diffs), expect);
+                return Ok(());
+            }
         }
 
         panic!("Expected a zkapp command")

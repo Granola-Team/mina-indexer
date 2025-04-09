@@ -270,23 +270,26 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
 
     /// Only called on zkapp commands
     fn accounts_updated(&self) -> Vec<AccountUpdate> {
+        use v2::staged_ledger_diff as v2;
         let mut updated = vec![];
 
-        if let UserCommandWithStatus::V2(v2::staged_ledger_diff::UserCommand {
-            data: (_, UserCommandData::ZkappCommandData(data)),
-            ..
-        }) = self
-        {
-            for update in &data.account_updates {
-                let account_update = AccountUpdate {
-                    public_key: update.elt.account_update.body.public_key.to_owned(),
-                    token: update.elt.account_update.body.token_id.to_owned(),
-                    balance_change: (&update.elt.account_update.body.balance_change).into(),
-                    increment_nonce: update.elt.account_update.body.increment_nonce,
-                };
+        if let UserCommandWithStatus::V2(box_cmd) = self {
+            if let v2::UserCommand {
+                data: (_, UserCommandData::ZkappCommandData(data)),
+                ..
+            } = box_cmd.as_ref()
+            {
+                for update in data.account_updates.iter() {
+                    let account_update = AccountUpdate {
+                        public_key: update.elt.account_update.body.public_key.to_owned(),
+                        token: update.elt.account_update.body.token_id.to_owned(),
+                        balance_change: (&update.elt.account_update.body.balance_change).into(),
+                        increment_nonce: update.elt.account_update.body.increment_nonce,
+                    };
 
-                updated.push(account_update);
-                recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
+                    updated.push(account_update);
+                    recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
+                }
             }
         }
 
@@ -821,18 +824,6 @@ impl From<v2::staged_ledger_diff::AccountUpdate> for AccountUpdate {
             balance_change: (&value.body.balance_change).into(),
             increment_nonce: value.body.increment_nonce,
         }
-    }
-}
-
-impl From<v2::staged_ledger_diff::AccountUpdates> for Vec<AccountUpdate> {
-    fn from(value: v2::staged_ledger_diff::AccountUpdates) -> Vec<AccountUpdate> {
-        let mut updates = vec![value.elt.account_update.into()];
-
-        for call in value.elt.calls {
-            updates.push(call.elt.account_update.into());
-        }
-
-        updates
     }
 }
 
