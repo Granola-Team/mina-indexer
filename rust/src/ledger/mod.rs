@@ -188,7 +188,7 @@ impl Ledger {
                 .cloned()
                 .with_context(|| format!("account {} token {}", pk, token))
                 .unwrap();
-            let expect = account.display();
+            let expect = account.deduct_mina_account_creation_fee();
 
             accessed_account.assert_eq_account(
                 &expect,
