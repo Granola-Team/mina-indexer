@@ -96,6 +96,7 @@ pub struct SnarkQueryRoot;
 #[Object]
 impl SnarkQueryRoot {
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::needless_lifetimes)]
     async fn snarks<'ctx>(
         &self,
         ctx: &Context<'ctx>,
@@ -312,7 +313,7 @@ impl SnarkQueryRoot {
         }
 
         // block height bounded query
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
                 || q.block_height_lt.is_some()

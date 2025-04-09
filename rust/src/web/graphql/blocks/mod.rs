@@ -31,6 +31,7 @@ pub struct BlocksQueryRoot;
 
 #[Object]
 impl BlocksQueryRoot {
+    #[allow(clippy::needless_lifetimes)]
     async fn block<'ctx>(
         &self,
         ctx: &async_graphql::Context<'ctx>,
@@ -91,6 +92,7 @@ impl BlocksQueryRoot {
     }
 
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::needless_lifetimes)]
     async fn blocks<'ctx>(
         &self,
         ctx: &async_graphql::Context<'ctx>,
@@ -302,7 +304,7 @@ impl BlocksQueryRoot {
         }
 
         // block height bounded query
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
                 || q.block_height_lt.is_some()
@@ -377,7 +379,7 @@ impl BlocksQueryRoot {
             .as_ref()
             .and_then(|f| f.protocol_state.as_ref())
             .and_then(|f| f.consensus_state.as_ref());
-        if consensus_state.map_or(false, |q| {
+        if consensus_state.is_some_and(|q| {
             q.slot_since_genesis_gt.is_some()
                 || q.slot_since_genesis_gte.is_some()
                 || q.slot_since_genesis_lt.is_some()
@@ -527,7 +529,7 @@ impl BlockQueryInput {
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
             .or(*global_slot_since_genesis)
-            .map_or(false, |global_slot| {
+            .is_some_and(|global_slot| {
                 block
                     .block
                     .protocol_state
@@ -545,7 +547,7 @@ impl BlockQueryInput {
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot)
-            .map_or(false, |slot| {
+            .is_some_and(|slot| {
                 block.block.protocol_state.consensus_state.slot != slot
             })
         {

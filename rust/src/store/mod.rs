@@ -399,7 +399,7 @@ fn archive_directory(input_dir: impl AsRef<Path>, output_file: impl AsRef<Path>)
     let mut archive = tar::Builder::new(BufWriter::new(File::create(output_file)?));
     read_dir(input_dir)?
         .flatten()
-        .filter(|entry| entry.file_type().map_or(false, |ft| ft.is_file()))
+        .filter(|entry| entry.file_type().is_ok_and(|ft| ft.is_file()))
         .for_each(|file| {
             archive
                 .append_path_with_name(file.path(), file.file_name())

@@ -127,6 +127,7 @@ struct TokenWithMeta {
 #[derive(Default)]
 pub struct TokensQueryRoot;
 
+#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TokensQueryRoot {
     async fn tokens<'ctx>(
@@ -200,6 +201,7 @@ impl TokensQueryRoot {
         Ok(tokens)
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn token_holders<'ctx>(
         &self,
         ctx: &Context<'ctx>,

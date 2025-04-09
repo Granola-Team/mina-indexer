@@ -115,6 +115,7 @@ pub struct AccountQueryRoot;
 
 #[Object]
 impl AccountQueryRoot {
+    #[allow(clippy::needless_lifetimes)]
     async fn accounts<'ctx>(
         &self,
         ctx: &Context<'ctx>,

@@ -63,6 +63,7 @@ pub struct ActionsQueryRoot;
 
 #[Object]
 impl ActionsQueryRoot {
+    #[allow(clippy::needless_lifetimes)]
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
     async fn get_actions<'ctx>(

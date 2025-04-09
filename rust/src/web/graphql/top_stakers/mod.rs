@@ -46,6 +46,7 @@ pub struct TopStakerAccount {
     num_slots_produced: u32,
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TopStakersQueryRoot {
     async fn top_stakers<'ctx>(

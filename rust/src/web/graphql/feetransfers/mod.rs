@@ -63,6 +63,7 @@ impl FeetransferWithMeta {
         &self.feetransfer
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
         let db = db(ctx);
 
@@ -186,6 +187,7 @@ pub struct FeetransferQueryRoot;
 
 #[Object]
 impl FeetransferQueryRoot {
+    #[allow(clippy::needless_lifetimes)]
     async fn feetransfers<'ctx>(
         &self,
         ctx: &Context<'ctx>,
@@ -228,7 +230,7 @@ impl FeetransferQueryRoot {
         }
 
         // block height bounded query
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height.is_some()
                 || q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
@@ -689,19 +691,19 @@ fn recipient_query_handler(
 }
 
 fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) -> bool {
-    query.block_height.map_or(false, |h| blockchain_length == h)
+    (query.block_height == Some(blockchain_length))
         || query
             .block_height_gt
-            .map_or(false, |gt| blockchain_length <= gt)
+            .is_some_and(|gt| blockchain_length <= gt)
         || query
             .block_height_gte
-            .map_or(false, |gte| blockchain_length < gte)
+            .is_some_and(|gte| blockchain_length < gte)
         || query
             .block_height_lt
-            .map_or(false, |lt| blockchain_length >= lt)
+            .is_some_and(|lt| blockchain_length >= lt)
         || query
             .block_height_lte
-            .map_or(false, |lte| blockchain_length > lte)
+            .is_some_and(|lte| blockchain_length > lte)
 }
 
 #[cfg(test)]

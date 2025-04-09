@@ -224,6 +224,7 @@ pub struct StakesQueryRoot;
 
 #[Object]
 impl StakesQueryRoot {
+    #[allow(clippy::needless_lifetimes)]
     // Cache for 1 day
     #[graphql(cache_control(max_age = 86400))]
     async fn stakes<'ctx>(

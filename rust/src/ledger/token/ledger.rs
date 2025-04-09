@@ -183,7 +183,7 @@ impl std::str::FromStr for TokenLedger {
                     balance: if acct
                         .token
                         .as_ref()
-                        .map_or(false, |t| t.0 != MINA_TOKEN_ADDRESS)
+                        .is_some_and(|t| t.0 != MINA_TOKEN_ADDRESS)
                     {
                         acct.balance
                     } else {

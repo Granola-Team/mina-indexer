@@ -48,6 +48,7 @@ pub struct TopSnarker {
     snarks_sold: u32,
 }
 
+#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TopSnarkersQueryRoot {
     async fn top_snarkers<'ctx>(

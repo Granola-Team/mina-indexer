@@ -233,7 +233,7 @@ impl GenesisRoot {
         let bytes = std::fs::read(path.as_ref())?;
 
         // decompress if gzip'd
-        if path.as_ref().extension().map_or(false, |ext| ext == "gz") {
+        if path.as_ref().extension().is_some_and(|ext| ext == "gz") {
             let bytes = decompress_gzip(&bytes[..])?;
             return Ok(serde_json::from_slice(&bytes)?);
         }
@@ -305,7 +305,7 @@ impl From<GenesisLedger> for TokenLedger {
                             balance: if acct
                                 .token
                                 .as_ref()
-                                .map_or(false, |t| t.0 != MINA_TOKEN_ADDRESS)
+                                .is_some_and(|t| t.0 != MINA_TOKEN_ADDRESS)
                             {
                                 acct.balance
                             } else {

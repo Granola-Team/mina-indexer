@@ -90,7 +90,7 @@ where
     }
 
     // check validity of file stem
-    file_stem.map_or(false, |stem| {
+    file_stem.is_some_and(|stem| {
         let parts: Vec<&str> = stem.split('-').collect();
 
         // mainnet-<number>-<hash>.json
