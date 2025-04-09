@@ -59,7 +59,7 @@ csv = "1.3.0"
 notify = { version = "6.*", default-features = false }
 tar = "0.4.41"
 libc = "0.2.158"
-tokio-graceful-shutdown = "0.16.0"
+tokio-graceful-shutdown = { version = "0.*", default-features = false }
 flate2 = "1.0.35"
 
 [dev-dependencies]
@@ -72,7 +72,7 @@ serde_stacker = "0.1.11"
 rayon = "1.10.0"
 
 [dependencies.tokio]
-version = "1.40.0"
+version = "1.*"
 features = ["macros", "rt-multi-thread"]
 default-features = false
 
