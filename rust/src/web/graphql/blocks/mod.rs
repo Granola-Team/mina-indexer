@@ -83,7 +83,7 @@ impl BlocksQueryRoot {
             let pcb = get_block(db, &state_hash);
             let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
 
-            if query.as_ref().map_or(true, |q| q.matches(&block)) {
+            if query.as_ref().is_none_or(|q| q.matches(&block)) {
                 return Ok(Some(block));
             }
         }
@@ -738,7 +738,7 @@ fn precomputed_matches_query(
     let block_with_canonicity = Block::from_precomputed(db, block, counts);
     if query
         .as_ref()
-        .map_or(true, |q| q.matches(&block_with_canonicity))
+        .is_none_or(|q| q.matches(&block_with_canonicity))
     {
         Some(block_with_canonicity)
     } else {

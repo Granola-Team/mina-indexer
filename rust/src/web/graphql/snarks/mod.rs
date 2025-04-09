@@ -225,7 +225,7 @@ impl SnarkQueryRoot {
                                 .into(),
                         };
 
-                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                        if query.as_ref().is_none_or(|q| q.matches(&sw)) {
                             snarks.push(sw);
 
                             if snarks.len() >= limit {
@@ -293,7 +293,7 @@ impl SnarkQueryRoot {
                                 .into(),
                         };
 
-                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                        if query.as_ref().is_none_or(|q| q.matches(&sw)) {
                             snarks.push(sw);
 
                             if snarks.len() >= limit {
@@ -378,7 +378,7 @@ impl SnarkQueryRoot {
                     });
 
                     for sw in snarks_with_canonicity {
-                        if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                        if query.as_ref().is_none_or(|q| q.matches(&sw)) {
                             snarks.push(sw);
 
                             if snarks.len() >= limit {
@@ -428,7 +428,7 @@ impl SnarkQueryRoot {
             });
 
             for sw in snarks_with_canonicity {
-                if query.as_ref().map_or(true, |q| q.matches(&sw)) {
+                if query.as_ref().is_none_or(|q| q.matches(&sw)) {
                     snarks.push(sw);
 
                     if snarks.len() >= limit {
@@ -461,7 +461,7 @@ fn snark_summary_matches_query(
 
     if query
         .as_ref()
-        .map_or(true, |q| q.matches(&snark_with_canonicity))
+        .is_none_or(|q| q.matches(&snark_with_canonicity))
     {
         Ok(Some(snark_with_canonicity))
     } else {

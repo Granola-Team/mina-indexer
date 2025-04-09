@@ -99,7 +99,7 @@ impl Account {
         if self
             .token
             .as_ref()
-            .map_or(true, |t| t.0 == MINA_TOKEN_ADDRESS)
+            .is_none_or(|t| t.0 == MINA_TOKEN_ADDRESS)
             && !self.created_by_zkapp
         {
             return Self {

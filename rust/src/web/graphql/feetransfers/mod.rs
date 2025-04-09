@@ -466,7 +466,7 @@ fn default_query_handler(
 
         if query
             .as_ref()
-            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+            .is_none_or(|q| q.matches(&feetransfer_with_meta))
         {
             fee_transfers.push(feetransfer_with_meta);
         }
@@ -509,7 +509,7 @@ fn get_fee_transfers_for_state_hash(
                     )),
                     block: Some(pcb.clone()),
                 })
-                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
+                .filter(|ft| query.as_ref().is_none_or(|q| q.matches(ft)))
                 .collect();
 
             match sort_by {
@@ -617,7 +617,7 @@ fn block_height_bound_query_handler(
 
         if query
             .as_ref()
-            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+            .is_none_or(|q| q.matches(&feetransfer_with_meta))
         {
             fee_transfers.push(feetransfer_with_meta);
         }
@@ -682,7 +682,7 @@ fn recipient_query_handler(
             )),
         };
 
-        if query.as_ref().map_or(true, |q| q.matches(&ft)) {
+        if query.as_ref().is_none_or(|q| q.matches(&ft)) {
             fee_transfers.push(ft);
         }
     }

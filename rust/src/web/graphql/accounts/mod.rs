@@ -200,7 +200,7 @@ impl AccountQueryRoot {
 
             if query
                 .as_ref()
-                .map_or(true, |q| q.matches(&account, username.as_ref()))
+                .is_none_or(|q| q.matches(&account, username.as_ref()))
             {
                 let account_with_meta = AccountWithMeta::new(db, account);
                 accounts.push(account_with_meta);
@@ -240,7 +240,7 @@ impl AccountQueryInput {
         }
 
         if let Some(username_prefix) = query_username_prefix {
-            if username.map_or(true, |u| {
+            if username.is_none_or(|u| {
                 !u.to_lowercase()
                     .starts_with(&username_prefix.to_lowercase())
             }) {

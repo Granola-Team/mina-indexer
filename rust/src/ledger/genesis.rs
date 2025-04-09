@@ -207,10 +207,10 @@ impl GenesisLedger {
                     public_key,
                     balance,
                     delegate,
-                    nonce: account.nonce.map(Into::into),
+                    nonce: account.nonce,
                     token: account.token.map(TokenAddress::from),
                     receipt_chain_hash: account.receipt_chain_hash,
-                    voting_for: account.voting_for.map(Into::into),
+                    voting_for: account.voting_for,
                     timing: account.timing.map(Into::into),
                     genesis_account: Some(balance),
                     ..Default::default()

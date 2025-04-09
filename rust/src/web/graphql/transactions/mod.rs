@@ -882,7 +882,7 @@ impl TransactionQueryInput {
             }
 
             let txn = Transaction::new(serde_json::from_slice(&value)?, db, num_commands);
-            if query.as_ref().map_or(true, |q| q.matches(&txn)) {
+            if query.as_ref().is_none_or(|q| q.matches(&txn)) {
                 txns.push(txn);
             };
         }
