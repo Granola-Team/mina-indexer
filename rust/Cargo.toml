@@ -51,7 +51,7 @@ tempfile = { version = "3.*", default-features = false }
 actix-web = { version = "4.9.0", default-features = false , features = ["macros"] }
 actix-cors = { version = "=0.7.0", default-features = false }
 async-graphql = { version = "7.*", default-features = false, features = ["graphiql"] }
-async-graphql-actix-web = { version = "7.*" }
+async-graphql-actix-web = { version = "7.0" }
 base64 = { version = "0.22.1", default-features = false }
 hex-literal = "0.4.1"
 chrono = { version = "0.4.38", default-features = false }
