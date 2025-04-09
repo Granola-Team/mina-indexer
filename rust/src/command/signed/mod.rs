@@ -314,17 +314,19 @@ impl SignedCommandWithData {
     }
 
     /// Only called on zkapp commands
-    pub fn accounts_updated(&self) -> Vec<(PublicKey, TokenAddress, i64, bool)> {
+    pub fn accounts_updated(&self) -> Vec<AccountUpdate> {
         let mut updated = vec![];
 
         if let SignedCommand::V2(UserCommandData::ZkappCommandData(data)) = &self.command {
             for update in &data.account_updates {
-                let pk = update.elt.account_update.body.public_key.to_owned();
-                let token = update.elt.account_update.body.token_id.to_owned();
-                let balance_change: i64 = (&update.elt.account_update.body.balance_change).into();
-                let increment_nonce = update.elt.account_update.body.increment_nonce;
+                let account_update = AccountUpdate {
+                    public_key: update.elt.account_update.body.public_key.to_owned(),
+                    token: update.elt.account_update.body.token_id.to_owned(),
+                    balance_change: (&update.elt.account_update.body.balance_change).into(),
+                    increment_nonce: update.elt.account_update.body.increment_nonce,
+                };
 
-                updated.push((pk, token, balance_change, increment_nonce));
+                updated.push(account_update);
                 recurse_calls_accounts_updated(&mut updated, update.elt.calls.iter());
             }
         }
@@ -850,21 +852,6 @@ impl std::fmt::Display for TxnHash {
 // helpers //
 /////////////
 
-fn recurse_calls_accounts_updated<'a>(
-    accounts: &mut Vec<(PublicKey, TokenAddress, i64, bool)>,
-    calls: impl Iterator<Item = &'a Call>,
-) {
-    for update in calls {
-        let pk = update.elt.account_update.body.public_key.to_owned();
-        let token = update.elt.account_update.body.token_id.to_owned();
-        let balance_change: i64 = (&update.elt.account_update.body.balance_change).into();
-        let increment_nonce = update.elt.account_update.body.increment_nonce;
-
-        accounts.push((pk, token, balance_change, increment_nonce));
-        recurse_calls_accounts_updated(accounts, update.elt.calls.iter());
-    }
-}
-
 fn recurse_calls_actions<'a>(actions: &mut Vec<String>, calls: impl Iterator<Item = &'a Call>) {
     for update in calls {
         let mut update_actions: Vec<_> = update
@@ -1049,20 +1036,20 @@ mod tests {
                 ))
                 .map(|cmd| cmd.accounts_updated()),
             Some(vec![
-                (
-                    "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                AccountUpdate {
+                    public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
+                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
                         .unwrap(),
-                    -2000000000,
-                    false,
-                ),
-                (
-                    "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
-                    TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                    balance_change: -2000000000,
+                    increment_nonce: false,
+                },
+                AccountUpdate {
+                    public_key: "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5".into(),
+                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
                         .unwrap(),
-                    2000000000,
-                    false,
-                ),
+                    balance_change: 2000000000,
+                    increment_nonce: false,
+                },
             ])
         );
 

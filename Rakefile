@@ -22,7 +22,11 @@ DEPLOY_PROD = "#{TOP}/ops/deploy-prod.rb"
 UTILS = "#{TOP}/ops/utils.rb"
 
 RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
-CARGO_DEPS = ["#{ENV["CARGO_HOME"]}/config.toml"] + RUST_SRC_FILES
+CARGO_DEPS = [
+  "#{ENV["CARGO_HOME"]}/config.toml",
+  "flake.nix",
+  "flake.lock"
+] + RUST_SRC_FILES
 RUBY_SRC_FILES = Dir.glob("#{TOP}/ops/**/*.rb") + Dir.glob("#{TOP}/ops/**/*.rake") + ["Rakefile"]
 NIX_FILES = %W[
   flake.nix
@@ -342,7 +346,7 @@ namespace :test do
       run("rspec ops/spec/*-spec.rb")
       puts "--- Performing tier 1 unit test(s)"
       cargo_output("nextest --version")
-      cargo_output("nextest run #{test}")
+      cargo_output("nextest run #{test} --failure-output immediate")
     end
 
     desc "Run all feature unit tests (debug build)"

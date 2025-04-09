@@ -94,12 +94,14 @@ pub enum Permission {
 //////////
 
 impl Account {
-    /// Display view of account, removes non-genesis account creation fee
-    pub fn display(self) -> Self {
+    /// Deduct the account creation fee if necessary
+    ///
+    /// Removes non-genesis, non-zkapp, MINA account creation fee
+    pub fn deduct_mina_account_creation_fee(self) -> Self {
         if self
             .token
             .as_ref()
-            .map_or(true, |t| t.0 == MINA_TOKEN_ADDRESS)
+            .is_none_or(|t| t.0 == MINA_TOKEN_ADDRESS)
             && !self.created_by_zkapp
         {
             return Self {
@@ -712,7 +714,7 @@ impl Account {
 /// Deduct account creation fee
 impl std::fmt::Display for Account {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let deducted = Self::display(self.to_owned());
+        let deducted = Self::deduct_mina_account_creation_fee(self.to_owned());
 
         match serde_json::to_string_pretty(&deducted) {
             Ok(s) => write!(f, "{s}"),
@@ -764,7 +766,7 @@ mod tests {
             balance: Amount::new(100),
             ..Default::default()
         };
-        let deduct_account = ledger_account.clone().display();
+        let deduct_account = ledger_account.clone().deduct_mina_account_creation_fee();
 
         // account display & debug => deduct "creation fee"
         assert_eq!(

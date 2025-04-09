@@ -50,9 +50,9 @@ pub struct TopSnarker {
 
 #[Object]
 impl TopSnarkersQueryRoot {
-    async fn top_snarkers<'ctx>(
+    async fn top_snarkers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TopSnarkersQueryInput>,
         sort_by: Option<TopSnarkersSortByInput>,
         #[graphql(default = 100)] limit: usize,

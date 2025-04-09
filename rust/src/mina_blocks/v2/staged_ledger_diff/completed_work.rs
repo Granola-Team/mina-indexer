@@ -13,8 +13,8 @@ pub struct CompletedWork {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Proofs {
-    One(ProofKind, Proof),
-    Two(ProofKind, Proof, Proof),
+    One(ProofKind, Box<Proof>),
+    Two(ProofKind, Box<Proof>, Box<Proof>),
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

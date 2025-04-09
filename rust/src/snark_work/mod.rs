@@ -49,7 +49,6 @@ impl SnarkWorkSummary {
         block
             .completed_works()
             .into_iter()
-            .map(Self::from)
             .collect()
     }
 

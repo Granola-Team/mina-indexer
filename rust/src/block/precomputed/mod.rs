@@ -52,14 +52,14 @@ pub enum PcbVersion {
 #[serde(untagged)]
 pub enum PrecomputedBlock {
     V1(Box<PrecomputedBlockV1>),
-    V2(PrecomputedBlockV2),
+    V2(Box<PrecomputedBlockV2>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum PrecomputedBlockWithCanonicity {
     V1(Box<PrecomputedBlockWithCanonicityV1>),
-    V2(PrecomputedBlockWithCanonicityV2),
+    V2(Box<PrecomputedBlockWithCanonicityV2>),
 }
 
 impl PrecomputedBlock {
@@ -99,7 +99,7 @@ impl PrecomputedBlock {
                             accounts_created,
                         },
                 } = serde_json::from_slice(&block_file_contents.contents)?;
-                Ok(Self::V2(PrecomputedBlockV2 {
+                Ok(Self::V2(Box::new(PrecomputedBlockV2 {
                     state_hash,
                     scheduled_time,
                     blockchain_length,
@@ -109,7 +109,7 @@ impl PrecomputedBlock {
                     tokens_used,
                     accounts_accessed,
                     accounts_created,
-                }))
+                })))
             }
         }
     }
@@ -1333,7 +1333,7 @@ impl PrecomputedBlock {
                 }))
             }
             Self::V2(pcb_v2) => {
-                PrecomputedBlockWithCanonicity::V2(PrecomputedBlockWithCanonicityV2 {
+                PrecomputedBlockWithCanonicity::V2(Box::new(PrecomputedBlockWithCanonicityV2 {
                     canonicity: Some(canonicity),
                     network: pcb_v2.network.to_owned(),
                     state_hash: pcb_v2.state_hash.to_owned(),
@@ -1341,7 +1341,7 @@ impl PrecomputedBlock {
                     scheduled_time: pcb_v2.scheduled_time,
                     protocol_state: pcb_v2.protocol_state.to_owned(),
                     staged_ledger_diff: pcb_v2.staged_ledger_diff.to_owned(),
-                })
+                }))
             }
         }
     }

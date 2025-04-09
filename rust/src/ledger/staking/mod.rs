@@ -260,7 +260,7 @@ impl StakingLedger {
     /// Parse a valid (compressed) ledger file
     pub async fn parse_file(path: &Path) -> anyhow::Result<Self> {
         let mut bytes = std::fs::read(path)?;
-        let is_compressed = path.extension().map_or(false, |ext| ext == "gz");
+        let is_compressed = path.extension().is_some_and(|ext| ext == "gz");
 
         // decompress if needed
         if is_compressed {

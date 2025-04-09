@@ -426,7 +426,7 @@ async fn run_indexer<P: AsRef<Path>>(
     let fetch_new_blocks_exe = fetch_new_blocks_opts.as_ref().map(|f| f.exe.clone());
     let missing_block_recovery_delay = missing_block_recovery.as_ref().map(|m| m.delay);
     let missing_block_recovery_exe = missing_block_recovery.as_ref().map(|m| m.exe.clone());
-    let missing_block_recovery_batch = missing_block_recovery.map_or(false, |m| m.batch);
+    let missing_block_recovery_batch = missing_block_recovery.is_some_and(|m| m.batch);
     loop {
         tokio::select! {
             // watch for shutdown signals
@@ -516,10 +516,11 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
 
                         // check if the block is already in the witness tree
                         if state.diffs_map.contains_key(&block.state_hash()) {
-                            return Ok(info!(
+                            info!(
                                 "Block is already present in the witness tree {}",
                                 block.summary()
-                            ));
+                            );
+                            return Ok(());
                         }
 
                         // if the block isn't in the witness tree, pipeline it

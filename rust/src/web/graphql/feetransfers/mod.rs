@@ -63,7 +63,7 @@ impl FeetransferWithMeta {
         &self.feetransfer
     }
 
-    async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
+    async fn block_state_hash(&self, ctx: &Context<'_>) -> Result<Option<Block>> {
         let db = db(ctx);
 
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
@@ -186,9 +186,10 @@ pub struct FeetransferQueryRoot;
 
 #[Object]
 impl FeetransferQueryRoot {
-    async fn feetransfers<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn feetransfers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<FeetransferQueryInput>,
         sort_by: Option<FeetransferSortByInput>,
         #[graphql(default = 100)] limit: usize,
@@ -228,7 +229,7 @@ impl FeetransferQueryRoot {
         }
 
         // block height bounded query
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height.is_some()
                 || q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
@@ -464,7 +465,7 @@ fn default_query_handler(
 
         if query
             .as_ref()
-            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+            .is_none_or(|q| q.matches(&feetransfer_with_meta))
         {
             fee_transfers.push(feetransfer_with_meta);
         }
@@ -507,7 +508,7 @@ fn get_fee_transfers_for_state_hash(
                     )),
                     block: Some(pcb.clone()),
                 })
-                .filter(|ft| query.as_ref().map_or(true, |q| q.matches(ft)))
+                .filter(|ft| query.as_ref().is_none_or(|q| q.matches(ft)))
                 .collect();
 
             match sort_by {
@@ -615,7 +616,7 @@ fn block_height_bound_query_handler(
 
         if query
             .as_ref()
-            .map_or(true, |q| q.matches(&feetransfer_with_meta))
+            .is_none_or(|q| q.matches(&feetransfer_with_meta))
         {
             fee_transfers.push(feetransfer_with_meta);
         }
@@ -680,7 +681,7 @@ fn recipient_query_handler(
             )),
         };
 
-        if query.as_ref().map_or(true, |q| q.matches(&ft)) {
+        if query.as_ref().is_none_or(|q| q.matches(&ft)) {
             fee_transfers.push(ft);
         }
     }
@@ -689,19 +690,19 @@ fn recipient_query_handler(
 }
 
 fn block_out_of_bounds(blockchain_length: u32, query: &FeetransferQueryInput) -> bool {
-    query.block_height.map_or(false, |h| blockchain_length == h)
+    (query.block_height == Some(blockchain_length))
         || query
             .block_height_gt
-            .map_or(false, |gt| blockchain_length <= gt)
+            .is_some_and(|gt| blockchain_length <= gt)
         || query
             .block_height_gte
-            .map_or(false, |gte| blockchain_length < gte)
+            .is_some_and(|gte| blockchain_length < gte)
         || query
             .block_height_lt
-            .map_or(false, |lt| blockchain_length >= lt)
+            .is_some_and(|lt| blockchain_length >= lt)
         || query
             .block_height_lte
-            .map_or(false, |lte| blockchain_length > lte)
+            .is_some_and(|lte| blockchain_length > lte)
 }
 
 #[cfg(test)]

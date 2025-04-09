@@ -31,9 +31,10 @@ pub struct BlocksQueryRoot;
 
 #[Object]
 impl BlocksQueryRoot {
-    async fn block<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn block(
         &self,
-        ctx: &async_graphql::Context<'ctx>,
+        ctx: &async_graphql::Context<'_>,
         query: Option<BlockQueryInput>,
     ) -> Result<Option<Block>> {
         let db = db(ctx);
@@ -82,7 +83,7 @@ impl BlocksQueryRoot {
             let pcb = get_block(db, &state_hash);
             let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
 
-            if query.as_ref().map_or(true, |q| q.matches(&block)) {
+            if query.as_ref().is_none_or(|q| q.matches(&block)) {
                 return Ok(Some(block));
             }
         }
@@ -91,9 +92,10 @@ impl BlocksQueryRoot {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn blocks<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn blocks(
         &self,
-        ctx: &async_graphql::Context<'ctx>,
+        ctx: &async_graphql::Context<'_>,
         query: Option<BlockQueryInput>,
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
@@ -302,7 +304,7 @@ impl BlocksQueryRoot {
         }
 
         // block height bounded query
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
                 || q.block_height_lt.is_some()
@@ -377,7 +379,7 @@ impl BlocksQueryRoot {
             .as_ref()
             .and_then(|f| f.protocol_state.as_ref())
             .and_then(|f| f.consensus_state.as_ref());
-        if consensus_state.map_or(false, |q| {
+        if consensus_state.is_some_and(|q| {
             q.slot_since_genesis_gt.is_some()
                 || q.slot_since_genesis_gte.is_some()
                 || q.slot_since_genesis_lt.is_some()
@@ -527,7 +529,7 @@ impl BlockQueryInput {
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot_since_genesis)
             .or(*global_slot_since_genesis)
-            .map_or(false, |global_slot| {
+            .is_some_and(|global_slot| {
                 block
                     .block
                     .protocol_state
@@ -545,9 +547,7 @@ impl BlockQueryInput {
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot)
-            .map_or(false, |slot| {
-                block.block.protocol_state.consensus_state.slot != slot
-            })
+            .is_some_and(|slot| block.block.protocol_state.consensus_state.slot != slot)
         {
             return false;
         }
@@ -736,7 +736,7 @@ fn precomputed_matches_query(
     let block_with_canonicity = Block::from_precomputed(db, block, counts);
     if query
         .as_ref()
-        .map_or(true, |q| q.matches(&block_with_canonicity))
+        .is_none_or(|q| q.matches(&block_with_canonicity))
     {
         Some(block_with_canonicity)
     } else {

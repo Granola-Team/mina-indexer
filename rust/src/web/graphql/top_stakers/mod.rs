@@ -48,9 +48,9 @@ pub struct TopStakerAccount {
 
 #[Object]
 impl TopStakersQueryRoot {
-    async fn top_stakers<'ctx>(
+    async fn top_stakers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TopStakersQueryInput>,
         sort_by: Option<TopStakersSortByInput>,
         #[graphql(default = 100)] limit: usize,
@@ -83,7 +83,7 @@ impl TopStakersQueryRoot {
                 .get_best_account(&pk, &TokenAddress::default())? // always MINA
                 .with_context(|| format!("Account missing {pk}"))
                 .unwrap()
-                .display();
+                .deduct_mina_account_creation_fee();
 
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,

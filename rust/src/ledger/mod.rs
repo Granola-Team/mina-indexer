@@ -287,7 +287,10 @@ impl Ledger {
             let mut accounts = HashMap::new();
 
             for (pk, acct) in token_ledger.accounts.iter() {
-                accounts.insert(pk.to_string(), acct.clone().display());
+                accounts.insert(
+                    pk.to_string(),
+                    acct.clone().deduct_mina_account_creation_fee(),
+                );
             }
 
             tokens.insert(token.to_string(), accounts);
@@ -340,17 +343,7 @@ impl std::fmt::Debug for Ledger {
                 writeln!(
                     f,
                     "  {pk} -> {}",
-                    acct.clone()
-                        .balance
-                        .display(
-                            &acct
-                                .token
-                                .clone()
-                                .or_else(|| Some(TokenAddress::default()))
-                                .unwrap(),
-                            acct.created_by_zkapp
-                        )
-                        .0
+                    acct.clone().deduct_mina_account_creation_fee().balance
                 )?;
             }
         }
@@ -387,7 +380,10 @@ mod tests {
         // make the serialized ledger
         let mut ser_ledger = HashMap::new();
         for (pk, account) in ledger.accounts.iter() {
-            ser_ledger.insert(pk.to_string(), account.clone().display());
+            ser_ledger.insert(
+                pk.to_string(),
+                account.clone().deduct_mina_account_creation_fee(),
+            );
         }
 
         // check balance serialization

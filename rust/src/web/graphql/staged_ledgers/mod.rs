@@ -74,9 +74,9 @@ pub struct StagedLedgerQueryRoot;
 impl StagedLedgerQueryRoot {
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
-    async fn staged_ledger_accounts<'ctx>(
+    async fn staged_ledger_accounts(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<StagedLedgerQueryInput>,
         sort_by: Option<StagedLedgerSortByInput>,
         #[graphql(default = 100)] limit: usize,
@@ -189,7 +189,7 @@ fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortBy
 
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
-        let acct = acct.display();
+        let acct = acct.deduct_mina_account_creation_fee();
 
         Self {
             balance_nanomina: acct.balance.0,

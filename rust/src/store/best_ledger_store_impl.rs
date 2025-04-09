@@ -47,7 +47,7 @@ impl BestLedgerStore for IndexerStore {
     ) -> Result<Option<Account>> {
         trace!("Display best ledger account {pk}");
         if let Some(best_acct) = self.get_best_account(pk, token)? {
-            return Ok(Some(best_acct.display()));
+            return Ok(Some(best_acct.deduct_mina_account_creation_fee()));
         }
         Ok(None)
     }

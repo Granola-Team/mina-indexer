@@ -4,6 +4,7 @@
 #![deny(warnings)]
 #![deny(missing_docs)]
 #![doc = include_str!("README.md")]
+#![allow(clippy::needless_lifetimes)]
 
 mod consts;
 mod de;

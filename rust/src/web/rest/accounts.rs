@@ -107,7 +107,7 @@ pub async fn get_account(
 
         return HttpResponse::Ok().content_type(ContentType::json()).body(
             serde_json::to_string_pretty(&Account {
-                account: account.account.clone().display(),
+                account: account.account.clone().deduct_mina_account_creation_fee(),
                 ..account
             })
             .expect("serde account bytes"),

@@ -7,7 +7,7 @@ use crate::{
     command::{
         signed::{SignedCommandWithData, TxnHash},
         store::UserCommandStore,
-        CommandStatusData,
+        AccountUpdate, CommandStatusData,
     },
     constants::millis_to_global_slot,
     ledger::token::TokenAddress,
@@ -312,7 +312,7 @@ impl TransactionsQueryRoot {
         // block height bound query //
         //////////////////////////////
 
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.block_height_gt.is_some()
                 || q.block_height_gte.is_some()
                 || q.block_height_lt.is_some()
@@ -334,7 +334,7 @@ impl TransactionsQueryRoot {
         // date time/global slot bound query //
         ///////////////////////////////////////
 
-        if query.as_ref().map_or(false, |q| {
+        if query.as_ref().is_some_and(|q| {
             q.global_slot_gt.is_some()
                 || q.global_slot_gte.is_some()
                 || q.global_slot_lt.is_some()
@@ -437,9 +437,16 @@ impl TransactionWithoutBlock {
                 accounts_updated: cmd
                     .accounts_updated()
                     .into_iter()
-                    .map(|(pk, token, balance_change, increment_nonce)| {
-                        TokenAccount::from(db, pk, token, balance_change, increment_nonce)
-                    })
+                    .map(
+                        |AccountUpdate {
+                             public_key: pk,
+                             token,
+                             balance_change,
+                             increment_nonce,
+                         }| {
+                            TokenAccount::from(db, pk, token, balance_change, increment_nonce)
+                        },
+                    )
                     .collect(),
                 actions: cmd.actions(),
                 events: cmd.events(),
@@ -581,8 +588,7 @@ impl TransactionQueryInput {
                 let pk_updated = zkapp
                     .accounts_updated
                     .iter()
-                    .map(|account| account.pk == *to)
-                    .any(|b| b);
+                    .any(|account| account.pk == *to);
 
                 if !pk_updated {
                     return false;
@@ -867,7 +873,7 @@ impl TransactionQueryInput {
                 if q.hash.is_some()
                     && user_commands_iterator_txn_hash(&key)
                         .ok()
-                        .map_or(false, |t| t.ref_inner() != q.hash.as_ref().unwrap())
+                        .is_some_and(|t| t.ref_inner() != q.hash.as_ref().unwrap())
                 {
                     continue;
                 }
@@ -883,7 +889,7 @@ impl TransactionQueryInput {
             }
 
             let txn = Transaction::new(serde_json::from_slice(&value)?, db, num_commands);
-            if query.as_ref().map_or(true, |q| q.matches(&txn)) {
+            if query.as_ref().is_none_or(|q| q.matches(&txn)) {
                 txns.push(txn);
             };
         }
@@ -1195,7 +1201,7 @@ impl TransactionQueryInput {
             }
 
             let txn = Transaction::new(serde_json::from_slice(&value)?, db, num_commands);
-            if query.as_ref().map_or(false, |q| q.matches(&txn)) {
+            if query.as_ref().is_some_and(|q| q.matches(&txn)) {
                 txns.push(txn);
             };
         }
