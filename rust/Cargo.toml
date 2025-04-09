@@ -24,10 +24,10 @@ anyhow = { version = "~1.0.97", default-features = false }
 bincode = "=2.0.0-rc.3"
 derive_more = { version = "~0.99", default-features = false }
 serde = { version = "1.*", default-features = false }
-serde_json = { version = "1.0.128", default-features = false, features = ["unbounded_depth"] }
-smart-default = "0.7.1"
-clap = { version = "4.5.17", default-features = false, features = ["help", "usage", "std", "derive", "string"] }
-thiserror = "1.0.63"
+serde_json = { version = "1.*", default-features = false, features = ["unbounded_depth"] }
+smart-default = { version = "0.*", default-features = false }
+clap = { version = "4.*", default-features = false, features = ["help", "usage", "std", "derive", "string"] }
+thiserror = { version = "1.*", default-features = false }
 glob = "0.3.1"
 mina_serialization_proc_macros = { path = "mina_serialization_macros/proc_macros" }
 mina_serialization_versioned = { path = "mina_serialization_macros/versioned" }
