@@ -21,7 +21,7 @@ use crate::{
     snark_work::SnarkWorkSummary,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use zkapp::{
     ZkappActionsDiff, ZkappDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonce,
     ZkappPaymentDiff, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff, ZkappTimingDiff,
@@ -423,58 +423,6 @@ impl AccountDiff {
                 | AccountDiff::FeeTransferViaCoinbase(_)
                 | AccountDiff::FailedTransactionNonce(_)
         )
-    }
-
-    pub fn add_mina_token_accounts(&self, zkapp_token_accounts: &mut BTreeSet<PublicKey>) {
-        match self {
-            AccountDiff::ZkappStateDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappPermissionsDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappVerificationKeyDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappUriDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappTokenSymbolDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappTimingDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappVotingForDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappActionsDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappEventsDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappIncrementNonce(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappProvedStateDiff(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-            AccountDiff::ZkappFeePayerNonce(diff) => {
-                zkapp_token_accounts.insert(diff.public_key.to_owned());
-            }
-
-            // non-zkapp diffs
-            AccountDiff::Payment(_)
-            | AccountDiff::Delegation(_)
-            | AccountDiff::Coinbase(_)
-            | AccountDiff::FeeTransfer(_)
-            | AccountDiff::FeeTransferViaCoinbase(_)
-            | AccountDiff::FailedTransactionNonce(_) => (),
-
-            // should only apply to expanded diffs
-            AccountDiff::Zkapp(_) => unreachable!(),
-        }
     }
 
     pub fn from(
