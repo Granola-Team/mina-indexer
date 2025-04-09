@@ -43,11 +43,11 @@ time = { version = "0.*", default-features = false }
 log = { version = "0.*", default-features = false }
 stderrlog = { version = "0.*", default-features = true }
 bytesize = { version = "1.*", default-features = true }
-rust_decimal = { version = "1.36.0", default-features = false }
-rust_decimal_macros = "1.36.0"
-blake2 = { version = "0.10.6", default-features = false }
-bs58 = { version = "0.5.1", default-features = false, features = ["check", "std"]}
-tempfile = "3.12.0"
+rust_decimal = { version = "1.*", default-features = false }
+rust_decimal_macros = { version = "1.*", default-features = false }
+blake2 = { version = "0.*", default-features = false }
+bs58 = { version = "0.*", default-features = false, features = ["check", "std"]}
+tempfile = { version = "3.*", default-features = false }
 actix-web = { version = "4.9.0", default-features = false , features = ["macros"] }
 actix-cors = { version = "=0.7.0", default-features = false }
 async-graphql = { version = "7.*", default-features = false, features = ["graphiql"] }
