@@ -736,11 +736,11 @@ impl std::fmt::Display for Permission {
             f,
             "{}",
             match self {
-                Permission::None => "none",
-                Permission::Either => "either",
-                Permission::Proof => "proof",
-                Permission::Signature => "signature",
-                Permission::Impossible => "impossible",
+                Permission::None => "None",
+                Permission::Either => "Either",
+                Permission::Proof => "Proof",
+                Permission::Signature => "Signature",
+                Permission::Impossible => "Impossible",
             }
         )
     }

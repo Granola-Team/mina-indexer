@@ -64,18 +64,43 @@ pub struct Account {
 
 #[derive(SimpleObject, Default, Debug, Clone, PartialEq, Eq)]
 struct Permissions {
+    #[graphql(name = "edit_state")]
     edit_state: String,
+
+    #[graphql(name = "access")]
     access: String,
+
+    #[graphql(name = "send")]
     send: String,
+
+    #[graphql(name = "receive")]
     receive: String,
+
+    #[graphql(name = "set_delegate")]
     set_delegate: String,
+
+    #[graphql(name = "set_permissions")]
     set_permissions: String,
+
+    #[graphql(name = "set_verification_key")]
     set_verification_key: PermissionVk,
+
+    #[graphql(name = "set_zkapp_uri")]
     set_zkapp_uri: String,
+
+    #[graphql(name = "edit_action_state")]
     edit_action_state: String,
+
+    #[graphql(name = "set_token_symbol")]
     set_token_symbol: String,
+
+    #[graphql(name = "increment_nonce")]
     increment_nonce: String,
+
+    #[graphql(name = "set_voting_for")]
     set_voting_for: String,
+
+    #[graphql(name = "set_timing")]
     set_timing: String,
 }
 
