@@ -23,7 +23,7 @@ fn test_mainnet_genesis_parser() -> anyhow::Result<()> {
     let total_supply: u64 = mina_accounts
         .values()
         .cloned()
-        .map(|account| account.display().balance.0)
+        .map(|account| account.deduct_mina_account_creation_fee().balance.0)
         .sum();
 
     assert_eq!(

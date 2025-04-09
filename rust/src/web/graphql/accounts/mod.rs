@@ -191,7 +191,8 @@ impl AccountQueryRoot {
                 break;
             }
 
-            let account = serde_json::from_slice::<account::Account>(&value)?.display();
+            let account = serde_json::from_slice::<account::Account>(&value)?
+                .deduct_mina_account_creation_fee();
             let pk = account.public_key.clone();
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,
@@ -353,7 +354,8 @@ impl AccountQueryInput {
                 break;
             }
 
-            let account = serde_json::from_slice::<account::Account>(&value)?.display();
+            let account = serde_json::from_slice::<account::Account>(&value)?
+                .deduct_mina_account_creation_fee();
             let pk = account.public_key.clone();
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,

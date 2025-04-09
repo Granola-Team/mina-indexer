@@ -89,7 +89,7 @@ impl StagedLedgerStore for IndexerStore {
     ) -> anyhow::Result<Option<Account>> {
         trace!("Display {pk} staged ledger {state_hash} account");
         if let Some(staged_acct) = self.get_staged_account(pk, token, state_hash)? {
-            return Ok(Some(staged_acct.display()));
+            return Ok(Some(staged_acct.deduct_mina_account_creation_fee()));
         }
         Ok(None)
     }

@@ -141,7 +141,10 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(mina_account.clone().display(), expect);
+        assert_eq!(
+            mina_account.clone().deduct_mina_account_creation_fee(),
+            expect
+        );
     } else {
         panic!("MINA zkapp account does not exist");
     }
@@ -192,7 +195,10 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             };
 
         assert_eq!(*mina_account, expect);
-        assert_eq!(mina_account.clone().display(), expect);
+        assert_eq!(
+            mina_account.clone().deduct_mina_account_creation_fee(),
+            expect
+        );
     } else {
         panic!(
             "B62qrgc2UBuyVYZLYU5eS9VFMzSHoKkQGubVm2UXX22q458VSm2Wn9P zkapp account does not exist"

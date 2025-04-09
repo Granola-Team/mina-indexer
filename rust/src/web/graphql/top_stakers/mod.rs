@@ -84,7 +84,7 @@ impl TopStakersQueryRoot {
                 .get_best_account(&pk, &TokenAddress::default())? // always MINA
                 .with_context(|| format!("Account missing {pk}"))
                 .unwrap()
-                .display();
+                .deduct_mina_account_creation_fee();
 
             let username = match db.get_username(&pk) {
                 Ok(None) | Err(_) => None,

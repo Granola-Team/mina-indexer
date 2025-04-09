@@ -158,7 +158,10 @@ impl TokenLedger {
         let mut accounts = HashMap::new();
 
         for (pk, acct) in self.accounts.iter() {
-            accounts.insert(pk.to_string(), acct.clone().display());
+            accounts.insert(
+                pk.to_string(),
+                acct.clone().deduct_mina_account_creation_fee(),
+            );
         }
 
         serde_json::to_string_pretty(&accounts).unwrap()
@@ -205,8 +208,15 @@ impl PartialEq for TokenLedger {
             if self.accounts.get(pk) != other.accounts.get(pk) {
                 println!(
                     "[TokenLedger.eq mismatch] {pk:?} | {:?} | {:?}",
-                    self.accounts.get(pk).cloned().map(Account::display),
-                    other.accounts.get(pk).cloned().map(Account::display),
+                    self.accounts
+                        .get(pk)
+                        .cloned()
+                        .map(Account::deduct_mina_account_creation_fee),
+                    other
+                        .accounts
+                        .get(pk)
+                        .cloned()
+                        .map(Account::deduct_mina_account_creation_fee),
                 );
 
                 return false;
@@ -217,8 +227,15 @@ impl PartialEq for TokenLedger {
             if self.accounts.get(pk) != other.accounts.get(pk) {
                 println!(
                     "[TokenLedger.eq mismatch] {pk:?} | {:?} | {:?}",
-                    self.accounts.get(pk).cloned().map(Account::display),
-                    other.accounts.get(pk).cloned().map(Account::display),
+                    self.accounts
+                        .get(pk)
+                        .cloned()
+                        .map(Account::deduct_mina_account_creation_fee),
+                    other
+                        .accounts
+                        .get(pk)
+                        .cloned()
+                        .map(Account::deduct_mina_account_creation_fee),
                 );
 
                 return false;
@@ -244,7 +261,11 @@ impl std::fmt::Display for TokenLedger {
 impl std::fmt::Debug for TokenLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (pk, acct) in &self.accounts {
-            writeln!(f, "{pk} -> {}", acct.clone().display().balance.0)?;
+            writeln!(
+                f,
+                "{pk} -> {}",
+                acct.clone().deduct_mina_account_creation_fee().balance.0
+            )?;
         }
 
         writeln!(f)?;

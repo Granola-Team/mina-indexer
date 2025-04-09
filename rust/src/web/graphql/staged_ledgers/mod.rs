@@ -190,7 +190,7 @@ fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortBy
 
 impl From<Account> for StagedLedgerAccount {
     fn from(acct: Account) -> Self {
-        let acct = acct.display();
+        let acct = acct.deduct_mina_account_creation_fee();
 
         Self {
             balance_nanomina: acct.balance.0,
