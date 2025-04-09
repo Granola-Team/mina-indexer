@@ -21,8 +21,8 @@ browser = []
 [dependencies]
 anyhow = { version = "~1.0.97", default-features = false }
 # https://github.com/bincode-org/bincode/issues/674
-bincode = "2.0.0-rc.3"
-derive_more = { version = "0.99", default-features = false }
+bincode = "=2.0.0-rc.3"
+derive_more = { version = "~0.99", default-features = false }
 serde = { version = "1.0.210", default-features = false }
 serde_json = { version = "1.0.128", default-features = false, features = ["unbounded_depth"] }
 smart-default = "0.7.1"
