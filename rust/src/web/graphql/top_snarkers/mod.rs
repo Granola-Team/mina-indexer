@@ -48,12 +48,11 @@ pub struct TopSnarker {
     snarks_sold: u32,
 }
 
-#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TopSnarkersQueryRoot {
-    async fn top_snarkers<'ctx>(
+    async fn top_snarkers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TopSnarkersQueryInput>,
         sort_by: Option<TopSnarkersSortByInput>,
         #[graphql(default = 100)] limit: usize,

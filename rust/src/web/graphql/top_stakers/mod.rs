@@ -46,12 +46,11 @@ pub struct TopStakerAccount {
     num_slots_produced: u32,
 }
 
-#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TopStakersQueryRoot {
-    async fn top_stakers<'ctx>(
+    async fn top_stakers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TopStakersQueryInput>,
         sort_by: Option<TopStakersSortByInput>,
         #[graphql(default = 100)] limit: usize,

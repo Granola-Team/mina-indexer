@@ -72,12 +72,11 @@ pub struct StagedLedgerQueryRoot;
 
 #[Object]
 impl StagedLedgerQueryRoot {
-    #[allow(clippy::needless_lifetimes)]
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
-    async fn staged_ledger_accounts<'ctx>(
+    async fn staged_ledger_accounts(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<StagedLedgerQueryInput>,
         sort_by: Option<StagedLedgerSortByInput>,
         #[graphql(default = 100)] limit: usize,

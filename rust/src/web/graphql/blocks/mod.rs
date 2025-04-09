@@ -31,10 +31,10 @@ pub struct BlocksQueryRoot;
 
 #[Object]
 impl BlocksQueryRoot {
-    #[allow(clippy::needless_lifetimes)]
-    async fn block<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn block(
         &self,
-        ctx: &async_graphql::Context<'ctx>,
+        ctx: &async_graphql::Context<'_>,
         query: Option<BlockQueryInput>,
     ) -> Result<Option<Block>> {
         let db = db(ctx);
@@ -92,10 +92,10 @@ impl BlocksQueryRoot {
     }
 
     #[allow(clippy::too_many_lines)]
-    #[allow(clippy::needless_lifetimes)]
-    async fn blocks<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn blocks(
         &self,
-        ctx: &async_graphql::Context<'ctx>,
+        ctx: &async_graphql::Context<'_>,
         query: Option<BlockQueryInput>,
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
@@ -547,9 +547,7 @@ impl BlockQueryInput {
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
             .and_then(|consensus_state| consensus_state.slot)
-            .is_some_and(|slot| {
-                block.block.protocol_state.consensus_state.slot != slot
-            })
+            .is_some_and(|slot| block.block.protocol_state.consensus_state.slot != slot)
         {
             return false;
         }

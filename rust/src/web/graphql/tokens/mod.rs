@@ -107,11 +107,12 @@ pub struct TokenHolder {
     account: accounts::Account,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum TokenHoldersSortByInput {
     #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
 
+    #[default]
     #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
 }
@@ -127,12 +128,12 @@ struct TokenWithMeta {
 #[derive(Default)]
 pub struct TokensQueryRoot;
 
-#[allow(clippy::needless_lifetimes)]
 #[Object]
 impl TokensQueryRoot {
-    async fn tokens<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn tokens(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TokensQueryInput>,
         sort_by: Option<TokensSortByInput>,
         #[graphql(default = 100)] limit: usize,
@@ -201,10 +202,10 @@ impl TokensQueryRoot {
         Ok(tokens)
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn token_holders<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn token_holders(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<TokenHoldersQueryInput>,
         sort_by: Option<TokenHoldersSortByInput>,
         #[graphql(default = 100)] limit: usize,

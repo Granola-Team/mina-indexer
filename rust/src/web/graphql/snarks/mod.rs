@@ -69,23 +69,29 @@ pub struct SnarkQueryInput {
     prover: Option<String>,
     block_height: Option<u32>,
     block: Option<BlockQueryInput>,
+
     #[graphql(name = "blockHeight_gt")]
     block_height_gt: Option<u32>,
+
     #[graphql(name = "blockHeight_gte")]
     block_height_gte: Option<u32>,
+
     #[graphql(name = "blockHeight_lt")]
     block_height_lt: Option<u32>,
+
     #[graphql(name = "blockHeight_lte")]
     block_height_lte: Option<u32>,
+
     and: Option<Vec<SnarkQueryInput>>,
     or: Option<Vec<SnarkQueryInput>>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum SnarkSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
 
+    #[default]
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
@@ -96,10 +102,10 @@ pub struct SnarkQueryRoot;
 #[Object]
 impl SnarkQueryRoot {
     #[allow(clippy::too_many_lines)]
-    #[allow(clippy::needless_lifetimes)]
-    async fn snarks<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn snarks(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<SnarkQueryInput>,
         sort_by: Option<SnarkSortByInput>,
         #[graphql(default = 100)] limit: usize,

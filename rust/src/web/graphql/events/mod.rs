@@ -8,11 +8,12 @@ pub struct EventsQueryInput {
     pub address: Option<String>,
 }
 
-#[derive(Enum, Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum EventsSortByInput {
     #[graphql(name = "BLOCKHEIGHT_ASC")]
     BlockHeightAsc,
 
+    #[default]
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
 }
@@ -31,14 +32,14 @@ pub struct BlockInfo {
     pub ledger_hash: String,
     pub height: u32,
     pub parent_hash: String,
-    pub chain_status: String, // TODO
+    pub chain_status: String,
     pub distance_from_max_block_height: u32,
     pub global_slot_since_genesis: u32,
 }
 
 #[derive(SimpleObject, Debug)]
 pub struct EventData {
-    pub data: String, // TODO
+    pub data: String,
 }
 
 #[derive(SimpleObject, Debug)]
@@ -53,12 +54,11 @@ pub struct EventsQueryRoot;
 
 #[Object]
 impl EventsQueryRoot {
-    #[allow(clippy::needless_lifetimes)]
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
-    async fn get_actions<'ctx>(
+    async fn get_actions(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<EventsQueryInput>,
         sort_by: Option<EventsSortByInput>,
         #[graphql(default = 100)] limit: usize,

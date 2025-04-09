@@ -115,10 +115,10 @@ pub struct AccountQueryRoot;
 
 #[Object]
 impl AccountQueryRoot {
-    #[allow(clippy::needless_lifetimes)]
-    async fn accounts<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn accounts(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<AccountQueryInput>,
         sort_by: Option<AccountSortByInput>,
         #[graphql(default = 100)] limit: usize,

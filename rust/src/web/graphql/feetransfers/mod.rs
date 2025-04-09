@@ -63,8 +63,7 @@ impl FeetransferWithMeta {
         &self.feetransfer
     }
 
-    #[allow(clippy::needless_lifetimes)]
-    async fn block_state_hash<'ctx>(&self, ctx: &Context<'ctx>) -> Result<Option<Block>> {
+    async fn block_state_hash(&self, ctx: &Context<'_>) -> Result<Option<Block>> {
         let db = db(ctx);
 
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
@@ -187,10 +186,10 @@ pub struct FeetransferQueryRoot;
 
 #[Object]
 impl FeetransferQueryRoot {
-    #[allow(clippy::needless_lifetimes)]
-    async fn feetransfers<'ctx>(
+    #[graphql(cache_control(max_age = 3600))]
+    async fn feetransfers(
         &self,
-        ctx: &Context<'ctx>,
+        ctx: &Context<'_>,
         query: Option<FeetransferQueryInput>,
         sort_by: Option<FeetransferSortByInput>,
         #[graphql(default = 100)] limit: usize,
