@@ -870,7 +870,7 @@ mod tests {
     use crate::{
         base::{nonce::Nonce, state_hash::StateHash},
         block::precomputed::{PcbVersion, PrecomputedBlock},
-        command::{Command, Delegation, Payment},
+        command::{AccountUpdate, Command, Delegation, Payment},
         constants::MAINNET_COINBASE_REWARD,
         ledger::{
             coinbase::{Coinbase, CoinbaseFeeTransfer, CoinbaseKind},
@@ -878,11 +878,13 @@ mod tests {
             token::TokenAddress,
             Amount, PublicKey,
         },
+        mina_blocks::v2::staged_ledger_diff::{UserCommand, UserCommandData},
+        store::Result,
     };
     use std::path::PathBuf;
 
     #[test]
-    fn test_amount() -> anyhow::Result<()> {
+    fn test_amount() -> Result<()> {
         let credit_amount = Amount(1000);
         let debit_amount = Amount(500);
 
@@ -1078,7 +1080,7 @@ mod tests {
     }
 
     #[test]
-    fn test_public_key_payment() -> anyhow::Result<()> {
+    fn test_public_key_payment() -> Result<()> {
         let nonce = Nonce(42);
         let payment_diff = PaymentDiff {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
@@ -1110,7 +1112,7 @@ mod tests {
     }
 
     #[test]
-    fn test_snark_account_creation_deduction() -> anyhow::Result<()> {
+    fn test_snark_account_creation_deduction() -> Result<()> {
         use crate::ledger::diff::AccountDiffType::*;
 
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-128743-3NLmYZD9eaV58opgC5RzQXaoPbyC15McNxw1CuCNatj7F9vGBbNz.json");
@@ -1166,7 +1168,7 @@ mod tests {
     }
 
     #[test]
-    fn genesis_v1() -> anyhow::Result<()> {
+    fn genesis_v1() -> Result<()> {
         let path = PathBuf::from("./data/genesis_blocks/mainnet-1-3NKeMoncuHab5ScarV5ViyF16cJPT4taWNSaTLS64Dp67wuXigPZ.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V1)?;
         let diff = LedgerDiff::from_precomputed(&block);
@@ -1176,12 +1178,129 @@ mod tests {
     }
 
     #[test]
-    fn genesis_v2() -> anyhow::Result<()> {
+    fn genesis_v2() -> Result<()> {
         let path = PathBuf::from("./data/genesis_blocks/mainnet-359605-3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
         let diff = LedgerDiff::from_precomputed(&block);
 
         assert!(diff.account_diffs.is_empty(), "{:#?}", diff.account_diffs);
         Ok(())
+    }
+
+    #[test]
+    fn zkapp_account_updates() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-368442-3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+
+        let zkapps = block.zkapp_commands();
+        let zkapp_cmd = zkapps.first().unwrap();
+
+        if let UserCommandWithStatus::V2(UserCommand {
+            data: (_, UserCommandData::ZkappCommandData(ZkappCommandData { .. })),
+            ..
+        }) = zkapp_cmd
+        {
+            let expect = vec![
+                AccountUpdate {
+                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
+                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                        .unwrap(),
+                    balance_change: -1000000000,
+                    increment_nonce: false,
+                },
+                AccountUpdate {
+                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                    token: TokenAddress::new("wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf")
+                        .unwrap(),
+                    balance_change: 0,
+                    increment_nonce: false,
+                },
+                AccountUpdate {
+                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        .unwrap(),
+                    balance_change: -10000000000,
+                    increment_nonce: false,
+                },
+                AccountUpdate {
+                    public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba".into(),
+                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        .unwrap(),
+                    balance_change: 10000000000,
+                    increment_nonce: false,
+                },
+            ];
+
+            assert_eq!(zkapp_cmd.accounts_updated(), expect);
+        } else {
+            panic!("Expected a zkapp command")
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_account_diffs() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-368442-3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu.json");
+        let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let state_hash: StateHash = "3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu".into();
+
+        let zkapps = block.zkapp_commands();
+        let zkapp_cmd = zkapps.first().unwrap();
+
+        if let UserCommandWithStatus::V2(UserCommand {
+            data: (_, UserCommandData::ZkappCommandData(zkapp)),
+            ..
+        }) = zkapp_cmd
+        {
+            let expect = vec![vec![
+                AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
+                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
+                    nonce: 59.into(),
+                }),
+                AccountDiff::Payment(PaymentDiff {
+                    amount: 1000000000.into(),
+                    update_type: UpdateType::Debit(None),
+                    public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
+                    token: TokenAddress::default(),
+                }),
+                AccountDiff::ZkappEventsDiff(ZkappEventsDiff {
+                    token: TokenAddress::default(),
+                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                    events: vec![
+                        "0x0000000000000000000000000000000000000000000000000000000000000002".into(),
+                        "0x01B2700CB8B5AB3EA1E6901ED662EDBD45F1FADEDFDA70A406F2E36F7A902F2C".into(),
+                        "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
+                        "0x3D76374FA52F749B664DB992AF45C57F92535C1CDAED68867781673A7E278F78".into(),
+                        "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
+                        "0x00000000000000000000000000000000000000000000000000000002540BE400".into(),
+                    ],
+                }),
+                AccountDiff::Payment(PaymentDiff {
+                    amount: 10000000000.into(),
+                    update_type: UpdateType::Debit(None),
+                    public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        .unwrap(),
+                }),
+                AccountDiff::Payment(PaymentDiff {
+                    amount: 10000000000.into(),
+                    update_type: UpdateType::Credit,
+                    public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba".into(),
+                    token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                        .unwrap(),
+                }),
+            ]];
+
+            let diffs = AccountDiff::from_command(CommandWithStateHash {
+                command: Command::Zkapp(zkapp.clone()),
+                state_hash,
+            });
+
+            assert_eq!(AccountDiff::expand(diffs), expect);
+            return Ok(());
+        }
+
+        panic!("Expected a zkapp command")
     }
 }
