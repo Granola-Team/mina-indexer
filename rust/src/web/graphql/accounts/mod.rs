@@ -8,7 +8,11 @@ use crate::{
     block::store::BlockStore,
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     constants::MINA_TOKEN_ADDRESS,
-    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{
+        account::{self, Permission},
+        store::best::BestLedgerStore,
+        token::TokenAddress,
+    },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
     utility::store::common::U64_LEN,
@@ -53,6 +57,32 @@ pub struct Account {
     timing: Option<Timing>,
     token: String,
     zkapp: Option<ZkappAccount>,
+    receipt_chain_hash: String,
+    voting_for: String,
+    permissions: Option<Permissions>,
+}
+
+#[derive(SimpleObject, Default, Debug, Clone, PartialEq, Eq)]
+struct Permissions {
+    edit_state: String,
+    access: String,
+    send: String,
+    receive: String,
+    set_delegate: String,
+    set_permissions: String,
+    set_verification_key: PermissionVk,
+    set_zkapp_uri: String,
+    edit_action_state: String,
+    set_token_symbol: String,
+    increment_nonce: String,
+    set_voting_for: String,
+    set_timing: String,
+}
+
+#[derive(SimpleObject, Default, Debug, Clone, PartialEq, Eq)]
+struct PermissionVk {
+    permission: String,
+    number: String,
 }
 
 #[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
@@ -426,6 +456,12 @@ impl AccountWithMeta {
 impl From<account::Account> for Account {
     fn from(value: account::Account) -> Self {
         let account = value.deduct_mina_account_creation_fee();
+        let permissions = if account.is_zkapp_account() {
+            account.permissions.map(Into::into)
+        } else {
+            None
+        };
+
         Self {
             public_key: account.public_key.0,
             delegate: account.delegate.0,
@@ -437,6 +473,9 @@ impl From<account::Account> for Account {
                 .token
                 .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
             zkapp: account.zkapp.map(Into::into),
+            receipt_chain_hash: account.receipt_chain_hash.unwrap_or_default().0,
+            voting_for: account.voting_for.unwrap_or_default().0,
+            permissions,
         }
     }
 }
@@ -452,6 +491,9 @@ impl From<AccountWithMeta> for Account {
             timing: value.account.timing,
             token: value.account.token,
             zkapp: value.account.zkapp,
+            receipt_chain_hash: value.account.receipt_chain_hash,
+            voting_for: value.account.voting_for,
+            permissions: value.account.permissions,
         }
     }
 }
@@ -464,6 +506,35 @@ impl From<account::Timing> for Timing {
             cliff_amount: Some(timing.cliff_amount.0),
             vesting_period: Some(timing.vesting_period.0),
             vesting_increment: Some(timing.vesting_increment.0),
+        }
+    }
+}
+
+impl From<account::Permissions> for Permissions {
+    fn from(value: account::Permissions) -> Self {
+        Self {
+            edit_state: value.edit_state.to_string(),
+            access: value.access.to_string(),
+            send: value.send.to_string(),
+            receive: value.receive.to_string(),
+            set_delegate: value.set_delegate.to_string(),
+            set_permissions: value.set_permissions.to_string(),
+            set_verification_key: value.set_verification_key.into(),
+            set_zkapp_uri: value.set_zkapp_uri.to_string(),
+            edit_action_state: value.edit_action_state.to_string(),
+            set_token_symbol: value.set_token_symbol.to_string(),
+            increment_nonce: value.increment_nonce.to_string(),
+            set_voting_for: value.set_voting_for.to_string(),
+            set_timing: value.set_timing.to_string(),
+        }
+    }
+}
+
+impl From<(Permission, String)> for PermissionVk {
+    fn from(value: (Permission, String)) -> Self {
+        Self {
+            permission: value.0.to_string(),
+            number: value.1,
         }
     }
 }

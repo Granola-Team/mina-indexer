@@ -125,6 +125,11 @@ struct TokenWithMeta {
     total_num_tokens: u32,
 }
 
+struct TokenAccount {
+    account: accounts::AccountWithMeta,
+    token: ledger::token::Token,
+}
+
 #[derive(Default)]
 pub struct TokensQueryRoot;
 
@@ -178,25 +183,13 @@ impl TokensQueryRoot {
 
         // sort tokens
         use TokensSortByInput::*;
-        match sort_by {
-            Some(SupplyDesc) | None => {
-                tokens.sort_by(|x: &Token, y: &Token| y.token.supply.cmp(&x.token.supply))
-            }
-            Some(SupplyAsc) => {
-                tokens.sort_by(|x: &Token, y: &Token| x.token.supply.cmp(&y.token.supply))
-            }
-            Some(NumHoldersDesc) => {
-                tokens.sort_by(|x: &Token, y: &Token| y.num_holders.cmp(&x.num_holders))
-            }
-            Some(NumHoldersAsc) => {
-                tokens.sort_by(|x: &Token, y: &Token| x.num_holders.cmp(&y.num_holders))
-            }
-            Some(NumTxnsDesc) => {
-                tokens.sort_by(|x: &Token, y: &Token| y.total_num_txns.cmp(&x.total_num_txns))
-            }
-            Some(NumTxnsAsc) => {
-                tokens.sort_by(|x: &Token, y: &Token| x.total_num_txns.cmp(&y.total_num_txns))
-            }
+        match sort_by.unwrap_or_default() {
+            SupplyDesc => tokens.sort_by(supply_desc),
+            SupplyAsc => tokens.sort_by(supply_asc),
+            NumHoldersDesc => tokens.sort_by(num_holders_desc),
+            NumHoldersAsc => tokens.sort_by(num_holders_asc),
+            NumTxnsDesc => tokens.sort_by(total_num_txns_desc),
+            NumTxnsAsc => tokens.sort_by(total_num_txns_asc),
         }
 
         Ok(tokens)
@@ -414,11 +407,6 @@ impl From<ledger::token::Token> for TokenSimple {
     }
 }
 
-struct TokenAccount {
-    account: accounts::AccountWithMeta,
-    token: ledger::token::Token,
-}
-
 impl From<TokenAccount> for TokenHolder {
     fn from(value: TokenAccount) -> Self {
         Self {
@@ -429,6 +417,34 @@ impl From<TokenAccount> for TokenHolder {
             symbol: Some(value.token.symbol.to_string()),
         }
     }
+}
+
+/////////////
+// helpers //
+/////////////
+
+fn supply_asc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    x.token.supply.cmp(&y.token.supply)
+}
+
+fn supply_desc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    y.token.supply.cmp(&x.token.supply)
+}
+
+fn num_holders_asc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    x.num_holders.cmp(&y.num_holders)
+}
+
+fn num_holders_desc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    y.num_holders.cmp(&x.num_holders)
+}
+
+fn total_num_txns_asc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    x.total_num_txns.cmp(&y.total_num_txns)
+}
+
+fn total_num_txns_desc(x: &Token, y: &Token) -> std::cmp::Ordering {
+    y.total_num_txns.cmp(&x.total_num_txns)
 }
 
 #[cfg(test)]

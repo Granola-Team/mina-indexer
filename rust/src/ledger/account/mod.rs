@@ -730,6 +730,22 @@ impl std::fmt::Debug for Account {
     }
 }
 
+impl std::fmt::Display for Permission {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Permission::None => "none",
+                Permission::Either => "either",
+                Permission::Proof => "proof",
+                Permission::Signature => "signature",
+                Permission::Impossible => "impossible",
+            }
+        )
+    }
+}
+
 const PKS_OF_INTEREST: [&str; 7] = [
     "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg",
     "B62qmYFLwGSjQuWdnygPLw5TvrMENrLEFQmTow8RhSUw6MCm2sjQEn9",
