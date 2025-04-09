@@ -19,7 +19,7 @@ browser = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.89"
+anyhow = { version = "~1.0.97", default-features = false }
 # https://github.com/bincode-org/bincode/issues/674
 bincode = "2.0.0-rc.3"
 derive_more = { version = "0.99", default-features = false }
