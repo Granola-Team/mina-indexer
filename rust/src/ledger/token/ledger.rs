@@ -57,7 +57,7 @@ impl TokenLedger {
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
-            self._apply_account_diff(acct_diff, diff.blockchain_length, &diff.state_hash)?;
+            self._apply_account_diff(acct_diff, &diff.state_hash)?;
         }
 
         Ok(())
@@ -67,7 +67,6 @@ impl TokenLedger {
     pub fn _apply_account_diff(
         &mut self,
         acct_diff: &AccountDiff,
-        block_height: u32,
         state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
@@ -78,10 +77,8 @@ impl TokenLedger {
             .remove(&pk)
             .or_else(|| Some(Account::empty(pk.clone(), token, acct_diff.is_zkapp_diff())))
         {
-            self.accounts.insert(
-                pk,
-                account.apply_account_diff(acct_diff, block_height, state_hash),
-            );
+            self.accounts
+                .insert(pk, account.apply_account_diff(acct_diff, state_hash));
         }
 
         Ok(())
@@ -90,7 +87,6 @@ impl TokenLedger {
     /// Unapply a ledger diff to a mutable ledger
     pub fn _unapply_diff(
         &mut self,
-        block_height: u32,
         state_hash: &StateHash,
         diff: &LedgerDiff,
     ) -> anyhow::Result<()> {
@@ -105,7 +101,6 @@ impl TokenLedger {
             {
                 if let Some(account) = account_after.unapply_account_diff(
                     acct_diff,
-                    block_height,
                     state_hash,
                     diff.new_pk_balances.contains_key(&pk),
                 ) {

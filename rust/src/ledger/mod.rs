@@ -132,7 +132,7 @@ impl Ledger {
     /// Apply a ledger diff to a mutable ledger
     pub fn _apply_diff(&mut self, diff: &LedgerDiff) -> anyhow::Result<()> {
         for acct_diff in diff.account_diffs.iter().flatten() {
-            self._apply_account_diff(acct_diff, diff.blockchain_length, &diff.state_hash)?;
+            self._apply_account_diff(acct_diff, &diff.state_hash)?;
         }
 
         Ok(())
@@ -142,7 +142,6 @@ impl Ledger {
     pub fn _apply_account_diff(
         &mut self,
         acct_diff: &AccountDiff,
-        block_height: u32,
         state_hash: &StateHash,
     ) -> anyhow::Result<()> {
         let pk = acct_diff.public_key();
@@ -160,10 +159,7 @@ impl Ledger {
                 ))
             })
         {
-            self.insert_account(
-                account.apply_account_diff(acct_diff, block_height, state_hash),
-                &token,
-            );
+            self.insert_account(account.apply_account_diff(acct_diff, state_hash), &token);
         }
 
         Ok(())
@@ -224,7 +220,6 @@ impl Ledger {
             {
                 if let Some(account) = account_after.unapply_account_diff(
                     acct_diff,
-                    diff.blockchain_length,
                     &diff.state_hash,
                     diff.new_pk_balances.contains_key(&pk),
                 ) {
