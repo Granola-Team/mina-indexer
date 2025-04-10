@@ -97,6 +97,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 public_key: pk.clone(),
                 delegate: pk.clone(),
                 token: Some(minu_token.clone()),
+                created_by_zkapp: true,
                 ..Default::default()
             }
         );

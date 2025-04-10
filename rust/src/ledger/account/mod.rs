@@ -8,9 +8,10 @@ use super::{
     diff::{
         account::{
             zkapp::{
-                ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonce,
-                ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff, ZkappTimingDiff,
-                ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff, ZkappVotingForDiff,
+                ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonceDiff,
+                ZkappPaymentDiff, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff,
+                ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
+                ZkappVotingForDiff,
             },
             AccountDiff, CoinbaseDiff, DelegationDiff, FailedTransactionNonceDiff, UpdateType,
         },
@@ -482,7 +483,7 @@ impl Account {
     }
 
     /// Apply zkapp nonce increment
-    pub fn zkapp_nonce(self, diff: &ZkappIncrementNonce, state_hash: &StateHash) -> Self {
+    pub fn zkapp_nonce(self, diff: &ZkappIncrementNonceDiff, state_hash: &StateHash) -> Self {
         self.checks(&diff.public_key, &diff.token, state_hash);
 
         Self {
@@ -523,24 +524,29 @@ impl Account {
         }
 
         let after = match diff {
-            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => self.payment(diff),
+            Payment(diff)
+            | FeeTransfer(diff)
+            | FeeTransferViaCoinbase(diff)
+            | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => self.payment(diff),
             Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
             }
             Coinbase(coinbase_diff) => self.coinbase(coinbase_diff.amount),
             FailedTransactionNonce(failed_diff) => self.failed_transaction(failed_diff.nonce),
-            ZkappStateDiff(diff) => self.zkapp_state(diff, state_hash),
-            ZkappPermissionsDiff(diff) => self.zkapp_permissions(diff, state_hash),
-            ZkappVerificationKeyDiff(diff) => self.zkapp_verification_key(diff, state_hash),
-            ZkappProvedStateDiff(diff) => self.zkapp_proved_state(diff, state_hash),
-            ZkappUriDiff(diff) => self.zkapp_uri(diff, state_hash),
-            ZkappTokenSymbolDiff(diff) => self.zkapp_token_symbol(diff, state_hash),
-            ZkappTimingDiff(diff) => self.zkapp_timing(diff, state_hash),
-            ZkappVotingForDiff(diff) => self.zkapp_voting_for(diff, state_hash),
-            ZkappActionsDiff(diff) => self.zkapp_actions(diff, state_hash),
-            ZkappEventsDiff(diff) => self.zkapp_events(diff, state_hash),
-            ZkappIncrementNonce(diff) => self.zkapp_nonce(diff, state_hash),
+            ZkappState(diff) => self.zkapp_state(diff, state_hash),
+            ZkappPermissions(diff) => self.zkapp_permissions(diff, state_hash),
+            ZkappVerificationKey(diff) => self.zkapp_verification_key(diff, state_hash),
+            ZkappProvedState(diff) => self.zkapp_proved_state(diff, state_hash),
+            ZkappUri(diff) => self.zkapp_uri(diff, state_hash),
+            ZkappTokenSymbol(diff) => self.zkapp_token_symbol(diff, state_hash),
+            ZkappTiming(diff) => self.zkapp_timing(diff, state_hash),
+            ZkappVotingFor(diff) => self.zkapp_voting_for(diff, state_hash),
+            ZkappActions(diff) => self.zkapp_actions(diff, state_hash),
+            ZkappEvents(diff) => self.zkapp_events(diff, state_hash),
+            ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff)) | ZkappIncrementNonce(diff) => {
+                self.zkapp_nonce(diff, state_hash)
+            }
             ZkappFeePayerNonce(diff) => self.zkapp_fee_payer_nonce(diff, state_hash),
             Zkapp(_) => unreachable!(),
         };
@@ -575,24 +581,26 @@ impl Account {
         }
 
         let after = match diff {
-            Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                self.payment_unapply(diff)
-            }
+            Payment(diff)
+            | FeeTransfer(diff)
+            | FeeTransferViaCoinbase(diff)
+            | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => self.payment_unapply(diff),
             Delegation(diff) => self.delegation_unapply(diff),
             Coinbase(diff) => self.coinbase_unapply(diff),
             FailedTransactionNonce(diff) => self.failed_transaction_unapply(diff),
 
             // TODO zkapp unapply
-            ZkappStateDiff(_)
-            | ZkappPermissionsDiff(_)
-            | ZkappVerificationKeyDiff(_)
-            | ZkappProvedStateDiff(_)
-            | ZkappUriDiff(_)
-            | ZkappTokenSymbolDiff(_)
-            | ZkappTimingDiff(_)
-            | ZkappVotingForDiff(_)
-            | ZkappActionsDiff(_)
-            | ZkappEventsDiff(_)
+            ZkappState(_)
+            | ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
+            | ZkappPermissions(_)
+            | ZkappVerificationKey(_)
+            | ZkappProvedState(_)
+            | ZkappUri(_)
+            | ZkappTokenSymbol(_)
+            | ZkappTiming(_)
+            | ZkappVotingFor(_)
+            | ZkappActions(_)
+            | ZkappEvents(_)
             | ZkappIncrementNonce(_)
             | ZkappFeePayerNonce(_) => {
                 if PKS_OF_INTEREST.contains(&(&pk.0 as &str)) {
@@ -995,12 +1003,12 @@ mod tests {
         };
 
         let diffs = vec![
-            AccountDiff::ZkappVerificationKeyDiff(ZkappVerificationKeyDiff {
+            AccountDiff::ZkappVerificationKey(ZkappVerificationKeyDiff {
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 verification_key: verification_key.clone(),
             }),
-            AccountDiff::ZkappProvedStateDiff(ZkappProvedStateDiff {
+            AccountDiff::ZkappProvedState(ZkappProvedStateDiff {
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 proved_state: true,
@@ -1050,7 +1058,7 @@ mod tests {
             ..Default::default()
         };
 
-        let diff = AccountDiff::ZkappPermissionsDiff(ZkappPermissionsDiff {
+        let diff = AccountDiff::ZkappPermissions(ZkappPermissionsDiff {
             token: TokenAddress::default(),
             public_key: pk.clone(),
             permissions: permissions.clone(),
