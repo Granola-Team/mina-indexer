@@ -160,33 +160,7 @@ impl LedgerDiff {
             .filter_map(|diffs| {
                 let diffs = diffs
                     .into_iter()
-                    .filter_map(|diff| {
-                        use AccountDiff::*;
-                        match diff {
-                            // zkapp
-                            Zkapp(_)
-                            | ZkappStateDiff(_)
-                            | ZkappPermissionsDiff(_)
-                            | ZkappVerificationKeyDiff(_)
-                            | ZkappUriDiff(_)
-                            | ZkappTokenSymbolDiff(_)
-                            | ZkappTimingDiff(_)
-                            | ZkappVotingForDiff(_)
-                            | ZkappActionsDiff(_)
-                            | ZkappEventsDiff(_)
-                            | ZkappIncrementNonce(_)
-                            | ZkappProvedStateDiff(_)
-                            | ZkappFeePayerNonce(_) => Some(diff),
-
-                            // non-zkapp
-                            Payment(_)
-                            | Delegation(_)
-                            | Coinbase(_)
-                            | FeeTransfer(_)
-                            | FeeTransferViaCoinbase(_)
-                            | FailedTransactionNonce(_) => None,
-                        }
-                    })
+                    .filter(|diff| diff.is_zkapp_diff())
                     .collect::<Vec<_>>();
 
                 // throw away non-zkapp account diffs

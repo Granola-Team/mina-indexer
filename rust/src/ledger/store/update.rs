@@ -5,7 +5,10 @@ use crate::{
     block::store::BlockStore,
     ledger::{
         account::Account,
-        diff::{account::AccountDiff, token::TokenDiff},
+        diff::{
+            account::{zkapp::ZkappPaymentDiff, AccountDiff},
+            token::TokenDiff,
+        },
         token::{account::TokenAccount, Token, TokenAddress},
     },
     store::{
@@ -61,31 +64,33 @@ impl DbAccountUpdate {
                     use AccountDiff::*;
 
                     after = match diff {
-                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
-                            after.payment(diff)
-                        }
+                        Payment(diff)
+                        | FeeTransfer(diff)
+                        | FeeTransferViaCoinbase(diff)
+                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => after.payment(diff),
                         Coinbase(diff) => after.coinbase(diff.amount),
                         Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
                         FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
-                        ZkappStateDiff(diff) => after.zkapp_state(diff, state_hash),
-                        ZkappPermissionsDiff(diff) => after.zkapp_permissions(diff, state_hash),
-                        ZkappVerificationKeyDiff(diff) => {
+                        ZkappState(diff) => after.zkapp_state(diff, state_hash),
+                        ZkappPermissions(diff) => after.zkapp_permissions(diff, state_hash),
+                        ZkappVerificationKey(diff) => {
                             after.zkapp_verification_key(diff, state_hash)
                         }
-                        ZkappProvedStateDiff(diff) => after.zkapp_proved_state(diff, state_hash),
-                        ZkappUriDiff(diff) => after.zkapp_uri(diff, state_hash),
-                        ZkappTokenSymbolDiff(diff) => after.zkapp_token_symbol(diff, state_hash),
-                        ZkappTimingDiff(diff) => after.zkapp_timing(diff, state_hash),
-                        ZkappVotingForDiff(diff) => after.zkapp_voting_for(diff, state_hash),
-                        ZkappIncrementNonce(diff) => after.zkapp_nonce(diff, state_hash),
+                        ZkappProvedState(diff) => after.zkapp_proved_state(diff, state_hash),
+                        ZkappUri(diff) => after.zkapp_uri(diff, state_hash),
+                        ZkappTokenSymbol(diff) => after.zkapp_token_symbol(diff, state_hash),
+                        ZkappTiming(diff) => after.zkapp_timing(diff, state_hash),
+                        ZkappVotingFor(diff) => after.zkapp_voting_for(diff, state_hash),
+                        ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff))
+                        | ZkappIncrementNonce(diff) => after.zkapp_nonce(diff, state_hash),
                         ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff, state_hash),
 
                         // these diffs do not modify the account
-                        ZkappActionsDiff(diff) => {
+                        ZkappActions(diff) => {
                             db.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
                             after
                         }
-                        ZkappEventsDiff(diff) => {
+                        ZkappEvents(diff) => {
                             db.add_events(&diff.public_key, &diff.token, &diff.events)?;
                             after
                         }
@@ -146,7 +151,10 @@ impl DbAccountUpdate {
                     use AccountDiff::*;
 
                     after = match diff {
-                        Payment(diff) | FeeTransfer(diff) | FeeTransferViaCoinbase(diff) => {
+                        Payment(diff)
+                        | FeeTransfer(diff)
+                        | FeeTransferViaCoinbase(diff)
+                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
                             after.payment_unapply(diff)
                         }
                         Coinbase(diff) => after.coinbase_unapply(diff),
@@ -157,24 +165,25 @@ impl DbAccountUpdate {
                         FailedTransactionNonce(diff) => after.failed_transaction_unapply(diff),
 
                         // zkapp diffs
-                        ZkappActionsDiff(diff) => {
+                        ZkappActions(diff) => {
                             db.remove_actions(&pk, &token, diff.actions.len() as u32)?;
                             after
                         }
-                        ZkappEventsDiff(diff) => {
+                        ZkappEvents(diff) => {
                             db.remove_events(&pk, &token, diff.events.len() as u32)?;
                             after
                         }
 
                         // TODO zkapp unapply
-                        ZkappStateDiff(_)
-                        | ZkappPermissionsDiff(_)
-                        | ZkappVerificationKeyDiff(_)
-                        | ZkappProvedStateDiff(_)
-                        | ZkappUriDiff(_)
-                        | ZkappTokenSymbolDiff(_)
-                        | ZkappTimingDiff(_)
-                        | ZkappVotingForDiff(_)
+                        ZkappState(_)
+                        | ZkappPermissions(_)
+                        | ZkappVerificationKey(_)
+                        | ZkappProvedState(_)
+                        | ZkappUri(_)
+                        | ZkappTokenSymbol(_)
+                        | ZkappTiming(_)
+                        | ZkappVotingFor(_)
+                        | ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
                         | ZkappIncrementNonce(_)
                         | ZkappFeePayerNonce(_) => after,
                         Zkapp(_) => unreachable!(),
