@@ -74,16 +74,16 @@ impl AccountAccessed {
                 account.token_symbol.clone().unwrap_or_default()
             ),
         );
-        // assert_eq(
-        //     &self.account.timing,
-        //     &account.timing,
-        //     format!("Timing mismatch: {}", msg),
-        // );
-        // assert_eq(
-        //     &self.account.permissions,
-        //     &account.permissions,
-        //     format!("Permissions mismatch: {}", msg),
-        // )
+
+        if self.account.balance != account.balance
+            || self.account.nonce.unwrap_or_default() != account.nonce.unwrap_or_default()
+            || self.account.delegate != account.delegate
+            || self.account.zkapp != account.zkapp
+            || self.account.token_symbol.clone().unwrap_or_default()
+                != account.token_symbol.clone().unwrap_or_default()
+        {
+            panic!("Account mismatch!")
+        }
     }
 }
 
