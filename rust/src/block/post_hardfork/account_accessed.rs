@@ -19,7 +19,7 @@ impl AccountAccessed {
             &account.public_key,
             format!(
                 "PK mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, self.account.public_key, account.public_key
+                msg, account.public_key, self.account.public_key
             ),
         );
         assert_eq(
@@ -27,7 +27,7 @@ impl AccountAccessed {
             &account.token,
             format!(
                 "Token mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, self.account.token, account.token
+                msg, account.token, self.account.token
             ),
         );
         assert_eq(
@@ -35,7 +35,7 @@ impl AccountAccessed {
             &account.balance,
             format!(
                 "Balance mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, self.account.balance, account.balance
+                msg, account.balance, self.account.balance
             ),
         );
         assert_eq(
@@ -44,8 +44,8 @@ impl AccountAccessed {
             format!(
                 "Nonce mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
                 msg,
-                self.account.nonce.unwrap_or_default(),
-                account.nonce.unwrap_or_default()
+                account.nonce.unwrap_or_default(),
+                self.account.nonce.unwrap_or_default()
             ),
         );
         assert_eq(
@@ -53,7 +53,7 @@ impl AccountAccessed {
             &account.delegate,
             format!(
                 "Delegate mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, self.account.delegate, account.delegate
+                msg, account.delegate, self.account.delegate
             ),
         );
         assert_eq(
@@ -61,7 +61,7 @@ impl AccountAccessed {
             &account.zkapp,
             format!(
                 "Zkapp mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, self.account.zkapp, account.zkapp,
+                msg, account.zkapp, self.account.zkapp
             ),
         );
         assert_eq(
@@ -70,8 +70,8 @@ impl AccountAccessed {
             format!(
                 "Token symbol mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
                 msg,
-                self.account.token_symbol.clone().unwrap_or_default(),
-                account.token_symbol.clone().unwrap_or_default()
+                account.token_symbol.clone().unwrap_or_default(),
+                self.account.token_symbol.clone().unwrap_or_default()
             ),
         );
 
@@ -82,7 +82,7 @@ impl AccountAccessed {
             || self.account.token_symbol.clone().unwrap_or_default()
                 != account.token_symbol.clone().unwrap_or_default()
         {
-            panic!("Account mismatch!")
+            panic!("Account mismatch!\n{:#?}", account)
         }
     }
 }

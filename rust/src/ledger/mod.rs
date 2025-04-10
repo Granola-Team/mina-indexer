@@ -208,10 +208,10 @@ impl Ledger {
                 .cloned()
                 .with_context(|| format!("account {} token {}", pk, token))
                 .unwrap();
-            let expect = account.deduct_mina_account_creation_fee();
+            let account = account.deduct_mina_account_creation_fee();
 
             accessed_account.assert_eq_account(
-                &expect,
+                &account,
                 &format!(
                     "Error applying {}\n     pk: {}\n  token: {}",
                     diff.summary(),
