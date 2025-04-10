@@ -46,7 +46,7 @@ use crate::{
 };
 use anyhow::bail;
 use id_tree::NodeId;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -504,6 +504,13 @@ impl IndexerState {
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
                     ledger_diffs.push(diff.clone());
+
+                    if diff.state_hash.0 == HARDFORK_GENESIS_HASH && !diff.account_diffs.is_empty()
+                    {
+                        for acct_diff in diff.account_diffs.iter().flatten() {
+                            warn!("{}", acct_diff);
+                        }
+                    }
 
                     indexer_store.add_block(&block, block_bytes)?;
                     indexer_store.set_best_block(&block.state_hash())?;
