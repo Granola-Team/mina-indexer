@@ -932,4 +932,68 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn zkapp_account_diff_368442() -> Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-368442-3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let ledger_diff = LedgerDiff::from_precomputed(&pcb);
+
+        use AccountDiff::*;
+
+        let account_diffs = ledger_diff.account_diffs[23].clone();
+        let expect = vec![
+            ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
+                public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
+                nonce: 59.into(),
+            }),
+            ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
+                amount: 1000000000.into(),
+                update_type: UpdateType::Debit(None),
+                public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h".into(),
+                token: TokenAddress::default(),
+            })),
+            ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
+                amount: 0.into(),
+                update_type: UpdateType::Credit,
+                public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                token: TokenAddress::default(),
+            })),
+            ZkappEvents(ZkappEventsDiff {
+                token: TokenAddress::default(),
+                public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                events: vec![
+                    "0x0000000000000000000000000000000000000000000000000000000000000002".into(),
+                    "0x01B2700CB8B5AB3EA1E6901ED662EDBD45F1FADEDFDA70A406F2E36F7A902F2C".into(),
+                    "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
+                    "0x3D76374FA52F749B664DB992AF45C57F92535C1CDAED68867781673A7E278F78".into(),
+                    "0x0000000000000000000000000000000000000000000000000000000000000001".into(),
+                    "0x00000000000000000000000000000000000000000000000000000002540BE400".into(),
+                ],
+            }),
+            ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
+                amount: 10000000000.into(),
+                update_type: UpdateType::Debit(None),
+                public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE".into(),
+                token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                    .unwrap(),
+            })),
+            ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
+                amount: 10000000000.into(),
+                update_type: UpdateType::Credit,
+                public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba".into(),
+                token: TokenAddress::new("xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg")
+                    .unwrap(),
+            })),
+        ];
+
+        for (n, x) in expect.iter().enumerate() {
+            assert_eq!(
+                account_diffs[n], *x,
+                "n = {}\nGOT: {:#?}\nEXPECT: {:#?}",
+                n, account_diffs[n], x
+            );
+        }
+        Ok(())
+    }
 }
