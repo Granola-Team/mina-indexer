@@ -174,7 +174,7 @@ def idxr_cleanup(which)
   elsif which == "all"
     Dir.glob("#{DEPLOY_DIR}/*").each do |path|
       # remove everything except blocks dirs & blocks.list
-      if /blocks.*/.match(File.basename(path)).nil?
+      if /blocks.*/.match(File.basename(path)).nil? && /staking-ledgers.*/.match(File.basename(path)).nil?
         puts "Removing #{path}"
         FileUtils.rm_rf(path)
       end
