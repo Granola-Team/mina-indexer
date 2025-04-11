@@ -19,13 +19,15 @@ data.keys.each do |token|
   end
 end
 
-def remove_verification_keys(obj)
+def remove_vk_actions(obj)
   case obj
   when Hash
+    obj.delete("action_state")
     obj.delete("verification_key")
-    obj.each_value { |v| remove_verification_keys(v) }
+
+    obj.each_value { |v| remove_vk_actions(v) }
   when Array
-    obj.each { |item| remove_verification_keys(item) }
+    obj.each { |item| remove_vk_actions(item) }
   end
   obj
 end

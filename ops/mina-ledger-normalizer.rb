@@ -20,7 +20,6 @@ end
 def normalize_zkapp(zkapp)
   unless zkapp.nil?
     zkapp["app_state"] = zkapp["app_state"].map { |app| normalize_hex(app) }
-    zkapp["action_state"] = zkapp["action_state"].map { |action| normalize_hex(action) }
     zkapp["last_action_slot"] = zkapp["last_action_slot"].to_s
   end
   zkapp
@@ -44,15 +43,17 @@ accounts.each do |account|
   }
 end
 
-def remove_verification_keys(obj)
+def remove_vk_actions(obj)
   case obj
   when Hash
+    obj.delete("action_state")
     obj.delete("verification_key")
-    obj.each_value { |v| remove_verification_keys(v) }
+
+    obj.each_value { |v| remove_vk_actions(v) }
   when Array
-    obj.each { |item| remove_verification_keys(item) }
+    obj.each { |item| remove_vk_actions(item) }
   end
   obj
 end
 
-puts JSON.pretty_generate(sort_recursively(remove_verification_keys(result)))
+puts JSON.pretty_generate(sort_recursively(remove_vk_actions(result)))
