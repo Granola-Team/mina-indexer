@@ -71,7 +71,7 @@ impl LedgerDiff {
             .flat_map(|user_cmd_with_status| {
                 if user_cmd_with_status.is_applied() {
                     let command = user_cmd_with_status.to_command(block.state_hash());
-                    AccountDiff::from_command(command)
+                    AccountDiff::from_command(command, block.global_slot_since_genesis())
                 } else {
                     vec![vec![AccountDiff::FailedTransactionNonce(
                         FailedTransactionNonceDiff {

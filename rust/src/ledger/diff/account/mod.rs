@@ -191,7 +191,7 @@ impl TokenAccount for AccountDiff {
 }
 
 impl AccountDiff {
-    pub fn from_command(command: CommandWithStateHash) -> Vec<Vec<Self>> {
+    pub fn from_command(command: CommandWithStateHash, global_slot: u32) -> Vec<Vec<Self>> {
         let CommandWithStateHash {
             command,
             state_hash: _,
@@ -220,7 +220,7 @@ impl AccountDiff {
                     nonce: delegation.nonce + 1,
                 })]]
             }
-            Command::Zkapp(zkapp) => AccountDiff::from_zkapp(&zkapp),
+            Command::Zkapp(zkapp) => AccountDiff::from_zkapp(&zkapp, global_slot),
         }
     }
 
@@ -600,7 +600,7 @@ impl From<SupplyAdjustmentSign> for UpdateType {
 
 // zkapp account diffs
 impl AccountDiff {
-    fn from_zkapp(zkapp: &ZkappCommandData) -> Vec<Vec<Self>> {
+    fn from_zkapp(zkapp: &ZkappCommandData, global_slot: u32) -> Vec<Vec<Self>> {
         let nonce = zkapp.fee_payer.body.nonce;
 
         // fee payer nonce
@@ -610,15 +610,15 @@ impl AccountDiff {
         })];
 
         for update in zkapp.account_updates.iter() {
-            diffs.push(Self::from_zkapp_account_update(&update.elt));
+            diffs.push(Self::from_zkapp_account_update(&update.elt, global_slot));
 
-            recurse_calls(&mut diffs, update.elt.calls.iter());
+            recurse_calls(&mut diffs, update.elt.calls.iter(), global_slot);
         }
 
         vec![diffs]
     }
 
-    fn from_zkapp_account_update(elt: &Elt) -> Self {
+    fn from_zkapp_account_update(elt: &Elt, global_slot: u32) -> Self {
         let public_key = elt.account_update.body.public_key.to_owned();
 
         let mut payment_diffs = vec![];
@@ -747,6 +747,7 @@ impl AccountDiff {
             actions,
             events,
             app_state_diff,
+            global_slot,
             ..Default::default()
         }))
     }
@@ -894,11 +895,18 @@ impl std::fmt::Debug for UpdateType {
 // helpers //
 /////////////
 
-fn recurse_calls<'a>(diffs: &mut Vec<AccountDiff>, calls: impl Iterator<Item = &'a Call>) {
+fn recurse_calls<'a>(
+    diffs: &mut Vec<AccountDiff>,
+    calls: impl Iterator<Item = &'a Call>,
+    global_slot: u32,
+) {
     for call in calls {
-        diffs.push(AccountDiff::from_zkapp_account_update(call.elt.as_ref()));
+        diffs.push(AccountDiff::from_zkapp_account_update(
+            call.elt.as_ref(),
+            global_slot,
+        ));
 
-        recurse_calls(diffs, call.elt.calls.iter());
+        recurse_calls(diffs, call.elt.calls.iter(), global_slot);
     }
 }
 
@@ -1034,6 +1042,7 @@ mod tests {
     #[test]
     fn test_from_command() {
         let nonce = Nonce(5);
+        let global_slot = 100;
         let amount = Amount(536900000000);
         let state_hash = StateHash::default();
 
@@ -1068,12 +1077,16 @@ mod tests {
             }),
         ]];
 
-        assert_eq!(AccountDiff::from_command(payment_command), expected_result);
+        assert_eq!(
+            AccountDiff::from_command(payment_command, global_slot),
+            expected_result
+        );
     }
 
     #[test]
     fn test_from_command_delegation() {
         let nonce = Nonce(42);
+        let global_slot = 100;
         let state_hash = StateHash::default();
 
         let delegator_public_key =
@@ -1091,7 +1104,7 @@ mod tests {
         };
 
         assert_eq!(
-            AccountDiff::from_command(delegation_command),
+            AccountDiff::from_command(delegation_command, global_slot),
             vec![vec![AccountDiff::Delegation(DelegationDiff {
                 delegator: delegator_public_key,
                 delegate: delegate_public_key,
@@ -1295,7 +1308,9 @@ mod tests {
     fn zkapp_account_diffs() -> Result<()> {
         let path = PathBuf::from("./tests/data/misc_blocks/mainnet-368442-3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu.json");
         let block = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
-        let state_hash: StateHash = "3NLTFUdvKixsbCqEbjWKskrjWuaSQpwTjoGNXWzK7eaUn4oHscbu".into();
+
+        let state_hash = block.state_hash();
+        let global_slot = block.global_slot_since_genesis();
 
         use AccountDiff::*;
         let zkapps = block.zkapp_commands();
@@ -1368,10 +1383,13 @@ mod tests {
                     })),
                 ]];
 
-                let diffs = AccountDiff::from_command(CommandWithStateHash {
-                    command: Command::Zkapp(zkapp.clone()),
-                    state_hash,
-                });
+                let diffs = AccountDiff::from_command(
+                    CommandWithStateHash {
+                        command: Command::Zkapp(zkapp.clone()),
+                        state_hash,
+                    },
+                    global_slot,
+                );
 
                 assert_eq!(AccountDiff::expand(diffs), expect);
                 return Ok(());

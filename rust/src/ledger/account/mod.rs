@@ -469,6 +469,7 @@ impl Account {
         for (idx, action_state) in diff.actions.iter().enumerate() {
             zkapp.action_state[idx % n] = action_state.to_owned();
         }
+        zkapp.last_action_slot = diff.global_slot.into();
 
         Self {
             zkapp: Some(zkapp),
