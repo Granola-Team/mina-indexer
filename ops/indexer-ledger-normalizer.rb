@@ -32,4 +32,4 @@ def remove_vk_actions(obj)
   obj
 end
 
-puts JSON.pretty_generate(sort_recursively(remove_verification_keys(result)))
+puts JSON.pretty_generate(sort_recursively(remove_vk_actions(result)))
