@@ -719,7 +719,7 @@ impl std::fmt::Display for Permission {
 mod tests {
     use super::{Account, Amount};
     use crate::{
-        base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+        base::{public_key::PublicKey, state_hash::StateHash},
         constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
         ledger::{
             account::{Permission, Permissions, Timing},
@@ -732,8 +732,9 @@ mod tests {
             },
             token::{TokenAddress, TokenSymbol},
         },
-        mina_blocks::v2::{AppState, VerificationKey, ZkappAccount, ZkappUri},
+        mina_blocks::v2::{ActionState, AppState, VerificationKey, ZkappAccount, ZkappUri},
     };
+    use quickcheck::{Arbitrary, Gen};
 
     #[test]
     fn test_mina_account_display() -> anyhow::Result<()> {
@@ -849,7 +850,7 @@ mod tests {
         app_state_diff[0] = Some(app_state_elem.clone());
 
         let zkapp_diff = ZkappDiff {
-            nonce: Some(Nonce(1)),
+            nonce: Some(1.into()),
             increment_nonce: true,
             public_key: pk.clone(),
             payment_diffs: vec![],
@@ -888,7 +889,7 @@ mod tests {
     fn zkapp_account_diff_delegate() {
         let pk = PublicKey::default();
         let delegate = PublicKey::from("B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5");
-        let nonce = Nonce(1);
+        let nonce = 1.into();
         let state_hash = StateHash::default();
 
         // account before applying diff
@@ -1030,7 +1031,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Some(Nonce(1)),
+            nonce: Some(1.into()),
             zkapp_uri: Some(zkapp_uri.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -1074,7 +1075,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Some(Nonce(1)),
+            nonce: Some(1.into()),
             increment_nonce: true,
             token_symbol: Some(token_symbol.clone()),
             public_key: pk.clone(),
@@ -1116,7 +1117,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Some(Nonce(1)),
+            nonce: Some(1.into()),
             timing: Some(timing.clone()),
             public_key: pk.clone(),
             ..Default::default()
@@ -1157,7 +1158,7 @@ mod tests {
         };
 
         let diff = ZkappDiff {
-            nonce: Some(Nonce(1)),
+            nonce: Some(1.into()),
             voting_for: Some(voting_for.to_owned().into()),
             public_key: pk.clone(),
             increment_nonce: true,
@@ -1180,6 +1181,62 @@ mod tests {
             after,
             Account {
                 voting_for: Some(voting_for.into()),
+                ..before
+            }
+        );
+    }
+
+    #[test]
+    fn zkapp_account_diff_actions() {
+        let mut g = Gen::new(1000);
+        let pk = PublicKey::arbitrary(&mut g);
+        let state_hash = StateHash::arbitrary(&mut g);
+        let global_slot = 100;
+
+        // account before applying diff
+        let before = Account {
+            public_key: pk.clone(),
+            zkapp: Some(ZkappAccount::default()),
+            ..Default::default()
+        };
+
+        let action = ActionState::arbitrary(&mut g);
+        let diff = ZkappDiff {
+            nonce: Some(1.into()),
+            public_key: pk.clone(),
+            actions: vec![action.clone()],
+            global_slot,
+            ..Default::default()
+        };
+
+        // account after applying diff
+        let after = {
+            let mut after = before.clone();
+
+            for diff in diff.expand() {
+                after = after.apply_account_diff(&diff, &state_hash);
+            }
+
+            after
+        };
+
+        // only the account voting_for changes
+        let before_zkapp = before.zkapp.clone().unwrap();
+        let action_state = {
+            let mut state = before_zkapp.action_state;
+            state[0] = action;
+
+            state
+        };
+
+        assert_eq!(
+            after,
+            Account {
+                zkapp: Some(ZkappAccount {
+                    last_action_slot: global_slot.into(),
+                    action_state,
+                    ..before_zkapp
+                }),
                 ..before
             }
         );
