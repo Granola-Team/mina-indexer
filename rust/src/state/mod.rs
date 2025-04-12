@@ -510,7 +510,9 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
-                    ledger_diffs.push((diff.clone(), block.accounts_accessed()));
+                    if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
+                        ledger_diffs.push((diff.clone(), block.accounts_accessed()));
+                    }
 
                     indexer_store.add_block(&block, block_bytes)?;
                     indexer_store.set_best_block(&block.state_hash())?;

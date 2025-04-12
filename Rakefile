@@ -268,15 +268,17 @@ namespace :show do
   end
 
   desc "Show prod directories"
-  task :prod do
+  task :prod, [:which] do |_, args|
+    which = args[:which] || "one"
     puts "Showing prod directory"
-    run("#{UTILS} prod show")
+    run("#{UTILS} prod show #{which}")
   end
 
   desc "Show test directories"
-  task :test do
+  task :test, [:which] do |_, args|
+    which = args[:which] || "one"
     puts "Showing test directory"
-    run("#{UTILS} test show")
+    run("#{UTILS} test show #{which}")
   end
 end
 
@@ -301,9 +303,10 @@ namespace :clean do
   end
 
   desc "Clean mina-indexer-test subdirectory"
-  task :test do
+  task :test, [:which] do |_, args|
+    which = args[:which] || "one"
     puts "Cleaning test directory"
-    run("#{UTILS} test clean")
+    run("#{UTILS} test clean #{which}")
   end
 end
 

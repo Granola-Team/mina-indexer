@@ -31,24 +31,9 @@ require "#{__dir__}/ops-common"
 # Clean
 #
 
-def clean_prod(type)
-  if type == "prod"
-    idxr_cleanup(ARGV.last)
-    exit 0
-  end
-end
-
-def clean_test(type)
-  if type == "test"
-    idxr_cleanup("one")
-    exit 0
-  end
-end
-
 # clean up directories
 if ARGV[1] == "clean"
-  clean_prod(DEPLOY_TYPE)
-  clean_test(DEPLOY_TYPE)
+  idxr_cleanup(ARGV.last)
   exit 0
 end
 
@@ -56,10 +41,16 @@ end
 # Show
 #
 
-def show(type)
+def show(type, which)
+  dir = if which == "one"
+    BASE_DIR
+  elsif which == "all"
+    deploy_dir
+  end
+
   if type == "prod" || type == "test"
-    if Dir.exist? BASE_DIR
-      system("ls", "-l", BASE_DIR)
+    if Dir.exist?(dir)
+      system("ls", "-l", dir)
       exit 0
     end
   end
@@ -67,7 +58,7 @@ end
 
 # show directories
 if ARGV[1] == "show"
-  show(DEPLOY_TYPE)
+  show(DEPLOY_TYPE, ARGV.last)
   exit 0
 end
 

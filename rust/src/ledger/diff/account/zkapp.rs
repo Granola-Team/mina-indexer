@@ -46,6 +46,7 @@ pub struct ZkappDiff {
     pub voting_for: Option<VotingFor>,
     pub actions: Vec<ActionState>,
     pub events: Vec<ZkappEvent>,
+    pub global_slot: u32,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -115,6 +116,7 @@ pub struct ZkappActionsDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub actions: Vec<ActionState>,
+    pub global_slot: u32,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -226,6 +228,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.actions,
+            self.global_slot,
         );
 
         // events
@@ -392,12 +395,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         actions: Vec<ActionState>,
+        global_slot: u32,
     ) {
         if !actions.is_empty() {
             account_diffs.push(AccountDiff::ZkappActions(ZkappActionsDiff {
                 token,
                 public_key: pk,
                 actions,
+                global_slot,
             }));
         }
     }
@@ -496,6 +501,7 @@ mod tests {
         let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
 
         use AccountDiff::*;
+        let global_slot = pcb.global_slot_since_genesis();
 
         // zkapp ledger diffs
         let diffs = LedgerDiff::from_precomputed_unexpanded(&pcb);
@@ -523,6 +529,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
                 Zkapp(Box::new(ZkappDiff {
@@ -535,6 +542,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
             ],
@@ -553,6 +561,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
                 Zkapp(Box::new(ZkappDiff {
@@ -565,6 +574,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
             ],
@@ -583,6 +593,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
                 Zkapp(Box::new(ZkappDiff {
@@ -595,6 +606,7 @@ mod tests {
                         amount: 2000000000.into(),
                         token: TokenAddress::default(),
                     })],
+                    global_slot,
                     ..Default::default()
                 })),
             ],
@@ -604,46 +616,48 @@ mod tests {
                     nonce: 5.into(),
                 }),
                 Zkapp(Box::new(ZkappDiff {
-                nonce: None,
-                public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
-                payment_diffs: vec![
-                    ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonceDiff {
-                        public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-                            .into(),
-                        token: TokenAddress::default(),
+                    nonce: None,
+                    public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into(),
+                    payment_diffs: vec![
+                        ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonceDiff {
+                            public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+                                .into(),
+                            token: TokenAddress::default(),
+                        }),
+                        ZkappPaymentDiff::Payment(PaymentDiff {
+                            amount: 0.into(),
+                            update_type: UpdateType::Credit,
+                            public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+                                .into(),
+                            token: TokenAddress::default(),
+                        }),
+                    ],
+                    verification_key: Some(VerificationKey {
+                        data: "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".into(),
+                        hash: "0x1C9320E5FD23AF1F8D8B1145484181C3E6B0F1C8C24FE4BDFFEF4281A61C3EBC".into(),
                     }),
-                    ZkappPaymentDiff::Payment(PaymentDiff {
-                        amount: 0.into(),
-                        update_type: UpdateType::Credit,
-                        public_key: "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-                            .into(),
-                        token: TokenAddress::default(),
+                    permissions: Some(Permissions {
+                        edit_state: Permission::Proof,
+                        access: Permission::None,
+                        send: Permission::Proof,
+                        receive: Permission::None,
+                        set_delegate: Permission::Signature,
+                        set_permissions: Permission::Signature,
+                        set_verification_key: (Permission::Signature, "3".to_string()),
+                        set_zkapp_uri: Permission::Signature,
+                        edit_action_state: Permission::Proof,
+                        set_token_symbol: Permission::Signature,
+                        increment_nonce: Permission::Signature,
+                        set_voting_for: Permission::Signature,
+                        set_timing: Permission::Signature
                     }),
-                ],
-                verification_key: Some(VerificationKey {
-                    data: "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".into(),
-                    hash: "0x1C9320E5FD23AF1F8D8B1145484181C3E6B0F1C8C24FE4BDFFEF4281A61C3EBC".into(),
-                }),
-                permissions: Some(Permissions {
-                    edit_state: Permission::Proof,
-                    access: Permission::None,
-                    send: Permission::Proof,
-                    receive: Permission::None,
-                    set_delegate: Permission::Signature,
-                    set_permissions: Permission::Signature,
-                    set_verification_key: (Permission::Signature, "3".to_string()),
-                    set_zkapp_uri: Permission::Signature,
-                    edit_action_state: Permission::Proof,
-                    set_token_symbol: Permission::Signature,
-                    increment_nonce: Permission::Signature,
-                    set_voting_for: Permission::Signature,
-                    set_timing: Permission::Signature
-                }),
-                zkapp_uri: Some("https://minainu.com".into()),
-                token_symbol: Some("MINU".into()),
-                increment_nonce: true,
-                ..Default::default()
-            }))],
+                    zkapp_uri: Some("https://minainu.com".into()),
+                    token_symbol: Some("MINU".into()),
+                    increment_nonce: true,
+                    global_slot,
+                    ..Default::default()
+                }))
+            ],
         ];
 
         for (n, x) in expect.iter().enumerate() {
