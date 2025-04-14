@@ -105,16 +105,13 @@ if !skippable
   # Ledger diff tests #
   #####################
 
-  def idxr_ledger(height)
-    "#{LOGS_DIR}/ledger-#{height}.json"
-  end
-
+  # Compare the indexer ledger at height #{height} with the corresponding Mina
+  # ledger.
+  #
   def check_ledger(height)
-    # Compare the indexer ledger at height #{height} with the corresponding Mina ledger
-    #
     puts "Attempting ledger extraction at height #{height}..."
 
-    idxr_ledger = idxr_ledger(height)
+    idxr_ledger = "#{LOGS_DIR}/ledger-#{height}.json"
     unless system(
       EXE,
       "--socket", SOCKET,
@@ -129,20 +126,9 @@ if !skippable
 
     puts "Ledger extraction complete. Verifying ledger at #{height}..."
 
-    idxr_norm_exe = "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb"
     idxr_norm_ledger = "#{idxr_ledger}.norm.json"
-    idxr_ledger_diff = "#{LOGS_DIR}/ledger-#{height}.diff"
-
-    # select appropriate ledger for comparison
-    mina_norm_ledger = if height == 359604
-      "#{SRC_TOP}/tests/data/ledgers/ledger-359604-3NLRTfY4kZyJtvaP4dFenDcxfoMfT3uEpkWS913KkeXLtziyVd15.norm.json"
-    else
-      "#{SRC_TOP}/tests/data/ledgers/ledger-427023-3NKmR7GZwjL9RCxE79DHCMFkKoRKT5kTiyUJfzcbzRtNE61rWxUn.norm.json"
-    end
-
-    # normalize indexer ledger
     unless system(
-      idxr_norm_exe,
+      "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb",
       idxr_ledger,
       out: idxr_norm_ledger
     )
@@ -150,11 +136,17 @@ if !skippable
       return false
     end
 
-    # check normalized ledgers match
+    mina_norm_ledgers = Dir["#{SRC_TOP}/tests/data/ledgers/ledger-#{height}-*.norm.json"]
+    unless mina_norm_ledgers.length == 1
+      warn "There is not exactly 1 normalized ledger against which to check."
+      return false
+    end
+
+    idxr_ledger_diff = "#{LOGS_DIR}/ledger-#{height}.diff"
     unless system(
-      "diff --unified #{idxr_norm_ledger} #{mina_norm_ledger}",
+      "diff --unified #{idxr_norm_ledger} #{mina_norm_ledgers[0]}",
       out: idxr_ledger_diff
-    ) && `cat #{idxr_ledger_diff}`.empty?
+    )
       warn("Regression introduced to ledger calculations. Inspect diff file: #{idxr_ledger_diff}")
       return false
     end
