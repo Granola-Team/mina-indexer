@@ -25,9 +25,8 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     state.add_blocks(&mut bp).await?;
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
-    println!("{}", state);
-
     let best_ledger = state.best_ledger();
+
     let pk = "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF".into();
     let minu_token = TokenAddress::from_str("wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd")?;
     let mina_token = TokenAddress::default();
@@ -97,7 +96,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 public_key: pk.clone(),
                 delegate: pk.clone(),
                 token: Some(minu_token.clone()),
-                created_by_zkapp: true,
+                creation_fee_paid: true,
                 ..Default::default()
             }
         );
@@ -114,7 +113,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             delegate: pk,
             token: Some(mina_token.clone()),
             token_symbol: Some("MINU".into()),
-            created_by_zkapp: true,
+            creation_fee_paid: true,
             permissions: Some(Permissions {
                 edit_state: Permission::Proof,
                 access: Permission::None,
@@ -159,7 +158,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 nonce: Some(1.into()),
                 delegate: pk,
                 token: Some(mina_token.clone()),
-                created_by_zkapp: true,
+                creation_fee_paid: true,
                 permissions: Some(Permissions {
                     edit_state: Permission::Proof,
                     access: Permission::None,
