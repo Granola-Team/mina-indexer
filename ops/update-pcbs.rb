@@ -7,19 +7,16 @@ require "etc"
 
 # Remove both `proofs` and `protocol_state_proof` and add a v2 hash for any transaction.
 class PcbUpdater
-  # Path to the external app for transaction hashing
-  MINA_TXN_HASHER = "#{__dir__}/mina/mina_txn_hasher.exe"
+  MINA_TXN_HASHER = "mina_txn_hasher.exe"
 
   # Add transaction hashes starting from this block height
   V2_BLOCKCHAIN_START = 359605
 
   def initialize
     @queue = Queue.new
-    # Determine the number of worker threads based on CPU count
     @num_workers = Etc.nprocessors * 4
   end
 
-  # Process all files in the queue
   def process_files
     # Create worker threads
     threads = []
@@ -57,13 +54,9 @@ class PcbUpdater
 
   # Process a single JSON file to remove `proofs` and `protocol_state_proof` and add v2 transaction hashes
   def process_file(path)
-    # Read and parse the file
     json_data = JSON.parse(File.read(path))
 
-    # Remove `proofs`
     remove_proofs(json_data)
-
-    # Remove `protocol_state_proof`
     json_data.delete("protocol_state_proof")
     json_data["data"]&.delete("protocol_state_proof")
 
@@ -173,7 +166,6 @@ class PcbUpdater
   end
 end
 
-# Main function
 def main
   if ARGV.empty?
     puts "Usage: #{$0} [FILE_OR_DIRECTORY...]"
@@ -182,18 +174,14 @@ def main
 
   processor = PcbUpdater.new
 
-  # Process command line arguments
   ARGV.each do |path|
     if File.directory?(path)
       processor.add_directory(path)
-    elsif File.file?(path) && path.end_with?(".json")
-      processor.add_file(path)
     else
-      puts "Skipping #{path}: not a JSON file or directory"
+      processor.add_file(path)
     end
   end
 
-  # Process all files
   processor.process_files
 end
 
