@@ -67,7 +67,9 @@ impl DbAccountUpdate {
                         Payment(diff)
                         | FeeTransfer(diff)
                         | FeeTransferViaCoinbase(diff)
-                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => after.payment(diff),
+                        | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
+                            after.payment(diff)
+                        }
                         Coinbase(diff) => after.coinbase(diff.amount),
                         Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
                         FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
@@ -154,7 +156,7 @@ impl DbAccountUpdate {
                         Payment(diff)
                         | FeeTransfer(diff)
                         | FeeTransferViaCoinbase(diff)
-                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
+                        | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
                             after.payment_unapply(diff)
                         }
                         Coinbase(diff) => after.coinbase_unapply(diff),

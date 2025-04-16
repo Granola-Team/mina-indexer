@@ -42,7 +42,7 @@ pub struct Account {
     pub balance: Amount,
     pub delegate: PublicKey,
     pub genesis_account: Option<Amount>,
-    pub created_by_zkapp: bool,
+    pub creation_fee_paid: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<Nonce>,
@@ -105,7 +105,7 @@ impl Account {
             .token
             .as_ref()
             .is_none_or(|t| t.0 == MINA_TOKEN_ADDRESS)
-            && !self.created_by_zkapp
+            && !self.creation_fee_paid
         {
             return Self {
                 balance: self.balance - MAINNET_ACCOUNT_CREATION_FEE,
@@ -144,12 +144,12 @@ impl Account {
     ///
     /// A new `Account` instance with the specified public key and token,
     /// default values for other fields.
-    pub fn empty(public_key: PublicKey, token: TokenAddress, created_by_zkapp: bool) -> Self {
+    pub fn empty(public_key: PublicKey, token: TokenAddress, creation_fee_paid: bool) -> Self {
         Self {
             public_key: public_key.clone(),
             delegate: public_key,
             token: Some(token),
-            created_by_zkapp,
+            creation_fee_paid,
             ..Default::default()
         }
     }
@@ -516,7 +516,7 @@ impl Account {
             Payment(diff)
             | FeeTransfer(diff)
             | FeeTransferViaCoinbase(diff)
-            | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => self.payment(diff),
+            | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => self.payment(diff),
             Delegation(delegation_diff) => {
                 assert_eq!(self.public_key, delegation_diff.delegator);
                 self.delegation(delegation_diff.delegate.clone(), delegation_diff.nonce)
@@ -558,7 +558,9 @@ impl Account {
             Payment(diff)
             | FeeTransfer(diff)
             | FeeTransferViaCoinbase(diff)
-            | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => self.payment_unapply(diff),
+            | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
+                self.payment_unapply(diff)
+            }
             Delegation(diff) => self.delegation_unapply(diff),
             Coinbase(diff) => self.coinbase_unapply(diff),
             FailedTransactionNonce(diff) => self.failed_transaction_unapply(diff),
@@ -801,12 +803,15 @@ mod tests {
         let diff = ZkappDiff {
             public_key: pk.clone(),
             nonce: Some(185.into()),
-            payment_diffs: vec![ZkappPaymentDiff::Payment(PaymentDiff {
-                public_key: pk.clone(),
-                update_type: UpdateType::Debit(None),
-                amount,
-                token: TokenAddress::default(),
-            })],
+            payment_diffs: vec![ZkappPaymentDiff::Payment {
+                creation_fee_paid: false,
+                payment: PaymentDiff {
+                    public_key: pk.clone(),
+                    update_type: UpdateType::Debit(None),
+                    amount,
+                    token: TokenAddress::default(),
+                },
+            }],
             ..Default::default()
         };
 

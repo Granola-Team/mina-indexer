@@ -47,11 +47,15 @@ pub struct ZkappDiff {
     pub actions: Vec<ActionState>,
     pub events: Vec<ZkappEvent>,
     pub global_slot: u32,
+    pub creation_fee_paid: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub enum ZkappPaymentDiff {
-    Payment(PaymentDiff),
+    Payment {
+        payment: PaymentDiff,
+        creation_fee_paid: bool,
+    },
     IncrementNonce(ZkappIncrementNonceDiff),
 }
 
@@ -130,6 +134,7 @@ pub struct ZkappEventsDiff {
 pub struct ZkappIncrementNonceDiff {
     pub public_key: PublicKey,
     pub token: TokenAddress,
+    pub creation_fee_paid: bool,
 }
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -246,8 +251,8 @@ impl ZkappDiff {
         use ZkappPaymentDiff::*;
 
         let acct_diff = match diff {
-            Payment(diff) => AccountDiff::ZkappPayment(Payment(diff)),
             IncrementNonce(diff) => AccountDiff::ZkappIncrementNonce(diff),
+            Payment { .. } => AccountDiff::ZkappPayment(diff),
         };
 
         account_diffs.push(acct_diff)
@@ -426,21 +431,21 @@ impl ZkappDiff {
 impl ZkappPaymentDiff {
     pub fn public_key(&self) -> PublicKey {
         match self {
-            Self::Payment(diff) => diff.public_key.to_owned(),
+            Self::Payment { payment, .. } => payment.public_key.to_owned(),
             Self::IncrementNonce(diff) => diff.public_key.to_owned(),
         }
     }
 
     pub fn token(&self) -> TokenAddress {
         match self {
-            Self::Payment(diff) => diff.token.to_owned(),
+            Self::Payment { payment, .. } => payment.token.to_owned(),
             Self::IncrementNonce(diff) => diff.token.to_owned(),
         }
     }
 
     pub fn balance_change(&self) -> i64 {
         match self {
-            Self::Payment(diff) => diff.balance_change(),
+            Self::Payment { payment, .. } => payment.balance_change(),
             Self::IncrementNonce(_) => 0.into(),
         }
     }

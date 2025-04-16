@@ -390,32 +390,32 @@ impl AccountDiff {
     }
 
     pub fn amount(&self) -> i64 {
-        use AccountDiff::*;
-
         match self {
-            Delegation(_) | FailedTransactionNonce(_) => 0,
-            Coinbase(diff) => diff.amount.0 as i64,
-            FeeTransfer(diff) | FeeTransferViaCoinbase(diff) | Payment(diff) => {
+            Self::Delegation(_) | Self::FailedTransactionNonce(_) => 0,
+            Self::Coinbase(diff) => diff.amount.0 as i64,
+            Self::FeeTransfer(diff) | Self::FeeTransferViaCoinbase(diff) | Self::Payment(diff) => {
                 match diff.update_type {
                     UpdateType::Credit => diff.amount.0 as i64,
                     UpdateType::Debit(_) => 0 - diff.amount.0 as i64,
                 }
             }
-            ZkappPayment(ZkappPaymentDiff::Payment(diff)) => diff.balance_change(),
-            Zkapp(_)
-            | ZkappPayment(_)
-            | ZkappState(_)
-            | ZkappPermissions(_)
-            | ZkappVerificationKey(_)
-            | ZkappProvedState(_)
-            | ZkappUri(_)
-            | ZkappTokenSymbol(_)
-            | ZkappTiming(_)
-            | ZkappVotingFor(_)
-            | ZkappActions(_)
-            | ZkappEvents(_)
-            | ZkappIncrementNonce(_)
-            | ZkappFeePayerNonce(_) => {
+            Self::ZkappPayment(ZkappPaymentDiff::Payment { payment, .. }) => {
+                payment.balance_change()
+            }
+            Self::Zkapp(_)
+            | Self::ZkappPayment(_)
+            | Self::ZkappState(_)
+            | Self::ZkappPermissions(_)
+            | Self::ZkappVerificationKey(_)
+            | Self::ZkappProvedState(_)
+            | Self::ZkappUri(_)
+            | Self::ZkappTokenSymbol(_)
+            | Self::ZkappTiming(_)
+            | Self::ZkappVotingFor(_)
+            | Self::ZkappActions(_)
+            | Self::ZkappEvents(_)
+            | Self::ZkappIncrementNonce(_)
+            | Self::ZkappFeePayerNonce(_) => {
                 unreachable!("zkapp commands do not have an amount")
             }
         }
@@ -424,13 +424,15 @@ impl AccountDiff {
     pub fn is_zkapp_diff(&self) -> bool {
         !matches!(
             self,
-            AccountDiff::Coinbase(_)
-                | AccountDiff::Payment(_)
-                | AccountDiff::Delegation(_)
-                | AccountDiff::FeeTransfer(_)
-                | AccountDiff::FeeTransferViaCoinbase(_)
-                | AccountDiff::FailedTransactionNonce(_)
+            Self::Coinbase(_)
+                | Self::Payment(_)
+                | Self::Delegation(_)
+                | Self::FeeTransfer(_)
+                | Self::FeeTransferViaCoinbase(_)
+                | Self::FailedTransactionNonce(_)
         )
+    }
+
     }
 
     pub fn from(
@@ -536,14 +538,14 @@ impl PaymentDiff {
                 .payment_diffs
                 .into_iter()
                 .filter_map(|diff| match diff {
-                    ZkappPaymentDiff::Payment(payment) => Some(payment),
+                    ZkappPaymentDiff::Payment { payment, .. } => Some(payment),
                     ZkappPaymentDiff::IncrementNonce(_) => None,
                 })
                 .collect(),
             AccountDiff::Payment(diff)
             | AccountDiff::FeeTransfer(diff)
             | AccountDiff::FeeTransferViaCoinbase(diff)
-            | AccountDiff::ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
+            | AccountDiff::ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
                 vec![diff]
             }
             AccountDiff::Coinbase(cb_diff) => vec![Self {
@@ -643,22 +645,26 @@ impl AccountDiff {
             payment_diffs.push(ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonceDiff {
                 public_key: public_key.to_owned(),
                 token: token.to_owned(),
+                creation_fee_paid,
             }));
         };
 
-        payment_diffs.push(ZkappPaymentDiff::Payment(PaymentDiff {
-            public_key: public_key.to_owned(),
-            token: token.to_owned(),
-            amount,
-            update_type: elt
-                .account_update
-                .body
-                .balance_change
-                .sgn
-                .0
-                .to_owned()
-                .into(),
-        }));
+        payment_diffs.push(ZkappPaymentDiff::Payment {
+            creation_fee_paid,
+            payment: PaymentDiff {
+                public_key: public_key.to_owned(),
+                token: token.to_owned(),
+                amount,
+                update_type: elt
+                    .account_update
+                    .body
+                    .balance_change
+                    .sgn
+                    .0
+                    .to_owned()
+                    .into(),
+            },
+        });
 
         // delegation change
         let delegate = elt.account_update.body.update.delegate.to_owned().into();
@@ -748,7 +754,8 @@ impl AccountDiff {
             events,
             app_state_diff,
             global_slot,
-            ..Default::default()
+            creation_fee_paid,
+            nonce: None,
         }))
     }
 }
@@ -803,11 +810,18 @@ impl std::fmt::Display for AccountDiff {
                 write!(f, "FAILED_TXN: {diff:?}")
             }
             Self::Zkapp(diff) => write!(f, "ZKAPP: {diff:?}"),
-            Self::ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
-                write!(f, "{:<27}{diff:?}", "ZkappPayment:")
+            Self::ZkappPayment(ZkappPaymentDiff::Payment {
+                payment,
+                creation_fee_paid,
+            }) => {
+                write!(
+                    f,
+                    "ZKAPP_PAYMENT: {:?} | creation fee paid: {}",
+                    payment, creation_fee_paid
+                )
             }
             Self::ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff)) => {
-                write!(f, "{:<27}{diff:?}", "ZkappIncrementNonce:")
+                write!(f, "ZKAPP_NONCE: {diff:?}")
             }
             Self::ZkappState(diff) => write!(f, "ZKAPP_STATE: {diff:?}"),
             Self::ZkappPermissions(diff) => write!(f, "ZKAPP_PERMISSIONS: {diff:?}"),
@@ -843,15 +857,15 @@ impl std::fmt::Debug for AccountDiff {
                 write!(f, "{:<27}{diff:?}", "Failed transaction:")
             }
             Self::Zkapp(diff) => write!(f, "{:<27}{diff:?}", "Zkapp:"),
-            Self::ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
+            Self::ZkappPayment(ZkappPaymentDiff::Payment { payment, .. }) => {
                 write!(
                     f,
-                    "{:<27}{diff:?}{}",
+                    "{:<27}{payment:?}{}",
                     "ZkappPayment:",
-                    if diff.token.0 == MINA_TOKEN_ADDRESS {
+                    if payment.token.0 == MINA_TOKEN_ADDRESS {
                         "".to_string()
                     } else {
-                        format!(" | {}", diff.token.0)
+                        format!(" | {}", payment.token.0)
                     }
                 )
             }
@@ -1328,20 +1342,26 @@ mod tests {
                             .into(),
                         nonce: 59.into(),
                     }),
-                    ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
-                        amount: 1000000000.into(),
-                        update_type: UpdateType::Debit(None),
-                        public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
-                            .into(),
-                        token: TokenAddress::default(),
-                    })),
-                    ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
-                        amount: 0.into(),
-                        update_type: UpdateType::Credit,
-                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
-                            .into(),
-                        token: TokenAddress::default(),
-                    })),
+                    ZkappPayment(ZkappPaymentDiff::Payment {
+                        creation_fee_paid: true,
+                        payment: PaymentDiff {
+                            amount: 1000000000.into(),
+                            update_type: UpdateType::Debit(None),
+                            public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
+                                .into(),
+                            token: TokenAddress::default(),
+                        },
+                    }),
+                    ZkappPayment(ZkappPaymentDiff::Payment {
+                        creation_fee_paid: true,
+                        payment: PaymentDiff {
+                            amount: 0.into(),
+                            update_type: UpdateType::Credit,
+                            public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                                .into(),
+                            token: TokenAddress::default(),
+                        },
+                    }),
                     ZkappEvents(ZkappEventsDiff {
                         token: TokenAddress::default(),
                         public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
@@ -1361,26 +1381,32 @@ mod tests {
                                 .into(),
                         ],
                     }),
-                    ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
-                        amount: 10000000000.into(),
-                        update_type: UpdateType::Debit(None),
-                        public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
-                            .into(),
-                        token: TokenAddress::new(
-                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
-                        )
-                        .unwrap(),
-                    })),
-                    ZkappPayment(ZkappPaymentDiff::Payment(PaymentDiff {
-                        amount: 10000000000.into(),
-                        update_type: UpdateType::Credit,
-                        public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba"
-                            .into(),
-                        token: TokenAddress::new(
-                            "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
-                        )
-                        .unwrap(),
-                    })),
+                    ZkappPayment(ZkappPaymentDiff::Payment {
+                        creation_fee_paid: true,
+                        payment: PaymentDiff {
+                            amount: 10000000000.into(),
+                            update_type: UpdateType::Debit(None),
+                            public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
+                                .into(),
+                            token: TokenAddress::new(
+                                "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                            )
+                            .unwrap(),
+                        },
+                    }),
+                    ZkappPayment(ZkappPaymentDiff::Payment {
+                        creation_fee_paid: true,
+                        payment: PaymentDiff {
+                            amount: 10000000000.into(),
+                            update_type: UpdateType::Credit,
+                            public_key: "B62qnVgC5sXACSeAAYV7wjeLYFeC3XZ1PA2MBsuSUUsqiK96jfN9sba"
+                                .into(),
+                            token: TokenAddress::new(
+                                "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
+                            )
+                            .unwrap(),
+                        },
+                    }),
                 ]];
 
                 let diffs = AccountDiff::from_command(

@@ -48,12 +48,16 @@ impl From<ZkappPaymentDiff> for Option<TokenDiff> {
     fn from(value: ZkappPaymentDiff) -> Self {
         use ZkappPaymentDiff::*;
 
-        if let Payment(PaymentDiff {
-            update_type,
-            public_key,
-            amount,
-            token,
-        }) = value
+        if let Payment {
+            payment:
+                PaymentDiff {
+                    update_type,
+                    public_key,
+                    amount,
+                    token,
+                },
+            ..
+        } = value
         {
             return Some(TokenDiff {
                 token,
