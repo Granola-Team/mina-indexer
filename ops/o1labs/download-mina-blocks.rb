@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 require "net/http"
 require "uri"
 require "fileutils"
@@ -213,12 +211,8 @@ def download_all_blocks_at_height(height, dir)
   true
 end
 
-def process_block_height(block_height, blocks_dir)
-  download_all_blocks_at_height(block_height, blocks_dir)
-end
-
 def download_blocks_in_range(min_height, max_height, blocks_dir)
-  ensure_directory_exists(blocks_dir)
+  FileUtils.mkdir_p(blocks_dir)
 
   puts "Downloading blocks from height #{min_height} to #{max_height} into #{blocks_dir}"
   puts "Using #{BLOCK_THREADS} threads with #{DOWNLOAD_THREADS_PER_BLOCK} download threads each"
@@ -234,7 +228,7 @@ def download_blocks_in_range(min_height, max_height, blocks_dir)
       until block_queue.empty?
         begin
           height = block_queue.pop(true)
-          process_block_height(height, blocks_dir)
+          download_all_blocks_at_height(height, blocks_dir)
         rescue ThreadError
           # Queue is empty
           break
@@ -246,10 +240,6 @@ def download_blocks_in_range(min_height, max_height, blocks_dir)
   # Wait for all block processing to complete
   threads.each(&:join)
   puts "Completed downloading blocks from #{min_height} to #{max_height}"
-end
-
-def ensure_directory_exists(dir)
-  FileUtils.mkdir_p(dir)
 end
 
 def main_download_mina_blocks
