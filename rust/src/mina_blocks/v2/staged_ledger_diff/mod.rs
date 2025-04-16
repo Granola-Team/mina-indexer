@@ -9,7 +9,7 @@ use crate::{
         scheduled_time::ScheduledTime, Balance,
     },
     command::{to_mina_format, to_zkapp_json, TxnHash},
-    constants::{MAINNET_ACCOUNT_CREATION_FEE, ZKAPP_STATE_FIELD_ELEMENTS_NUM},
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS, ZKAPP_STATE_FIELD_ELEMENTS_NUM},
     ledger::{token::TokenAddress, LedgerHash},
     protocol::serialization_types::staged_ledger_diff::{
         TransactionStatus2, TransactionStatusFailedType,
@@ -513,6 +513,7 @@ impl Call {
         self.elt
             .calls
             .iter()
+            .filter(|call| call.elt.account_update.body.token_id.0 == MINA_TOKEN_ADDRESS)
             .for_each(|call| call.balance_change_acc(acc));
     }
 }
@@ -525,6 +526,7 @@ impl AccountUpdates {
         self.elt
             .calls
             .iter()
+            .filter(|call| call.elt.account_update.body.token_id.0 == MINA_TOKEN_ADDRESS)
             .for_each(|call| call.balance_change_acc(&mut acc));
 
         acc < 0 && acc.unsigned_abs() >= MAINNET_ACCOUNT_CREATION_FEE.0
