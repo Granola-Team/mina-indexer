@@ -72,11 +72,13 @@ impl TokenLedger {
         let pk = acct_diff.public_key();
         let token = acct_diff.token();
 
-        if let Some(account) = self
-            .accounts
-            .remove(&pk)
-            .or_else(|| Some(Account::empty(pk.clone(), token, acct_diff.is_zkapp_diff())))
-        {
+        if let Some(account) = self.accounts.remove(&pk).or_else(|| {
+            Some(Account::empty(
+                pk.clone(),
+                token,
+                acct_diff.creation_fee_paid(),
+            ))
+        }) {
             self.accounts
                 .insert(pk, account.apply_account_diff(acct_diff, state_hash));
         }
@@ -94,11 +96,13 @@ impl TokenLedger {
             let pk = acct_diff.public_key();
             let token = acct_diff.token();
 
-            if let Some(account_after) = self
-                .accounts
-                .remove(&pk)
-                .or_else(|| Some(Account::empty(pk.clone(), token, acct_diff.is_zkapp_diff())))
-            {
+            if let Some(account_after) = self.accounts.remove(&pk).or_else(|| {
+                Some(Account::empty(
+                    pk.clone(),
+                    token,
+                    acct_diff.creation_fee_paid(),
+                ))
+            }) {
                 if let Some(account) = account_after.unapply_account_diff(
                     acct_diff,
                     state_hash,

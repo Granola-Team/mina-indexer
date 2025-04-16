@@ -9,7 +9,7 @@ use crate::{
         scheduled_time::ScheduledTime, Balance,
     },
     command::{to_mina_format, to_zkapp_json, TxnHash},
-    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, ZKAPP_STATE_FIELD_ELEMENTS_NUM},
     ledger::{token::TokenAddress, LedgerHash},
     protocol::serialization_types::staged_ledger_diff::{
         TransactionStatus2, TransactionStatusFailedType,
@@ -499,6 +499,36 @@ pub struct SignedCommandPayloadCommon {
 pub enum StatusKind {
     Applied,
     Failed,
+}
+
+///////////
+// impls //
+///////////
+
+impl Call {
+    pub fn balance_change_acc(&self, acc: &mut i64) {
+        let delta: i64 = (&self.elt.account_update.body.balance_change).into();
+        *acc += delta;
+
+        self.elt
+            .calls
+            .iter()
+            .for_each(|call| call.balance_change_acc(acc));
+    }
+}
+
+impl AccountUpdates {
+    pub fn creation_fee_paid(&self) -> bool {
+        let delta: i64 = (&self.elt.account_update.body.balance_change).into();
+        let mut acc = delta;
+
+        self.elt
+            .calls
+            .iter()
+            .for_each(|call| call.balance_change_acc(&mut acc));
+
+        acc < 0 && acc.unsigned_abs() >= MAINNET_ACCOUNT_CREATION_FEE.0
+    }
 }
 
 impl UserCommandData {

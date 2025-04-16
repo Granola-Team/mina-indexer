@@ -55,7 +55,7 @@ impl DbAccountUpdate {
                         Account::empty(
                             pk.clone(),
                             token.clone(),
-                            diffs.first().expect("apply diff").is_zkapp_diff(),
+                            diffs.iter().any(|diff| diff.creation_fee_paid()),
                         )
                     }),
                 );
@@ -140,13 +140,7 @@ impl DbAccountUpdate {
                 let before = db.get_best_account(&pk, &token)?;
                 let (before_values, mut after) = (
                     before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or_else(|| {
-                        Account::empty(
-                            pk.clone(),
-                            token.clone(),
-                            diffs.first().expect("unapply diff").is_zkapp_diff(),
-                        )
-                    }),
+                    before.expect("account to unapply"),
                 );
 
                 for diff in diffs.iter() {

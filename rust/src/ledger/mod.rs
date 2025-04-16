@@ -153,7 +153,7 @@ impl Ledger {
                 Some(Account::empty(
                     pk,
                     token.to_owned(),
-                    acct_diff.is_zkapp_diff(),
+                    acct_diff.creation_fee_paid(),
                 ))
             })
         {
@@ -177,7 +177,7 @@ impl Ledger {
                     Some(Account::empty(
                         pk.to_owned(),
                         token.to_owned(),
-                        acct_diff.is_zkapp_diff(),
+                        acct_diff.creation_fee_paid(),
                     ))
                 })
             {

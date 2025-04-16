@@ -192,10 +192,9 @@ impl TokenAccount for AccountDiff {
 
 impl AccountDiff {
     pub fn from_command(command: CommandWithStateHash, global_slot: u32) -> Vec<Vec<Self>> {
-        let CommandWithStateHash {
-            command,
-            state_hash: _,
-        } = command;
+        let CommandWithStateHash { command, .. } = command;
+        let creation_fee_paid = command.creation_fee_paid().unwrap_or_default();
+
         match command {
             Command::Payment(payment) => {
                 vec![vec![
@@ -220,7 +219,9 @@ impl AccountDiff {
                     nonce: delegation.nonce + 1,
                 })]]
             }
-            Command::Zkapp(zkapp) => AccountDiff::from_zkapp(&zkapp, global_slot),
+            Command::Zkapp(zkapp) => {
+                AccountDiff::from_zkapp(&zkapp, global_slot, creation_fee_paid)
+            }
         }
     }
 
@@ -433,6 +434,21 @@ impl AccountDiff {
         )
     }
 
+    pub fn creation_fee_paid(&self) -> bool {
+        match self {
+            Self::Zkapp(diff) => diff.creation_fee_paid,
+            Self::ZkappPayment(ZkappPaymentDiff::Payment {
+                creation_fee_paid, ..
+            })
+            | Self::ZkappPayment(ZkappPaymentDiff::IncrementNonce(ZkappIncrementNonceDiff {
+                creation_fee_paid,
+                ..
+            }))
+            | Self::ZkappIncrementNonce(ZkappIncrementNonceDiff {
+                creation_fee_paid, ..
+            }) => *creation_fee_paid,
+            _ => false,
+        }
     }
 
     pub fn from(
@@ -499,18 +515,24 @@ impl AccountDiff {
                     token: token.to_owned(),
                     public_key: sender.into(),
                     payment_diffs: vec![
-                        ZkappPaymentDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Credit,
-                            public_key: receiver.into(),
-                            amount: amount.into(),
-                            token: token.to_owned(),
-                        }),
-                        ZkappPaymentDiff::Payment(PaymentDiff {
-                            update_type: UpdateType::Debit(None),
-                            public_key: sender.into(),
-                            amount: amount.into(),
-                            token,
-                        }),
+                        ZkappPaymentDiff::Payment {
+                            creation_fee_paid: false,
+                            payment: PaymentDiff {
+                                update_type: UpdateType::Credit,
+                                public_key: receiver.into(),
+                                amount: amount.into(),
+                                token: token.to_owned(),
+                            },
+                        },
+                        ZkappPaymentDiff::Payment {
+                            creation_fee_paid: false,
+                            payment: PaymentDiff {
+                                update_type: UpdateType::Debit(None),
+                                public_key: sender.into(),
+                                amount: amount.into(),
+                                token,
+                            },
+                        },
                     ],
                     ..Default::default()
                 }))]]
@@ -602,7 +624,11 @@ impl From<SupplyAdjustmentSign> for UpdateType {
 
 // zkapp account diffs
 impl AccountDiff {
-    fn from_zkapp(zkapp: &ZkappCommandData, global_slot: u32) -> Vec<Vec<Self>> {
+    fn from_zkapp(
+        zkapp: &ZkappCommandData,
+        global_slot: u32,
+        creation_fee_paid: bool,
+    ) -> Vec<Vec<Self>> {
         let nonce = zkapp.fee_payer.body.nonce;
 
         // fee payer nonce
@@ -612,15 +638,24 @@ impl AccountDiff {
         })];
 
         for update in zkapp.account_updates.iter() {
-            diffs.push(Self::from_zkapp_account_update(&update.elt, global_slot));
+            diffs.push(Self::from_zkapp_account_update(
+                &update.elt,
+                global_slot,
+                creation_fee_paid,
+            ));
 
-            recurse_calls(&mut diffs, update.elt.calls.iter(), global_slot);
+            recurse_calls(
+                &mut diffs,
+                update.elt.calls.iter(),
+                global_slot,
+                creation_fee_paid,
+            );
         }
 
         vec![diffs]
     }
 
-    fn from_zkapp_account_update(elt: &Elt, global_slot: u32) -> Self {
+    fn from_zkapp_account_update(elt: &Elt, global_slot: u32, creation_fee_paid: bool) -> Self {
         let public_key = elt.account_update.body.public_key.to_owned();
 
         let mut payment_diffs = vec![];
@@ -631,12 +666,15 @@ impl AccountDiff {
 
         // pay creation fee of receiver zkapp
         if elt.account_update.body.implicit_account_creation_fee {
-            payment_diffs.push(ZkappPaymentDiff::Payment(PaymentDiff {
-                public_key: public_key.to_owned(),
-                update_type: UpdateType::Debit(None),
-                token: token.to_owned(),
-                amount,
-            }));
+            payment_diffs.push(ZkappPaymentDiff::Payment {
+                creation_fee_paid,
+                payment: PaymentDiff {
+                    public_key: public_key.to_owned(),
+                    update_type: UpdateType::Debit(None),
+                    token: token.to_owned(),
+                    amount,
+                },
+            });
         }
 
         // increment nonce of updated account
@@ -913,14 +951,16 @@ fn recurse_calls<'a>(
     diffs: &mut Vec<AccountDiff>,
     calls: impl Iterator<Item = &'a Call>,
     global_slot: u32,
+    creation_fee_paid: bool,
 ) {
     for call in calls {
         diffs.push(AccountDiff::from_zkapp_account_update(
             call.elt.as_ref(),
             global_slot,
+            creation_fee_paid,
         ));
 
-        recurse_calls(diffs, call.elt.calls.iter(), global_slot);
+        recurse_calls(diffs, call.elt.calls.iter(), global_slot, creation_fee_paid);
     }
 }
 
