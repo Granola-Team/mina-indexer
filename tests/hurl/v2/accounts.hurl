@@ -198,7 +198,7 @@ jsonpath "$.data.accounts[4].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbo
 duration < 100
 
 #
-# Balance-sorted all accounts query
+# Balance-sorted token accounts query
 #
 
 POST {{url}}
@@ -245,7 +245,7 @@ jsonpath "$.data.accounts[4].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbo
 duration < 100
 
 #
-# Balance-sorted zkapp
+# Balance-sorted zkapp token accounts query
 #
 
 POST {{url}}
@@ -292,6 +292,40 @@ jsonpath "$.data.accounts[1].is_genesis_account" == false
 jsonpath "$.data.accounts[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 
 duration < 100
+
+#
+# Account balance_lte query
+#
+
+
+POST {{url}}
+```graphql
+{
+  accounts(
+    limit:1
+    query: {
+      balance_lte: 144390363909300000
+      token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+    }
+  ) {
+    publicKey
+    balance
+    token
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# only datum
+jsonpath "$.data.accounts[0].publicKey" == "B62qrQKS9ghd91shs73TCmBJRW9GzvTJK443DPx2YbqcyoLc56g1ny9"
+jsonpath "$.data.accounts[0].balance" == 144390363909300000
+jsonpath "$.data.accounts[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
+
+duration < 500
 
 #
 # Data counts
