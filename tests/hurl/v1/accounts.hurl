@@ -414,3 +414,32 @@ jsonpath "$.data.accounts" count == 1
 jsonpath "$.data.accounts[0].genesis_account" == 222221235183807
 
 duration < 100
+
+#
+# Account balance_lte query
+#
+
+
+POST {{url}}
+```graphql
+{
+  accounts(
+    limit:1
+    query: { balance_lte: 75000000000000000 }
+  ) {
+    publicKey
+    balance
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.accounts" count == 1
+
+# only datum
+jsonpath "$.data.accounts[0].publicKey" == "B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3"
+jsonpath "$.data.accounts[0].balance" == 75000000000000000
+
+duration < 500
