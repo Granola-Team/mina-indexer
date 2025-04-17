@@ -71,8 +71,10 @@ class PcbUpdater
     File.write(path, JSON.generate(json_data))
 
     puts "Updated #{path}"
+    true
   rescue => e
     puts "Error processing #{path}: #{e.message}"
+    false
   end
 
   # Get the blockchain length from the JSON data

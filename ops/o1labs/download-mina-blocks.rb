@@ -10,7 +10,6 @@ require_relative "../update-pcbs"
 
 BASE_URL = "https://storage.googleapis.com/mina_network_block_data"
 BLOCK_THREADS = Etc.nprocessors * 4
-DOWNLOAD_THREADS_PER_BLOCK = 5
 
 PCB_UPDATER = PcbUpdater.new
 
@@ -95,7 +94,10 @@ def list_files_at_url(url)
 end
 
 def download_file(url, target_path)
-  return true if File.exist?(target_path)
+  if File.exist?(target_path)
+    puts "File #{target_path} already exists."
+    return true
+  end
 
   temp_path = "#{target_path}.download"
 
@@ -116,9 +118,8 @@ def download_file(url, target_path)
           end
 
           FileUtils.mv(temp_path, target_path)
+          puts "Downloaded #{target_path}. Updating PCB."
           update_pcb(target_path)
-
-          return true
         else
           puts "Failed to download #{url}: #{response.code} #{response.message}"
           return false
@@ -133,8 +134,6 @@ def download_file(url, target_path)
 end
 
 def update_pcb(file_path)
-  # Use the global PCB_UPDATER instance
-
   PCB_UPDATER.process_file(file_path)
 rescue => e
   puts "Error updating PCB for #{file_path}: #{e.message}"
@@ -145,83 +144,58 @@ def download_single_block(height, state_hash, dir)
   url = "#{BASE_URL}/#{filename}"
   target_path = File.join(dir, filename)
 
-  puts "Downloading block at height #{height} with state hash #{state_hash}..."
-  if download_file(url, target_path)
-    puts "Successfully downloaded #{filename}"
-    true
-  else
-    puts "Failed to download #{filename}"
-    false
-  end
+  puts "Attempting to fetch block at height #{height} with state hash #{state_hash}..."
+  download_file(url, target_path)
 end
 
 def download_all_blocks_at_height(height, dir)
   # List all files at the height
   list_url = URI.parse("#{BASE_URL}?prefix=mainnet-#{height}-")
+  puts "Issuing HTTP GET request to #{list_url} to obtain files list."
   response = Net::HTTP.get_response(list_url)
 
   if response.is_a?(Net::HTTPSuccess)
     filenames = response.body.scan(/<Key>([^<]+)<\/Key>/).flatten
     matching_files = filenames.select { |f| f.start_with?("mainnet-#{height}-") }
-
-    # Sort the matching files
-    matching_files.sort!
   else
-    puts "Failed to list blocks at height #{height}: #{response.code} #{response.message}"
-    return false
+    abort "Failed to list blocks at height #{height}: #{response.code} #{response.message}"
   end
 
   if matching_files.empty?
     puts "No blocks found at height #{height}"
-    return false
+    return
   end
 
   puts "Found #{matching_files.size} blocks at height #{height}"
 
+  # Sort the matching files
+  matching_files.sort!
+
   # Create a queue of files to download
-  queue = Queue.new
-  matching_files.each { |f| queue << f }
+  matching_files.each do |f|
+    url = "#{BASE_URL}/#{f}"
+    target_path = File.join(dir, f)
 
-  # Create download threads
-  threads = []
-  DOWNLOAD_THREADS_PER_BLOCK.times do
-    threads << Thread.new do
-      until queue.empty?
-        filename = begin
-          queue.pop(true)
-        rescue
-          nil
-        end
-        break unless filename
-
-        url = "#{BASE_URL}/#{filename}"
-        target_path = File.join(dir, filename)
-
-        if download_file(url, target_path)
-          puts "Downloaded #{filename}"
-        else
-          puts "Failed to download #{filename}"
-        end
-      end
+    if download_file(url, target_path)
+      puts "Downloaded #{f}"
+    else
+      abort "Failed to download #{f}"
     end
   end
 
-  threads.each(&:join)
   puts "Completed downloading blocks at height #{height}"
-  true
 end
 
 def download_blocks_in_range(min_height, max_height, blocks_dir)
   FileUtils.mkdir_p(blocks_dir)
 
-  puts "Downloading blocks from height #{min_height} to #{max_height} into #{blocks_dir}"
-  puts "Using #{BLOCK_THREADS} threads with #{DOWNLOAD_THREADS_PER_BLOCK} download threads each"
+  puts "Downloading blocks from height #{min_height} to #{max_height} into #{blocks_dir}."
 
-  # Create a queue of block heights to process
+  # Create a queue of block heights to process.
   block_queue = Queue.new
-  (min_height..max_height).to_a.sort.each { |height| block_queue << height }
+  (min_height..max_height).to_a.each { |height| block_queue << height }
 
-  # Create worker threads to process the block heights
+  # Create worker threads to process the block heights queue.
   threads = []
   BLOCK_THREADS.times do
     threads << Thread.new do
