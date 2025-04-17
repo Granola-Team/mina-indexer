@@ -188,3 +188,73 @@ impl TokenDiff {
         diff
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        block::precomputed::{PcbVersion, PrecomputedBlock},
+        ledger::{
+            diff::{
+                token::{TokenDiff, TokenDiffType},
+                LedgerDiff,
+            },
+            token::TokenAddress,
+        },
+    };
+    use std::path::PathBuf;
+
+    #[test]
+    fn token_diffs() -> anyhow::Result<()> {
+        let path = PathBuf::from("./tests/data/misc_blocks/mainnet-360930-3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi.json");
+        let pcb = PrecomputedBlock::parse_file(&path, PcbVersion::V2)?;
+        let diff = LedgerDiff::from_precomputed(&pcb);
+
+        let token_diffs = diff.token_diffs;
+        let expect = vec![
+            TokenDiff {
+                public_key: "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into(),
+                token: TokenAddress::default(),
+                diff: TokenDiffType::Supply(-1000000000),
+            },
+            TokenDiff {
+                public_key: "B62qnzkHunByjReoEwMKCJ9HQxZP2MSYcUe8Lfesy4SpufxWp3viNFT".into(),
+                token: TokenAddress::default(),
+                diff: TokenDiffType::Supply(0),
+            },
+            TokenDiff {
+                public_key: "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into(),
+                token: TokenAddress::default(),
+                diff: TokenDiffType::Supply(0),
+            },
+            TokenDiff {
+                public_key: "B62qo69VLUPMXEC6AFWRgjdTEGsA3xKvqeU5CgYm3jAbBJL7dTvaQkv".into(),
+                token: TokenAddress::default(),
+                diff: TokenDiffType::Supply(-19000000000),
+            },
+            TokenDiff {
+                public_key: "B62qq7ecvBQZQK68dwstL27888NEKZJwNXNFjTyu3xpQcfX5UBivCU6".into(),
+                token: TokenAddress::default(),
+                diff: TokenDiffType::Supply(19000000000),
+            },
+            TokenDiff {
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn")
+                    .unwrap(),
+                diff: TokenDiffType::Supply(0),
+            },
+            TokenDiff {
+                public_key: "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4".into(),
+                token: TokenAddress::new("xosVXFFDvDiKvHSDAaHvrTSRtoa5Graf2J7LM5Smb4GNTrT2Hn")
+                    .unwrap(),
+                diff: TokenDiffType::Supply(1000000000),
+            },
+        ];
+
+        for (n, x) in expect.iter().enumerate() {
+            assert_eq!(token_diffs[n], *x, "n = {n}");
+        }
+
+        assert_eq!(token_diffs, expect);
+        Ok(())
+    }
+}
