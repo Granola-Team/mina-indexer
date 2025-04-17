@@ -231,7 +231,8 @@ impl TokensQueryRoot {
                         break;
                     }
 
-                    let account = serde_json::from_slice(&value)?;
+                    let account = serde_json::from_slice::<account::Account>(&value)?
+                        .deduct_mina_account_creation_fee();
                     let token = db.get_token(&token)?.unwrap_or_default();
 
                     if TokenHoldersQueryInput::matches(query.as_ref(), &account) {

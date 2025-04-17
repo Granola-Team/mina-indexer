@@ -94,20 +94,20 @@ impl StagedLedgerQueryRoot {
             if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
                 return Ok(db
                     .get_staged_account(&pk.into(), &token, &state_hash.into())?
-                    .map(|acct| vec![acct.into()]));
+                    .map(|acct| vec![StagedLedgerAccount::from(acct)]));
             } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
                 if let Some(state_hash) =
                     db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
                 {
                     return Ok(db
                         .get_staged_account(&pk.into(), &token, &state_hash)?
-                        .map(|acct| vec![acct.into()]));
+                        .map(|acct| vec![StagedLedgerAccount::from(acct)]));
                 }
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
                 if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
                     return Ok(db
                         .get_staged_account(&pk.into(), &token, &state_hash)?
-                        .map(|acct| vec![acct.into()]));
+                        .map(|acct| vec![StagedLedgerAccount::from(acct)]));
                 }
             }
 
@@ -188,6 +188,7 @@ fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortBy
 }
 
 impl From<Account> for StagedLedgerAccount {
+    /// Account creation fee deducted here
     fn from(acct: Account) -> Self {
         let acct = acct.deduct_mina_account_creation_fee();
 
