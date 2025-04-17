@@ -27,7 +27,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use log::trace;
+use log::{trace, warn};
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
 
@@ -188,6 +188,10 @@ impl ZkappTokenStore for IndexerStore {
     fn apply_token_diff(&self, state_hash: &StateHash, diff: &TokenDiff) -> Result<Option<Token>> {
         trace!("Applying {} token diff {:?}", state_hash, diff);
 
+        if state_hash.0 == "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi" {
+            warn!("{:?}", diff);
+        }
+
         // get token to modify
         let diff_pk = &diff.public_key;
         let diff_token = &diff.token;
@@ -282,6 +286,11 @@ impl ZkappTokenStore for IndexerStore {
                         token_account
                     })
             });
+
+        if diff_pk.0 == "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4" {
+            warn!("TOKEN HOLDER INDEX {}", index);
+            warn!("TOKEN HOLDER ACCOUNT {}", account);
+        }
 
         self.database.put_cf(
             self.zkapp_tokens_holder_cf(),
