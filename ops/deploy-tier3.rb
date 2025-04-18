@@ -120,8 +120,7 @@ if !skippable
       "--height", height.to_s,
       "--path", idxr_ledger
     )
-      warn("Ledger extraction failed.")
-      return false
+      abort("Ledger extraction failed.")
     end
 
     puts "Ledger extraction complete. Verifying ledger at #{height}..."
@@ -132,14 +131,12 @@ if !skippable
       idxr_ledger,
       out: idxr_norm_ledger
     )
-      warn("Normalizing indexer ledger at height #{height} failed.")
-      return false
+      abort("Normalizing indexer ledger at height #{height} failed.")
     end
 
     mina_norm_ledgers = Dir["#{SRC_TOP}/tests/data/ledgers/ledger-#{height}-*.norm.json"]
     unless mina_norm_ledgers.length == 1
-      warn "There is not exactly 1 normalized ledger against which to check."
-      return false
+      abort "There is not exactly 1 normalized ledger against which to check."
     end
 
     idxr_ledger_diff = "#{LOGS_DIR}/ledger-#{height}.diff"
@@ -147,15 +144,12 @@ if !skippable
       "diff --unified #{idxr_norm_ledger} #{mina_norm_ledgers[0]}",
       out: idxr_ledger_diff
     )
-      warn("Regression introduced to ledger calculations. Inspect diff file: #{idxr_ledger_diff}")
-      return false
+      abort("Regression introduced to ledger calculations. Inspect diff file: #{idxr_ledger_diff}")
     end
-
-    true
   end
 
   if BLOCKS_COUNT >= 359604
-    check_ledger(359604) || abort("Incorrect ledger at height 359604.")
+    check_ledger(359604)
   end
 
   if BLOCKS_COUNT >= 427023
