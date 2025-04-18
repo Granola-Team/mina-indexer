@@ -319,9 +319,9 @@ impl PrecomputedBlock {
         // maybe coinbase receiver
         if let Some(bal) = self.coinbase_receiver_balance() {
             if [
-                (Amount(MAINNET_COINBASE_REWARD) - MAINNET_ACCOUNT_CREATION_FEE).0,
+                Amount(MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE_U64).0,
                 // supercharged
-                (Amount(2 * MAINNET_COINBASE_REWARD) - MAINNET_ACCOUNT_CREATION_FEE).0,
+                Amount(2 * MAINNET_COINBASE_REWARD - MAINNET_ACCOUNT_CREATION_FEE_U64).0,
             ]
             .contains(&bal)
             {
