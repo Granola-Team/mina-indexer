@@ -99,6 +99,8 @@ else
     " --web-port #{WEB_PORT}" \
     " --database-dir #{my_db_dir}" \
     " --staking-ledgers-dir #{LEDGERS_DIR}" \
+    " --fetch-new-blocks-exe #{SRC_TOP}/ops/o1labs/block-recovery.sh" \
+    " --fetch-new-blocks-delay 1" \
     " --blocks-dir #{BASE_DIR}/blocks" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   puts "Command line: #{command_line}"
