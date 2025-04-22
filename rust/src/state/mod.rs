@@ -44,7 +44,7 @@ use crate::{
         },
     },
 };
-use anyhow::bail;
+use anyhow::{bail, Result};
 use id_tree::NodeId;
 use log::{debug, error, info, trace};
 use std::{
@@ -200,7 +200,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
             version,
@@ -217,7 +217,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let genesis_ledger = GenesisLedger::new_v1()?;
         let version = IndexerVersion::v1();
 
@@ -237,7 +237,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let genesis_ledger = GenesisLedger::new_v2()?;
         let version = IndexerVersion::v2();
 
@@ -256,7 +256,7 @@ impl IndexerState {
     pub async fn parse_file(
         state: &Arc<tokio::sync::RwLock<Self>>,
         path: &Path,
-    ) -> anyhow::Result<PrecomputedBlock> {
+    ) -> Result<PrecomputedBlock> {
         let genesis_state_hash = GenesisStateHash::from_path(path)?;
         let read_state = state.read().await;
         let curr_pcb_version = read_state.version.version.clone();
@@ -283,7 +283,7 @@ impl IndexerState {
     }
 
     /// Creates a new indexer state from the genesis ledger
-    pub fn new_from_config(config: IndexerStateConfig) -> anyhow::Result<Self> {
+    pub fn new_from_config(config: IndexerStateConfig) -> Result<Self> {
         // set chain id
         config
             .indexer_store
@@ -363,7 +363,7 @@ impl IndexerState {
     }
 
     /// Creates a new indexer state without genesis events
-    pub fn new_without_genesis_events(config: IndexerStateConfig) -> anyhow::Result<Self> {
+    pub fn new_without_genesis_events(config: IndexerStateConfig) -> Result<Self> {
         let root_branch = Branch::new_genesis(
             config.version.genesis.state_hash.to_owned(),
             config.version.genesis.prev_hash.to_owned(),
@@ -409,7 +409,7 @@ impl IndexerState {
         transition_frontier_length: Option<u32>,
         ledger_cadence: Option<u32>,
         reporting_freq: Option<u32>,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self> {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = speedb_path.map(|path| {
             let store = IndexerStore::new(path).unwrap();
@@ -474,7 +474,7 @@ impl IndexerState {
     pub async fn initialize_with_canonical_chain_discovery(
         &mut self,
         block_parser: &mut BlockParser,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         info!("Initializing indexer with canonical chain blocks");
 
         let total_time = Instant::now();
@@ -494,6 +494,8 @@ impl IndexerState {
             while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
+
+                self.compact_db_every_n_blocks(200_000)?;
 
                 if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
                     block_parser.next_block().await?
@@ -563,7 +565,7 @@ impl IndexerState {
 
     /// Adds blocks to the state according to `block_parser` then changes phase
     /// to Watching
-    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> anyhow::Result<()> {
+    pub async fn add_blocks(&mut self, block_parser: &mut BlockParser) -> Result<()> {
         self.add_blocks_with_time(block_parser, None).await
     }
 
@@ -571,7 +573,7 @@ impl IndexerState {
         &mut self,
         block_parser: &mut BlockParser,
         start: Option<Instant>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let total_time = start.unwrap_or(Instant::now());
         let mut step_time = total_time;
 
@@ -635,11 +637,7 @@ impl IndexerState {
     /// - db processes
     ///     - best block update
     ///     - new deep canonical blocks
-    pub fn block_pipeline(
-        &mut self,
-        block: &PrecomputedBlock,
-        block_bytes: u64,
-    ) -> anyhow::Result<bool> {
+    pub fn block_pipeline(&mut self, block: &PrecomputedBlock, block_bytes: u64) -> Result<bool> {
         if let Some(db_event) = self.add_block_to_store(block, block_bytes, false)? {
             self.bytes_processed += block_bytes;
 
@@ -684,7 +682,7 @@ impl IndexerState {
         precomputed_block: &PrecomputedBlock,
         increment_blocks: bool,
         insert_diff: bool,
-    ) -> anyhow::Result<(ExtensionType, Option<WitnessTreeEvent>)> {
+    ) -> Result<(ExtensionType, Option<WitnessTreeEvent>)> {
         let incoming_length = precomputed_block.blockchain_length();
         if self.root_branch.root_block().blockchain_length > incoming_length {
             error!(
@@ -748,7 +746,7 @@ impl IndexerState {
     fn root_extension(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<Option<ExtensionType>> {
+    ) -> Result<Option<ExtensionType>> {
         if let Some((new_node_id, new_block)) = self.root_branch.simple_extension(precomputed_block)
         {
             trace!("Root extension block {}", precomputed_block.summary());
@@ -809,7 +807,7 @@ impl IndexerState {
     fn dangling_extension(
         &mut self,
         precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<Option<(usize, NodeId, ExtensionDirection)>> {
+    ) -> Result<Option<(usize, NodeId, ExtensionDirection)>> {
         let mut extension = None;
 
         for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
@@ -854,7 +852,7 @@ impl IndexerState {
         extended_branch_index: usize,
         new_node_id: NodeId,
         direction: ExtensionDirection,
-    ) -> anyhow::Result<ExtensionType> {
+    ) -> Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
         for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
             if is_reverse_extension(dangling_branch, precomputed_block) {
@@ -890,10 +888,7 @@ impl IndexerState {
     }
 
     /// Spawns a new dangling branch in the witness tree
-    fn new_dangling(
-        &mut self,
-        precomputed_block: &PrecomputedBlock,
-    ) -> anyhow::Result<ExtensionType> {
+    fn new_dangling(&mut self, precomputed_block: &PrecomputedBlock) -> Result<ExtensionType> {
         self.dangling_branches.push(Branch::new(precomputed_block)?);
 
         Ok(ExtensionType::DanglingNew)
@@ -921,7 +916,7 @@ impl IndexerState {
     }
 
     /// Removes the lower portion of the root tree which is no longer needed
-    fn prune_root_branch(&mut self) -> anyhow::Result<Vec<Block>> {
+    fn prune_root_branch(&mut self) -> Result<Vec<Block>> {
         let k = self.transition_frontier_length;
         let canonical_event = self.update_canonical()?;
 
@@ -957,7 +952,7 @@ impl IndexerState {
     }
 
     /// Updates the canonical root if the precondition is met
-    pub fn update_canonical(&mut self) -> anyhow::Result<Vec<Block>> {
+    pub fn update_canonical(&mut self) -> Result<Vec<Block>> {
         if self.is_canonical_updatable() {
             let old_canonical_root_id = self.canonical_root.node_id.clone();
             let new_canonical_blocks = self.get_new_canonical_blocks(&old_canonical_root_id)?;
@@ -978,7 +973,7 @@ impl IndexerState {
     }
 
     /// Get the status of a block: Canonical, Pending, or Orphaned
-    pub fn get_block_status(&self, state_hash: &StateHash) -> anyhow::Result<Option<Canonicity>> {
+    pub fn get_block_status(&self, state_hash: &StateHash) -> Result<Option<Canonicity>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             return indexer_store.get_block_canonicity(state_hash);
         }
@@ -1043,10 +1038,7 @@ impl IndexerState {
     }
 
     /// Get the canonical block at the given height
-    pub fn canonical_block_at_height(
-        &self,
-        height: u32,
-    ) -> anyhow::Result<Option<PrecomputedBlock>> {
+    pub fn canonical_block_at_height(&self, height: u32) -> Result<Option<PrecomputedBlock>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             if let Ok(Some(state_hash)) = indexer_store.get_canonical_hash_at_height(height) {
                 return Ok(indexer_store.get_block(&state_hash)?.map(|b| b.0));
@@ -1071,10 +1063,7 @@ impl IndexerState {
     }
 
     /// Add staking ledgers to the underlying ledger store
-    pub async fn add_startup_staking_ledgers_to_store(
-        &mut self,
-        ledgers_dir: &Path,
-    ) -> anyhow::Result<()> {
+    pub async fn add_startup_staking_ledgers_to_store(&mut self, ledgers_dir: &Path) -> Result<()> {
         match std::fs::read_dir(ledgers_dir) {
             Ok(dir) => {
                 if dir.count() > 0 {
@@ -1113,7 +1102,7 @@ impl IndexerState {
         path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &Arc<Mutex<HashSet<(u32, LedgerHash)>>>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let (epoch, hash) = extract_epoch_hash(path);
 
         if store
@@ -1149,7 +1138,7 @@ impl IndexerState {
         block: &PrecomputedBlock,
         num_block_bytes: u64,
         increment_blocks: bool,
-    ) -> anyhow::Result<Option<DbEvent>> {
+    ) -> Result<Option<DbEvent>> {
         if increment_blocks {
             self.blocks_processed += 1;
             self.bytes_processed += num_block_bytes;
@@ -1167,7 +1156,7 @@ impl IndexerState {
         block: &Block,
         genesis_state_hash: &StateHash,
         genesis_prev_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.add_canonical_block(
                 block.blockchain_length,
@@ -1183,7 +1172,7 @@ impl IndexerState {
     pub fn update_best_block_in_store(
         &self,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<HashMap<PublicKey, Username>>> {
+    ) -> Result<Option<HashMap<PublicKey, Username>>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             indexer_store.set_best_block(state_hash)?;
 
@@ -1199,7 +1188,7 @@ impl IndexerState {
     ///
     /// Short-circuits adding all blocks to the witness tree by rooting the
     /// witness tree `canonical_threshold` blocks behind the current best tip
-    pub fn sync_from_db(&mut self) -> anyhow::Result<Option<u32>> {
+    pub fn sync_from_db(&mut self) -> Result<Option<u32>> {
         let mut min_length_filter = None;
         let mut witness_tree_blocks = vec![];
         let mut staking_ledgers = HashSet::new();
@@ -1341,7 +1330,7 @@ impl IndexerState {
     }
 
     /// Replay events on a mutable state
-    pub fn replay_events(&mut self, state: &Self) -> anyhow::Result<Option<u32>> {
+    pub fn replay_events(&mut self, state: &Self) -> Result<Option<u32>> {
         let mut min_length_filter = None;
         if let Some(indexer_store) = state.indexer_store.as_ref() {
             indexer_store
@@ -1368,7 +1357,7 @@ impl IndexerState {
         Ok(min_length_filter)
     }
 
-    fn replay_event(&mut self, event: &IndexerEvent) -> anyhow::Result<()> {
+    fn replay_event(&mut self, event: &IndexerEvent) -> Result<()> {
         match event {
             IndexerEvent::Db(db_event) => match db_event {
                 DbEvent::Block(db_block_event) => match db_block_event {
@@ -1511,7 +1500,7 @@ impl IndexerState {
         }
     }
 
-    fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> anyhow::Result<()> {
+    fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> Result<()> {
         info!("Replaying staking ledger (epoch {epoch}): {ledger_hash}");
 
         // check ledger at hash & epoch
@@ -1552,10 +1541,7 @@ impl IndexerState {
         }
     }
 
-    fn get_new_canonical_blocks(
-        &mut self,
-        old_canonical_root_id: &NodeId,
-    ) -> anyhow::Result<Vec<Block>> {
+    fn get_new_canonical_blocks(&mut self, old_canonical_root_id: &NodeId) -> Result<Vec<Block>> {
         let mut canonical_blocks = vec![];
 
         for ancestor_id in self
@@ -1585,7 +1571,7 @@ impl IndexerState {
     }
 
     /// Add new canonical diffs to the ledger
-    fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
+    fn update_ledger(&mut self, canonical_blocks: &Vec<Block>) -> Result<()> {
         // apply the new canonical diffs and store each nth resulting ledger
         let mut ledger_diff = LedgerDiff::default();
 
@@ -1608,7 +1594,7 @@ impl IndexerState {
     }
 
     /// Add new canonical ledgers to the ledger store
-    fn update_ledger_store(&self, canonical_blocks: &Vec<Block>) -> anyhow::Result<()> {
+    fn update_ledger_store(&self, canonical_blocks: &Vec<Block>) -> Result<()> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
             for canonical_block in canonical_blocks {
                 if canonical_block.blockchain_length % self.ledger_cadence == 0 {
@@ -1626,7 +1612,7 @@ impl IndexerState {
 
     /// Remove diffs corresponding to blocks at or beneath the height of the new
     /// canonical root
-    fn prune_diffs_map(&mut self, old_canonical_root_id: &NodeId) -> anyhow::Result<()> {
+    fn prune_diffs_map(&mut self, old_canonical_root_id: &NodeId) -> Result<()> {
         for node_id in self
             .root_branch
             .branches
@@ -1757,6 +1743,20 @@ impl IndexerState {
             || self.blocks_processed == block_parser.num_deep_canonical_blocks + 1
     }
 
+    /// Compact the indexer store at the specified cadenece
+    fn compact_db_every_n_blocks(&self, cadence: u32) -> Result<()> {
+        if self.blocks_processed % cadence == 0 {
+            if let Some(store) = self.indexer_store.as_ref() {
+                let file = tempfile::NamedTempFile::new()?;
+
+                store.create_snapshot(file.path())?;
+                std::fs::remove_file(file.path())?
+            }
+        }
+
+        Ok(())
+    }
+
     fn report_from_block_count(&self, block_parser: &mut BlockParser, total_time: Instant) {
         if self.should_report_from_block_count(block_parser) {
             let elapsed = total_time.elapsed().as_secs();
@@ -1798,7 +1798,7 @@ impl IndexerState {
         block_parser: &BlockParser,
         step_time: Instant,
         total_time: Instant,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         if self.should_report_from_block_count(block_parser)
             || step_time.elapsed().as_secs() > BLOCK_REPORTING_FREQ_SEC
         {
