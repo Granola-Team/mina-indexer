@@ -27,7 +27,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use log::trace;
+use log::{trace, warn};
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
 
@@ -68,9 +68,24 @@ impl ZkappTokenStore for IndexerStore {
             if let Some(owner) = token.owner.as_ref() {
                 let account = self
                     .get_best_account(owner, &token.token)
-                    .unwrap()
-                    .with_context(|| format!("owner {} token {}", owner, token.token))
-                    .expect("token owner");
+                    .ok()
+                    .flatten()
+                    .unwrap_or_else(|| {
+                        let token_account = Account {
+                            balance: token.supply,
+                            ..Account::empty(owner.to_owned(), token.token.to_owned(), true)
+                        };
+
+                        self.update_best_account(
+                            &token_account.public_key,
+                            token_account.token.as_ref().unwrap(),
+                            None,
+                            Some(token_account.to_owned()),
+                        )
+                        .unwrap();
+
+                        token_account
+                    });
 
                 let pk_index = self
                     .get_token_pk_index(owner, &token.token)
@@ -173,6 +188,10 @@ impl ZkappTokenStore for IndexerStore {
     fn apply_token_diff(&self, state_hash: &StateHash, diff: &TokenDiff) -> Result<Option<Token>> {
         trace!("Applying {} token diff {:?}", state_hash, diff);
 
+        if state_hash.0 == "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi" {
+            warn!("{:?}", diff);
+        }
+
         // get token to modify
         let diff_pk = &diff.public_key;
         let diff_token = &diff.token;
@@ -248,12 +267,30 @@ impl ZkappTokenStore for IndexerStore {
             .get_token_holder(diff_token, index)?
             .unwrap_or_else(|| {
                 self.get_best_account(diff_pk, diff_token)
-                    .unwrap()
-                    .with_context(|| {
-                        format!("holder {} token {} index {}", diff_pk, diff_token, index)
-                    })
+                    .with_context(|| format!("token holder {} index {}", diff_token, index))
                     .expect("token holder")
+                    .unwrap_or_else(|| {
+                        let token_account = Account {
+                            balance: token.supply,
+                            ..Account::empty(diff_pk.to_owned(), diff_token.to_owned(), true)
+                        };
+
+                        self.update_best_account(
+                            &token_account.public_key,
+                            token_account.token.as_ref().unwrap(),
+                            None,
+                            Some(token_account.to_owned()),
+                        )
+                        .unwrap();
+
+                        token_account
+                    })
             });
+
+        if diff_pk.0 == "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4" {
+            warn!("TOKEN HOLDER INDEX {}", index);
+            warn!("TOKEN HOLDER ACCOUNT {}", account);
+        }
 
         self.database.put_cf(
             self.zkapp_tokens_holder_cf(),
