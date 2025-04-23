@@ -4,7 +4,7 @@ pub mod permissions;
 use super::token::TokenAddress;
 use crate::{
     base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
-    block::{extract_height_and_hash, extract_network},
+    block::extract_network,
     chain::Network,
     constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH, MINA_SCALE_DEC},
     ledger::{
@@ -12,7 +12,7 @@ use crate::{
         LedgerHash,
     },
     mina_blocks::v2::ZkappAccount,
-    utility::compression::decompress_gzip,
+    utility::{compression::decompress_gzip, functions::extract_height_and_hash},
 };
 use anyhow::Context;
 use log::trace;

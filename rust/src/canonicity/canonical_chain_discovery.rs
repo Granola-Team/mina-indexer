@@ -1,11 +1,10 @@
 use crate::{
     base::state_hash::StateHash,
     block::{
-        extract_block_height, extract_height_and_hash, extract_state_hash,
-        genesis_state_hash::GenesisStateHash, previous_state_hash::*,
-        sort_by_height_and_lexicographical_order,
+        extract_block_height, extract_state_hash, genesis_state_hash::GenesisStateHash,
+        previous_state_hash::*, sort_by_height_and_lexicographical_order,
     },
-    utility::functions::pretty_print_duration,
+    utility::functions::{extract_height_and_hash, pretty_print_duration},
 };
 use log::info;
 use std::{

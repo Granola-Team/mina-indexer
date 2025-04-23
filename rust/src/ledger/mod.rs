@@ -258,6 +258,10 @@ impl Ledger {
     }
 }
 
+/////////////////
+// comparisons //
+/////////////////
+
 impl PartialEq for Ledger {
     fn eq(&self, other: &Self) -> bool {
         for token in self.tokens.keys() {

@@ -17,7 +17,7 @@ use crate::{
     canonicity::Canonicity,
     chain::Network,
     constants::*,
-    utility::functions::is_valid_file_name,
+    utility::functions::{extract_height_and_hash, is_valid_file_name},
 };
 use precomputed::PcbVersion;
 use serde::{Deserialize, Serialize};
@@ -319,29 +319,6 @@ pub fn sort_by_height_and_lexicographical_order(paths: &mut [&std::path::PathBuf
             other => other,
         }
     });
-}
-
-pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
-    let filename = path
-        .file_stem()
-        .and_then(|x| x.to_str())
-        .expect("Failed to extract filename from path");
-
-    let mut parts = filename.split('-');
-
-    match (parts.next(), parts.next(), parts.next()) {
-        (Some(_), Some(height_str), Some(hash_part)) => {
-            let block_height = height_str
-                .parse::<u32>()
-                .expect("Failed to parse block height");
-            let hash = hash_part
-                .split('.')
-                .next()
-                .expect("Failed to parse the hash");
-            (block_height, hash)
-        }
-        _ => panic!("Filename format is invalid {}", filename),
-    }
 }
 
 pub fn extract_block_height(path: &Path) -> u32 {

@@ -1,3 +1,4 @@
+use crate::ledger::LedgerHash;
 use rust_decimal::Decimal;
 use std::{
     path::{Path, PathBuf},
@@ -60,6 +61,59 @@ pub fn calculate_total_size(paths: &[PathBuf]) -> u64 {
     })
 }
 
+/// Extract the height and state hash from a PCB path
+pub fn extract_height_and_hash(path: &Path) -> (u32, &str) {
+    let filename = path
+        .file_stem()
+        .and_then(|x| x.to_str())
+        .expect("Failed to extract filename from path");
+
+    let mut parts = filename.split('-');
+
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(_), Some(height_str), Some(hash_part)) => {
+            let block_height = height_str
+                .parse::<u32>()
+                .expect("Failed to parse block height");
+            let hash = hash_part
+                .split('.')
+                .next()
+                .expect("Failed to parse the hash");
+            (block_height, hash)
+        }
+        _ => panic!("Filename format is invalid {}", filename),
+    }
+}
+
+/// Extract the network, height/epoch, and hash from a PCB or staking ledger
+/// path
+pub fn extract_network_height_hash(path: &Path) -> (&str, u32, &str) {
+    let filename = path
+        .file_stem()
+        .and_then(|x| x.to_str())
+        .expect("Failed to extract filename from path");
+
+    let mut parts = filename.split('-');
+
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(network), Some(height_or_epoch), Some(hash)) => {
+            let height_or_epoch = height_or_epoch
+                .parse::<u32>()
+                .expect("Failed to parse height/epoch");
+            let hash = hash.split('.').next().expect("Failed to parse the hash");
+            (network, height_or_epoch, hash)
+        }
+        _ => panic!("Filename format is invalid {}", filename),
+    }
+}
+
+/// Extract the epoch and ledger hash from a staking ledger path
+pub fn extract_epoch_hash(path: &Path) -> (u32, LedgerHash) {
+    let (epoch, hash) = extract_height_and_hash(path);
+    (epoch, LedgerHash::new_or_panic(hash.to_string()))
+}
+
+/// Checks if the file name is valid for the provided hash validator
 pub fn is_valid_file_name<P>(path: P, hash_validator: &dyn Fn(&str) -> bool) -> bool
 where
     P: AsRef<Path>,

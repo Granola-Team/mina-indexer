@@ -1,8 +1,7 @@
 use super::StakingLedger;
 use crate::{
-    block::extract_height_and_hash,
-    ledger::{store::staking::StakingLedgerStore, LedgerHash},
-    store::IndexerStore,
+    ledger::store::staking::StakingLedgerStore, store::IndexerStore,
+    utility::functions::extract_epoch_hash,
 };
 use glob::glob;
 use log::debug;
@@ -71,11 +70,6 @@ impl StakingLedgerParser {
 
         Ok(None)
     }
-}
-
-pub fn extract_epoch_hash(path: &Path) -> (u32, LedgerHash) {
-    let (epoch, hash) = extract_height_and_hash(path);
-    (epoch, LedgerHash::new_or_panic(hash.to_string()))
 }
 
 #[cfg(test)]
