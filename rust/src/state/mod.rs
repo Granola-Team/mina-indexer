@@ -495,7 +495,7 @@ impl IndexerState {
                 self.blocks_processed += 1;
                 self.report_from_block_count(block_parser, total_time);
 
-                self.compact_db_every_n_blocks(200_000)?;
+                self.compact_db_every_n_blocks(100_000)?;
 
                 if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
                     block_parser.next_block().await?
