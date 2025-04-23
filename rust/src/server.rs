@@ -1,15 +1,24 @@
-//! Server
+//! Server & file
 
 use crate::{
     base::state_hash::StateHash,
-    block::{self, parser::BlockParser, precomputed::PcbVersion, vrf_output::VrfOutput},
+    block::{
+        self,
+        parser::BlockParser,
+        precomputed::{PcbVersion, PrecomputedBlock},
+        vrf_output::VrfOutput,
+    },
     chain::{ChainId, Network},
     cli::server::ServerArgsJson,
     constants::*,
-    ledger::{genesis::GenesisLedger, staking::StakingLedger, store::staking::StakingLedgerStore},
+    ledger::{
+        genesis::GenesisLedger, staking::StakingLedger, store::staking::StakingLedgerStore,
+        LedgerHash,
+    },
     state::{IndexerState, IndexerStateConfig},
     store::IndexerStore,
     unix_socket_server::{create_socket_listener, handle_connection},
+    utility::functions::extract_network_height_hash,
 };
 use log::{debug, error, info, trace, warn};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -18,7 +27,6 @@ use speedb::checkpoint::Checkpoint;
 use std::{
     collections::HashSet,
     fs,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process,
     sync::Arc,
@@ -125,7 +133,10 @@ impl IndexerConfiguration {
         // blocks dir
         if let Some(ref blocks_dir) = blocks_dir {
             if let Err(e) = fs::create_dir_all(blocks_dir) {
-                error!("Failed to create blocks directory in {blocks_dir:#?}: {e}");
+                error!(
+                    "Failed to create blocks directory in {:#?}: {}",
+                    blocks_dir, e
+                );
                 process::exit(1);
             }
         }
@@ -134,30 +145,12 @@ impl IndexerConfiguration {
         if let Some(ref staking_ledgers_dir) = staking_ledgers_dir {
             if let Err(e) = fs::create_dir_all(staking_ledgers_dir) {
                 error!(
-                    "Failed to create staking ledgers directory in {staking_ledgers_dir:#?}: {e}"
+                    "Failed to create staking ledgers directory in {:#?}: {}",
+                    staking_ledgers_dir, e
                 );
                 process::exit(1);
             }
         }
-
-        // let chain_id = chain_id(
-        //     &version.genesis.state_hash.0,
-        //     &[
-        //         genesis_constants.k.unwrap(),
-        //         genesis_constants.slots_per_epoch.unwrap(),
-        //         genesis_constants.slots_per_sub_window.unwrap(),
-        //         genesis_constants.delta.unwrap(),
-        //         genesis_constants.txpool_max_size.unwrap(),
-        //     ],
-        //     constraint_system_digests
-        //         .iter()
-        //         .map(|x| x.as_str())
-        //         .collect::<Vec<&str>>()
-        //         .as_slice(),
-        //     MAINNET_GENESIS_TIMESTAMP as i64,
-        //     protocol_txn_version_digest.as_ref().map(|d| d as &str),
-        //     protocol_network_version_digest.as_ref().map(|d| d as &str),
-        // );
 
         let pcb_version = version.version.to_owned();
         let state_config = IndexerStateConfig {
@@ -341,33 +334,15 @@ async fn start_uds_server(
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
 fn matches_event_kind(kind: EventKind) -> bool {
+    use notify::event::{AccessKind, AccessMode, CreateKind, ModifyKind};
+
     matches!(
         kind,
-        EventKind::Access(notify::event::AccessKind::Close(
-            notify::event::AccessMode::Write
-        )) | EventKind::Create(notify::event::CreateKind::File)
-            | EventKind::Modify(notify::event::ModifyKind::Name(_))
+        EventKind::Create(CreateKind::File)
+            | EventKind::Modify(ModifyKind::Name(_))
+            | EventKind::Access(AccessKind::Close(AccessMode::Write))
     )
-}
-
-#[cfg(target_os = "macos")]
-fn matches_event_kind(kind: EventKind) -> bool {
-    matches!(
-        kind,
-        EventKind::Modify(notify::event::ModifyKind::Data(
-            notify::event::DataChange::Content
-        )) | EventKind::Modify(notify::event::ModifyKind::Name(_))
-            | EventKind::Create(notify::event::CreateKind::File)
-    )
-}
-
-fn is_hard_link<P: AsRef<Path>>(path: P) -> bool {
-    match fs::metadata(path) {
-        Ok(metadata) => metadata.nlink() > 1,
-        Err(_) => false,
-    }
 }
 
 struct MissingBlockRecoveryOptions {
@@ -422,11 +397,15 @@ async fn run_indexer<P: AsRef<Path>>(
         );
     }
 
+    // fetch new block options
     let fetch_new_blocks_delay = fetch_new_blocks_opts.as_ref().map(|f| f.delay);
-    let fetch_new_blocks_exe = fetch_new_blocks_opts.as_ref().map(|f| f.exe.clone());
+    let fetch_new_blocks_exe = fetch_new_blocks_opts.map(|f| f.exe);
+
+    // missing block recovery options
+    let missing_block_recovery_batch = missing_block_recovery.as_ref().is_some_and(|m| m.batch);
     let missing_block_recovery_delay = missing_block_recovery.as_ref().map(|m| m.delay);
-    let missing_block_recovery_exe = missing_block_recovery.as_ref().map(|m| m.exe.clone());
-    let missing_block_recovery_batch = missing_block_recovery.is_some_and(|m| m.batch);
+    let missing_block_recovery_exe = missing_block_recovery.map(|m| m.exe);
+
     loop {
         tokio::select! {
             // watch for shutdown signals
@@ -465,6 +444,7 @@ async fn run_indexer<P: AsRef<Path>>(
         }
     }
 
+    // shutdown
     let state = state.write().await;
     if let Some(store) = state.indexer_store.as_ref() {
         debug!("Canceling db background work");
@@ -475,70 +455,83 @@ async fn run_indexer<P: AsRef<Path>>(
     Ok(())
 }
 
-async fn retry_parse_staking_ledger(path: &Path) -> anyhow::Result<StakingLedger> {
-    for attempt in 1..=5 {
-        match StakingLedger::parse_file(path).await {
-            Ok(ledger) => return Ok(ledger),
-            Err(e) if attempt < 5 => {
-                warn!("Attempt {attempt} failed: {e}. Retrying in 1 second...");
-                tokio::time::sleep(Duration::from_secs(1)).await;
+async fn retry_parse_precomputed_block(path: &Path) -> anyhow::Result<PrecomputedBlock> {
+    let num_attempts = 5;
+    for attempt in 1..num_attempts {
+        match PrecomputedBlock::from_path(path) {
+            Ok(block) => return Ok(block),
+            Err(e) => {
+                warn!("Attempt {attempt}: {e}. Retrying in 100ms...");
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
-            Err(e) => panic!("Failed after {attempt} attempts: {e}"),
         }
     }
-    panic!("All attempts to parse the staking ledger failed.")
+
+    panic!(
+        "All {} attempts to parse the staking ledger failed.",
+        num_attempts
+    )
+}
+
+async fn retry_parse_staking_ledger(path: &Path) -> anyhow::Result<StakingLedger> {
+    let num_attempts = 5;
+    for attempt in 1..num_attempts {
+        match StakingLedger::parse_file(path).await {
+            Ok(ledger) => return Ok(ledger),
+            Err(e) => {
+                warn!("Attempt {attempt}: {e}. Retrying in 1s...");
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+        }
+    }
+
+    panic!(
+        "All {} attempts to parse the staking ledger failed.",
+        num_attempts
+    )
 }
 
 /// Precomputed block & staking ledger event handler
 async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyhow::Result<()> {
-    trace!("Event: {event:?}");
+    trace!("{:?}", event);
+
     if matches_event_kind(event.kind) {
         for path in event.paths {
-            if !is_hard_link(&path)
-                && matches!(
-                    event.kind,
-                    EventKind::Create(notify::event::CreateKind::File)
-                )
-            {
-                debug!("Ignore create file event when the file isn't a hard link");
-                // This potentially can cause an EOF when parsing the
-                // files because it many not be fully written
-                // yet. Instead use the close event as a signal to
-                // process
-                continue;
-            }
             if block::is_valid_block_file(&path) {
-                debug!("Valid precomputed block file: {}", path.display());
-                match IndexerState::parse_file(state, &path).await {
+                debug!("Valid precomputed block file: {:#?}", path);
+
+                // exit early if present
+                if check_block(state, &path).await {
+                    return Ok(());
+                }
+
+                // if the block isn't in the witness tree, parse & pipeline it
+                match retry_parse_precomputed_block(&path).await {
                     Ok(block) => {
-                        // Acquire write lock
                         let mut state = state.write().await;
+                        let block_summary = block.summary();
 
-                        // check if the block is already in the witness tree
-                        if state.diffs_map.contains_key(&block.state_hash()) {
-                            info!(
-                                "Block is already present in the witness tree {}",
-                                block.summary()
-                            );
-                            return Ok(());
-                        }
-
-                        // if the block isn't in the witness tree, pipeline it
                         match state.block_pipeline(&block, path.metadata()?.len()) {
                             Ok(is_added) => {
                                 if is_added {
-                                    info!("Added block {}", block.summary())
+                                    info!("Added block {}", block_summary)
                                 }
                             }
-                            Err(e) => error!("Error adding block: {e}"),
+                            Err(e) => error!("Error adding block {}: {}", block_summary, e),
                         }
                     }
-                    Err(e) => error!("Error parsing precomputed block: {e}"),
+                    Err(e) => error!("Error parsing precomputed block: {}", e),
                 }
             } else if StakingLedger::is_valid(&path) {
-                // acquire state write lock
-                let state = state.write().await;
+                debug!("Valid staking ledger file: {:#?}", path);
 
+                // exit early if present
+                if check_staking_ledger(state, &path).await {
+                    return Ok(());
+                }
+
+                // if staking ledger is not in the witness tree, parse & add it
+                let mut state = state.write().await;
                 if let Some(store) = state.indexer_store.as_ref() {
                     match retry_parse_staking_ledger(&path).await {
                         Ok(staking_ledger) => {
@@ -546,31 +539,73 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                             let ledger_hash = staking_ledger.ledger_hash.clone();
                             let ledger_summary = staking_ledger.summary();
 
-                            info!("Adding staking ledger {ledger_summary}");
+                            info!("Adding staking ledger {}", ledger_summary);
                             store
                                 .add_staking_ledger(
                                     staking_ledger,
                                     &state.version.genesis.state_hash,
                                 )
                                 .unwrap_or_else(|e| {
-                                    error!("Error adding staking ledger {ledger_summary} {e}")
+                                    error!("Error adding staking ledger {}: {}", ledger_summary, e)
                                 });
 
-                            let mut staking_ledgers = state.staking_ledgers.lock().unwrap();
-                            staking_ledgers.insert((epoch, ledger_hash));
+                            state.staking_ledgers.insert((epoch, ledger_hash));
                         }
                         Err(e) => {
-                            error!("Error parsing staking ledger: {e}")
+                            error!("Error parsing staking ledger: {}", e)
                         }
                     }
                 } else {
                     error!("Indexer store unavailable");
                 }
+            } else {
+                warn!("OTHER {:#?}", path)
             }
         }
     }
 
     Ok(())
+}
+
+/// Checks if the PCB is already present in the witness tree
+async fn check_block(state: &Arc<RwLock<IndexerState>>, path: &Path) -> bool {
+    let (network, height, state_hash) = extract_network_height_hash(path);
+    let state_hash: StateHash = state_hash.into();
+    let ro_state = state.read().await;
+
+    // check if the block is already in the witness tree
+    if ro_state.diffs_map.contains_key(&state_hash) {
+        info!(
+            "Block is already present in the witness tree {}-{}-{}",
+            network, height, state_hash
+        );
+
+        return true;
+    }
+
+    false
+}
+
+/// Checks if the staking ledger is already present in the witness tree
+async fn check_staking_ledger(state: &Arc<RwLock<IndexerState>>, path: &Path) -> bool {
+    let (network, epoch, ledger_hash) = extract_network_height_hash(path);
+    let ledger_hash: LedgerHash = ledger_hash.into();
+    let ro_state = state.read().await;
+
+    // check if the staking ledger is already in the witness tree
+    if ro_state
+        .staking_ledgers
+        .contains(&(epoch, ledger_hash.clone()))
+    {
+        info!(
+            "Staking ledger is already present in the witness tree {}-{}-{}",
+            network, epoch, ledger_hash
+        );
+
+        return true;
+    }
+
+    false
 }
 
 /// Fetch new blocks
@@ -582,26 +617,37 @@ async fn fetch_new_blocks(
     let state = state.read().await;
     let network = state.version.network.clone();
     let new_block_length = state.best_tip_block().blockchain_length + 1;
-    let mut c = std::process::Command::new(fetch_new_blocks_exe.as_ref().display().to_string());
-    let cmd = c.args([
+
+    let mut cmd = std::process::Command::new(fetch_new_blocks_exe.as_ref().display().to_string());
+    let cmd = cmd.args([
         &network.to_string(),
         &new_block_length.to_string(),
         &blocks_dir.as_ref().display().to_string(),
     ]);
+
     match cmd.output() {
         Ok(output) => {
             let stdout = String::from_utf8(output.stdout)?;
-            info!("{}", stdout.trim_end());
+            let stdout = stdout.trim_end();
+
+            if !stdout.is_empty() {
+                info!("{}", stdout);
+            }
 
             let stderr = String::from_utf8(output.stderr)?;
-            info!("{}", stderr.trim_end());
+            let stderr = stderr.trim_end();
+
+            if !stderr.is_empty() {
+                info!("{}", stderr);
+            }
         }
         Err(e) => error!(
-            "Error fetching new blocks: {e}, pgm: {}, args: {:?}",
+            "Error fetching new blocks: {}, pgm: {}, args: {:?}",
+            e,
             cmd.get_program().to_str().unwrap(),
             cmd.get_args()
                 .map(|arg| arg.to_str().unwrap())
-                .collect::<Vec<&str>>()
+                .collect::<Vec<_>>()
         ),
     }
 
@@ -622,32 +668,44 @@ async fn recover_missing_blocks(
         .iter()
         .map(|b| b.root_block().blockchain_length.saturating_sub(1))
         .collect();
+
+    // exit early if no missing blocks
     if missing_parent_lengths.is_empty() {
         return Ok(());
     }
 
     let run_missing_blocks_recovery = |blockchain_length: u32| {
-        let mut c =
+        let mut cmd =
             std::process::Command::new(missing_block_recovery_exe.as_ref().display().to_string());
-        let cmd = c.args([
+        let cmd = cmd.args([
             &network.to_string(),
             &blockchain_length.to_string(),
             &blocks_dir.as_ref().display().to_string(),
         ]);
+
         match cmd.output() {
             Ok(output) => {
                 let stdout = String::from_utf8(output.stdout).expect("stdout");
-                info!("{}", stdout.trim_end());
+                let stdout = stdout.trim_end();
+
+                if !stdout.is_empty() {
+                    info!("{}", stdout);
+                }
 
                 let stderr = String::from_utf8(output.stderr).expect("stderr");
-                info!("{}", stderr.trim_end());
+                let stderr = stderr.trim_end();
+
+                if !stderr.is_empty() {
+                    info!("{}", stderr);
+                }
             }
             Err(e) => error!(
-                "Error recovery missing block: {e}, pgm: {}, args: {:?}",
+                "Error recovery missing block: {}, pgm: {}, args: {:?}",
+                e,
                 cmd.get_program().to_str().unwrap(),
                 cmd.get_args()
                     .map(|arg| arg.to_str().unwrap())
-                    .collect::<Vec<&str>>()
+                    .collect::<Vec<_>>()
             ),
         }
     };
@@ -655,6 +713,8 @@ async fn recover_missing_blocks(
     debug!("Getting missing parent blocks of dangling roots");
     let min_missing_length = missing_parent_lengths.iter().min().cloned();
     let max_missing_length = missing_parent_lengths.iter().max().cloned();
+
+    // fetch each missing block
     missing_parent_lengths
         .into_iter()
         .for_each(run_missing_blocks_recovery);
