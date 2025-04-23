@@ -1,17 +1,34 @@
 #!/usr/bin/env -S ruby -w
 
-require "net/http"
-require "uri"
+require "etc"
 require "fileutils"
 require "json"
-require "etc"
+require "net/http"
 require "optparse"
+require "socket"
+require "uri"
+
 require_relative "../update-pcbs"
 
 BASE_URL = "https://storage.googleapis.com/mina_network_block_data"
 BLOCK_THREADS = Etc.nprocessors * 4
 
 PCB_UPDATER = PcbUpdater.new
+
+# Force IPv4 by monkey patching TCPSocket. This is required because the IPv6
+# address is sometimes used if so directed by DNS resolution, and yet the IPv6
+# address does not work for 'storage.googleapis.com'.
+#
+class << TCPSocket
+  alias_method :original_open, :open
+
+  def open(host, port, *)
+    # Force IPv4 address family
+    addrs = Socket.getaddrinfo(host, port, Socket::AF_INET)
+    addr = addrs.first
+    original_open(addr[3], port, *)
+  end
+end
 
 def parse_arguments
   options = {
