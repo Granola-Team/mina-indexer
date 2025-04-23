@@ -27,7 +27,7 @@ use crate::{
     },
 };
 use anyhow::Context;
-use log::{trace, warn};
+use log::trace;
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
 
@@ -188,10 +188,6 @@ impl ZkappTokenStore for IndexerStore {
     fn apply_token_diff(&self, state_hash: &StateHash, diff: &TokenDiff) -> Result<Option<Token>> {
         trace!("Applying {} token diff {:?}", state_hash, diff);
 
-        if state_hash.0 == "3NL3mVAEwJuBS8F3fMWBZZRjQC4JBzdGTD7vN5SqizudnkPKsRyi" {
-            warn!("{:?}", diff);
-        }
-
         // get token to modify
         let diff_pk = &diff.public_key;
         let diff_token = &diff.token;
@@ -216,8 +212,10 @@ impl ZkappTokenStore for IndexerStore {
             }
         });
 
+        self.set_token(&token)?;
+
         // check token address
-        assert_eq!(token.token, diff.token);
+        assert_eq!(token.token, *diff_token);
 
         // update diff count
         let diff_num = self.get_token_diff_num(diff_token)?.unwrap_or_default();
@@ -227,6 +225,7 @@ impl ZkappTokenStore for IndexerStore {
             (diff_num + 1).to_be_bytes(),
         )?;
 
+        // write token diff
         self.database.put_cf(
             self.zkapp_tokens_historical_diffs_cf(),
             zkapp_tokens_historical_diffs_key(diff_token, diff_num),
@@ -234,10 +233,10 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // update holder info
-        let index = self
+        let holder_index = self
             .get_token_holder_index(diff_token, diff_pk)?
             .unwrap_or_else(|| {
-                let num = self
+                let index = self
                     .get_token_holders_num(diff_token)
                     .with_context(|| format!("token holders count for {}", diff_token))
                     .expect("token holders count")
@@ -247,27 +246,33 @@ impl ZkappTokenStore for IndexerStore {
                 self.database
                     .put_cf(
                         self.zkapp_tokens_holder_count_cf(),
-                        diff.token.0.as_bytes(),
-                        (num + 1).to_be_bytes(),
+                        diff_token.0.as_bytes(),
+                        (index + 1).to_be_bytes(),
                     )
                     .unwrap();
 
+                // write holder's token index
                 self.database
                     .put_cf(
                         self.zkapp_tokens_holder_index_cf(),
                         zkapp_tokens_holder_index_key(diff_token, diff_pk),
-                        num.to_be_bytes(),
+                        index.to_be_bytes(),
                     )
                     .unwrap();
 
-                num
+                index
             });
 
         let account = self
-            .get_token_holder(diff_token, index)?
+            .get_token_holder(diff_token, holder_index)?
             .unwrap_or_else(|| {
                 self.get_best_account(diff_pk, diff_token)
-                    .with_context(|| format!("token holder {} index {}", diff_token, index))
+                    .with_context(|| {
+                        format!(
+                            "token {} holder {} index {}",
+                            diff_token, diff_pk, holder_index
+                        )
+                    })
                     .expect("token holder")
                     .unwrap_or_else(|| {
                         let token_account = Account {
@@ -276,8 +281,8 @@ impl ZkappTokenStore for IndexerStore {
                         };
 
                         self.update_best_account(
-                            &token_account.public_key,
-                            token_account.token.as_ref().unwrap(),
+                            diff_pk,
+                            diff_token,
                             None,
                             Some(token_account.to_owned()),
                         )
@@ -287,18 +292,15 @@ impl ZkappTokenStore for IndexerStore {
                     })
             });
 
-        if diff_pk.0 == "B62qnVLedrzTUMZME91WKbNw3qJ3hw7cc5PeK6RR3vH7RTFTsVbiBj4" {
-            warn!("TOKEN HOLDER INDEX {}", index);
-            warn!("TOKEN HOLDER ACCOUNT {}", account);
-        }
+        assert_eq!(account.public_key, *diff_pk, "{:?}", account);
 
         self.database.put_cf(
             self.zkapp_tokens_holder_cf(),
-            zkapp_tokens_holder_key(diff_token, index),
+            zkapp_tokens_holder_key(diff_token, holder_index),
             serde_json::to_vec(&account)?,
         )?;
 
-        // update pk diffs
+        // update pk diffs - count & append diff
         let diff_num = self.get_token_pk_diff_num(diff_pk)?.unwrap_or_default();
         self.database.put_cf(
             self.zkapp_tokens_historical_pk_diffs_num_cf(),
@@ -313,16 +315,16 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // update pk token accounts
-        let pk_index = self
+        let pk_token_index = self
             .get_token_pk_index(diff_pk, diff_token)?
             .unwrap_or_else(|| {
-                let pk_num = self.get_token_pk_num(diff_pk).unwrap().unwrap_or_default();
+                let pk_index = self.get_token_pk_num(diff_pk).unwrap().unwrap_or_default();
 
                 self.database
                     .put_cf(
                         self.zkapp_tokens_pk_num_cf(),
                         diff_pk.0.as_bytes(),
-                        (pk_num + 1).to_be_bytes(),
+                        (pk_index + 1).to_be_bytes(),
                     )
                     .unwrap();
 
@@ -330,16 +332,16 @@ impl ZkappTokenStore for IndexerStore {
                     .put_cf(
                         self.zkapp_tokens_pk_index_cf(),
                         zkapp_tokens_pk_index_key(diff_token, diff_pk),
-                        pk_num.to_be_bytes(),
+                        pk_index.to_be_bytes(),
                     )
                     .unwrap();
 
-                pk_num
+                pk_index
             });
 
         self.database.put_cf(
             self.zkapp_tokens_pk_cf(),
-            zkapp_tokens_pk_key(diff_pk, pk_index),
+            zkapp_tokens_pk_key(diff_pk, pk_token_index),
             serde_json::to_vec(&account)?,
         )?;
 
@@ -841,10 +843,6 @@ impl ZkappTokenStore for IndexerStore {
     fn get_token_holders_num(&self, token: &TokenAddress) -> Result<Option<u32>> {
         trace!("Getting token holders count for {}", token);
 
-        if token.0 == MINA_TOKEN_ADDRESS {
-            return self.get_num_mina_accounts();
-        }
-
         Ok(self
             .database
             .get_cf(self.zkapp_tokens_holder_count_cf(), token.0.as_bytes())?
@@ -852,7 +850,7 @@ impl ZkappTokenStore for IndexerStore {
     }
 
     fn get_token_holder(&self, token: &TokenAddress, index: u32) -> Result<Option<Account>> {
-        trace!("Getting token holder {} index {}", token, index);
+        trace!("Getting token {} holder at index {}", token, index);
 
         Ok(self
             .database
@@ -862,13 +860,13 @@ impl ZkappTokenStore for IndexerStore {
             )?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
-                    .with_context(|| format!("token holder index {} for {}", index, token))
-                    .expect("token holder")
+                    .with_context(|| format!("token {} holder index {}", token, index))
+                    .expect("token holder index")
             }))
     }
 
     fn get_token_holder_index(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>> {
-        trace!("Getting token holder index for {} pk {}", token, pk);
+        trace!("Getting token {} holder {} index", token, pk);
 
         Ok(self
             .database
@@ -887,8 +885,8 @@ impl ZkappTokenStore for IndexerStore {
             for index in 0..num {
                 holders.push(
                     self.get_token_holder(token, index)?
-                        .with_context(|| format!("token holder index {} for {}", index, token))
-                        .expect("token holder"),
+                        .with_context(|| format!("token {} holder index {}", token, index))
+                        .expect("token holder index"),
                 );
             }
 
@@ -907,7 +905,7 @@ impl ZkappTokenStore for IndexerStore {
                 tokens.push(
                     self.get_token_pk(pk, index)?
                         .with_context(|| format!("token held by {} index {}", pk, index))
-                        .expect("pk token"),
+                        .expect("tokens held"),
                 );
             }
         }

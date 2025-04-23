@@ -13,7 +13,7 @@ use speedb::{DBIterator, Direction};
 use std::collections::HashMap;
 
 pub trait ZkappTokenStore {
-    /// Set a token
+    /// Set a token's owner, supply & address
     fn set_token(&self, token: &Token) -> Result<u32>;
 
     /// Update a token by applying a diff
