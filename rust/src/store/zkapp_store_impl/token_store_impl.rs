@@ -53,7 +53,8 @@ impl ZkappTokenStore for IndexerStore {
                 .put(Self::ZKAPP_TOKEN_COUNT, (num + 1).to_be_bytes())
                 .unwrap();
 
-            if token.token.0 != MINA_TOKEN_ADDRESS {
+            // modify owner info
+            if let Some(owner) = token.owner.as_ref() {
                 // set new token holder count
                 self.database
                     .put_cf(
@@ -62,10 +63,16 @@ impl ZkappTokenStore for IndexerStore {
                         1u32.to_be_bytes(),
                     )
                     .unwrap();
-            }
 
-            // modify owner info
-            if let Some(owner) = token.owner.as_ref() {
+                // set owner's token index
+                self.database
+                    .put_cf(
+                        self.zkapp_tokens_holder_index_cf(),
+                        zkapp_tokens_holder_index_key(&token.token, owner),
+                        0u32.to_be_bytes(),
+                    )
+                    .unwrap();
+
                 let account = self
                     .get_best_account(owner, &token.token)
                     .ok()
@@ -292,7 +299,7 @@ impl ZkappTokenStore for IndexerStore {
                     })
             });
 
-        assert_eq!(account.public_key, *diff_pk, "{:?}", account);
+        assert_eq!(account.public_key, *diff_pk);
 
         self.database.put_cf(
             self.zkapp_tokens_holder_cf(),
