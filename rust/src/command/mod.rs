@@ -766,7 +766,18 @@ impl Command {
         match self {
             Self::Delegation(Delegation { nonce, .. }) => *nonce,
             Self::Payment(Payment { nonce, .. }) => *nonce,
-            Self::Zkapp(data) => todo!("nonce {data:?}"),
+            Self::Zkapp(data) => data.fee_payer.body.nonce,
+        }
+    }
+
+    pub fn creation_fee_paid(&self) -> Option<bool> {
+        match self {
+            Self::Zkapp(data) => Some(
+                data.account_updates
+                    .iter()
+                    .any(|update| update.creation_fee_paid()),
+            ),
+            Self::Delegation(_) | Self::Payment(_) => None,
         }
     }
 }

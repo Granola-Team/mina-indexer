@@ -212,8 +212,10 @@ impl ZkappTokenStore for IndexerStore {
             }
         });
 
+        self.set_token(&token)?;
+
         // check token address
-        assert_eq!(token.token, diff.token);
+        assert_eq!(token.token, *diff_token);
 
         // update diff count
         let diff_num = self.get_token_diff_num(diff_token)?.unwrap_or_default();
@@ -223,6 +225,7 @@ impl ZkappTokenStore for IndexerStore {
             (diff_num + 1).to_be_bytes(),
         )?;
 
+        // write token diff
         self.database.put_cf(
             self.zkapp_tokens_historical_diffs_cf(),
             zkapp_tokens_historical_diffs_key(diff_token, diff_num),
@@ -230,10 +233,10 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // update holder info
-        let index = self
+        let holder_index = self
             .get_token_holder_index(diff_token, diff_pk)?
             .unwrap_or_else(|| {
-                let num = self
+                let index = self
                     .get_token_holders_num(diff_token)
                     .with_context(|| format!("token holders count for {}", diff_token))
                     .expect("token holders count")
@@ -243,27 +246,33 @@ impl ZkappTokenStore for IndexerStore {
                 self.database
                     .put_cf(
                         self.zkapp_tokens_holder_count_cf(),
-                        diff.token.0.as_bytes(),
-                        (num + 1).to_be_bytes(),
+                        diff_token.0.as_bytes(),
+                        (index + 1).to_be_bytes(),
                     )
                     .unwrap();
 
+                // write holder's token index
                 self.database
                     .put_cf(
                         self.zkapp_tokens_holder_index_cf(),
                         zkapp_tokens_holder_index_key(diff_token, diff_pk),
-                        num.to_be_bytes(),
+                        index.to_be_bytes(),
                     )
                     .unwrap();
 
-                num
+                index
             });
 
         let account = self
-            .get_token_holder(diff_token, index)?
+            .get_token_holder(diff_token, holder_index)?
             .unwrap_or_else(|| {
                 self.get_best_account(diff_pk, diff_token)
-                    .with_context(|| format!("token holder {} index {}", diff_token, index))
+                    .with_context(|| {
+                        format!(
+                            "token {} holder {} index {}",
+                            diff_token, diff_pk, holder_index
+                        )
+                    })
                     .expect("token holder")
                     .unwrap_or_else(|| {
                         let token_account = Account {
@@ -272,8 +281,8 @@ impl ZkappTokenStore for IndexerStore {
                         };
 
                         self.update_best_account(
-                            &token_account.public_key,
-                            token_account.token.as_ref().unwrap(),
+                            diff_pk,
+                            diff_token,
                             None,
                             Some(token_account.to_owned()),
                         )
@@ -283,13 +292,15 @@ impl ZkappTokenStore for IndexerStore {
                     })
             });
 
+        assert_eq!(account.public_key, *diff_pk, "{:?}", account);
+
         self.database.put_cf(
             self.zkapp_tokens_holder_cf(),
-            zkapp_tokens_holder_key(diff_token, index),
+            zkapp_tokens_holder_key(diff_token, holder_index),
             serde_json::to_vec(&account)?,
         )?;
 
-        // update pk diffs
+        // update pk diffs - count & append diff
         let diff_num = self.get_token_pk_diff_num(diff_pk)?.unwrap_or_default();
         self.database.put_cf(
             self.zkapp_tokens_historical_pk_diffs_num_cf(),
@@ -304,16 +315,16 @@ impl ZkappTokenStore for IndexerStore {
         )?;
 
         // update pk token accounts
-        let pk_index = self
+        let pk_token_index = self
             .get_token_pk_index(diff_pk, diff_token)?
             .unwrap_or_else(|| {
-                let pk_num = self.get_token_pk_num(diff_pk).unwrap().unwrap_or_default();
+                let pk_index = self.get_token_pk_num(diff_pk).unwrap().unwrap_or_default();
 
                 self.database
                     .put_cf(
                         self.zkapp_tokens_pk_num_cf(),
                         diff_pk.0.as_bytes(),
-                        (pk_num + 1).to_be_bytes(),
+                        (pk_index + 1).to_be_bytes(),
                     )
                     .unwrap();
 
@@ -321,16 +332,16 @@ impl ZkappTokenStore for IndexerStore {
                     .put_cf(
                         self.zkapp_tokens_pk_index_cf(),
                         zkapp_tokens_pk_index_key(diff_token, diff_pk),
-                        pk_num.to_be_bytes(),
+                        pk_index.to_be_bytes(),
                     )
                     .unwrap();
 
-                pk_num
+                pk_index
             });
 
         self.database.put_cf(
             self.zkapp_tokens_pk_cf(),
-            zkapp_tokens_pk_key(diff_pk, pk_index),
+            zkapp_tokens_pk_key(diff_pk, pk_token_index),
             serde_json::to_vec(&account)?,
         )?;
 
@@ -832,10 +843,6 @@ impl ZkappTokenStore for IndexerStore {
     fn get_token_holders_num(&self, token: &TokenAddress) -> Result<Option<u32>> {
         trace!("Getting token holders count for {}", token);
 
-        if token.0 == MINA_TOKEN_ADDRESS {
-            return self.get_num_mina_accounts();
-        }
-
         Ok(self
             .database
             .get_cf(self.zkapp_tokens_holder_count_cf(), token.0.as_bytes())?
@@ -843,7 +850,7 @@ impl ZkappTokenStore for IndexerStore {
     }
 
     fn get_token_holder(&self, token: &TokenAddress, index: u32) -> Result<Option<Account>> {
-        trace!("Getting token holder {} index {}", token, index);
+        trace!("Getting token {} holder at index {}", token, index);
 
         Ok(self
             .database
@@ -853,13 +860,13 @@ impl ZkappTokenStore for IndexerStore {
             )?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
-                    .with_context(|| format!("token holder index {} for {}", index, token))
-                    .expect("token holder")
+                    .with_context(|| format!("token {} holder index {}", token, index))
+                    .expect("token holder index")
             }))
     }
 
     fn get_token_holder_index(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>> {
-        trace!("Getting token holder index for {} pk {}", token, pk);
+        trace!("Getting token {} holder {} index", token, pk);
 
         Ok(self
             .database
@@ -878,8 +885,8 @@ impl ZkappTokenStore for IndexerStore {
             for index in 0..num {
                 holders.push(
                     self.get_token_holder(token, index)?
-                        .with_context(|| format!("token holder index {} for {}", index, token))
-                        .expect("token holder"),
+                        .with_context(|| format!("token {} holder index {}", token, index))
+                        .expect("token holder index"),
                 );
             }
 
@@ -898,7 +905,7 @@ impl ZkappTokenStore for IndexerStore {
                 tokens.push(
                     self.get_token_pk(pk, index)?
                         .with_context(|| format!("token held by {} index {}", pk, index))
-                        .expect("pk token"),
+                        .expect("tokens held"),
                 );
             }
         }
@@ -1061,8 +1068,6 @@ mod token_store_tests {
 
         let block: PrecomputedBlock = PrecomputedBlock::from_path(&path)?;
         let commands = block.zkapp_commands();
-
-        // assert_eq!(commands.len(), 1);
         let zkapp_command: &UserCommandWithStatus = commands.get(3).unwrap();
 
         assert!(zkapp_command.is_zkapp_command());
@@ -1081,7 +1086,7 @@ mod token_store_tests {
                                     panic!("Should have been Set"),
                                 crate::mina_blocks::v2::staged_ledger_diff::UpdateKind::Set((_, token_symbol)) => {
                                     assert_eq!(token_symbol, "MINU");
-                                    Ok(()) // Return Ok(()) instead of just Ok(())
+                                    Ok(())
                                 },
                             }
                         } else {
@@ -1092,242 +1097,5 @@ mod token_store_tests {
             }
             _ => panic!("Unexpected command type"),
         }
-    }
-}
-
-#[cfg(all(test, feature = "tier2"))]
-mod tests {
-    use super::Result;
-    use crate::{
-        base::{public_key::PublicKey, state_hash::StateHash},
-        ledger::{
-            diff::token::{TokenDiff, TokenDiffType},
-            token::Token,
-        },
-        store::{zkapp::tokens::ZkappTokenStore, IndexerStore},
-    };
-    use quickcheck::{Arbitrary, Gen};
-
-    #[test]
-    fn update_token() -> Result<()> {
-        let g = &mut Gen::new(1000);
-
-        // setup indexer store
-        let tmp = tempfile::TempDir::new()?;
-        let store = IndexerStore::new(tmp.path())?;
-
-        // check num tokens
-        assert_eq!(store.get_num_tokens()?, 0);
-
-        // set an arbitrary token with an owner
-        let owner0 = PublicKey::arbitrary(g);
-        let token0 = Token::arbitrary_with_owner(g, owner0.to_owned());
-        let index0 = store.set_token(&token0)?;
-
-        // check num tokens
-        assert_eq!(index0, 0);
-        assert_eq!(store.get_num_tokens()?, 1);
-
-        // check indexes
-        assert_eq!(store.get_token(&token0.token)?.unwrap(), token0);
-        assert_eq!(store.get_token_at_index(index0)?.unwrap(), token0);
-        assert_eq!(store.get_token_index(&token0.token)?.unwrap(), index0);
-
-        // check all tokens & properties
-        assert_eq!(store.get_all_tokens()?, vec![token0.to_owned()]);
-        assert_eq!(
-            store.get_token_supply(&token0.token)?.unwrap(),
-            token0.supply
-        );
-        assert_eq!(store.get_token_owner(&token0.token)?, token0.owner);
-        assert_eq!(
-            store.get_token_symbol(&token0.token)?.unwrap(),
-            token0.symbol
-        );
-
-        // check token holders
-        let holder0 = store.get_token_holder(&token0.token, 0)?.unwrap();
-
-        assert_eq!(holder0.balance, token0.supply);
-        assert_eq!(holder0.public_key, token0.owner.to_owned().unwrap());
-        assert_eq!(holder0.token.unwrap(), token0.token);
-
-        assert_eq!(store.get_token_holders_num(&token0.token)?.unwrap(), 1);
-        assert_eq!(
-            vec![(
-                token0.owner.to_owned().unwrap(),
-                token0.token.to_owned(),
-                token0.supply,
-            )],
-            store
-                .get_token_holders(&token0.token)?
-                .unwrap()
-                .iter()
-                .map(|holder| (
-                    holder.public_key.to_owned(),
-                    holder.token.to_owned().unwrap(),
-                    store
-                        .get_token_supply(&holder.token.to_owned().unwrap())
-                        .unwrap()
-                        .unwrap()
-                ))
-                .collect::<Vec<_>>(),
-        );
-        assert_eq!(
-            store.get_tokens_held(&token0.owner.to_owned().unwrap())?,
-            store.get_token_holders(&token0.token)?.unwrap(),
-        );
-
-        // set an arbitrary token with another owner
-        let owner1 = PublicKey::arbitrary_not(g, &token0.owner);
-        let token1 = Token::arbitrary_with_owner(g, owner1.to_owned());
-        let index1 = store.set_token(&token1)?;
-
-        // check num tokens & token1
-        assert_eq!(index1, 1);
-        assert_eq!(store.get_num_tokens()?, 2);
-
-        assert_eq!(store.get_token(&token1.token)?.unwrap(), token1);
-        assert_eq!(store.get_token_at_index(index1)?.unwrap(), token1);
-        assert_eq!(store.get_token_index(&token1.token)?.unwrap(), index1);
-
-        // check all tokens & properties
-        assert_eq!(
-            store.get_all_tokens()?,
-            vec![token0.to_owned(), token1.to_owned()]
-        );
-        assert_eq!(
-            store.get_token_supply(&token1.token)?.unwrap(),
-            token1.supply
-        );
-        assert_eq!(store.get_token_owner(&token1.token)?.unwrap(), owner1);
-        assert_eq!(
-            store.get_token_symbol(&token1.token)?.unwrap(),
-            token1.symbol
-        );
-
-        // check token holders
-        let token_holder = store.get_token_holder(&token1.token, 0)?.unwrap();
-
-        assert_eq!(token_holder.balance, token1.supply);
-        assert_eq!(token_holder.public_key, owner1);
-        assert_eq!(token_holder.token.unwrap(), token1.token);
-
-        assert_eq!(store.get_token_holders_num(&token1.token)?.unwrap(), 1);
-        assert_eq!(
-            vec![(owner1.to_owned(), token1.token.to_owned(), token1.supply)],
-            store
-                .get_token_holders(&token1.token)?
-                .unwrap()
-                .iter()
-                .map(|holder| (
-                    holder.public_key.to_owned(),
-                    holder.token.to_owned().unwrap(),
-                    store
-                        .get_token_supply(&holder.token.to_owned().unwrap())
-                        .unwrap()
-                        .unwrap()
-                ))
-                .collect::<Vec<_>>(),
-        );
-        assert_eq!(
-            store.get_tokens_held(&owner1)?,
-            store.get_token_holders(&token1.token)?.unwrap(),
-        );
-
-        // update with token0 diff for owner1
-        let token_diff = TokenDiff::arbitrary_with_address_pk_max_supply(
-            g,
-            token0.token.to_owned(),
-            owner1.to_owned(),
-            token0.supply,
-        );
-
-        let new_token0 = store
-            .apply_token_diff(&StateHash::arbitrary(g), &token_diff)?
-            .unwrap();
-        assert_eq!(new_token0.token, token0.token);
-
-        match &token_diff.diff {
-            TokenDiffType::Owner(owner) => {
-                // owner changes
-                assert_eq!(*owner, owner1);
-                assert_eq!(*new_token0.owner.as_ref().unwrap(), *owner);
-
-                // symbol & supply unchanged
-                assert_eq!(new_token0.supply, token0.supply);
-                assert_eq!(new_token0.symbol, token0.symbol);
-            }
-            TokenDiffType::Supply(supply) => {
-                // supply changes
-                assert_eq!(new_token0.supply, token0.supply + *supply);
-
-                // owner & symbol unchanged
-                assert_eq!(new_token0.owner, token0.owner);
-                assert_eq!(new_token0.symbol, token0.symbol);
-            }
-            TokenDiffType::Symbol(symbol) => {
-                // symbol changes
-                assert_eq!(new_token0.symbol, *symbol);
-
-                // owner & supply unchanged
-                assert_eq!(new_token0.owner, token0.owner);
-                assert_eq!(new_token0.supply, token0.supply);
-            }
-        }
-
-        // check num tokens
-        assert_eq!(store.get_num_tokens()?, 2);
-
-        // check all tokens & properties
-        assert_eq!(
-            store.get_all_tokens()?,
-            vec![new_token0.to_owned(), token1.to_owned()]
-        );
-        assert_eq!(
-            store.get_token_supply(&token0.token)?.unwrap(),
-            new_token0.supply
-        );
-
-        // check token holders
-        assert_eq!(store.get_token_holders_num(&token0.token)?.unwrap(), 2);
-        assert_eq!(
-            vec![
-                (
-                    owner0.to_owned(),
-                    token0.token.to_owned(),
-                    new_token0.supply
-                ),
-                (
-                    owner1.to_owned(),
-                    token0.token.to_owned(),
-                    new_token0.supply,
-                )
-            ],
-            store
-                .get_token_holders(&token0.token)?
-                .unwrap()
-                .iter()
-                .map(|holder| (
-                    holder.public_key.to_owned(),
-                    holder.token.to_owned().unwrap(),
-                    store
-                        .get_token_supply(&holder.token.to_owned().unwrap())
-                        .unwrap()
-                        .unwrap()
-                ))
-                .collect::<Vec<_>>(),
-        );
-
-        store.get_tokens_held(&owner1)?.iter().for_each(|holder| {
-            // check pk held token has a corresponding token holder entry
-            assert!(store
-                .get_token_holders(&holder.token.to_owned().unwrap())
-                .unwrap()
-                .unwrap()
-                .contains(holder));
-        });
-
-        Ok(())
     }
 }

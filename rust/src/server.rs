@@ -449,7 +449,7 @@ async fn run_indexer<P: AsRef<Path>>(
             _ = tokio::time::sleep(std::time::Duration::from_secs(fetch_new_blocks_delay.unwrap_or(180))) => {
                 if let Some(ref blocks_dir) = blocks_dir {
                     if let Some(ref fetch_new_blocks_exe) = fetch_new_blocks_exe {
-                        fetch_new_blocks(&state, &blocks_dir, fetch_new_blocks_exe).await
+                        fetch_new_blocks(&state, &blocks_dir, fetch_new_blocks_exe).await?
                     }
                 }
             }
@@ -458,7 +458,7 @@ async fn run_indexer<P: AsRef<Path>>(
             _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
                 if let Some(ref blocks_dir) = blocks_dir {
                     if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
-                        recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await
+                        recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await?
                     }
                 }
             }
@@ -578,7 +578,7 @@ async fn fetch_new_blocks(
     state: &Arc<RwLock<IndexerState>>,
     blocks_dir: impl AsRef<Path>,
     fetch_new_blocks_exe: impl AsRef<Path>,
-) {
+) -> anyhow::Result<()> {
     let state = state.read().await;
     let network = state.version.network.clone();
     let new_block_length = state.best_tip_block().blockchain_length + 1;
@@ -590,9 +590,11 @@ async fn fetch_new_blocks(
     ]);
     match cmd.output() {
         Ok(output) => {
-            use std::io::*;
-            stdout().write_all(&output.stdout).ok();
-            stderr().write_all(&output.stderr).ok();
+            let stdout = String::from_utf8(output.stdout)?;
+            info!("{}", stdout.trim_end());
+
+            let stderr = String::from_utf8(output.stderr)?;
+            info!("{}", stderr.trim_end());
         }
         Err(e) => error!(
             "Error fetching new blocks: {e}, pgm: {}, args: {:?}",
@@ -602,6 +604,8 @@ async fn fetch_new_blocks(
                 .collect::<Vec<&str>>()
         ),
     }
+
+    Ok(())
 }
 
 /// Recovers missing blocks
@@ -610,7 +614,7 @@ async fn recover_missing_blocks(
     blocks_dir: impl AsRef<Path>,
     missing_block_recovery_exe: impl AsRef<Path>,
     batch_recovery: bool,
-) {
+) -> anyhow::Result<()> {
     let state = state.read().await;
     let network = state.version.network.clone();
     let missing_parent_lengths: HashSet<u32> = state
@@ -619,7 +623,7 @@ async fn recover_missing_blocks(
         .map(|b| b.root_block().blockchain_length.saturating_sub(1))
         .collect();
     if missing_parent_lengths.is_empty() {
-        return;
+        return Ok(());
     }
 
     let run_missing_blocks_recovery = |blockchain_length: u32| {
@@ -632,9 +636,11 @@ async fn recover_missing_blocks(
         ]);
         match cmd.output() {
             Ok(output) => {
-                use std::io::*;
-                stdout().write_all(&output.stdout).unwrap();
-                stderr().write_all(&output.stderr).unwrap();
+                let stdout = String::from_utf8(output.stdout).expect("stdout");
+                info!("{}", stdout.trim_end());
+
+                let stderr = String::from_utf8(output.stderr).expect("stderr");
+                info!("{}", stderr.trim_end());
             }
             Err(e) => error!(
                 "Error recovery missing block: {e}, pgm: {}, args: {:?}",
@@ -661,6 +667,8 @@ async fn recover_missing_blocks(
             (min_length..max_length).for_each(run_missing_blocks_recovery)
         }
     }
+
+    Ok(())
 }
 
 impl GenesisVersion {

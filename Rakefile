@@ -311,20 +311,6 @@ namespace :clean do
 end
 
 # Dev tasks
-namespace :download do
-  desc "Download a specific mainnet PCB (based on height and state hash) from o1Labs' bucket"
-  task :block, [:height, :state_hash, :dir] do |_, args|
-    dir = args[:dir] || "."
-    run("./ops/o1labs/download-mina-blocks.rb block #{args[:height]} #{args[:state_hash]} --dir #{dir}")
-  end
-
-  desc "Download all mainnet PCBs (at a specific height) from o1Labs' bucket"
-  task :blocks, [:height, :dir] do |_, args|
-    dir = args[:dir] || "."
-    run("./ops/o1labs/download-mina-blocks.rb blocks #{args[:height]} --dir #{dir}")
-  end
-end
-
 desc "Dev build and run regression tests"
 task :dev, [:subtest] => "build:dev" do |_, args|
   subtest = args[:subtest] || ""

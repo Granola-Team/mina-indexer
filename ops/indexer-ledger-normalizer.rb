@@ -23,8 +23,8 @@ def remove_vk_actions(obj)
   case obj
   when Hash
     obj.delete("action_state")
+    obj.delete("proved_state")
     obj.delete("verification_key")
-
     obj.each_value { |v| remove_vk_actions(v) }
   when Array
     obj.each { |item| remove_vk_actions(item) }

@@ -196,15 +196,15 @@ impl AccountQueryRoot {
             if let Ok(pk) = PublicKey::new(public_key) {
                 return Ok(db
                     .get_best_account_display(&pk, &token)?
-                    .iter()
+                    .into_iter()
                     .filter_map(|acct| {
                         let username = match db.get_username(&pk) {
                             Ok(None) | Err(_) => None,
                             Ok(Some(username)) => Some(username.0),
                         };
 
-                        if query.as_ref().unwrap().matches(acct, username.as_ref()) {
-                            let account = AccountWithMeta::new(db, acct.to_owned());
+                        if query.as_ref().unwrap().matches(&acct, username.as_ref()) {
+                            let account = AccountWithMeta::new(db, acct);
                             return Some(account);
                         }
 
@@ -428,6 +428,7 @@ impl AccountQueryInput {
 }
 
 impl AccountWithMeta {
+    /// Account creation fee must already be deducted
     pub fn new(db: &std::sync::Arc<IndexerStore>, account: account::Account) -> Self {
         let pk = account.public_key.to_owned();
 
@@ -480,26 +481,23 @@ impl AccountWithMeta {
 
 impl From<account::Account> for Account {
     fn from(value: account::Account) -> Self {
-        let account = value.deduct_mina_account_creation_fee();
-        let permissions = if account.is_zkapp_account() {
-            account.permissions.map(Into::into)
+        let permissions = if value.is_zkapp_account() {
+            value.permissions.map(Into::into)
         } else {
             None
         };
 
         Self {
-            public_key: account.public_key.0,
-            delegate: account.delegate.0,
-            nonce: account.nonce.map_or(0, |n| n.0),
-            balance: account.balance.0,
-            time_locked: account.timing.is_some(),
-            timing: account.timing.map(Into::into),
-            token: account
-                .token
-                .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
-            zkapp: account.zkapp.map(Into::into),
-            receipt_chain_hash: account.receipt_chain_hash.unwrap_or_default().0,
-            voting_for: account.voting_for.unwrap_or_default().0,
+            public_key: value.public_key.0,
+            delegate: value.delegate.0,
+            nonce: value.nonce.map_or(0, |n| n.0),
+            balance: value.balance.0,
+            time_locked: value.timing.is_some(),
+            timing: value.timing.map(Into::into),
+            token: value.token.map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
+            zkapp: value.zkapp.map(Into::into),
+            receipt_chain_hash: value.receipt_chain_hash.unwrap_or_default().0,
+            voting_for: value.voting_for.unwrap_or_default().0,
             permissions,
         }
     }

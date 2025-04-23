@@ -55,7 +55,7 @@ impl DbAccountUpdate {
                         Account::empty(
                             pk.clone(),
                             token.clone(),
-                            diffs.first().expect("apply diff").is_zkapp_diff(),
+                            diffs.iter().any(|diff| diff.creation_fee_paid()),
                         )
                     }),
                 );
@@ -67,7 +67,9 @@ impl DbAccountUpdate {
                         Payment(diff)
                         | FeeTransfer(diff)
                         | FeeTransferViaCoinbase(diff)
-                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => after.payment(diff),
+                        | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
+                            after.payment(diff)
+                        }
                         Coinbase(diff) => after.coinbase(diff.amount),
                         Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
                         FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
@@ -138,13 +140,7 @@ impl DbAccountUpdate {
                 let before = db.get_best_account(&pk, &token)?;
                 let (before_values, mut after) = (
                     before.as_ref().map(|a| (a.is_zkapp_account(), a.balance.0)),
-                    before.unwrap_or_else(|| {
-                        Account::empty(
-                            pk.clone(),
-                            token.clone(),
-                            diffs.first().expect("unapply diff").is_zkapp_diff(),
-                        )
-                    }),
+                    before.expect("account to unapply"),
                 );
 
                 for diff in diffs.iter() {
@@ -154,7 +150,7 @@ impl DbAccountUpdate {
                         Payment(diff)
                         | FeeTransfer(diff)
                         | FeeTransferViaCoinbase(diff)
-                        | ZkappPayment(ZkappPaymentDiff::Payment(diff)) => {
+                        | ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
                             after.payment_unapply(diff)
                         }
                         Coinbase(diff) => after.coinbase_unapply(diff),
