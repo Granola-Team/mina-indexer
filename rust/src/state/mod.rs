@@ -1431,12 +1431,12 @@ impl IndexerState {
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::NewStakingLedger {
                     epoch,
-                    genesis_state_hash: _,
+                    genesis_state_hash,
                     ledger_hash,
                 }) => {
                     self.staking_ledgers
                         .insert((*epoch, ledger_hash.to_owned()));
-                    self.replay_staking_ledger(epoch, ledger_hash)
+                    self.replay_staking_ledger(epoch, ledger_hash, Some(genesis_state_hash))
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
                     epoch,
@@ -1498,13 +1498,18 @@ impl IndexerState {
         }
     }
 
-    fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> Result<()> {
+    fn replay_staking_ledger(
+        &self,
+        epoch: &u32,
+        ledger_hash: &LedgerHash,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<()> {
         info!("Replaying staking ledger (epoch {epoch}): {ledger_hash}");
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
         if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), None)?
+            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), genesis_state_hash)?
         {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
