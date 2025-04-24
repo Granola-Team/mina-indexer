@@ -506,6 +506,192 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Zkapp store CFs //
     /////////////////////
 
+    /// #### CF for storing zkapp states
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [[ZkappState; 8]] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_state_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-state")
+            .expect("zkapp-state column family exists")
+    }
+
+    /// #### CF for storing zkapp state counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_state_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-state-num")
+            .expect("zkapp-state-num column family exists")
+    }
+
+    /// #### CF for storing zkapp permissions
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [Permissions] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_permissions_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-permissions")
+            .expect("zkapp-permissions column family exists")
+    }
+
+    /// #### CF for storing zkapp permission counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_permissions_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-permissions-num")
+            .expect("zkapp-permissions-num column family exists")
+    }
+
+    /// #### CF for storing zkapp verification keys
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [VerificationKey] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_verification_key_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-verification-key")
+            .expect("zkapp-verification-key column family exists")
+    }
+
+    /// #### CF for storing zkapp verification key counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_verification_key_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-verification-key-num")
+            .expect("zkapp-verification-key-num column family exists")
+    }
+
+    /// #### CF for storing zkapp uris
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [Permissions] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_uri_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-uri")
+            .expect("zkapp-uri column family exists")
+    }
+
+    /// #### CF for storing zkapp uri counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_uri_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-uri-num")
+            .expect("zkapp-uri-num column family exists")
+    }
+
+    /// #### CF for storing zkapp token symbols
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [TokenSymbol] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_token_symbol_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-token-symbol")
+            .expect("zkapp-token-symbol column family exists")
+    }
+
+    /// #### CF for storing zkapp token symbol counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_token_symbol_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-token-symbol-num")
+            .expect("zkapp-token-symbol-num column family exists")
+    }
+
+    /// #### CF for storing zkapp timings
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}{num}
+    /// val: [Timing] serde bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    /// - num:   [u32] BE bytes
+    fn zkapp_timing_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-timing")
+            .expect("zkapp-timing column family exists")
+    }
+
+    /// #### CF for storing zkapp timing counts
+    ///
+    /// Key-value pairs
+    /// ```
+    /// key: {token}{pk}
+    /// val: [u32] BE bytes
+    /// where:
+    /// - token: [TokenAddress] bytes
+    /// - pk:    [PublicKey] bytes
+    fn zkapp_timing_num_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("zkapp-timing-num")
+            .expect("zkapp-timing-num column family exists")
+    }
+
     /// #### CF for storing zkapp actions
     ///
     /// Key-value pairs
