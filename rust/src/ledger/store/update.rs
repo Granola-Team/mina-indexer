@@ -198,39 +198,101 @@ impl DbAccountUpdate {
                         FailedTransactionNonce(diff) => after.failed_transaction_unapply(diff),
 
                         // zkapp diffs
+                        ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
+                        | ZkappIncrementNonce(_) => after.zkapp_nonce_unapply(),
+                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce_unapply(diff),
+                        ZkappState(diff) => {
+                            let zkapp_state = db
+                                .remove_last_zkapp_state(&diff.token, &diff.public_key)
+                                .ok();
+
+                            if let Some(app_state) = zkapp_state {
+                                let mut zkapp = after.zkapp.expect("zkapp");
+                                zkapp.app_state = app_state;
+
+                                Account {
+                                    zkapp: Some(zkapp),
+                                    ..after
+                                }
+                            } else {
+                                Account {
+                                    zkapp: None,
+                                    ..after
+                                }
+                            }
+                        }
+                        ZkappPermissions(diff) => {
+                            let permissions = db
+                                .remove_last_zkapp_permissions(&diff.token, &diff.public_key)
+                                .ok();
+
+                            Account {
+                                permissions,
+                                ..after
+                            }
+                        }
+                        ZkappVerificationKey(diff) => {
+                            let vk = db
+                                .remove_last_zkapp_verification_key(&diff.token, &diff.public_key)
+                                .ok();
+
+                            if let Some(vk) = vk {
+                                let mut zkapp = after.zkapp.expect("zkapp");
+                                zkapp.verification_key = vk;
+
+                                Account {
+                                    zkapp: Some(zkapp),
+                                    ..after
+                                }
+                            } else {
+                                Account {
+                                    zkapp: None,
+                                    ..after
+                                }
+                            }
+                        }
+                        ZkappUri(diff) => {
+                            let zkapp_uri =
+                                db.remove_last_zkapp_uri(&diff.token, &diff.public_key).ok();
+
+                            if let Some(zkapp_uri) = zkapp_uri {
+                                let mut zkapp = after.zkapp.expect("zkapp");
+                                zkapp.zkapp_uri = zkapp_uri;
+
+                                Account {
+                                    zkapp: Some(zkapp),
+                                    ..after
+                                }
+                            } else {
+                                Account {
+                                    zkapp: None,
+                                    ..after
+                                }
+                            }
+                        }
+                        ZkappTokenSymbol(diff) => {
+                            let token_symbol = db
+                                .remove_last_zkapp_token_symbol(&diff.token, &diff.public_key)
+                                .ok();
+
+                            Account {
+                                token_symbol,
+                                ..after
+                            }
+                        }
+                        ZkappTiming(diff) => {
+                            let timing = db
+                                .remove_last_zkapp_timing(&diff.token, &diff.public_key)
+                                .ok();
+
+                            Account { timing, ..after }
+                        }
                         ZkappActions(diff) => {
                             db.remove_actions(&pk, &token, diff.actions.len() as u32)?;
                             after
                         }
                         ZkappEvents(diff) => {
                             db.remove_events(&pk, &token, diff.events.len() as u32)?;
-                            after
-                        }
-                        ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
-                        | ZkappIncrementNonce(_) => after.zkapp_nonce_unapply(),
-                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce_unapply(diff),
-                        ZkappState(_) => {
-                            // TODO recover previous zkapp state
-                            after
-                        }
-                        ZkappPermissions(_) => {
-                            // TODO recover previous zkapp permissions
-                            after
-                        }
-                        ZkappVerificationKey(_) => {
-                            // TODO recover previous zkapp vk
-                            after
-                        }
-                        ZkappUri(_) => {
-                            // TODO recover previous zkapp uri
-                            after
-                        }
-                        ZkappTokenSymbol(_) => {
-                            // TODO recover previous zkapp token symbol
-                            after
-                        }
-                        ZkappTiming(_) => {
-                            // TODO recover previous zkapp timing
                             after
                         }
                         ZkappProvedState(_) | ZkappVotingFor(_) => after,
