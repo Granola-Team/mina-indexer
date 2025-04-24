@@ -285,7 +285,7 @@ jsonpath "$.data.accounts[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbo
 
 jsonpath "$.data.accounts[1].publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.accounts[1].balance" == 0
-jsonpath "$.data.accounts[1].nonce" == 3
+jsonpath "$.data.accounts[1].nonce" == 1
 jsonpath "$.data.accounts[1].delegate" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.accounts[1].timeLocked" == false
 jsonpath "$.data.accounts[1].is_genesis_account" == false
