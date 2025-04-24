@@ -511,7 +511,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}{num}
-    /// val: [[ZkappState; 8]] serde bytes
+    /// val: [[AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM]] serde bytes
     /// where:
     /// - token: [TokenAddress] bytes
     /// - pk:    [PublicKey] bytes
@@ -604,7 +604,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}{num}
-    /// val: [Permissions] serde bytes
+    /// val: [ZkappUri] bytes
     /// where:
     /// - token: [TokenAddress] bytes
     /// - pk:    [PublicKey] bytes
@@ -635,7 +635,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// Key-value pairs
     /// ```
     /// key: {token}{pk}{num}
-    /// val: [TokenSymbol] serde bytes
+    /// val: [TokenSymbol] bytes
     /// where:
     /// - token: [TokenAddress] bytes
     /// - pk:    [PublicKey] bytes
