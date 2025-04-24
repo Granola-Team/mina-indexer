@@ -753,7 +753,7 @@ impl IndexerState {
 
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 // new block is the parent of the dangling branch root
-                if is_reverse_extension(dangling_branch, precomputed_block) {
+                if dangling_branch.is_reverse_extension(precomputed_block) {
                     merged_tip_ids.push(
                         self.root_branch
                             .merge_on(&new_node_id, dangling_branch)
@@ -816,7 +816,7 @@ impl IndexerState {
                 && precomputed_block.blockchain_length() + 1 >= min_length
             {
                 // simple reverse
-                if is_reverse_extension(dangling_branch, precomputed_block) {
+                if dangling_branch.is_reverse_extension(precomputed_block) {
                     dangling_branch.new_root(precomputed_block);
                     extension = Some((
                         index,
@@ -827,6 +827,7 @@ impl IndexerState {
                             .clone(),
                         ExtensionDirection::Reverse,
                     ));
+
                     break;
                 }
 
@@ -852,7 +853,7 @@ impl IndexerState {
     ) -> Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
         for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
-            if is_reverse_extension(dangling_branch, precomputed_block) {
+            if dangling_branch.is_reverse_extension(precomputed_block) {
                 branches_to_update.push(index);
             }
         }
@@ -1848,10 +1849,9 @@ impl IndexerState {
     }
 }
 
-/// Checks if the block is the parent of the branch's root
-fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
-    precomputed_block.state_hash() == branch.root_block().parent_hash
-}
+/////////////
+// display //
+/////////////
 
 impl std::fmt::Display for IndexerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
