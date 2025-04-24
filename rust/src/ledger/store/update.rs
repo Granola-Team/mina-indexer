@@ -12,7 +12,9 @@ use crate::{
         token::{account::TokenAccount, Token, TokenAddress},
     },
     store::{
-        zkapp::{actions::ZkappActionStore, events::ZkappEventStore, tokens::ZkappTokenStore},
+        zkapp::{
+            actions::ZkappActionStore, events::ZkappEventStore, tokens::ZkappTokenStore, ZkappStore,
+        },
         DbUpdate, IndexerStore, Result,
     },
 };
@@ -73,19 +75,54 @@ impl DbAccountUpdate {
                         Coinbase(diff) => after.coinbase(diff.amount),
                         Delegation(diff) => after.delegation(diff.delegate.clone(), diff.nonce),
                         FailedTransactionNonce(diff) => after.failed_transaction(diff.nonce),
-                        ZkappState(diff) => after.zkapp_state(diff, state_hash),
-                        ZkappPermissions(diff) => after.zkapp_permissions(diff, state_hash),
-                        ZkappVerificationKey(diff) => {
-                            after.zkapp_verification_key(diff, state_hash)
-                        }
-                        ZkappProvedState(diff) => after.zkapp_proved_state(diff, state_hash),
-                        ZkappUri(diff) => after.zkapp_uri(diff, state_hash),
-                        ZkappTokenSymbol(diff) => after.zkapp_token_symbol(diff, state_hash),
-                        ZkappTiming(diff) => after.zkapp_timing(diff, state_hash),
-                        ZkappVotingFor(diff) => after.zkapp_voting_for(diff, state_hash),
+
+                        // zkapp diffs
                         ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff))
                         | ZkappIncrementNonce(diff) => after.zkapp_nonce(diff, state_hash),
                         ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce(diff, state_hash),
+                        ZkappState(diff) => {
+                            let after = after.zkapp_state(diff, state_hash);
+                            db.add_zkapp_state(
+                                &diff.token,
+                                &diff.public_key,
+                                &after.zkapp.as_ref().expect("zkapp").app_state,
+                            )?;
+                            after
+                        }
+                        ZkappPermissions(diff) => {
+                            db.add_zkapp_permissions(
+                                &diff.token,
+                                &diff.public_key,
+                                &diff.permissions,
+                            )?;
+                            after.zkapp_permissions(diff, state_hash)
+                        }
+                        ZkappVerificationKey(diff) => {
+                            db.add_zkapp_verification_key(
+                                &diff.token,
+                                &diff.public_key,
+                                &diff.verification_key,
+                            )?;
+                            after.zkapp_verification_key(diff, state_hash)
+                        }
+                        ZkappUri(diff) => {
+                            db.add_zkapp_uri(&diff.token, &diff.public_key, &diff.zkapp_uri)?;
+                            after.zkapp_uri(diff, state_hash)
+                        }
+                        ZkappTokenSymbol(diff) => {
+                            db.add_zkapp_token_symbol(
+                                &diff.token,
+                                &diff.public_key,
+                                &diff.token_symbol,
+                            )?;
+                            after.zkapp_token_symbol(diff, state_hash)
+                        }
+                        ZkappTiming(diff) => {
+                            db.add_zkapp_timing(&diff.token, &diff.public_key, &diff.timing)?;
+                            after.zkapp_timing(diff, state_hash)
+                        }
+                        ZkappVotingFor(diff) => after.zkapp_voting_for(diff, state_hash),
+                        ZkappProvedState(diff) => after.zkapp_proved_state(diff, state_hash),
 
                         // these diffs do not modify the account
                         ZkappActions(diff) => {
@@ -197,6 +234,8 @@ impl DbAccountUpdate {
                             after
                         }
                         ZkappProvedState(_) | ZkappVotingFor(_) => after,
+
+                        // zkapp diffs should be expanded by this point
                         Zkapp(_) => unreachable!(),
                     };
                 }
