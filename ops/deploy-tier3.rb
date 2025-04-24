@@ -185,14 +185,14 @@ if !skippable
   # Self-check #
   ##############
 
-  puts "Initiating self-check with the restored database..."
+  puts "Initiating self-check with the original database..."
   command_line = EXE +
     " --socket #{SOCKET} " \
     " server start" \
     " --self-check" \
     " --log-level DEBUG" \
     " --web-port #{PORT}" \
-    " --database-dir #{restore_path}" \
+    " --database-dir #{db_dir(BLOCKS_COUNT)}" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
   wait_for_socket(10)
