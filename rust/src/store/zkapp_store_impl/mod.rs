@@ -1,3 +1,5 @@
+//! Zkapp store trait implementation
+
 use super::{
     zkapp::{ZkappState, ZkappStore},
     IndexerStore, Result,
@@ -9,7 +11,16 @@ use crate::{
         token::{TokenAddress, TokenSymbol},
     },
     mina_blocks::v2::{VerificationKey, ZkappUri},
+    store::column_families::ColumnFamilyHelpers,
+    utility::store::{
+        common::from_be_bytes,
+        zkapp::{
+            zkapp_permissions_num_key, zkapp_state_num_key, zkapp_timing_num_key,
+            zkapp_token_symbol_num_key, zkapp_uri_num_key, zkapp_verification_key_num_key,
+        },
+    },
 };
+use log::trace;
 
 pub mod action_store_impl;
 pub mod event_store_impl;
@@ -20,8 +31,13 @@ impl ZkappStore for IndexerStore {
     // app state //
     ///////////////
 
-    fn get_zkapp_state_num(&self, _token: &TokenAddress, _pk: &PublicKey) -> Result<Option<u32>> {
-        Ok(None)
+    fn get_zkapp_state_num(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>> {
+        trace!("Getting zkapp state count for token {} pk {}", token, pk);
+
+        Ok(self
+            .database
+            .get_cf(self.zkapp_state_num_cf(), zkapp_state_num_key(token, pk))?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_state(
@@ -56,10 +72,22 @@ impl ZkappStore for IndexerStore {
 
     fn get_zkapp_permissions_num(
         &self,
-        _token: &TokenAddress,
-        _pk: &PublicKey,
+        token: &TokenAddress,
+        pk: &PublicKey,
     ) -> Result<Option<u32>> {
-        Ok(None)
+        trace!(
+            "Getting zkapp permissions count for token {} pk {}",
+            token,
+            pk
+        );
+
+        Ok(self
+            .database
+            .get_cf(
+                self.zkapp_permissions_num_cf(),
+                zkapp_permissions_num_key(token, pk),
+            )?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_permissions(
@@ -94,10 +122,22 @@ impl ZkappStore for IndexerStore {
 
     fn get_zkapp_verification_key_num(
         &self,
-        _token: &TokenAddress,
-        _pk: &PublicKey,
+        token: &TokenAddress,
+        pk: &PublicKey,
     ) -> Result<Option<u32>> {
-        Ok(None)
+        trace!(
+            "Getting zkapp verification key count for token {} pk {}",
+            token,
+            pk
+        );
+
+        Ok(self
+            .database
+            .get_cf(
+                self.zkapp_verification_key_num_cf(),
+                zkapp_verification_key_num_key(token, pk),
+            )?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_verification_key(
@@ -130,8 +170,13 @@ impl ZkappStore for IndexerStore {
     // zkapp uri //
     ///////////////
 
-    fn get_zkapp_uri_num(&self, _token: &TokenAddress, _pk: &PublicKey) -> Result<Option<u32>> {
-        Ok(None)
+    fn get_zkapp_uri_num(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>> {
+        trace!("Getting zkapp uri count for token {} pk {}", token, pk);
+
+        Ok(self
+            .database
+            .get_cf(self.zkapp_uri_num_cf(), zkapp_uri_num_key(token, pk))?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_uri(
@@ -162,10 +207,22 @@ impl ZkappStore for IndexerStore {
 
     fn get_zkapp_token_symbol_num(
         &self,
-        _token: &TokenAddress,
-        _pk: &PublicKey,
+        token: &TokenAddress,
+        pk: &PublicKey,
     ) -> Result<Option<u32>> {
-        Ok(None)
+        trace!(
+            "Getting zkapp token symbol count for token {} pk {}",
+            token,
+            pk
+        );
+
+        Ok(self
+            .database
+            .get_cf(
+                self.zkapp_token_symbol_num_cf(),
+                zkapp_token_symbol_num_key(token, pk),
+            )?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_token_symbol(
@@ -198,8 +255,13 @@ impl ZkappStore for IndexerStore {
     // timing //
     ////////////
 
-    fn get_zkapp_timing_num(&self, _token: &TokenAddress, _pk: &PublicKey) -> Result<Option<u32>> {
-        Ok(None)
+    fn get_zkapp_timing_num(&self, token: &TokenAddress, pk: &PublicKey) -> Result<Option<u32>> {
+        trace!("Getting zkapp timing count for token {} pk {}", token, pk);
+
+        Ok(self
+            .database
+            .get_cf(self.zkapp_timing_num_cf(), zkapp_timing_num_key(token, pk))?
+            .map(from_be_bytes))
     }
 
     fn get_zkapp_timing(

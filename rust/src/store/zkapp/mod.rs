@@ -1,4 +1,6 @@
-//! The zkapp store trait defines the functionality for:
+//! Zkapp store trait
+//!
+//! Defines the functionality for:
 //! - zkapp accounts
 //! - zkapp transactions
 //! - minted tokens
