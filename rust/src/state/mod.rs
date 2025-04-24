@@ -594,6 +594,7 @@ impl IndexerState {
                     match res {
                         Ok(Some((parsed_block, block_bytes))) => {
                             self.report_progress(block_parser, step_time, total_time)?;
+                            self.compact_db_every_n_blocks(100_000)?;
                             step_time = Instant::now();
 
                             match parsed_block {
