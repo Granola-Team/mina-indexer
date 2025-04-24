@@ -738,7 +738,14 @@ test_sync() {
 test_replay() {
 	stage_blocks v1 15 "$BLOCKS_DIR"
 
-	start_v1
+	idxr database create \
+		--blocks-dir ./blocks \
+		--database-dir ./database \
+		--staking-ledgers-dir $STAKING_LEDGERS
+	start \
+		--blocks-dir ./blocks \
+		--database-dir ./database \
+		--staking-ledgers-dir $STAKING_LEDGERS
 
 	assert 26 $(idxr summary --json | jq -r .blocks_processed)
 	shutdown_idxr
@@ -750,7 +757,8 @@ test_replay() {
 	start \
 		--self-check \
 		--blocks-dir ./blocks \
-		--database-dir ./database
+		--database-dir ./database \
+		--staking-ledgers-dir $STAKING_LEDGERS
 
 	# post-replay results
 	root_hash_replay=$(idxr summary --json | jq -r .witness_tree.canonical_root_hash)
