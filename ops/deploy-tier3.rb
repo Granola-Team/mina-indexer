@@ -169,18 +169,47 @@ if !skippable
   ) || abort("Snapshot restore failed.")
   puts "Snapshot restore complete."
 
-  ############
-  # Shutdown #
-  ############
+  ##############
+  # Shutdown 1 #
+  ##############
 
-  puts "Initiating shutdown..."
+  puts "Initiating shutdown 1..."
   invoke_mina_indexer(
     "--socket", SOCKET,
     "shutdown"
   ) || abort("Shutdown failed after snapshot.")
-
   Process.wait(pid)
-  puts "Shutdown complete."
+  puts "Shutdown 1 complete."
+
+  ##############
+  # Self-check #
+  ##############
+
+  puts "Initiating self-check with the restored database..."
+  command_line = EXE +
+    " --socket #{SOCKET} " \
+    " server start" \
+    " --self-check" \
+    " --log-level DEBUG" \
+    " --web-port #{PORT}" \
+    " --database-dir #{restore_path}" \
+    " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
+  pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
+  wait_for_socket(10)
+  puts "Self-check complete."
+
+  ##############
+  # Shutdown 2 #
+  ##############
+
+  puts "Initiating shutdown 2..."
+  invoke_mina_indexer(
+    "--socket", SOCKET,
+    "shutdown"
+  ) || abort("Shutdown failed after self-check.")
+  Process.wait(pid)
+  puts "Shutdown 2 complete."
+
   File.delete(CURRENT)
 
   # Delete the snapshot and the database directory restored to.
@@ -193,23 +222,4 @@ if !skippable
   # Delete the database directory. We have the snapshot if we want it.
   #
   FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
-
-  ##############
-  # Self-check #
-  ##############
-
-  # TODO: uncomment this!
-  # https://github.com/Granola-Team/mina-indexer/issues/1852
-  #
-  # puts 'Initiating self-check...'
-  # pid = spawn EXE +
-  #             " --socket #{SOCKET}" \
-  #             ' server start' \
-  #             ' --self-check' \
-  #             ' --log-level DEBUG' \
-  #             " --web-port #{PORT}" \
-  #             " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-  #             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  # wait_for_socket(10)
-  # puts 'Self-check complete.'
 end
