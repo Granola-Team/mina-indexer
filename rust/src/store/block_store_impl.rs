@@ -190,7 +190,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting block {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.blocks_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.blocks_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| {
                 serde_json::from_slice::<PrecomputedBlock>(&bytes[U64_LEN..])
                     .with_context(|| format!("{:?}", bytes.to_vec()))
@@ -384,7 +384,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting block ledger diff {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.block_ledger_diff_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.block_ledger_diff_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
@@ -768,7 +768,7 @@ impl BlockStore for IndexerStore {
         let key = state_hash.0.as_bytes();
         Ok(self
             .database
-            .get_pinned_cf(self.block_version_cf(), key)?
+            .get_cf(self.block_version_cf(), key)?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 
@@ -832,7 +832,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting global slot for height {blockchain_length}");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.block_height_to_global_slots_cf(),
                 blockchain_length.to_be_bytes(),
             )?
@@ -843,7 +843,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting height for global slot {global_slot}");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.block_global_slot_to_heights_cf(),
                 global_slot.to_be_bytes(),
             )?
@@ -921,7 +921,7 @@ impl BlockStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.block_total_supply_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.block_total_supply_cf(), state_hash.0.as_bytes())?
             .map(|bytes| u64_from_be_bytes(&bytes).expect("block total currency")))
     }
 
@@ -1511,7 +1511,7 @@ impl BlockStore for IndexerStore {
         trace!("Getting block comparison {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.block_comparison_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.block_comparison_cf(), state_hash.0.as_bytes())?
             .and_then(|bytes| serde_json::from_slice(&bytes).ok()))
     }
 

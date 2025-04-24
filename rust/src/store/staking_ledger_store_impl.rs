@@ -41,7 +41,7 @@ impl StakingLedgerStore for IndexerStore {
 
             return Ok(self
                 .database
-                .get_pinned_cf(self.staking_ledger_accounts_cf(), key)?
+                .get_cf(self.staking_ledger_accounts_cf(), key)?
                 .and_then(|bytes| {
                     serde_json::from_slice(&bytes).expect("staking ledger account")
                 }));

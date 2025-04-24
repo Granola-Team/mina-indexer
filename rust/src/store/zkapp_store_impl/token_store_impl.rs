@@ -416,7 +416,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_cf(), token.0.as_bytes())?
+            .get_cf(self.zkapp_tokens_cf(), token.0.as_bytes())?
             .map(|token| serde_json::from_slice(&token).expect("token")))
     }
 
@@ -425,7 +425,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_diffs_cf(),
                 zkapp_tokens_historical_diffs_key(token, index),
             )?
@@ -504,7 +504,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_pk_diffs_cf(),
                 zkapp_tokens_historical_pk_diffs_key(pk, index),
             )?
@@ -537,7 +537,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_pk_diffs_cf(),
                 zkapp_tokens_historical_pk_diffs_key(pk, index),
             )?
@@ -567,7 +567,7 @@ impl ZkappTokenStore for IndexerStore {
         // get diff to return
         let diff = self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_diffs_cf(),
                 zkapp_tokens_historical_diffs_key(token, index),
             )?
@@ -610,7 +610,7 @@ impl ZkappTokenStore for IndexerStore {
         // get diff to return
         let diff = self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_pk_diffs_cf(),
                 zkapp_tokens_historical_pk_diffs_key(pk, index),
             )?
@@ -669,7 +669,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_at_index_cf(), index.to_be_bytes())?
+            .get_cf(self.zkapp_tokens_at_index_cf(), index.to_be_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("token index {}", index))
@@ -682,7 +682,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_supply_cf(), token.0.as_bytes())?
+            .get_cf(self.zkapp_tokens_supply_cf(), token.0.as_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("token supply {}", token))
@@ -695,7 +695,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_owner_cf(), token.0.as_bytes())?
+            .get_cf(self.zkapp_tokens_owner_cf(), token.0.as_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("token owner {}", token))
@@ -716,7 +716,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_owners_cf(),
                 zkapp_tokens_historical_owners_key(token, index),
             )?
@@ -754,7 +754,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_symbols_cf(),
                 zkapp_tokens_historical_symbols_key(token, index),
             )?
@@ -792,7 +792,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_historical_supplies_cf(),
                 zkapp_tokens_historical_supplies_key(token, index),
             )?
@@ -829,7 +829,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_symbol_cf(), token.0.as_bytes())?
+            .get_cf(self.zkapp_tokens_symbol_cf(), token.0.as_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("token symbol {}", token))
@@ -861,7 +861,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.zkapp_tokens_holder_cf(),
                 zkapp_tokens_holder_key(token, index),
             )?
@@ -969,7 +969,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_tokens_pk_cf(), zkapp_tokens_pk_key(pk, index))?
+            .get_cf(self.zkapp_tokens_pk_cf(), zkapp_tokens_pk_key(pk, index))?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("held token for {} index {}", pk, index))
@@ -997,7 +997,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.blocks_tokens_used_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.blocks_tokens_used_cf(), state_hash.0.as_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("tokens used for {}", state_hash))

@@ -53,7 +53,7 @@ impl ZkappEventStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_events_cf(), zkapp_events_key(token, pk, index))?
+            .get_cf(self.zkapp_events_cf(), zkapp_events_key(token, pk, index))?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .context(format!("missing {index} event for ({pk}, {token})"))

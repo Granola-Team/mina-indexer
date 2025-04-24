@@ -270,7 +270,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command {txn_hash} in block {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.user_commands_cf(), txn_block_key(txn_hash, state_hash))?
+            .get_cf(self.user_commands_cf(), txn_block_key(txn_hash, state_hash))?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("txn hash {txn_hash} state hash {state_hash}"))
@@ -282,7 +282,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting user command blocks {txn_hash}");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.user_commands_state_hashes_cf(),
                 txn_hash.ref_inner().as_bytes(),
             )?
@@ -353,7 +353,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting block user commands {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.user_commands_per_block_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.user_commands_per_block_cf(), state_hash.0.as_bytes())?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .with_context(|| format!("state hash {state_hash}"))
@@ -377,7 +377,7 @@ impl UserCommandStore for IndexerStore {
             for m in 0..n {
                 if let Some(mut block_m_commands) = self
                     .database
-                    .get_pinned_cf(self.user_commands_pk_cf(), key_n(pk, m))?
+                    .get_cf(self.user_commands_pk_cf(), key_n(pk, m))?
                     .map(|bytes| {
                         serde_json::from_slice::<Vec<SignedCommandWithData>>(&bytes)
                             .with_context(|| format!("user command pk {pk} index {m}"))
@@ -930,7 +930,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting block user command count {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.block_user_command_counts_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.block_user_command_counts_cf(), state_hash.0.as_bytes())?
             .map(|bytes| from_be_bytes(bytes.to_vec())))
     }
 
@@ -938,7 +938,7 @@ impl UserCommandStore for IndexerStore {
         trace!("Getting block zkapp command count {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(
+            .get_cf(
                 self.block_zkapp_command_counts_cf(),
                 state_hash.0.as_bytes(),
             )?

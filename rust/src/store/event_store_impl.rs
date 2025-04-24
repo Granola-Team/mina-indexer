@@ -53,7 +53,7 @@ impl EventStore for IndexerStore {
         trace!("Getting event {seq_num}");
         Ok(self
             .database
-            .get_pinned_cf(self.events_cf(), seq_num.to_be_bytes())?
+            .get_cf(self.events_cf(), seq_num.to_be_bytes())?
             .and_then(|bytes| serde_json::from_slice(&bytes[5..]).ok()))
     }
 
