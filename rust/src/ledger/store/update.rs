@@ -169,19 +169,34 @@ impl DbAccountUpdate {
                             db.remove_events(&pk, &token, diff.events.len() as u32)?;
                             after
                         }
-
-                        // TODO zkapp unapply
-                        ZkappState(_)
-                        | ZkappPermissions(_)
-                        | ZkappVerificationKey(_)
-                        | ZkappProvedState(_)
-                        | ZkappUri(_)
-                        | ZkappTokenSymbol(_)
-                        | ZkappTiming(_)
-                        | ZkappVotingFor(_)
-                        | ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
-                        | ZkappIncrementNonce(_)
-                        | ZkappFeePayerNonce(_) => after,
+                        ZkappPayment(ZkappPaymentDiff::IncrementNonce(_))
+                        | ZkappIncrementNonce(_) => after.zkapp_nonce_unapply(),
+                        ZkappFeePayerNonce(diff) => after.zkapp_fee_payer_nonce_unapply(diff),
+                        ZkappState(_) => {
+                            // TODO recover previous zkapp state
+                            after
+                        }
+                        ZkappPermissions(_) => {
+                            // TODO recover previous zkapp permissions
+                            after
+                        }
+                        ZkappVerificationKey(_) => {
+                            // TODO recover previous zkapp vk
+                            after
+                        }
+                        ZkappUri(_) => {
+                            // TODO recover previous zkapp uri
+                            after
+                        }
+                        ZkappTokenSymbol(_) => {
+                            // TODO recover previous zkapp token symbol
+                            after
+                        }
+                        ZkappTiming(_) => {
+                            // TODO recover previous zkapp timing
+                            after
+                        }
+                        ZkappProvedState(_) | ZkappVotingFor(_) => after,
                         Zkapp(_) => unreachable!(),
                     };
                 }

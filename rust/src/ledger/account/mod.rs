@@ -8,7 +8,7 @@ use super::{
     diff::{
         account::{
             zkapp::{
-                ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonceDiff,
+                ZkappActionsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonceDiff,
                 ZkappPaymentDiff, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff,
                 ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
                 ZkappVotingForDiff,
@@ -477,12 +477,6 @@ impl Account {
         }
     }
 
-    /// Apply zkapp events diff
-    fn zkapp_events(self, _diff: &ZkappEventsDiff, _state_hash: &StateHash) -> Self {
-        // todo!("events diff {:?}", diff)
-        self
-    }
-
     /// Apply zkapp nonce increment
     pub fn zkapp_nonce(self, diff: &ZkappIncrementNonceDiff, state_hash: &StateHash) -> Self {
         self.checks(&diff.public_key, &diff.token, state_hash);
@@ -491,6 +485,21 @@ impl Account {
             nonce: Some(self.nonce.unwrap_or_default() + 1),
             ..self
         }
+    }
+
+    /// Unapply a zkapp nonce increment
+    pub fn zkapp_nonce_unapply(self) -> Self {
+        let nonce = if let Some(nonce) = self.nonce {
+            if nonce.0 > 1 {
+                Some(nonce - 1)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self { nonce, ..self }
     }
 
     /// Apply zkapp fee payer nonce
@@ -506,6 +515,17 @@ impl Account {
             nonce: Some(diff.nonce),
             ..self
         }
+    }
+
+    /// Unapply zkapp fee payer nonce
+    pub fn zkapp_fee_payer_nonce_unapply(self, diff: &ZkappFeePayerNonceDiff) -> Self {
+        let nonce = if diff.nonce.0 > 1 {
+            Some(diff.nonce - 1)
+        } else {
+            None
+        };
+
+        Self { nonce, ..self }
     }
 
     /// Apply an account diff to an account
@@ -532,7 +552,7 @@ impl Account {
             ZkappTiming(diff) => self.zkapp_timing(diff, state_hash),
             ZkappVotingFor(diff) => self.zkapp_voting_for(diff, state_hash),
             ZkappActions(diff) => self.zkapp_actions(diff, state_hash),
-            ZkappEvents(diff) => self.zkapp_events(diff, state_hash),
+            ZkappEvents(_) => self,
             ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff)) | ZkappIncrementNonce(diff) => {
                 self.zkapp_nonce(diff, state_hash)
             }
