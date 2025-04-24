@@ -558,8 +558,6 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
                 } else {
                     error!("Indexer store unavailable");
                 }
-            } else {
-                warn!("OTHER {:#?}", path)
             }
         }
     }
