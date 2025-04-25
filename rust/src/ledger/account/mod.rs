@@ -737,6 +737,45 @@ impl std::fmt::Display for Permission {
     }
 }
 
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Permission {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        match u8::arbitrary(g) % 5 {
+            0 => Self::None,
+            1 => Self::Either,
+            2 => Self::Proof,
+            3 => Self::Signature,
+            4 => Self::Impossible,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Permissions {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            edit_state: Permission::arbitrary(g),
+            access: Permission::arbitrary(g),
+            send: Permission::arbitrary(g),
+            receive: Permission::arbitrary(g),
+            set_delegate: Permission::arbitrary(g),
+            set_permissions: Permission::arbitrary(g),
+            set_verification_key: (Permission::arbitrary(g), u8::arbitrary(g).to_string()),
+            set_zkapp_uri: Permission::arbitrary(g),
+            edit_action_state: Permission::arbitrary(g),
+            set_token_symbol: Permission::arbitrary(g),
+            increment_nonce: Permission::arbitrary(g),
+            set_voting_for: Permission::arbitrary(g),
+            set_timing: Permission::arbitrary(g),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Account, Amount};
