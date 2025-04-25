@@ -172,3 +172,25 @@ where
         Self(value.into())
     }
 }
+
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for ZkappUri {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let len = u8::arbitrary(g);
+
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..len {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(chars.iter().collect())
+    }
+}
