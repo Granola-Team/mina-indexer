@@ -122,8 +122,8 @@ impl IndexerStore {
         /////////////////////
         "zkapp-state",
         "zkapp-state-num",
-        "zkapp-permisisons",
-        "zkapp-permisisons-num",
+        "zkapp-permissions",
+        "zkapp-permissions-num",
         "zkapp-verification-key",
         "zkapp-verification-key-num",
         "zkapp-uri",
