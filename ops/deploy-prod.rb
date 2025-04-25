@@ -18,15 +18,17 @@ config_log_dir
 snapshot_name = snapshot_path(BLOCKS_COUNT)
 snapshot_basename = File.basename(snapshot_name)
 if BUILD_TYPE == "nix"
-  puts "Fetching snapshot."
+  puts "Fetching snapshot..."
   system(
     "#{SRC_TOP}/ops/download-snapshot.sh",
     snapshot_basename,
     BASE_DIR
   ) || abort("Failed to download snapshot.")
+  puts "Snapshot fetched."
 else
-  puts "Copying snapshot."
+  puts "Copying snapshot..."
   system("cp #{base_dir("test")}/#{snapshot_basename} #{snapshot_name}") || abort("Failed to move snapshot file.")
+  puts "Snapshot copied."
 end
 
 my_db_dir = db_dir(BLOCKS_COUNT)
@@ -36,13 +38,13 @@ restore_dir = my_db_dir + ".restore"
 #
 FileUtils.rm_rf(restore_dir)
 
-puts "Restoring the snapshot to the database directory (#{my_db_dir})."
-
+puts "Restoring the snapshot to the database directory (#{my_db_dir})..."
 invoke_mina_indexer(
   "database", "restore",
   "--snapshot-file", snapshot_name,
   "--restore-dir", restore_dir
 ) || abort("Snapshot restore failed. Aborting.")
+puts "Restore complete."
 
 # The snapshot restore succeeded, so we may delete the snapshot.
 #
@@ -67,8 +69,9 @@ if File.exist? CURRENT
     "server", "shutdown"
   ) || puts("Shutting down (via command line and socket #{socket}) failed. Moving on.")
 
-  # Maybe the shutdown worked, maybe it didn't. Either way, give the process a
-  # second to clean up.
+  # Maybe the shutdown worked, maybe it didn't. Either way:
+  #
+  puts "Give the process 1 second to clean up."
   sleep 1
 end
 
@@ -91,6 +94,7 @@ if pid
 else
   # I am the child. (The child gets a nil return value.)
   Process.setsid
+  blocks_dir = "#{DEPLOY_DIR}/new-blocks"
   command_line = EXE +
     " --socket #{SOCKET} " \
     " server start" \
@@ -103,10 +107,10 @@ else
     " --missing-block-recovery-delay 11" \
     " --fetch-new-blocks-exe #{SRC_TOP}/ops/o1labs/block-recovery.sh" \
     " --fetch-new-blocks-delay 7" \
-    " --blocks-dir #{BASE_DIR}/blocks" \
+    " --blocks-dir #{blocks_dir}" \
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  puts "Command line: #{command_line}"
+  puts "Spawning: #{command_line}"
   pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
   Process.detach pid
-  puts "Mina Indexer daemon dispatched with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
+  puts "Mina Indexer daemon spawned with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
 end
