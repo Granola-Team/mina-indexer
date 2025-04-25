@@ -630,3 +630,306 @@ impl ZkappStore for IndexerStore {
         Ok(timing)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ZkappStore;
+    use crate::{
+        base::public_key::PublicKey,
+        ledger::{
+            account::{Permissions, Timing},
+            token::{TokenAddress, TokenSymbol},
+        },
+        mina_blocks::v2::{
+            zkapp::{app_state::ZkappState, verification_key::VerificationKey},
+            ZkappUri,
+        },
+        store::IndexerStore,
+    };
+    use quickcheck::{Arbitrary, Gen};
+    use tempfile::TempDir;
+
+    const GEN_SIZE: usize = 1000;
+
+    fn create_indexer_store() -> anyhow::Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(std::env::current_dir()?)?;
+        let store = IndexerStore::new(temp_dir.path())?;
+        Ok(store)
+    }
+
+    #[test]
+    fn zkapp_state() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_state_num(&token, &pk)?.is_none());
+
+        // add zkapp state
+        let zkapp_state0 = ZkappState::arbitrary(g);
+        store.add_zkapp_state(&token, &pk, &zkapp_state0)?;
+
+        assert_eq!(store.get_zkapp_state_num(&token, &pk)?.unwrap(), 1);
+
+        // add another zkapp state
+        let zkapp_state1 = ZkappState::arbitrary(g);
+        store.add_zkapp_state(&token, &pk, &zkapp_state1)?;
+
+        assert_eq!(store.get_zkapp_state_num(&token, &pk)?.unwrap(), 2);
+
+        // get zkapp states
+        assert_eq!(
+            store.get_zkapp_state(&token, &pk, 0)?.unwrap(),
+            zkapp_state0
+        );
+        assert_eq!(
+            store.get_zkapp_state(&token, &pk, 1)?.unwrap(),
+            zkapp_state1
+        );
+
+        // remove last zkapp states
+        store.remove_last_zkapp_state(&token, &pk)?;
+
+        assert_eq!(store.get_zkapp_state_num(&token, &pk)?.unwrap(), 1);
+        assert_eq!(
+            store.get_zkapp_state(&token, &pk, 0)?.unwrap(),
+            zkapp_state0
+        );
+
+        store.remove_last_zkapp_state(&token, &pk)?;
+        assert_eq!(store.get_zkapp_state_num(&token, &pk)?.unwrap(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_permissions() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_permissions_num(&token, &pk)?.is_none());
+
+        // add zkapp permissions
+        let permissions0 = Permissions::arbitrary(g);
+        store.add_zkapp_permissions(&token, &pk, &permissions0)?;
+
+        assert_eq!(store.get_zkapp_permissions_num(&token, &pk)?.unwrap(), 1);
+
+        // add another zkapp permissions
+        let permissions1 = Permissions::arbitrary(g);
+        store.add_zkapp_permissions(&token, &pk, &permissions1)?;
+
+        assert_eq!(store.get_zkapp_permissions_num(&token, &pk)?.unwrap(), 2);
+
+        // get zkapp permissions
+        assert_eq!(
+            store.get_zkapp_permissions(&token, &pk, 0)?.unwrap(),
+            permissions0
+        );
+        assert_eq!(
+            store.get_zkapp_permissions(&token, &pk, 1)?.unwrap(),
+            permissions1
+        );
+
+        // remove last zkapp permissions
+        store.remove_last_zkapp_permissions(&token, &pk)?;
+
+        assert_eq!(store.get_zkapp_permissions_num(&token, &pk)?.unwrap(), 1);
+        assert_eq!(
+            store.get_zkapp_permissions(&token, &pk, 0)?.unwrap(),
+            permissions0
+        );
+
+        store.remove_last_zkapp_permissions(&token, &pk)?;
+        assert_eq!(store.get_zkapp_permissions_num(&token, &pk)?.unwrap(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_verification_key() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_verification_key_num(&token, &pk)?.is_none());
+
+        // add zkapp verification key
+        let verification_key0 = VerificationKey::arbitrary(g);
+        store.add_zkapp_verification_key(&token, &pk, &verification_key0)?;
+
+        assert_eq!(
+            store.get_zkapp_verification_key_num(&token, &pk)?.unwrap(),
+            1
+        );
+
+        // add another zkapp verification key
+        let verification_key1 = VerificationKey::arbitrary(g);
+        store.add_zkapp_verification_key(&token, &pk, &verification_key1)?;
+
+        assert_eq!(
+            store.get_zkapp_verification_key_num(&token, &pk)?.unwrap(),
+            2
+        );
+
+        // get zkapp verification keys
+        assert_eq!(
+            store.get_zkapp_verification_key(&token, &pk, 0)?.unwrap(),
+            verification_key0
+        );
+        assert_eq!(
+            store.get_zkapp_verification_key(&token, &pk, 1)?.unwrap(),
+            verification_key1
+        );
+
+        // remove last zkapp verification keys
+        store.remove_last_zkapp_verification_key(&token, &pk)?;
+
+        assert_eq!(
+            store.get_zkapp_verification_key_num(&token, &pk)?.unwrap(),
+            1
+        );
+        assert_eq!(
+            store.get_zkapp_verification_key(&token, &pk, 0)?.unwrap(),
+            verification_key0
+        );
+
+        store.remove_last_zkapp_verification_key(&token, &pk)?;
+        assert_eq!(
+            store.get_zkapp_verification_key_num(&token, &pk)?.unwrap(),
+            0
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_uri() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_uri_num(&token, &pk)?.is_none());
+
+        // add zkapp uri
+        let zkapp_uri0 = ZkappUri::arbitrary(g);
+        store.add_zkapp_uri(&token, &pk, &zkapp_uri0)?;
+
+        assert_eq!(store.get_zkapp_uri_num(&token, &pk)?.unwrap(), 1);
+
+        // add another zkapp uri
+        let zkapp_uri1 = ZkappUri::arbitrary(g);
+        store.add_zkapp_uri(&token, &pk, &zkapp_uri1)?;
+
+        assert_eq!(store.get_zkapp_uri_num(&token, &pk)?.unwrap(), 2);
+
+        // get zkapp uris
+        assert_eq!(store.get_zkapp_uri(&token, &pk, 0)?.unwrap(), zkapp_uri0);
+        assert_eq!(store.get_zkapp_uri(&token, &pk, 1)?.unwrap(), zkapp_uri1);
+
+        // remove last zkapp uris
+        store.remove_last_zkapp_uri(&token, &pk)?;
+
+        assert_eq!(store.get_zkapp_uri_num(&token, &pk)?.unwrap(), 1);
+        assert_eq!(store.get_zkapp_uri(&token, &pk, 0)?.unwrap(), zkapp_uri0);
+
+        store.remove_last_zkapp_uri(&token, &pk)?;
+        assert_eq!(store.get_zkapp_uri_num(&token, &pk)?.unwrap(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_token_symbol() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_token_symbol_num(&token, &pk)?.is_none());
+
+        // add zkapp token symbol
+        let token_symbol0 = TokenSymbol::arbitrary(g);
+        store.add_zkapp_token_symbol(&token, &pk, &token_symbol0)?;
+
+        assert_eq!(store.get_zkapp_token_symbol_num(&token, &pk)?.unwrap(), 1);
+
+        // add another zkapp token symbol
+        let token_symbol1 = TokenSymbol::arbitrary(g);
+        store.add_zkapp_token_symbol(&token, &pk, &token_symbol1)?;
+
+        assert_eq!(store.get_zkapp_token_symbol_num(&token, &pk)?.unwrap(), 2);
+
+        // get zkapp token symbols
+        assert_eq!(
+            store.get_zkapp_token_symbol(&token, &pk, 0)?.unwrap(),
+            token_symbol0
+        );
+        assert_eq!(
+            store.get_zkapp_token_symbol(&token, &pk, 1)?.unwrap(),
+            token_symbol1
+        );
+
+        // remove last zkapp token symbols
+        store.remove_last_zkapp_token_symbol(&token, &pk)?;
+
+        assert_eq!(store.get_zkapp_token_symbol_num(&token, &pk)?.unwrap(), 1);
+        assert_eq!(
+            store.get_zkapp_token_symbol(&token, &pk, 0)?.unwrap(),
+            token_symbol0
+        );
+
+        store.remove_last_zkapp_token_symbol(&token, &pk)?;
+        assert_eq!(store.get_zkapp_token_symbol_num(&token, &pk)?.unwrap(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn zkapp_timing() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::arbitrary(g);
+        let token = TokenAddress::arbitrary(g);
+
+        assert!(store.get_zkapp_timing_num(&token, &pk)?.is_none());
+
+        // add zkapp timing
+        let timing0 = Timing::arbitrary(g);
+        store.add_zkapp_timing(&token, &pk, &timing0)?;
+
+        assert_eq!(store.get_zkapp_timing_num(&token, &pk)?.unwrap(), 1);
+
+        // add another zkapp timing
+        let timing1 = Timing::arbitrary(g);
+        store.add_zkapp_timing(&token, &pk, &timing1)?;
+
+        assert_eq!(store.get_zkapp_timing_num(&token, &pk)?.unwrap(), 2);
+
+        // get zkapp timings
+        assert_eq!(store.get_zkapp_timing(&token, &pk, 0)?.unwrap(), timing0);
+        assert_eq!(store.get_zkapp_timing(&token, &pk, 1)?.unwrap(), timing1);
+
+        // remove last zkapp timings
+        store.remove_last_zkapp_timing(&token, &pk)?;
+
+        assert_eq!(store.get_zkapp_timing_num(&token, &pk)?.unwrap(), 1);
+        assert_eq!(store.get_zkapp_timing(&token, &pk, 0)?.unwrap(), timing0);
+
+        store.remove_last_zkapp_timing(&token, &pk)?;
+        assert_eq!(store.get_zkapp_timing_num(&token, &pk)?.unwrap(), 0);
+
+        Ok(())
+    }
+}
