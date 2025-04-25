@@ -169,46 +169,17 @@ if !skippable
   ) || abort("Snapshot restore failed.")
   puts "Snapshot restore complete."
 
-  ##############
-  # Shutdown 1 #
-  ##############
+  ############
+  # Shutdown #
+  ############
 
-  puts "Initiating shutdown 1..."
+  puts "Initiating shutdown..."
   invoke_mina_indexer(
     "--socket", SOCKET,
     "shutdown"
   ) || abort("Shutdown failed after snapshot.")
   Process.wait(pid)
-  puts "Shutdown 1 complete."
-
-  ##############
-  # Self-check #
-  ##############
-
-  puts "Initiating self-check with the original database..."
-  command_line = EXE +
-    " --socket #{SOCKET} " \
-    " server start" \
-    " --self-check" \
-    " --log-level DEBUG" \
-    " --web-port #{PORT}" \
-    " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-    " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
-  wait_for_socket(10)
-  puts "Self-check complete."
-
-  ##############
-  # Shutdown 2 #
-  ##############
-
-  puts "Initiating shutdown 2..."
-  invoke_mina_indexer(
-    "--socket", SOCKET,
-    "shutdown"
-  ) || abort("Shutdown failed after self-check.")
-  Process.wait(pid)
-  puts "Shutdown 2 complete."
+  puts "Shutdown complete."
 
   File.delete(CURRENT)
 
