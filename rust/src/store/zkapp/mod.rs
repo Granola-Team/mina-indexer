@@ -9,20 +9,17 @@
 
 use crate::{
     base::public_key::PublicKey,
-    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::{Permissions, Timing},
         token::{TokenAddress, TokenSymbol},
     },
-    mina_blocks::v2::{AppState, VerificationKey, ZkappUri},
+    mina_blocks::v2::{VerificationKey, ZkappState, ZkappUri},
     store::Result,
 };
 
 pub mod actions;
 pub mod events;
 pub mod tokens;
-
-pub type ZkappState = [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM];
 
 pub trait ZkappStore {
     ///////////////

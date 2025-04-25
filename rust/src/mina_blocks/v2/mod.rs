@@ -10,7 +10,6 @@ use crate::{
         nonce::Nonce, numeric::Numeric, public_key::PublicKey, scheduled_time::ScheduledTime,
         Balance,
     },
-    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
         token::{TokenAddress, TokenSymbol},
@@ -23,6 +22,7 @@ use staged_ledger_diff::StagedLedgerDiff;
 // re-export types
 
 pub type AppState = zkapp::app_state::AppState;
+pub type ZkappState = zkapp::app_state::ZkappState;
 pub type ActionState = zkapp::action_state::ActionState;
 pub type ZkappEvent = zkapp::event::ZkappEvent;
 pub type VerificationKey = zkapp::verification_key::VerificationKey;
@@ -128,7 +128,7 @@ pub enum PermissionKind {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZkappAccount {
-    pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    pub app_state: ZkappState,
     pub action_state: [ActionState; 5],
     pub verification_key: VerificationKey,
     pub proved_state: bool,

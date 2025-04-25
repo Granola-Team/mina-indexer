@@ -359,7 +359,7 @@ impl Account {
         // modify app state
         for (idx, diff) in diff.diffs.iter().enumerate() {
             if let Some(app_state) = diff.to_owned() {
-                zkapp.app_state[idx] = app_state;
+                zkapp.app_state.0[idx] = app_state;
             }
         }
 
@@ -897,7 +897,7 @@ mod tests {
         // only the first app state element is modified
         let expect = {
             let mut app_state = before.zkapp.clone().unwrap().app_state;
-            app_state[0] = app_state_elem;
+            app_state.0[0] = app_state_elem;
 
             Account {
                 zkapp: Some(ZkappAccount {

@@ -23,7 +23,7 @@ pub struct VerificationKey {
 impl From<v2::ZkappAccount> for ZkappAccount {
     fn from(value: v2::ZkappAccount) -> Self {
         Self {
-            app_state: value.app_state.map(|s| s.0),
+            app_state: value.app_state.0.map(|s| s.0),
             action_state: value.action_state.map(|s| s.0),
             verification_key: value.verification_key.into(),
             proved_state: value.proved_state,

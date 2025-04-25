@@ -1,4 +1,10 @@
+//! Zkapp state
+
+use crate::constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM;
 use serde::{Deserialize, Serialize};
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ZkappState(pub [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM]);
 
 /// 32 bytes
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -63,5 +69,21 @@ impl quickcheck::Arbitrary for AppState {
         }
 
         Self(format!("0x{}", hex::encode(bytes)))
+    }
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for ZkappState {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self([
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+            AppState::arbitrary(g),
+        ])
     }
 }

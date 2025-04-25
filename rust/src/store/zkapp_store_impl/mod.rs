@@ -1,16 +1,13 @@
 //! Zkapp store trait implementation
 
-use super::{
-    zkapp::{ZkappState, ZkappStore},
-    IndexerStore, Result,
-};
+use super::{zkapp::ZkappStore, IndexerStore, Result};
 use crate::{
     base::public_key::PublicKey,
     ledger::{
         account::{Permissions, Timing},
         token::{TokenAddress, TokenSymbol},
     },
-    mina_blocks::v2::{VerificationKey, ZkappUri},
+    mina_blocks::v2::{VerificationKey, ZkappState, ZkappUri},
     store::column_families::ColumnFamilyHelpers,
     utility::store::{
         common::from_be_bytes,
@@ -111,7 +108,7 @@ impl ZkappStore for IndexerStore {
         self.database.put_cf(
             self.zkapp_state_num_cf(),
             zkapp_state_num_key(token, pk),
-            (index - 1).to_be_bytes(),
+            index.to_be_bytes(),
         )?;
 
         Ok(zkapp_state)
@@ -225,7 +222,7 @@ impl ZkappStore for IndexerStore {
         self.database.put_cf(
             self.zkapp_permissions_num_cf(),
             zkapp_permissions_num_key(token, pk),
-            (index - 1).to_be_bytes(),
+            index.to_be_bytes(),
         )?;
 
         Ok(permissions)
