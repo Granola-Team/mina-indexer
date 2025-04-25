@@ -39,7 +39,6 @@ SHELL_SCRIPTS = %W[
   ops/ci/tier2
   tests/regression.bash
   tests/recovery.sh
-  ops/download-snapshot.sh
   ops/traverse-canonical-chain.sh
   ops/correct-file-names.sh
   ops/minaexplorer/download-staking-ledgers.sh
