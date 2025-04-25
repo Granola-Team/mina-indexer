@@ -67,6 +67,11 @@ impl Branch {
         Self { root, branches }
     }
 
+    /// Checks if the block is the parent of the branch's root
+    pub fn is_reverse_extension(&self, precomputed_block: &PrecomputedBlock) -> bool {
+        precomputed_block.state_hash() == self.root_block().parent_hash
+    }
+
     pub fn is_empty(&self) -> bool {
         self.branches.height() == 0
     }

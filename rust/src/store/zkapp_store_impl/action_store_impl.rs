@@ -54,7 +54,7 @@ impl ZkappActionStore for IndexerStore {
 
         Ok(self
             .database
-            .get_pinned_cf(self.zkapp_actions_cf(), zkapp_actions_key(token, pk, index))?
+            .get_cf(self.zkapp_actions_cf(), zkapp_actions_key(token, pk, index))?
             .map(|bytes| {
                 serde_json::from_slice(&bytes)
                     .context(format!("missing {index} action for ({pk}, {token})"))

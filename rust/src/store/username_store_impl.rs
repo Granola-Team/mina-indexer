@@ -45,7 +45,7 @@ impl UsernameStore for IndexerStore {
         trace!("Getting block username updates {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.usernames_per_block_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.usernames_per_block_cf(), state_hash.0.as_bytes())?
             .map(|bytes| serde_json::from_slice(&bytes).expect("msg")))
     }
 

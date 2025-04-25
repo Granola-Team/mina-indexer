@@ -113,7 +113,7 @@ impl SnarkStore for IndexerStore {
             for (index, snark) in block_pk_snarks.iter().enumerate() {
                 if self
                     .database
-                    .get_pinned_cf(
+                    .get_cf(
                         self.snark_prover_block_height_sort_cf(),
                         snark_prover_sort_key(&pk, block_height, index as u32),
                     )?
@@ -144,7 +144,7 @@ impl SnarkStore for IndexerStore {
         for index in 0..self.get_snarks_pk_total_count(pk)? {
             snarks.push(
                 self.database
-                    .get_pinned_cf(self.snarks_prover_cf(), pk_index_key(pk, index))?
+                    .get_cf(self.snarks_prover_cf(), pk_index_key(pk, index))?
                     .map(|bytes| {
                         serde_json::from_slice::<SnarkWorkSummaryWithStateHash>(&bytes)
                             .expect("SNARK work with state hash")
@@ -165,7 +165,7 @@ impl SnarkStore for IndexerStore {
             for index in 0..num {
                 let snark = self
                     .database
-                    .get_pinned_cf(self.snarks_cf(), block_index_key(state_hash, index))?
+                    .get_cf(self.snarks_cf(), block_index_key(state_hash, index))?
                     .map(|bytes| {
                         serde_json::from_slice(&bytes).expect("SnarkWorkSummary serde bytes")
                     })
@@ -576,7 +576,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(self.snark_prover_fees_cf(), pk.0.as_bytes())?
+                .get_cf(self.snark_prover_fees_cf(), pk.0.as_bytes())?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK total fees")),
             Some(block_height) => self
                 .get_snark_prover_prev_fees(pk, block_height, None)?
@@ -599,7 +599,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(
+                .get_cf(
                     self.snark_prover_fees_epoch_cf(),
                     snark_epoch_key(epoch, pk),
                 )?
@@ -623,7 +623,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(self.snark_prover_max_fee_cf(), pk.0.as_bytes())?
+                .get_cf(self.snark_prover_max_fee_cf(), pk.0.as_bytes())?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK max fee")),
             Some(block_height) => self
                 .get_snark_prover_prev_fees(pk, block_height, None)?
@@ -646,7 +646,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(
+                .get_cf(
                     self.snark_prover_max_fee_epoch_cf(),
                     snark_epoch_key(epoch, pk),
                 )?
@@ -670,7 +670,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(self.snark_prover_min_fee_cf(), pk.0.as_bytes())?
+                .get_cf(self.snark_prover_min_fee_cf(), pk.0.as_bytes())?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK min fee")),
             Some(block_height) => self
                 .get_snark_prover_prev_fees(pk, block_height, None)?
@@ -693,7 +693,7 @@ impl SnarkStore for IndexerStore {
         Ok(match block_height {
             None => self
                 .database
-                .get_pinned_cf(
+                .get_cf(
                     self.snark_prover_min_fee_epoch_cf(),
                     snark_epoch_key(epoch, pk),
                 )?
@@ -936,7 +936,7 @@ impl SnarkStore for IndexerStore {
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
             .database
-            .get_pinned_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
+            .get_cf(self.snarks_epoch_cf(), epoch.to_be_bytes())?
             .map_or(0, |bytes| {
                 u32_from_be_bytes(&bytes).expect("epoch SNARK count")
             }))
@@ -1009,7 +1009,7 @@ impl SnarkStore for IndexerStore {
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
         Ok(self
             .database
-            .get_pinned_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
+            .get_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
             .map_or(0, |bytes| {
                 u32_from_be_bytes(&bytes).expect("pk epoch SNARK count")
             }))
@@ -1029,7 +1029,7 @@ impl SnarkStore for IndexerStore {
         trace!("Getting pk total SNARKs count {pk}");
         Ok(self
             .database
-            .get_pinned_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
+            .get_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
             .map_or(0, |bytes| {
                 u32_from_be_bytes(&bytes).expect("pk total SNARK count")
             }))
@@ -1049,7 +1049,7 @@ impl SnarkStore for IndexerStore {
         trace!("Getting block SNARKs count {state_hash}");
         Ok(self
             .database
-            .get_pinned_cf(self.block_snark_counts_cf(), state_hash.0.as_bytes())?
+            .get_cf(self.block_snark_counts_cf(), state_hash.0.as_bytes())?
             .map(|bytes| u32_from_be_bytes(&bytes).expect("block SNARK count")))
     }
 

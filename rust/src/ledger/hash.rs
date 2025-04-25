@@ -79,6 +79,12 @@ impl std::str::FromStr for LedgerHash {
     }
 }
 
+impl From<&str> for LedgerHash {
+    fn from(value: &str) -> Self {
+        Self::new_or_panic(value.to_string())
+    }
+}
+
 /////////////
 // default //
 /////////////

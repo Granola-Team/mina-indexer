@@ -179,6 +179,42 @@ pub trait ColumnFamilyHelpers {
     // Zkapp store CFs //
     /////////////////////
 
+    /// CF for storing zkapp states
+    fn zkapp_state_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp state counts
+    fn zkapp_state_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp permissions
+    fn zkapp_permissions_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp permission counts
+    fn zkapp_permissions_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp verification keys
+    fn zkapp_verification_key_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp verification key counts
+    fn zkapp_verification_key_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp uris
+    fn zkapp_uri_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp uri counts
+    fn zkapp_uri_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp token symbols
+    fn zkapp_token_symbol_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp token symbol counts
+    fn zkapp_token_symbol_num_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp timings
+    fn zkapp_timing_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing zkapp timing counts
+    fn zkapp_timing_num_cf(&self) -> &ColumnFamily;
+
     /// CF for storing zkapp actions
     fn zkapp_actions_cf(&self) -> &ColumnFamily;
 

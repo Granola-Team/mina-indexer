@@ -15,12 +15,15 @@ pub trait BestLedgerStore {
     /////////////////////////
 
     /// Get the token account from the best ledger
+    /// ****************************************************
+    /// This does not account for any potential creation fee
+    /// ****************************************************
     fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>>;
 
     /// Get the display view of the token account
-    /// ****************************************************************
-    /// This is `pk`'s balance accounting for any potential creation fee
-    /// ****************************************************************
+    /// ********************************************
+    /// This accounts for any potential creation fee
+    /// ********************************************
     fn get_best_account_display(
         &self,
         pk: &PublicKey,

@@ -113,7 +113,7 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonical state hash at height {height}");
         Ok(self
             .database
-            .get_pinned_cf(&self.canonicity_length_cf(), height.to_be_bytes())?
+            .get_cf(&self.canonicity_length_cf(), height.to_be_bytes())?
             .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 
@@ -121,7 +121,7 @@ impl CanonicityStore for IndexerStore {
         trace!("Getting canonical state hash at slot {global_slot}");
         Ok(self
             .database
-            .get_pinned_cf(&self.canonicity_slot_cf(), global_slot.to_be_bytes())?
+            .get_cf(&self.canonicity_slot_cf(), global_slot.to_be_bytes())?
             .and_then(|bytes| StateHash::from_bytes(&bytes).ok()))
     }
 

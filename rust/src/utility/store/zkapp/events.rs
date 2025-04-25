@@ -1,3 +1,5 @@
+//! Zkapp events store helpers
+
 use crate::{
     base::public_key::PublicKey,
     ledger::token::TokenAddress,

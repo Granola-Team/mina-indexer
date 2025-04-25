@@ -8,7 +8,7 @@ use super::{
     diff::{
         account::{
             zkapp::{
-                ZkappActionsDiff, ZkappEventsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonceDiff,
+                ZkappActionsDiff, ZkappFeePayerNonceDiff, ZkappIncrementNonceDiff,
                 ZkappPaymentDiff, ZkappPermissionsDiff, ZkappProvedStateDiff, ZkappStateDiff,
                 ZkappTimingDiff, ZkappTokenSymbolDiff, ZkappUriDiff, ZkappVerificationKeyDiff,
                 ZkappVotingForDiff,
@@ -359,7 +359,7 @@ impl Account {
         // modify app state
         for (idx, diff) in diff.diffs.iter().enumerate() {
             if let Some(app_state) = diff.to_owned() {
-                zkapp.app_state[idx] = app_state;
+                zkapp.app_state.0[idx] = app_state;
             }
         }
 
@@ -477,12 +477,6 @@ impl Account {
         }
     }
 
-    /// Apply zkapp events diff
-    fn zkapp_events(self, _diff: &ZkappEventsDiff, _state_hash: &StateHash) -> Self {
-        // todo!("events diff {:?}", diff)
-        self
-    }
-
     /// Apply zkapp nonce increment
     pub fn zkapp_nonce(self, diff: &ZkappIncrementNonceDiff, state_hash: &StateHash) -> Self {
         self.checks(&diff.public_key, &diff.token, state_hash);
@@ -491,6 +485,21 @@ impl Account {
             nonce: Some(self.nonce.unwrap_or_default() + 1),
             ..self
         }
+    }
+
+    /// Unapply a zkapp nonce increment
+    pub fn zkapp_nonce_unapply(self) -> Self {
+        let nonce = if let Some(nonce) = self.nonce {
+            if nonce.0 > 1 {
+                Some(nonce - 1)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Self { nonce, ..self }
     }
 
     /// Apply zkapp fee payer nonce
@@ -506,6 +515,17 @@ impl Account {
             nonce: Some(diff.nonce),
             ..self
         }
+    }
+
+    /// Unapply zkapp fee payer nonce
+    pub fn zkapp_fee_payer_nonce_unapply(self, diff: &ZkappFeePayerNonceDiff) -> Self {
+        let nonce = if diff.nonce.0 > 1 {
+            Some(diff.nonce - 1)
+        } else {
+            None
+        };
+
+        Self { nonce, ..self }
     }
 
     /// Apply an account diff to an account
@@ -532,7 +552,7 @@ impl Account {
             ZkappTiming(diff) => self.zkapp_timing(diff, state_hash),
             ZkappVotingFor(diff) => self.zkapp_voting_for(diff, state_hash),
             ZkappActions(diff) => self.zkapp_actions(diff, state_hash),
-            ZkappEvents(diff) => self.zkapp_events(diff, state_hash),
+            ZkappEvents(_) => self,
             ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff)) | ZkappIncrementNonce(diff) => {
                 self.zkapp_nonce(diff, state_hash)
             }
@@ -717,6 +737,45 @@ impl std::fmt::Display for Permission {
     }
 }
 
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Permission {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        match u8::arbitrary(g) % 5 {
+            0 => Self::None,
+            1 => Self::Either,
+            2 => Self::Proof,
+            3 => Self::Signature,
+            4 => Self::Impossible,
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Permissions {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            edit_state: Permission::arbitrary(g),
+            access: Permission::arbitrary(g),
+            send: Permission::arbitrary(g),
+            receive: Permission::arbitrary(g),
+            set_delegate: Permission::arbitrary(g),
+            set_permissions: Permission::arbitrary(g),
+            set_verification_key: (Permission::arbitrary(g), u8::arbitrary(g).to_string()),
+            set_zkapp_uri: Permission::arbitrary(g),
+            edit_action_state: Permission::arbitrary(g),
+            set_token_symbol: Permission::arbitrary(g),
+            increment_nonce: Permission::arbitrary(g),
+            set_voting_for: Permission::arbitrary(g),
+            set_timing: Permission::arbitrary(g),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Account, Amount};
@@ -877,7 +936,7 @@ mod tests {
         // only the first app state element is modified
         let expect = {
             let mut app_state = before.zkapp.clone().unwrap().app_state;
-            app_state[0] = app_state_elem;
+            app_state.0[0] = app_state_elem;
 
             Account {
                 zkapp: Some(ZkappAccount {

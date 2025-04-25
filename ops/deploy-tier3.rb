@@ -178,9 +178,9 @@ if !skippable
     "--socket", SOCKET,
     "shutdown"
   ) || abort("Shutdown failed after snapshot.")
-
   Process.wait(pid)
   puts "Shutdown complete."
+
   File.delete(CURRENT)
 
   # Delete the snapshot and the database directory restored to.
@@ -193,23 +193,4 @@ if !skippable
   # Delete the database directory. We have the snapshot if we want it.
   #
   FileUtils.rm_rf(db_dir(BLOCKS_COUNT))
-
-  ##############
-  # Self-check #
-  ##############
-
-  # TODO: uncomment this!
-  # https://github.com/Granola-Team/mina-indexer/issues/1852
-  #
-  # puts 'Initiating self-check...'
-  # pid = spawn EXE +
-  #             " --socket #{SOCKET}" \
-  #             ' server start' \
-  #             ' --self-check' \
-  #             ' --log-level DEBUG' \
-  #             " --web-port #{PORT}" \
-  #             " --database-dir #{db_dir(BLOCKS_COUNT)}" \
-  #             " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
-  # wait_for_socket(10)
-  # puts 'Self-check complete.'
 end

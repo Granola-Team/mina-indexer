@@ -19,10 +19,7 @@ use crate::{
     ledger::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
-        staking::{
-            parser::{extract_epoch_hash, StakingLedgerParser},
-            StakingLedger,
-        },
+        staking::{parser::StakingLedgerParser, StakingLedger},
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
         username::Username,
@@ -38,7 +35,7 @@ use crate::{
     },
     store::{fixed_keys::FixedKeys, username::UsernameStore, IndexerStore},
     utility::{
-        functions::pretty_print_duration,
+        functions::{extract_network_height_hash, pretty_print_duration},
         store::{
             common::{block_u32_prefix_from_key, state_hash_suffix, u64_from_be_bytes},
             ledger::staking::split_staking_ledger_epoch_key,
@@ -52,7 +49,7 @@ use std::{
     collections::{HashMap, HashSet},
     path::Path,
     str::FromStr,
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -88,7 +85,7 @@ pub struct IndexerState {
     pub indexer_store: Option<Arc<IndexerStore>>,
 
     /// Staking ledger epochs and ledger hashes
-    pub staking_ledgers: Arc<Mutex<HashSet<(u32, LedgerHash)>>>,
+    pub staking_ledgers: HashSet<(u32, LedgerHash)>,
 
     /// Threshold amount of confirmations to trigger a pruning event
     pub transition_frontier_length: u32,
@@ -361,7 +358,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
+            staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
         })
     }
@@ -399,7 +396,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: config.ledger_cadence,
             reporting_freq: config.reporting_freq,
-            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
+            staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
         })
     }
@@ -468,7 +465,7 @@ impl IndexerState {
             init_time: Instant::now(),
             ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
             reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
-            staking_ledgers: Arc::new(Mutex::new(HashSet::new())),
+            staking_ledgers: HashSet::new(),
             version: IndexerVersion::default(),
             chain_data: ChainData::default(),
         })
@@ -606,6 +603,7 @@ impl IndexerState {
                     match res {
                         Ok(Some((parsed_block, block_bytes))) => {
                             self.report_progress(block_parser, step_time, total_time)?;
+                            self.compact_db_every_n_blocks(100_000)?;
                             step_time = Instant::now();
 
                             match parsed_block {
@@ -763,7 +761,7 @@ impl IndexerState {
 
             for (index, dangling_branch) in self.dangling_branches.iter_mut().enumerate() {
                 // new block is the parent of the dangling branch root
-                if is_reverse_extension(dangling_branch, precomputed_block) {
+                if dangling_branch.is_reverse_extension(precomputed_block) {
                     merged_tip_ids.push(
                         self.root_branch
                             .merge_on(&new_node_id, dangling_branch)
@@ -826,7 +824,7 @@ impl IndexerState {
                 && precomputed_block.blockchain_length() + 1 >= min_length
             {
                 // simple reverse
-                if is_reverse_extension(dangling_branch, precomputed_block) {
+                if dangling_branch.is_reverse_extension(precomputed_block) {
                     dangling_branch.new_root(precomputed_block);
                     extension = Some((
                         index,
@@ -837,6 +835,7 @@ impl IndexerState {
                             .clone(),
                         ExtensionDirection::Reverse,
                     ));
+
                     break;
                 }
 
@@ -862,7 +861,7 @@ impl IndexerState {
     ) -> Result<ExtensionType> {
         let mut branches_to_update = Vec::new();
         for (index, dangling_branch) in self.dangling_branches.iter().enumerate() {
-            if is_reverse_extension(dangling_branch, precomputed_block) {
+            if dangling_branch.is_reverse_extension(precomputed_block) {
                 branches_to_update.push(index);
             }
         }
@@ -1088,11 +1087,12 @@ impl IndexerState {
             let tasks: Vec<_> = ledger_parser
                 .ledger_paths
                 .map(|path| {
-                    let staking_ledgers = self.staking_ledgers.clone();
+                    let mut staking_ledgers = self.staking_ledgers.clone();
                     let indexer_store = indexer_store.clone();
 
                     tokio::task::spawn(async move {
-                        Self::process_staking_ledger(&path, &indexer_store, &staking_ledgers).await
+                        Self::process_staking_ledger(&path, &indexer_store, &mut staking_ledgers)
+                            .await
                     })
                 })
                 .collect();
@@ -1108,9 +1108,10 @@ impl IndexerState {
     pub async fn process_staking_ledger(
         path: &Path,
         store: &Arc<IndexerStore>,
-        staking_ledgers: &Arc<Mutex<HashSet<(u32, LedgerHash)>>>,
+        staking_ledgers: &mut HashSet<(u32, LedgerHash)>,
     ) -> Result<()> {
-        let (epoch, hash) = extract_epoch_hash(path);
+        let (network, epoch, hash) = extract_network_height_hash(path);
+        let hash: LedgerHash = hash.into();
 
         if store
             .get_staking_ledger_hash_by_epoch(
@@ -1122,7 +1123,6 @@ impl IndexerState {
             let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
 
-            let mut staking_ledgers = staking_ledgers.lock().unwrap();
             staking_ledgers.insert((staking_ledger.epoch, staking_ledger.ledger_hash.to_owned()));
 
             let genesis_state_hash = staking_ledger.genesis_state_hash.to_owned();
@@ -1131,8 +1131,8 @@ impl IndexerState {
             info!("Added staking ledger {summary}");
         } else {
             debug!(
-                "Skipping staking ledger mainnet-{}-{}. Already present in store.",
-                epoch, hash
+                "Skipping staking ledger {}-{}-{}. Already present in store.",
+                network, epoch, hash
             )
         }
 
@@ -1329,7 +1329,7 @@ impl IndexerState {
         };
 
         // update witness tree blocks/staking ledgers
-        self.staking_ledgers = Arc::new(Mutex::new(staking_ledgers));
+        self.staking_ledgers = staking_ledgers;
 
         for block in witness_tree_blocks {
             debug!("Sync: add block {}", block.summary());
@@ -1443,12 +1443,12 @@ impl IndexerState {
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::NewStakingLedger {
                     epoch,
-                    genesis_state_hash: _,
+                    genesis_state_hash,
                     ledger_hash,
                 }) => {
-                    let mut staking_ledgers = self.staking_ledgers.lock().unwrap();
-                    staking_ledgers.insert((*epoch, ledger_hash.to_owned()));
-                    self.replay_staking_ledger(epoch, ledger_hash)
+                    self.staking_ledgers
+                        .insert((*epoch, ledger_hash.to_owned()));
+                    self.replay_staking_ledger(epoch, ledger_hash, Some(genesis_state_hash))
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
                     epoch,
@@ -1510,13 +1510,18 @@ impl IndexerState {
         }
     }
 
-    fn replay_staking_ledger(&self, epoch: &u32, ledger_hash: &LedgerHash) -> Result<()> {
+    fn replay_staking_ledger(
+        &self,
+        epoch: &u32,
+        ledger_hash: &LedgerHash,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<()> {
         info!("Replaying staking ledger (epoch {epoch}): {ledger_hash}");
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
         if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), None)?
+            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), genesis_state_hash)?
         {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
@@ -1673,9 +1678,10 @@ impl IndexerState {
             max_dangling_height,
             max_dangling_length,
         };
-        let staking_ledgers = self.staking_ledgers.lock().unwrap();
+
         let (max_staking_ledger_epoch, max_staking_ledger_hash) = {
-            let epoch_hash = staking_ledgers
+            let epoch_hash = self
+                .staking_ledgers
                 .iter()
                 .max_by(|(epoch0, _), (epoch1, _)| epoch0.cmp(epoch1));
             (
@@ -1727,9 +1733,10 @@ impl IndexerState {
             max_dangling_length,
             witness_tree: format!("{self}"),
         };
-        let staking_ledgers = self.staking_ledgers.lock().unwrap();
+
         let (max_staking_ledger_epoch, max_staking_ledger_hash) = {
-            let epoch_hash = staking_ledgers
+            let epoch_hash = self
+                .staking_ledgers
                 .iter()
                 .max_by(|(epoch0, _), (epoch1, _)| epoch0.cmp(epoch1));
             (
@@ -1853,10 +1860,9 @@ impl IndexerState {
     }
 }
 
-/// Checks if the block is the parent of the branch's root
-fn is_reverse_extension(branch: &Branch, precomputed_block: &PrecomputedBlock) -> bool {
-    precomputed_block.state_hash() == branch.root_block().parent_hash
-}
+/////////////
+// display //
+/////////////
 
 impl std::fmt::Display for IndexerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

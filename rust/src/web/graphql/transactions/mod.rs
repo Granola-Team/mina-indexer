@@ -1411,7 +1411,11 @@ impl TokenAccount {
         balance_change: i64,
         increment_nonce: bool,
     ) -> Self {
-        let token_symbol = db.get_token_symbol(&token).unwrap().expect("token symbol");
+        let token_symbol = db
+            .get_token_symbol(&token)
+            .unwrap()
+            .with_context(|| format!("token {}", token))
+            .unwrap_or_default();
 
         Self {
             balance_change,

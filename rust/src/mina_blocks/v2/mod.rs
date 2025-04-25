@@ -10,7 +10,6 @@ use crate::{
         nonce::Nonce, numeric::Numeric, public_key::PublicKey, scheduled_time::ScheduledTime,
         Balance,
     },
-    constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::ReceiptChainHash,
         token::{TokenAddress, TokenSymbol},
@@ -23,6 +22,7 @@ use staged_ledger_diff::StagedLedgerDiff;
 // re-export types
 
 pub type AppState = zkapp::app_state::AppState;
+pub type ZkappState = zkapp::app_state::ZkappState;
 pub type ActionState = zkapp::action_state::ActionState;
 pub type ZkappEvent = zkapp::event::ZkappEvent;
 pub type VerificationKey = zkapp::verification_key::VerificationKey;
@@ -128,7 +128,7 @@ pub enum PermissionKind {
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ZkappAccount {
-    pub app_state: [AppState; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    pub app_state: ZkappState,
     pub action_state: [ActionState; 5],
     pub verification_key: VerificationKey,
     pub proved_state: bool,
@@ -170,5 +170,27 @@ where
 {
     fn from(value: T) -> Self {
         Self(value.into())
+    }
+}
+
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for ZkappUri {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let len = u8::arbitrary(g);
+
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..len {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(chars.iter().collect())
     }
 }
