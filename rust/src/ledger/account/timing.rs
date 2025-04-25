@@ -18,3 +18,20 @@ pub struct Timing {
     pub vesting_increment: Balance,
     pub initial_minimum_balance: Balance,
 }
+
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Timing {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            cliff_time: Numeric(u32::arbitrary(g)),
+            vesting_period: Numeric(u32::arbitrary(g)),
+            cliff_amount: Numeric(u64::arbitrary(g)),
+            vesting_increment: Numeric(u64::arbitrary(g)),
+            initial_minimum_balance: Numeric(u64::arbitrary(g)),
+        }
+    }
+}
