@@ -21,7 +21,6 @@ Files in this directory:
 - `./o1-labs/download-mina-blocks.sh`
 - `./rclone.conf`
 - `./recycle-pcbs.rb`
-- `./regression-test.rb`
 - `./stage-blocks.rb`
 - `./traverse-canonical-chain.sh`
 - `./unformat-pcbs.rb`
@@ -99,10 +98,6 @@ Downloads historical Mina PCBs from o1Labs' [Google Cloud Storage bucket](https:
 A mandatory config file used by `granola-rclone.rb`.
 
 ### `./recycle-pcbs.rb`
-
-TBD
-
-### `./regression-test.rb`
 
 TBD
 

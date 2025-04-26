@@ -2,7 +2,7 @@
 
 BUILD_TYPE = ARGV.shift
 
-require "#{__dir__}/ops-common"
+require "#{__dir__}/../ops/ops-common"
 
 test_names = %w[
   indexer_cli_reports

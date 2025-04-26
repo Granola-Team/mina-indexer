@@ -16,7 +16,7 @@ IMAGE = "mina-indexer:#{ENV["GIT_COMMIT_HASH"]}"
 import "#{TOP}/ops/bin.rake"
 import "#{TOP}/ops/stage-blocks.rake"
 
-REGRESSION_TEST = "#{TOP}/ops/regression-test.rb"
+REGRESSION_TEST = "#{TOP}/tests/regression-test.rb"
 DEPLOY_TIER3 = "#{TOP}/ops/deploy-tier3.rb"
 DEPLOY_PROD = "#{TOP}/ops/deploy-prod.rb"
 UTILS = "#{TOP}/ops/utils.rb"
