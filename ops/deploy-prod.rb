@@ -99,7 +99,6 @@ if pid.nil?
     " --socket #{SOCKET} " \
     " server start" \
     " --log-level DEBUG" \
-    " --web-hostname 0.0.0.0" \
     " --database-dir #{my_db_dir}" \
     " --staking-ledgers-dir #{LEDGERS_DIR}" \
     " --missing-block-recovery-exe #{SRC_TOP}/ops/o1labs/block-recovery.sh" \

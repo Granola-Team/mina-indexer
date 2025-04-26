@@ -300,7 +300,6 @@ namespace :bin do
 
     start_args = [
       "--web-port", web_port.to_s,
-      "--web-hostname", "0.0.0.0",
       "--blocks-dir", BLOCKS_DIR,
       "--staking-ledgers-dir", STAKING_LEDGERS_DIR,
       "--database-dir", DATABASE_DIR,

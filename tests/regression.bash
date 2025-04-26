@@ -1014,8 +1014,7 @@ test_rest_accounts_summary() {
 	database_create
 	start \
 		--database-dir ./database \
-		--web-port "$port" \
-		--web-hostname "0.0.0.0"
+		--web-port "$port"
 	sleep 3
 
 	# results
@@ -1105,7 +1104,6 @@ test_rest_blocks() {
 	database_create
 	start \
 		--web-port "$port" \
-		--web-hostname "0.0.0.0" \
 		--blocks-dir ./blocks \
 		--database-dir ./database
 	sleep 3
@@ -1581,7 +1579,6 @@ test_hurl_v1() {
 		--staking-ledgers-dir $STAKING_LEDGERS
 	start \
 		--web-port "$port" \
-		--web-hostname "0.0.0.0" \
 		--database-dir ./database
 	sleep 3
 
@@ -1641,7 +1638,6 @@ test_hurl_v2() {
 		--genesis-hash $HARDFORK_GENESIS_STATE_HASH
 	start \
 		--web-port "$port" \
-		--web-hostname "0.0.0.0" \
 		--database-dir ./database \
 		--genesis-hash $HARDFORK_GENESIS_STATE_HASH
 	sleep 10
