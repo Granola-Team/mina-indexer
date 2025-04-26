@@ -1,3 +1,5 @@
+#! /usr/bin/env -S ruby -w
+
 def granola_rclone(*args)
   config_file = "#{__dir__}/rclone.conf"
   default_access_key = "PBCXKO3DINPHOQL2C6L9"
@@ -15,4 +17,8 @@ def granola_rclone(*args)
   )
   warn "granola_rclone issuing: #{args}"
   system(*args)
+end
+
+if __FILE__ == $0
+  granola_rclone(*ARGV)
 end
