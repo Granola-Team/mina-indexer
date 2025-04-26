@@ -40,10 +40,10 @@ pub struct DatabaseArgs {
     pub staking_ledgers_dir: Option<PathBuf>,
 
     /// Path to directory for speedb
-    #[arg(long, default_value = "/var/log/mina-indexer/database")]
+    #[arg(long, default_value = "/var/lib/mina-indexer/database")]
     pub database_dir: PathBuf,
 
-    /// Max stdout log level
+    /// Max stderr log level
     #[arg(long, default_value_t = LogLevelFilter::default())]
     pub log_level: LogLevelFilter,
 

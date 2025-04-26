@@ -126,7 +126,7 @@
               cd rust
             '';
             doCheck = false;
-            preInstall = "mkdir -p $out/var/log/mina-indexer";
+            preInstall = "mkdir -p $out/var/lib/mina-indexer";
           };
 
           default = mina-indexer;
