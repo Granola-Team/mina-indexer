@@ -418,20 +418,18 @@ end
 # Deploy tasks
 namespace :deploy do
   desc "Run a server as if in production with the Nix-built binary"
-  task :local_prod, [:blocks, :web_port] => "build:prod" do |_, args|
+  task :local_prod, [:blocks] => "build:prod" do |_, args|
     blocks = args[:blocks] || "5000"
-    web_port = args[:web_port] || ""
     puts "--- Deploying prod indexer"
-    run("#{DEPLOY_PROD} nix #{blocks} #{web_port}")
+    run("#{DEPLOY_PROD} nix #{blocks}")
   end
 
   desc "Run a server as if in production with the release-built binary"
-  task :local_prod_dev, [:blocks, :web_port] do |_, args|
+  task :local_prod_dev, [:blocks] do |_, args|
     blocks = args[:blocks] || "5000"
-    web_port = args[:web_port] || ""
     Rake::Task["test:tier3:dev"].invoke(blocks)
     puts "--- Deploying local prod indexer"
-    run("#{DEPLOY_PROD} release #{blocks} #{web_port}")
+    run("#{DEPLOY_PROD} release #{blocks}")
   end
 end
 

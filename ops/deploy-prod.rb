@@ -2,7 +2,6 @@
 
 BUILD_TYPE = ARGV[0]        # 'nix' or 'dev' or 'release'
 BLOCKS_COUNT = ARGV[1].to_i # number of blocks to deploy
-WEB_PORT = ARGV[2] || 8080  # optional web port for server
 
 DEPLOY_TYPE = "prod"
 require "#{__dir__}/ops-common"
@@ -101,7 +100,6 @@ if pid.nil?
     " server start" \
     " --log-level DEBUG" \
     " --web-hostname 0.0.0.0" \
-    " --web-port #{WEB_PORT}" \
     " --database-dir #{my_db_dir}" \
     " --staking-ledgers-dir #{LEDGERS_DIR}" \
     " --missing-block-recovery-exe #{SRC_TOP}/ops/o1labs/block-recovery.sh" \
@@ -112,6 +110,6 @@ if pid.nil?
     " >> #{LOGS_DIR}/out 2>> #{LOGS_DIR}/err"
   puts "Spawning: #{command_line}"
   pid = spawn({"RUST_BACKTRACE" => "full"}, command_line)
-  puts "Mina Indexer daemon spawned with PID #{pid}. Web port: #{WEB_PORT}. Child exiting."
+  puts "Mina Indexer daemon spawned with PID #{pid}. Child exiting."
 end
 Process.detach pid
