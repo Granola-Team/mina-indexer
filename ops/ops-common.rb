@@ -103,7 +103,7 @@ end
 LEDGERS_DIR = "#{DEPLOY_DIR}/staking-ledgers"
 
 def fetch_ledgers
-  system("#{SRC_TOP}/ops/download-staking-ledgers.rb", LEDGERS_DIR) ||
+  system("#{SRC_TOP}/ops/download-granola-ledgers.rb", LEDGERS_DIR) ||
     abort("Something went wrong with staking ledger downloads.")
 end
 

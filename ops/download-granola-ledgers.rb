@@ -17,7 +17,7 @@ ledgers_list = "#{DEST}/../staking-ledgers.list"
 unless File.exist?(ledgers_list)
   warn "#{ledgers_list} does not exist. Fetching..."
   cmd = "#{clone_exe} lsf linode-granola:staking-ledgers.minasearch.com"
-  warn "download-staking-ledgers issuing: #{cmd}"
+  warn "download-granola-ledgers issuing: #{cmd}"
   contents = `#{cmd}` || abort("Failure: #{cmd}")
   new_list = contents.lines(chomp: true).sort! do |a, b|
     a_split = a.split("-")
@@ -52,7 +52,7 @@ else
     "linode-granola:staking-ledgers.minasearch.com",
     "--files-from-raw", "ledgers-to-fetch.list",
     DEST
-  ) || abort("Files sync failed in download-staking-ledgers.rb")
+  ) || abort("Files sync failed in download-granola-ledgers.rb")
   File.delete("ledgers-to-fetch.list")
 
   # Files should be read-only.

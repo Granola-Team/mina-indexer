@@ -41,7 +41,6 @@ SHELL_SCRIPTS = %W[
   tests/recovery.sh
   ops/traverse-canonical-chain.sh
   ops/correct-file-names.sh
-  ops/minaexplorer/download-staking-ledgers.sh
   ops/upload-staking-ledgers.sh
   ops/upload-snapshot.sh
   ops/upload-mina-blocks.sh

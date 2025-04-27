@@ -9,15 +9,12 @@ Files in this directory:
 - `./correct-file-names.sh`
 - `./deploy.rb`
 - `./download-mina-blocks.rb`
-- `./download-staking-ledgers.rb`
 - `./format-graphql-in-hurl-files.rb`
 - `./granola-rclone.rb`
 - `./hashes.list`
 - `./indexer-ledger-normalizer.rb`
 - `./maybe-dupes.list`
 - `./mina-ledger-normalizer.rb`
-- `./minaexplorer/download-staking-ledgers.sh`
-- `./minaexplorer/ledgers.json`
 - `./o1-labs/download-mina-blocks.sh`
 - `./rclone.conf`
 - `./recycle-pcbs.rb`
@@ -53,10 +50,6 @@ Compare the list of historical Mina PCBs in the specified block range between o1
 
 Downloads historical Mina PCBs in the Granola storage bucket by using `rclone`. See the instructions at the top of the script.
 
-### `./download-staking-ledgers.rb`
-
-Downloads Mina staking ledgers stored in the Granola storage bucket by using `rclone`. See the instructions at the top of the script.
-
 ### `./format-graphql-in-hurl-files.rb`
 
 Standardize formatting of GraphQL in `hurl` files.
@@ -80,14 +73,6 @@ TBD
 ### `./mina/mina_txn_hasher.exe`
 
 Computes Berkeley hashes for different types of commands (e.g. user or zkApp).
-
-### `./minaexplorer/download-staking-ledgers.sh`
-
-Utility to download historical staking ledgers from MinaExplorer.com's Google Cloud Storage bucket.
-
-### `./minaexplorer/ledgers.json`
-
-JSON list of known staking ledgers available. See [MinaExplorer docs](https://docs.minaexplorer.com/minaexplorer/data-archive).
 
 ### `./o1-labs/download-mina-blocks.rb`
 
