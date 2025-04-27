@@ -1,5 +1,4 @@
 require "fileutils"
-require "open3"
 
 TOP = __dir__
 
@@ -47,15 +46,6 @@ SHELL_SCRIPTS = %W[
   ops/calculate-archive-ledgers.sh
   ops/recover-block
 ]
-
-def is_rustfmt_nightly
-  stdout, _, _ = Open3.capture3("rustfmt --version | grep stable || echo \"true\"")
-  stdout.strip == "true"
-end
-
-def nightly_if_required
-  is_rustfmt_nightly ? "" : "+nightly"
-end
 
 def run(cmd, *args, dir: TOP)
   success = system(cmd, *args, chdir: dir)
@@ -198,7 +188,7 @@ task lint: [:lint_ruby, :lint_shell, :lint_nix, :cargo_machete, :lint_rust]
 desc "Format all code"
 task :format do
   # Format Rust code
-  cargo_output("#{nightly_if_required} fmt --all")
+  cargo_output("fmt --all")
 
   # Format Ruby code
   run("standardrb --fix #{RUBY_SRC_FILES.join(" ")}")
