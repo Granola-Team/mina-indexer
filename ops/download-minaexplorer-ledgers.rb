@@ -130,7 +130,7 @@ ledgers.each do |row|
   hash = row[1]
   url = "https://storage.googleapis.com/mina-explorer-ledgers/#{hash}.json"
   puts "Fetching #{url}"
-  content = URI.open(url).read
+  content = URI.open(url).read # standard:disable Security/Open
   epoch = row[0]
   target = "#{dest}/mainnet-#{epoch}-#{hash}.json"
   File.write(target, content)
