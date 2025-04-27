@@ -8,7 +8,7 @@ require "optparse"
 require "socket"
 require "uri"
 
-require_relative "../update-pcbs"
+require_relative "update-pcbs"
 
 BASE_URL = "https://storage.googleapis.com/mina_network_block_data"
 BLOCK_THREADS = Etc.nprocessors * 4
