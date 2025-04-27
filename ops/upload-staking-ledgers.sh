@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# Uploads Mina staking ledger logs to the Granola bucket.
+# Uploads Mina staking ledger logs to the Granola bucket. Requires appropriate
+# credentials.
+#
 # $1 = source directory
 
 set -eu

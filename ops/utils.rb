@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 # show mina-indexer PID(s)
 if ARGV == ["pids", "show"]
   system("pgrep", "mina-indexer") || puts("No running indexer")

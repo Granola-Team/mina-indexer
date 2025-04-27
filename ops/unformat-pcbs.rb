@@ -1,6 +1,6 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
+# Compacts JSON into single line.
 
 require "json"
 require "find"

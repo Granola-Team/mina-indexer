@@ -1,6 +1,6 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
+# Standardize formatting of GraphQL in `hurl` files.
 
 require "json"
 require "tempfile"

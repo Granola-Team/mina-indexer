@@ -1,7 +1,5 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
-
 require "fileutils"
 
 # Usage: ./recycle-pcbs.rb <source_folder> <dest_folder> <blocks_list_file> <min_number> <max_number>

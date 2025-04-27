@@ -1,5 +1,8 @@
 #!/usr/bin/env -S ruby -w
 
+# Compare the list of historical Mina PCBs in the specified block range between
+# O(1)Labs and Granola storage buckets.
+
 require "time"
 
 # Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola storage buckets.

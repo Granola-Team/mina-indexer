@@ -1,6 +1,7 @@
 #!/usr/bin/env -S ruby -w
 
-# -*- mode: ruby -*-
+# Scans a directory of Mina PCB JSON files and checks for contiguous block
+# numbers in the filenames.
 
 BLOCK_PATTERN = /mainnet-(\d+)-/
 
