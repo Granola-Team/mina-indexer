@@ -45,6 +45,7 @@ SHELL_SCRIPTS = %W[
   ops/upload-snapshot.sh
   ops/upload-granola-blocks
   ops/calculate-archive-ledgers.sh
+  ops/recover-block
 ]
 
 def is_rustfmt_nightly

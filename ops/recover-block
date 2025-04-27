@@ -8,4 +8,4 @@ set -eu
 
 MY_DIR="$(CDPATH='' cd "$(dirname "$0")" && pwd)"
 
-exec "$MY_DIR"/download-mina-blocks.rb -d "$3" blocks "$2"
+exec "$MY_DIR"/download-o1labs-blocks -d "$3" blocks "$2"
