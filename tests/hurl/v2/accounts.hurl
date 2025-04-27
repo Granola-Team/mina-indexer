@@ -302,7 +302,7 @@ POST {{url}}
 ```graphql
 {
   accounts(
-    limit:1
+    limit: 1
     query: {
       balance_lte: 144390363909300000
       token: "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"

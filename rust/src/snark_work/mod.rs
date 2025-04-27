@@ -46,10 +46,7 @@ pub struct SnarkWorkWithStateHash {
 
 impl SnarkWorkSummary {
     pub fn from_precomputed(block: &PrecomputedBlock) -> Vec<Self> {
-        block
-            .completed_works()
-            .into_iter()
-            .collect()
+        block.completed_works().into_iter().collect()
     }
 
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {

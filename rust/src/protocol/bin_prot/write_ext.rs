@@ -124,7 +124,7 @@ pub trait WriteBinProtExt: io::Write {
     /// You can convert between ocaml native integer using (x >> 1)
     fn bin_write_polyvar_tag(&mut self, i: u32) -> Result<usize, io::Error> {
         self.write(&((i << 1) | 1).to_le_bytes()).map(|_| 4) // truncating
-                                                           // downcast
+                                                             // downcast
     }
 }
 

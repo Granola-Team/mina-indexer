@@ -1287,10 +1287,10 @@ test_startup_staking_ledgers() {
 	assert $pk $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.delegate)
 	assert '1000' $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.balance)
 	assert $MINA_TOKEN_ID $(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.token)
-	
+
 	assert $epoch0 $(cat ./epoch_0_ledger.json | jq -r .ledger_hash)
 	assert 'mainnet' $(cat ./epoch_0_ledger.json | jq -r .network)
-	
+
 	voting_for=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.voting_for)
 	receipt_chain_hash=$(cat ./epoch_0_ledger.json | jq -r .staking_ledger.${pk}.receipt_chain_hash)
 	assert '3NK2tkzqqK5spR2sZ7tujjqPksL45M3UUrcA4WhCkeiPtnugyE2x' $voting_for
@@ -1704,7 +1704,7 @@ test_fetch_new_blocks() {
 		--database-dir ./database
 
 	start \
-	    --log-level debug \
+		--log-level debug \
 		--blocks-dir ./blocks \
 		--database-dir ./database \
 		--fetch-new-blocks-exe "$SRC"/tests/recovery.sh \

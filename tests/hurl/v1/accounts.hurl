@@ -423,10 +423,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  accounts(
-    limit:1
-    query: { balance_lte: 75000000000000000 }
-  ) {
+  accounts(limit: 1, query: { balance_lte: 75000000000000000 }) {
     publicKey
     balance
   }

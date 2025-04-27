@@ -5,11 +5,13 @@
 POST {{url}}
 ```graphql
 {
-  feetransfers(query: {
-    blockStateHash: {
-      stateHash: "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP"
+  feetransfers(
+    query: {
+      blockStateHash: {
+        stateHash: "3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP"
+      }
     }
-  }) {
+  ) {
     blockHeight
     canonical
   }
@@ -30,10 +32,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  feetransfers(query: {
-    blockHeight: 359605
-    canonical: true
-  }) {
+  feetransfers(query: { blockHeight: 359605, canonical: true }) {
     blockStateHash {
       stateHash
     }
@@ -55,9 +54,11 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  feetransfers(query: {
-    recipient: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
-  }) {
+  feetransfers(
+    query: {
+      recipient: "B62qiy32p8kAKnny8ZFwoMhYpBppM1DWVCqAPBYNcXnsAHhnfAAuXgg"
+    }
+  ) {
     blockStateHash {
       stateHash
     }
