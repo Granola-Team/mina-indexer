@@ -1,4 +1,22 @@
-[
+#! /usr/bin/env -S ruby -w
+
+# MinaExplorer maintains a set of staking ledger JSON dumps at
+# https://storage.googleapis.com/mina-explorer-ledgers/
+#
+# The files are named after the hash: `<hash>.json`. For example:
+# jxyJvcM4j4Mi2hNh6aLTB6wPChm5KtaaYGZBhTurWWBJ1278z5X.json
+#
+# The files can be fetched with, for example: 'curl', a web browser, or this
+# script.
+#
+# See also: https://docs.minaexplorer.com/minaexplorer/data-archive
+
+require "fileutils"
+require "open-uri"
+
+dest = ARGV[0]
+
+ledgers = [
   ["22", "jxyJvcM4j4Mi2hNh6aLTB6wPChm5KtaaYGZBhTurWWBJ1278z5X"],
   ["21", "jxFEmi9RUo7SArPwupC3QWdWPdoCYEWwhQhkMg9EeCM6QQV5HFs"],
   ["20", "jwNgkdZmaT8kekYmspUncrDSdT5HQqrJQNvWCJ6JcGeKATyW4BZ"],
@@ -102,3 +120,18 @@
   ["2", "jwAAZcXndLYxb8w4LTU2d4K1qT3dL8Ck2jKzVEf9t9GAyXweQRG"],
   ["1", "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"]
 ]
+
+FileUtils.mkdir_p(dest)
+unless Dir.exist?(dest)
+  abort("#{dest} is not a directory")
+end
+
+ledgers.each do |row|
+  hash = row[1]
+  url = "https://storage.googleapis.com/mina-explorer-ledgers/#{hash}.json"
+  puts "Fetching #{url}"
+  content = URI.open(url).read
+  epoch = row[0]
+  target = "#{dest}/mainnet-#{epoch}-#{hash}.json"
+  File.write(target, content)
+end
