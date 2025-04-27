@@ -101,7 +101,7 @@
               filter =
                 path: type:
                 (path != ".direnv")
-                && ((path == ".cargo") || (path == ".cargo/config.toml") || (dirOf path != ".cargo"))
+                && ((path == "rust/.cargo") || (path == "rust/.cargo/config.toml") || (dirOf path != "rust/.cargo"))
                 && (path != "result")
                 && (path != ".build")
                 && (path != "rust/target")

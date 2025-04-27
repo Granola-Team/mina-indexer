@@ -3,7 +3,7 @@ require "open3"
 
 TOP = __dir__
 
-ENV["CARGO_HOME"] = "#{TOP}/.cargo"
+ENV["CARGO_HOME"] = "#{TOP}/rust/.cargo"
 
 # This required environment variable is used during the Rust compilation.
 ENV["GIT_COMMIT_HASH"] ||= begin

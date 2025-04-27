@@ -1,10 +1,11 @@
+# Cargo build output
 /rust/target/
-/result
-/.gitconfig
-.hooks/
 
-# local database
-database/
+# Local Cargo cache
+/rust/.cargo/
+
+# Don't ignore the config.toml file
+!/rust/.cargo/config.toml
 
 # direnv creates this directory as a cache
 .direnv
@@ -15,22 +16,9 @@ database/
 # direnv reads its configuration from .envrc, so never ignore that!
 !.envrc
 
-# Editor Droppings
-.idea*
-.*.swp
-.*.swo
-/.vscode
-
-# Local Cargo cache
-/.cargo/
-# Don't ignore the config.toml file
-!/.cargo/config.toml
-
 # tier3 blocks
 files-to-fetch.list
 
-# mina_txn_hasher wrapper
-/.local
-
-# Our temporary build output
+# Our ephemeral build output
 /.build
+/result
