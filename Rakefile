@@ -43,7 +43,7 @@ SHELL_SCRIPTS = %W[
   ops/correct-file-names.sh
   ops/upload-staking-ledgers.sh
   ops/upload-snapshot.sh
-  ops/upload-mina-blocks.sh
+  ops/upload-granola-blocks
   ops/calculate-archive-ledgers.sh
 ]
 

@@ -19,7 +19,6 @@ Files in this directory:
 - `./traverse-canonical-chain.sh`
 - `./unformat-pcbs.rb`
 - `./update-pcbs.rb`
-- `./upload-mina-blocks.sh`
 - `./upload-staking-ledgers.sh`
 - `./utils.rb`
 
@@ -90,10 +89,6 @@ Compact JSON into single line
 ### `./update-pcbs.rb`
 
 Remove any "proofs" array from the PCB JSON files in a directory. This significantly shrinks files and helps ensure no invalid unicde characters exist. In addition, it adds a v2 hash for any transaction to the PCB.
-
-### `./upload-mina-blocks.sh`
-
-Utility to upload PCBs to Granola's storage bucket. Requires appropriate credentials.
 
 ### `./upload-staking-ledgers.sh`
 
