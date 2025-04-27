@@ -132,10 +132,10 @@ def stage_blocks(end_height, start_height = 1, network = "mainnet", dest = "")
 
     # Ensure that the blocks are present in the main blocks directory.
     #
-    system("#{__dir__}/download-mina-blocks.rb",
+    system("#{__dir__}/download-granola-blocks.rb",
       start_height.to_s,
       end_height.to_s,
-      MASTER_BLOCKS_DIR) || abort("Failure of download-mina-blocks.rb")
+      MASTER_BLOCKS_DIR) || abort("Failure of download-granola-blocks.rb")
 
     FileUtils.mkdir_p(dest)
 

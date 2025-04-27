@@ -19,7 +19,7 @@ unless File.exist?(blocks_list)
   warn "#{blocks_list} does not exist. Fetching..."
 
   cmd = "#{__dir__}/granola-rclone.rb lsf linode-granola:blocks.minasearch.com"
-  warn "download-mina-blocks issuing: #{cmd}"
+  warn "download-granola-blocks issuing: #{cmd}"
 
   contents = `#{cmd}`
   abort("Failure: #{cmd}") unless $?.success?

@@ -8,7 +8,6 @@ Files in this directory:
 - `./check-contiguous-blocks.rb`
 - `./correct-file-names.sh`
 - `./deploy.rb`
-- `./download-mina-blocks.rb`
 - `./format-graphql-in-hurl-files.rb`
 - `./granola-rclone.rb`
 - `./hashes.list`
@@ -43,10 +42,6 @@ Utility to manage the running of a production instance of Mina Indexer. See the 
 ### `./diff-buckets.rb`
 
 Compare the list of historical Mina PCBs in the specified block range between o1Labs and Granola storage buckets.
-
-### `./download-mina-blocks.rb`
-
-Downloads historical Mina PCBs in the Granola storage bucket by using `rclone`. See the instructions at the top of the script.
 
 ### `./format-graphql-in-hurl-files.rb`
 
