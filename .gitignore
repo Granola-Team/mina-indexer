@@ -34,3 +34,4 @@ files-to-fetch.list
 
 # Our temporary build output
 /.build
+.dir-locals.el
