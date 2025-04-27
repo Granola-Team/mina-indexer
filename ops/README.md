@@ -12,9 +12,7 @@ Files in this directory:
 - `./format-graphql-in-hurl-files.rb`
 - `./granola-rclone.rb`
 - `./hashes.list`
-- `./indexer-ledger-normalizer.rb`
 - `./maybe-dupes.list`
-- `./mina-ledger-normalizer.rb`
 - `./o1-labs/download-mina-blocks.sh`
 - `./rclone.conf`
 - `./recycle-pcbs.rb`
@@ -59,10 +57,6 @@ Standardize formatting of GraphQL in `hurl` files.
 Utility to wrap `rclone`. See [rclone](https://rclone.org).
 
 ### `./hashes.list`
-
-TBD
-
-### `/.indexer-ledger-normalizer.rb`
 
 TBD
 

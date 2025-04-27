@@ -127,7 +127,7 @@ if !skippable
 
     idxr_norm_ledger = "#{idxr_ledger}.norm.json"
     unless system(
-      "#{SRC_TOP}/ops/indexer-ledger-normalizer.rb",
+      "#{SRC_TOP}/tests/indexer-ledger-normalizer.rb",
       idxr_ledger,
       out: idxr_norm_ledger
     )
