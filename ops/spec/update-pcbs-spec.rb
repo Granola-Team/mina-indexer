@@ -4,6 +4,8 @@ require_relative "../update-pcbs"
 RSpec.describe PcbUpdater do
   let(:test_directory) { "spec/test_json" }
   let(:test_file) { "#{test_directory}/test.json" }
+  let(:output_dir) { "spec/out" }
+  let(:out_file) { "#{output_dir}/test.json" }
   let(:updater) { PcbUpdater.new }
 
   # JSON content with "proofs" property and blockchain data
@@ -94,6 +96,7 @@ RSpec.describe PcbUpdater do
 
     # Create test directory and file
     Dir.mkdir(test_directory) unless Dir.exist?(test_directory)
+    Dir.mkdir(output_dir) unless Dir.exist?(output_dir)
 
     # Write the JSON content with "proofs" property to test file
     File.write(test_file, JSON.generate(json_content))
@@ -104,7 +107,9 @@ RSpec.describe PcbUpdater do
 
   after do
     # Clean up - remove the test directory and files
+    File.delete(out_file) if File.exist?(test_file)
     File.delete(test_file) if File.exist?(test_file)
+    Dir.rmdir(output_dir) if Dir.exist?(output_dir)
     Dir.rmdir(test_directory) if Dir.exist?(test_directory)
     Dir.rmdir("spec") if Dir.exist?("spec") && Dir.empty?("spec")
   end
@@ -114,10 +119,10 @@ RSpec.describe PcbUpdater do
     updater.add_file(test_file)
 
     # Process the file
-    updater.process_files
+    updater.process_files(output_dir)
 
     # Read the processed file
-    processed_content = File.read(test_file)
+    processed_content = File.read(out_file)
     processed_json = JSON.parse(processed_content)
 
     # Check if the "proofs" property is removed
@@ -133,10 +138,10 @@ RSpec.describe PcbUpdater do
     updater.add_file(test_file)
 
     # Process the file
-    updater.process_files
+    updater.process_files(output_dir)
 
     # Read the processed file
-    processed_json = JSON.parse(File.read(test_file))
+    processed_json = JSON.parse(File.read(out_file))
 
     # Check if transaction hash was added
     expect(processed_json.dig("data", "txn_hash")).to eq("mock_transaction_hash")
@@ -147,10 +152,10 @@ RSpec.describe PcbUpdater do
     updater.add_directory(test_directory)
 
     # Process all files
-    updater.process_files
+    updater.process_files(output_dir)
 
     # Read the processed file
-    processed_json = JSON.parse(File.read(test_file))
+    processed_json = JSON.parse(File.read(out_file))
 
     # Check basic structure is maintained
     expect(processed_json.keys).to eq(expected_content_structure.keys)
