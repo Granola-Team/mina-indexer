@@ -2,7 +2,7 @@
 
 use super::{date_time_to_scalar, db, get_block_canonicity, PK};
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
     command::{
         signed::{SignedCommandWithData, TxnHash},
@@ -105,9 +105,13 @@ struct TokenAccount {
     /// Token symbol
     symbol: String,
 
-    /// Balance change
+    /// Balance change (nano units)
     #[graphql(name = "balance_change")]
     balance_change: i64,
+
+    /// Balance change (decimal)
+    #[graphql(name = "balance_change_str")]
+    balance_change_str: String,
 
     /// Increment nonce
     #[graphql(name = "increment_nonce")]
@@ -1423,13 +1427,39 @@ impl TokenAccount {
             pk: pk.to_string(),
             token: token.to_string(),
             symbol: token_symbol.to_string(),
+            balance_change_str: balance_change_str(balance_change),
         }
     }
+}
+
+/////////////
+// helpers //
+/////////////
+
+fn balance_change_str(balance_change: i64) -> String {
+    let sign = if balance_change < 0 { "-" } else { "" };
+    let magnitude: Amount = balance_change.unsigned_abs().into();
+    format!("{}{}", sign, magnitude)
 }
 
 #[cfg(test)]
 mod tests {
     use super::TransactionQueryInput;
+
+    #[test]
+    fn balance_change_str() {
+        let balance_change0 = 0;
+        assert_eq!(super::balance_change_str(balance_change0), "0");
+
+        let balance_change1 = 100000000000000;
+        assert_eq!(super::balance_change_str(balance_change1), "100000");
+
+        let balance_change2 = -100000000000001;
+        assert_eq!(
+            super::balance_change_str(balance_change2),
+            "-100000.000000001"
+        )
+    }
 
     #[test]
     fn test_bounds_with_both_gte_and_gt() {
