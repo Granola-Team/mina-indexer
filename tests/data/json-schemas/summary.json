@@ -154,7 +154,6 @@
     "epochNumBlocks",
     "totalNumBlocks",
     "epochNumCanonicalBlocks",
-    "totalNumCanonicalBlocks",
     "epochNumSnarks",
     "totalNumSnarks",
     "totalNumCanonicalSnarks",
