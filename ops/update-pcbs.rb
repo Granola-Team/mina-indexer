@@ -17,7 +17,7 @@ class PcbUpdater
     @num_workers = Etc.nprocessors * 4
   end
 
-  def process_files
+  def process_files(output_dir)
     # Create worker threads
     threads = []
     @num_workers.times do
@@ -29,7 +29,7 @@ class PcbUpdater
             nil
           end
           break unless path
-          process_file(path)
+          process_file(path, output_dir)
         end
       end
     end
@@ -45,15 +45,14 @@ class PcbUpdater
     @queue << path if File.file?(path) && path.end_with?(".json")
   end
 
-  # Add all JSON files in a directory to the queue
   def add_directory(dir)
-    Dir.glob(File.join(dir, "*.json")).each do |path|
-      add_file(path)
+    Dir.foreach(dir) do |entry|
+      add_file(File.join(dir, entry))
     end
   end
 
   # Process a single JSON file to remove `proofs` and `protocol_state_proof` and add v2 transaction hashes
-  def process_file(path)
+  def process_file(path, output_dir)
     json_data = JSON.parse(File.read(path))
 
     remove_proofs(json_data)
@@ -63,29 +62,21 @@ class PcbUpdater
     # Check blockchain length before adding transaction hashes
     blockchain_length = get_blockchain_length(json_data)
 
-    if blockchain_length && blockchain_length.to_i >= V2_BLOCKCHAIN_START
+    if blockchain_length.to_i >= V2_BLOCKCHAIN_START
       add_transaction_hashes(json_data, File.basename(path))
     end
 
-    # Write the modified JSON back to the same file (compact format)
-    File.write(path, JSON.generate(json_data))
-
-    puts "Updated #{path}"
-    true
+    # Write the modified JSON in compact format.
+    outfile = File.join(output_dir, File.basename(path))
+    File.write(outfile, JSON.generate(json_data))
+    puts "Wrote #{outfile}"
   rescue => e
-    puts "Error processing #{path}: #{e.message}"
-    false
+    abort "Error processing #{path}: #{e.message}"
   end
 
-  # Get the blockchain length from the JSON data
   def get_blockchain_length(json_data)
-    # Use dig method with safe conversion to integer
-    json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")&.to_i
-
-    # Return the blockchain length (will be nil if any part of the path doesn't exist)
-  rescue
-    puts "Error extracting blockchain length"
-    nil
+    json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")&.to_i ||
+      raise("Error extracting blockchain length")
   end
 
   # Recursively remove proofs from the JSON
@@ -169,14 +160,16 @@ class PcbUpdater
 end
 
 def main
-  if ARGV.empty?
-    puts "Usage: #{$0} [FILE_OR_DIRECTORY...]"
+  if ARGV.size != 2
+    puts "Usage: #{$0} [FILE_OR_DIRECTORY] [OUTPUT_DIR]"
     exit 1
   end
 
   processor = PcbUpdater.new
 
-  ARGV.each do |path|
+  in_path = ARGV[0]
+  output_dir = ARGV[1]
+  in_path.each do |path|
     if File.directory?(path)
       processor.add_directory(path)
     else
@@ -184,7 +177,7 @@ def main
     end
   end
 
-  processor.process_files
+  processor.process_files(output_dir)
 end
 
 # Only execute main when this script is run directly, not when required
