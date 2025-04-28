@@ -631,7 +631,7 @@ impl ZkappStore for IndexerStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tier2"))]
 mod tests {
     use super::ZkappStore;
     use crate::{
