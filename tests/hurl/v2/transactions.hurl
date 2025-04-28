@@ -166,6 +166,7 @@ POST {{url}}
         pk
         token
         balance_change
+        balance_change_str
         increment_nonce
       }
       actions
@@ -189,11 +190,13 @@ jsonpath "$.data.transactions[0].zkapp.accounts_updated" count == 2
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change" == -2000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change_str" == "-2"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].increment_nonce" == false
 
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change" == 2000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change_str" == "2"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].increment_nonce" == false
 
 duration < 100
@@ -221,6 +224,7 @@ POST {{url}}
         pk
         token
         balance_change
+        balance_change_str
         increment_nonce
         symbol
       }
@@ -247,24 +251,28 @@ jsonpath "$.data.transactions[0].zkapp.accounts_updated" count == 4
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].pk" == "B62qoxZPhqRsKromMF72kjZr6LQnufZ8T2iZuDzCmtuDnnddCRF7fpp"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change" == -2000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change_str" == "-2"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].increment_nonce" == false
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].symbol" == "MINA"
 
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].pk" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change" == 0
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change_str" == "0"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].increment_nonce" == true
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].symbol" == "MINA"
 
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].pk" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].balance_change" == 0
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].balance_change_str" == "0"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].increment_nonce" == false
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[2].symbol" == "MINA"
 
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].pk" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].balance_change" == 100000000000000
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].balance_change_str" == "100000"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].increment_nonce" == false
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[3].symbol" == "MINU"
 
