@@ -65,9 +65,6 @@
     "epochNumCanonicalBlocks": {
       "type": "integer"
     },
-    "totalNumCanonicalBlocks": {
-      "type": "integer"
-    },
     "epochNumSnarks": {
       "type": "integer"
     },
