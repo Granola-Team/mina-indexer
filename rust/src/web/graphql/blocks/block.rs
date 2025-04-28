@@ -38,10 +38,6 @@ pub struct Block {
     #[graphql(name = "total_num_blocks")]
     pub total_num_blocks: u32,
 
-    /// Value total num canonical blocks
-    #[graphql(name = "total_num_canonical_blocks")]
-    pub total_num_canonical_blocks: u32,
-
     /// Value total num supercharged blocks
     #[graphql(name = "total_num_supercharged_blocks")]
     pub total_num_supercharged_blocks: u32,
@@ -313,7 +309,7 @@ impl Block {
         let epoch_num_supercharged_blocks = counts[2];
 
         let total_num_blocks = counts[3];
-        let total_num_canonical_blocks = counts[4];
+        let _total_num_canonical_blocks = counts[4];
         let total_num_supercharged_blocks = counts[5];
 
         let epoch_num_user_commands = counts[8];
@@ -358,7 +354,6 @@ impl Block {
             epoch_num_canonical_blocks,
             epoch_num_supercharged_blocks,
             total_num_blocks,
-            total_num_canonical_blocks,
             total_num_supercharged_blocks,
             block_num_snarks,
             block_num_user_commands,

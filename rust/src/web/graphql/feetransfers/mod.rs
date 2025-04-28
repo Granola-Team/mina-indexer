@@ -66,25 +66,30 @@ impl FeetransferWithMeta {
     async fn block_state_hash(&self, ctx: &Context<'_>) -> Result<Option<Block>> {
         let db = db(ctx);
 
+        // blocks
         let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
 
+        // canonical blocks
         let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
-        let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
 
+        // supercharged
         let epoch_num_supercharged_blocks =
             db.get_block_production_supercharged_epoch_count(None)?;
         let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
+        // all user commands
         let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
+        // zkapp commands
         let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None)?;
         let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
 
+        // slot produced
         let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
 
-        if let Some(block) = self.block.clone() {
+        if let Some(block) = self.block.as_ref() {
             let block_num_snarks = db
                 .get_block_snarks_count(&block.state_hash())?
                 .unwrap_or_default();
@@ -101,7 +106,7 @@ impl FeetransferWithMeta {
             return Ok(Some(Block {
                 block: BlockWithoutCanonicity::new(
                     db,
-                    &block,
+                    block,
                     self.canonical,
                     [
                         epoch_num_user_commands,
@@ -115,7 +120,6 @@ impl FeetransferWithMeta {
                 epoch_num_canonical_blocks,
                 epoch_num_supercharged_blocks,
                 total_num_blocks,
-                total_num_canonical_blocks,
                 total_num_supercharged_blocks,
                 block_num_snarks,
                 block_num_user_commands,

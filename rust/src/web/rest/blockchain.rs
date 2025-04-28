@@ -58,7 +58,6 @@ pub struct BlockchainSummary {
     total_num_blocks: u32,
 
     epoch_num_canonical_blocks: u32,
-    total_num_canonical_blocks: u32,
 
     num_unique_block_producers: Option<u32>,
 
@@ -147,8 +146,8 @@ struct SummaryInput {
     // blocks
     epoch_num_blocks: u32,
     total_num_blocks: u32,
+
     epoch_num_canonical_blocks: u32,
-    total_num_canonical_blocks: u32,
 
     /// Unique block producer count in last n blocks
     num_unique_block_producers: Option<u32>,
@@ -213,7 +212,6 @@ impl BlockchainSummary {
             epoch_num_blocks,
             total_num_blocks,
             epoch_num_canonical_blocks,
-            total_num_canonical_blocks,
             num_unique_block_producers,
 
             epoch_num_snarks,
@@ -296,7 +294,6 @@ impl BlockchainSummary {
             epoch_num_blocks,
             total_num_blocks,
             epoch_num_canonical_blocks,
-            total_num_canonical_blocks,
             num_unique_block_producers,
 
             epoch_num_snarks,
@@ -476,8 +473,9 @@ pub async fn get_blockchain_summary(
 
             epoch_num_blocks,
             total_num_blocks,
+
             epoch_num_canonical_blocks,
-            total_num_canonical_blocks,
+
             num_unique_block_producers,
 
             epoch_num_snarks,
