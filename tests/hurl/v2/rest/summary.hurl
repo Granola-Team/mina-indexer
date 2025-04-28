@@ -24,7 +24,6 @@ jsonpath "$.numUniqueBlockProducers" == 26
 
 # canonical blocks
 jsonpath "$.epochNumCanonicalBlocks" == 13
-jsonpath "$.totalNumCanonicalBlocks" == 359617
 
 # canonical snarks
 jsonpath "$.totalNumCanonicalSnarks" == 0

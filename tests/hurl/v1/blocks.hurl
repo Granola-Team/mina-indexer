@@ -556,7 +556,6 @@ POST {{url}}
     epoch_num_canonical_blocks
     epoch_num_supercharged_blocks
     total_num_blocks
-    total_num_canonical_blocks
     total_num_supercharged_blocks
   }
 }
@@ -573,7 +572,6 @@ jsonpath "$.data.blocks[0].epoch_num_canonical_blocks" == 120
 jsonpath "$.data.blocks[0].epoch_num_supercharged_blocks" == 23
 
 jsonpath "$.data.blocks[0].total_num_blocks" == 204
-jsonpath "$.data.blocks[0].total_num_canonical_blocks" == 120
 jsonpath "$.data.blocks[0].total_num_supercharged_blocks" == 23
 
 duration < 200
