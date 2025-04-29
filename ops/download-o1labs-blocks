@@ -151,7 +151,7 @@ def download_file(url, target_path)
 end
 
 def update_pcb(file_path)
-  PCB_UPDATER.process_file(file_path)
+  PCB_UPDATER.process_file(file_path, File.dirname(file_path))
 rescue => e
   puts "Error updating PCB for #{file_path}: #{e.message}"
 end
