@@ -629,14 +629,14 @@ async fn fetch_new_blocks(
             let stdout = stdout.trim_end();
 
             if !stdout.is_empty() {
-                info!("{}", stdout);
+                info!("Fetch new blocks: {}", stdout);
             }
 
             let stderr = String::from_utf8(output.stderr)?;
             let stderr = stderr.trim_end();
 
             if !stderr.is_empty() {
-                info!("{}", stderr);
+                info!("Fetch new blocks: {}", stderr);
             }
         }
         Err(e) => error!(
@@ -687,14 +687,14 @@ async fn recover_missing_blocks(
                 let stdout = stdout.trim_end();
 
                 if !stdout.is_empty() {
-                    info!("{}", stdout);
+                    info!("Missing block recovery: {}", stdout);
                 }
 
                 let stderr = String::from_utf8(output.stderr).expect("stderr");
                 let stderr = stderr.trim_end();
 
                 if !stderr.is_empty() {
-                    info!("{}", stderr);
+                    info!("Missing block recovery: {}", stderr);
                 }
             }
             Err(e) => error!(
