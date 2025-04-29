@@ -1,3 +1,5 @@
+//! SNARK store helpers
+
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     utility::store::common::{U32_LEN, U64_LEN},

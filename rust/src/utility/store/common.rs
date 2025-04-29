@@ -86,8 +86,10 @@ pub fn token_pk_index_key(
 /// - index: u32 BE bytes
 pub fn block_index_key(state_hash: &StateHash, index: u32) -> [u8; StateHash::LEN + U32_LEN] {
     let mut key = [0; StateHash::LEN + U32_LEN];
+
     key[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
     key[StateHash::LEN..].copy_from_slice(&index.to_be_bytes());
+
     key
 }
 
@@ -99,8 +101,10 @@ pub fn block_index_key(state_hash: &StateHash, index: u32) -> [u8; StateHash::LE
 /// - index: u32 BE bytes
 pub fn pk_index_key(pk: &PublicKey, index: u32) -> [u8; PublicKey::LEN + U32_LEN] {
     let mut key = [0; PublicKey::LEN + U32_LEN];
+
     key[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     key[PublicKey::LEN..].copy_from_slice(&index.to_be_bytes());
+
     key
 }
 
@@ -118,8 +122,10 @@ pub fn block_u32_prefix_from_key(key: &[u8]) -> anyhow::Result<u32> {
 
 pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
     assert_eq!(bytes.len(), U32_LEN);
+
     let mut be_bytes = [0; U32_LEN];
     be_bytes.copy_from_slice(&bytes);
+
     u32::from_be_bytes(be_bytes)
 }
 
@@ -128,8 +134,10 @@ pub fn from_be_bytes(bytes: Vec<u8>) -> u32 {
 /// - `pk`:     public key
 pub fn u32_prefix_key(prefix: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::LEN] {
     let mut bytes = [0; U32_LEN + PublicKey::LEN];
+
     bytes[..U32_LEN].copy_from_slice(&prefix.to_be_bytes());
     bytes[U32_LEN..].copy_from_slice(pk.0.as_bytes());
+
     bytes
 }
 
@@ -138,8 +146,10 @@ pub fn u32_prefix_key(prefix: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::
 /// - `pk`:     [PublicKey] bytes
 pub fn u64_prefix_key(prefix: u64, pk: &PublicKey) -> [u8; U64_LEN + PublicKey::LEN] {
     let mut bytes = [0; U64_LEN + PublicKey::LEN];
+
     bytes[..U64_LEN].copy_from_slice(&prefix.to_be_bytes());
     bytes[U64_LEN..].copy_from_slice(pk.0.as_bytes());
+
     bytes
 }
 

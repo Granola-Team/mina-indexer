@@ -1,3 +1,5 @@
+//! Block store helpers
+
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::precomputed::PrecomputedBlock,
