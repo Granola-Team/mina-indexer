@@ -99,6 +99,7 @@ if pid.nil?
     " --socket #{SOCKET} " \
     " server start" \
     " --log-level DEBUG" \
+    " --ledger-cadence 1000" \
     " --database-dir #{my_db_dir}" \
     " --staking-ledgers-dir #{LEDGERS_DIR}" \
     " --missing-block-recovery-exe #{SRC_TOP}/ops/recover-block" \
