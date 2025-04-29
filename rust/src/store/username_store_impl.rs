@@ -188,3 +188,85 @@ impl UsernameStore for IndexerStore {
             .and_then(|bytes| serde_json::from_slice(&bytes).expect("username pks")))
     }
 }
+
+#[cfg(all(test, feature = "tier2"))]
+mod tests {
+    use crate::{
+        base::public_key::PublicKey,
+        ledger::username::Username,
+        store::{username::UsernameStore, IndexerStore},
+    };
+    use quickcheck::{Arbitrary, Gen};
+    use std::collections::BTreeSet;
+    use tempfile::TempDir;
+
+    const GEN_SIZE: usize = 1000;
+
+    fn create_indexer_store() -> anyhow::Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(std::env::current_dir()?)?;
+        IndexerStore::new(temp_dir.path())
+    }
+
+    #[test]
+    fn username_store() -> anyhow::Result<()> {
+        let store = create_indexer_store()?;
+
+        let g = &mut Gen::new(GEN_SIZE);
+        let pk0 = PublicKey::arbitrary(g);
+        let pk1 = PublicKey::arbitrary_not(g, &Some(pk0.clone()));
+
+        // no usernames initially
+        assert!(store.get_pk_num_username_updates(&pk0)?.is_none());
+        assert!(store.get_pk_num_username_updates(&pk1)?.is_none());
+
+        assert!(store.get_username(&pk0)?.is_none());
+        assert!(store.get_username(&pk1)?.is_none());
+
+        // add pk0 username
+        let username0 = Username::arbitrary(g);
+        store.add_username(pk0.clone(), &username0)?;
+
+        assert_eq!(store.get_pk_num_username_updates(&pk0)?.unwrap(), 1);
+        assert_eq!(store.get_pk_username(&pk0, 0)?.unwrap(), username0);
+        assert_eq!(store.get_username(&pk0)?.unwrap(), username0);
+        assert_eq!(
+            store.get_username_pks(&username0.0)?.unwrap(),
+            BTreeSet::from([pk0.clone()])
+        );
+
+        // add pk1 username (same as pk0)
+        store.add_username(pk1.clone(), &username0)?;
+
+        assert_eq!(store.get_pk_num_username_updates(&pk1)?.unwrap(), 1);
+        assert_eq!(store.get_pk_username(&pk1, 0)?.unwrap(), username0);
+        assert_eq!(store.get_username(&pk1)?.unwrap(), username0);
+        assert_eq!(
+            store.get_username_pks(&username0.0)?.unwrap(),
+            BTreeSet::from([pk0.clone(), pk1.clone()])
+        );
+
+        // remove pk1 username
+        store.remove_username(&pk1)?;
+
+        assert!(store.get_username(&pk1)?.is_none());
+        assert_eq!(store.get_pk_num_username_updates(&pk1)?.unwrap(), 0);
+        assert_eq!(
+            store.get_username_pks(&username0.0)?.unwrap(),
+            BTreeSet::from([pk0.clone()])
+        );
+
+        // add pk1 username (different from pk0)
+        let username1 = Username::arbitrary_not(g, &username0);
+        store.add_username(pk1.clone(), &username1)?;
+
+        assert_eq!(store.get_pk_num_username_updates(&pk1)?.unwrap(), 1);
+        assert_eq!(store.get_pk_username(&pk1, 0)?.unwrap(), username1);
+        assert_eq!(store.get_username(&pk1)?.unwrap(), username1);
+        assert_eq!(
+            store.get_username_pks(&username1.0)?.unwrap(),
+            BTreeSet::from([pk1.clone()])
+        );
+
+        Ok(())
+    }
+}
