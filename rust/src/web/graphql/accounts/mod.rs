@@ -248,8 +248,7 @@ impl AccountQueryRoot {
 
             let account = serde_json::from_slice::<account::Account>(&value)?
                 .deduct_mina_account_creation_fee();
-            let pk = account.public_key.clone();
-            let username = match db.get_username(&pk) {
+            let username = match db.get_username(&account.public_key) {
                 Ok(None) | Err(_) => None,
                 Ok(Some(username)) => Some(username.0),
             };
@@ -411,8 +410,9 @@ impl AccountQueryInput {
 
             let account = serde_json::from_slice::<account::Account>(&value)?
                 .deduct_mina_account_creation_fee();
-            let pk = account.public_key.clone();
-            let username = match db.get_username(&pk) {
+
+            let pk = &account.public_key;
+            let username = match db.get_username(pk) {
                 Ok(None) | Err(_) => None,
                 Ok(Some(username)) => Some(username.0),
             };
@@ -430,47 +430,47 @@ impl AccountQueryInput {
 impl AccountWithMeta {
     /// Account creation fee must already be deducted
     pub fn new(db: &std::sync::Arc<IndexerStore>, account: account::Account) -> Self {
-        let pk = account.public_key.to_owned();
+        let pk = &account.public_key;
 
         Self {
             is_genesis_account: account.genesis_account.is_some(),
             genesis_account: account.genesis_account.map(|amt| amt.0),
             pk_epoch_num_blocks: db
-                .get_block_production_pk_epoch_count(&pk, None)
+                .get_block_production_pk_epoch_count(pk, None)
                 .expect("pk epoch block count"),
             pk_total_num_blocks: db
-                .get_block_production_pk_total_count(&pk)
+                .get_block_production_pk_total_count(pk)
                 .expect("pk total block count"),
             pk_epoch_num_snarks: db
-                .get_snarks_pk_epoch_count(&pk, None)
+                .get_snarks_pk_epoch_count(pk, None)
                 .expect("pk epoch snark count"),
             pk_total_num_snarks: db
-                .get_snarks_pk_total_count(&pk)
+                .get_snarks_pk_total_count(pk)
                 .expect("pk total snark count"),
             pk_epoch_num_user_commands: db
-                .get_user_commands_pk_epoch_count(&pk, None)
+                .get_user_commands_pk_epoch_count(pk, None)
                 .expect("pk epoch user command count"),
             pk_total_num_user_commands: db
-                .get_user_commands_pk_total_count(&pk)
+                .get_user_commands_pk_total_count(pk)
                 .expect("pk total user command count"),
             pk_epoch_num_zkapp_commands: db
-                .get_zkapp_commands_pk_epoch_count(&pk, None)
+                .get_zkapp_commands_pk_epoch_count(pk, None)
                 .expect("pk epoch zkapp command count"),
             pk_total_num_zkapp_commands: db
-                .get_zkapp_commands_pk_total_count(&pk)
+                .get_zkapp_commands_pk_total_count(pk)
                 .expect("pk total zkapp command count"),
             pk_epoch_num_internal_commands: db
-                .get_internal_commands_pk_epoch_count(&pk, None)
+                .get_internal_commands_pk_epoch_count(pk, None)
                 .expect("pk epoch internal command count"),
             pk_total_num_internal_commands: db
-                .get_internal_commands_pk_total_count(&pk)
+                .get_internal_commands_pk_total_count(pk)
                 .expect("pk total internal command count"),
             block_height: db
                 .get_best_block_height()
                 .unwrap()
                 .expect("best block height"),
             username: db
-                .get_username(&pk)
+                .get_username(pk)
                 .expect("username")
                 .map(|user| user.0)
                 .or(Some("Unknown".to_string())),

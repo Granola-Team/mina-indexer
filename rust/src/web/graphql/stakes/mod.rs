@@ -477,6 +477,7 @@ impl StakesQueryInput {
                 }
             }
         }
+
         true
     }
 
@@ -509,9 +510,9 @@ impl StakesQueryInput {
                     if *username != *acct_username {
                         return false;
                     }
-                } else {
-                    return false;
                 }
+
+                return false;
             }
 
             if let Some(delegate) = delegate {
@@ -552,7 +553,7 @@ impl StakesLedgerAccountWithMeta {
         ledger_hash: LedgerHash,
         total_currency: u64,
     ) -> Self {
-        let pk = account.pk.clone();
+        let pk = &account.pk;
         let total_delegated_nanomina = delegations.total_delegated.unwrap_or_default();
         let count_delegates = delegations.count_delegates.unwrap_or_default();
 
@@ -575,36 +576,36 @@ impl StakesLedgerAccountWithMeta {
 
         // pk data counts
         let pk_epoch_num_blocks = db
-            .get_block_production_pk_epoch_count(&pk, Some(epoch))
+            .get_block_production_pk_epoch_count(pk, Some(epoch))
             .expect("pk epoch num blocks");
         let pk_total_num_blocks = db
-            .get_block_production_pk_total_count(&pk)
+            .get_block_production_pk_total_count(pk)
             .expect("pk total num blocks");
         let pk_epoch_num_supercharged_blocks = db
-            .get_block_production_pk_supercharged_epoch_count(&pk, Some(epoch))
+            .get_block_production_pk_supercharged_epoch_count(pk, Some(epoch))
             .expect("pk epoch num supercharged blocks");
         let pk_total_num_supercharged_blocks = db
-            .get_block_production_pk_supercharged_total_count(&pk)
+            .get_block_production_pk_supercharged_total_count(pk)
             .expect("pk total num supercharged blocks");
         let pk_epoch_num_snarks = db
-            .get_snarks_pk_epoch_count(&pk, Some(epoch))
+            .get_snarks_pk_epoch_count(pk, Some(epoch))
             .expect("pk epoch num snarks");
         let pk_total_num_snarks = db
-            .get_snarks_pk_total_count(&pk)
+            .get_snarks_pk_total_count(pk)
             .expect("pk total num snarks");
         let pk_epoch_num_user_commands = db
-            .get_user_commands_pk_epoch_count(&pk, Some(epoch))
+            .get_user_commands_pk_epoch_count(pk, Some(epoch))
             .expect("pk epoch num user commands");
         let pk_total_num_user_commands = db
-            .get_user_commands_pk_total_count(&pk)
+            .get_user_commands_pk_total_count(pk)
             .expect("pk total num user commands");
         let pk_epoch_num_internal_commands = db
-            .get_internal_commands_pk_epoch_count(&pk, Some(epoch))
+            .get_internal_commands_pk_epoch_count(pk, Some(epoch))
             .expect("pk epoch num internal commands");
         let pk_total_num_internal_commands = db
-            .get_internal_commands_pk_total_count(&pk)
+            .get_internal_commands_pk_total_count(pk)
             .expect("pk total num internal commands");
-        let username = match db.get_username(&pk) {
+        let username = match db.get_username(pk) {
             Ok(None) | Err(_) => Some("Unknown".to_string()),
             Ok(username) => username.map(|u| u.0),
         };
