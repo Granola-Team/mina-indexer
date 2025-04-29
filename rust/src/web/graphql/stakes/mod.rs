@@ -309,9 +309,62 @@ impl StakesQueryRoot {
         let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
 
         use StakesSortByInput::*;
+        let mut accounts = Vec::with_capacity(limit);
+
+        // username query
+        if let Some(username) = query.as_ref().and_then(|q| q.username.as_ref()) {
+            let username_accounts = db.get_username_pks(username)?.unwrap_or_default();
+
+            for pk in username_accounts {
+                // check limit
+                if accounts.len() >= limit {
+                    break;
+                }
+
+                if let Some(account) =
+                    db.get_staking_account(&pk, epoch, Some(&genesis_state_hash))?
+                {
+                    if let Some(delegation) =
+                        db.get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
+                    {
+                        if StakesQueryInput::matches_staking_account(
+                            query.as_ref(),
+                            &account,
+                            &ledger_hash,
+                            &genesis_state_hash,
+                            epoch,
+                        ) {
+                            let account = StakesLedgerAccountWithMeta::new(
+                                db,
+                                account,
+                                &delegation,
+                                epoch,
+                                ledger_hash.to_owned(),
+                                total_currency,
+                            );
+
+                            if StakesQueryInput::matches(query.as_ref(), &account) {
+                                accounts.push(account);
+                            }
+                        }
+                    } else {
+                        return Err(async_graphql::Error::new(format!(
+                            "No staking delegations found for pk {} epoch {} genesis {}",
+                            pk, epoch, genesis_state_hash,
+                        )));
+                    }
+                } else {
+                    return Err(async_graphql::Error::new(format!(
+                        "No staking account found for pk {} epoch {} genesis {}",
+                        pk, epoch, genesis_state_hash,
+                    )));
+                }
+            }
+
+            return Ok(accounts);
+        }
 
         // balance/stake-sorted queries
-        let mut accounts = Vec::with_capacity(limit);
         let iter = match sort_by {
             Some(StakeDesc) | None => db.staking_ledger_account_stake_iterator(
                 epoch,
