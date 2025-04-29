@@ -482,14 +482,17 @@ pub trait ColumnFamilyHelpers {
     // Username store //
     ////////////////////
 
-    /// CF for storing update index
-    fn username_pk_num_cf(&self) -> &ColumnFamily;
+    /// CF for storing username update count
+    fn username_num_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing indexed usernames
-    fn username_pk_index_cf(&self) -> &ColumnFamily;
+    /// CF for storing usernames per pk
+    fn username_cf(&self) -> &ColumnFamily;
 
-    /// CF for storing state hash -> usernames
+    /// CF for storing usernames per block
     fn usernames_per_block_cf(&self) -> &ColumnFamily;
+
+    /// CF for storing pk's per username
+    fn username_pk_cf(&self) -> &ColumnFamily;
 
     /////////////////
     // Data counts //

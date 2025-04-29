@@ -1808,23 +1808,47 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Username store CFs //
     ////////////////////////
 
-    fn username_pk_num_cf(&self) -> &ColumnFamily {
+    /// CF for storing username update count
+    /// ```
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
+    fn username_num_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("username-pk-num")
-            .expect("username-pk-num column family exists")
+            .cf_handle("username-num")
+            .expect("username-num column family exists")
     }
 
-    fn username_pk_index_cf(&self) -> &ColumnFamily {
+    /// CF for storing usernames per pk
+    /// ```
+    /// key: {pk}{index}
+    /// val: [Username] bytes
+    /// where
+    /// - pk:    [PublicKey] bytes
+    /// - index: [u32] BE bytes
+    fn username_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("username-pk-index")
-            .expect("username-pk-index column family exists")
+            .cf_handle("username")
+            .expect("username column family exists")
     }
 
-    /// CF for storing state hash -> usernames
+    /// CF for storing usernames per block
+    /// ```
+    /// key: [StateHash] bytes
+    /// val: [UsernameUpdate] serde bytes
     fn usernames_per_block_cf(&self) -> &ColumnFamily {
         self.database
-            .cf_handle("usernames-per-block")
-            .expect("usernames-per-block column family exists")
+            .cf_handle("username-block")
+            .expect("username-block column family exists")
+    }
+
+    /// CF for storing pk's per username
+    /// ```
+    /// key: [Username] bytes
+    /// val: [BTreeSet<PublicKey>] serde bytes
+    fn username_pk_cf(&self) -> &ColumnFamily {
+        self.database
+            .cf_handle("username-pk")
+            .expect("username-pk column family exists")
     }
 
     /////////////////////

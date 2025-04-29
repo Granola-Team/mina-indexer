@@ -54,7 +54,7 @@ pub struct DbUpdate<T> {
 impl IndexerStore {
     /// Add the corresponding CF helper to [ColumnFamilyHelpers]
     /// & modify [IndexerStoreVersion] as needed!
-    const COLUMN_FAMILIES: [&'static str; 178] = [
+    const COLUMN_FAMILIES: [&'static str; 179] = [
         //////////////////////
         // Blocks store CFs //
         //////////////////////
@@ -242,9 +242,10 @@ impl IndexerStore {
         ////////////////////////
         // Username store CFs //
         ////////////////////////
-        "username-pk-num",
-        "username-pk-index",
-        "usernames-per-block",
+        "username",
+        "username-num",
+        "username-block",
+        "username-pk",
         // block counts
         "block-production-pk-epoch",
         "block-production-pk-canonical-epoch",
