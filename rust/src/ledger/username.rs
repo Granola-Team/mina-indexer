@@ -45,3 +45,37 @@ impl std::fmt::Display for Username {
         write!(f, "{}", self.0)
     }
 }
+
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for Username {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..MEMO_LEN - NAME_SERVICE_MEMO_PREFIX.len() {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(chars.iter().collect())
+    }
+}
+
+#[cfg(test)]
+impl Username {
+    pub fn arbitrary_not(g: &mut quickcheck::Gen, username: &Self) -> Self {
+        use quickcheck::Arbitrary;
+
+        let mut name = Self::arbitrary(g);
+        while name == *username {
+            name = Self::arbitrary(g);
+        }
+
+        name
+    }
+}
