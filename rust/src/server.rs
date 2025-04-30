@@ -275,12 +275,14 @@ impl IndexerConfiguration {
     ) -> anyhow::Result<()> {
         let blocks_dir = self.blocks_dir.clone();
         let staking_ledgers_dir = self.staking_ledgers_dir.clone();
+        let domain_socket_path = self.domain_socket_path.clone();
+
         let fetch_new_blocks_delay = self.fetch_new_blocks_delay;
         let fetch_new_blocks_exe = self.fetch_new_blocks_exe.clone();
+
         let missing_block_recovery_delay = self.missing_block_recovery_delay;
         let missing_block_recovery_exe = self.missing_block_recovery_exe.clone();
         let missing_block_recovery_batch = self.missing_block_recovery_batch;
-        let domain_socket_path = self.domain_socket_path.clone();
 
         // initialize witness tree & connect database
         let state = Arc::new(RwLock::new(self.initialize(&store).await.unwrap_or_else(
@@ -612,6 +614,8 @@ async fn fetch_new_blocks(
     blocks_dir: impl AsRef<Path>,
     fetch_new_blocks_exe: impl AsRef<Path>,
 ) -> anyhow::Result<()> {
+    debug!("Fetching new blocks");
+
     let state = state.read().await;
     let network = state.version.network.clone();
     let new_block_length = state.best_tip_block().blockchain_length + 1;
@@ -659,13 +663,15 @@ async fn recover_missing_blocks(
     missing_block_recovery_exe: impl AsRef<Path>,
     batch_recovery: bool,
 ) -> anyhow::Result<()> {
+    debug!("Running missing block recovery");
+
     let state = state.read().await;
     let network = state.version.network.clone();
-    let missing_parent_lengths: HashSet<u32> = state
+    let missing_parent_lengths = state
         .dangling_branches
         .iter()
         .map(|b| b.root_block().blockchain_length.saturating_sub(1))
-        .collect();
+        .collect::<HashSet<_>>();
 
     // exit early if no missing blocks
     if missing_parent_lengths.is_empty() {
@@ -718,11 +724,8 @@ async fn recover_missing_blocks(
         .for_each(run_missing_blocks_recovery);
 
     if batch_recovery {
-        let best_tip_length = state.best_tip_block().blockchain_length;
         if let (Some(min), Some(max)) = (min_missing_length, max_missing_length) {
-            let min_length = best_tip_length.min(min);
-            let max_length = best_tip_length.max(max);
-            (min_length..max_length).for_each(run_missing_blocks_recovery)
+            (min..=max).for_each(run_missing_blocks_recovery)
         }
     }
 
