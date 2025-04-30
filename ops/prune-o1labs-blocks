@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+
+class Updater
+  def initialize(output_dir)
+    @queue = Queue.new
+    @output_dir = output_dir
+  end
+
+  def add(path)
+    stat = File.stat(path)
+    if stat.file?
+      @queue << path
+    elsif stat.directory?
+      Dir.children(path).each do |f|
+        add(File.join(path, f))
+      end
+    elsif stat.symlink?
+      abort("Can't operate on symlinks. Aborting.")
+    else
+      abort("Invalid file #{path}. Aborting.")
+    end
+  end
+
+  def is_allowed_filename(path)
+    disallowed_prefixes = %W[
+      mainnet-upgrade-final-step
+      mainnet-pre-hf-dry-run
+      mainnet-post-hf-dry-run
+      mainnet-multi-cluster
+      mainnet-final-step-post-hf
+      mainnet-bundle
+    ]
+    basename = File.basename(path)
+    File.extname(path) == ".json" &&
+      !basename.start_with?(*disallowed_prefixes)
+  end
+
+  def process_file(path)
+    print "Processing file #{path}... "
+    if is_allowed_filename(path)
+      out_link = File.join(@output_dir, File.basename(path))
+      File.link(path, out_link)
+      puts "Linked to #{out_link}."
+    else
+      puts "Excluded due to dissallowed file name."
+    end
+  rescue => e
+    abort "Error processing #{path}: #{e.message}"
+  end
+
+  def process_files
+    until @queue.empty?
+      path = begin
+        @queue.pop(true)
+      rescue
+        nil
+      end
+      break unless path
+      process_file(path)
+    end
+  end
+end
+
+def main
+  if ARGV.size != 2
+    puts "Usage: #{$0} <FILE_OR_DIRECTORY> <output_dir>"
+    exit 1
+  end
+
+  processor = Updater.new(ARGV[1])
+  processor.add(ARGV[0])
+  puts "Processing..."
+  processor.process_files
+end
+
+# Only execute main when this script is run directly, not when required
+main if __FILE__ == $0
