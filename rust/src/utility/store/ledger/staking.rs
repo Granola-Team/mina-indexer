@@ -59,40 +59,6 @@ pub fn staking_ledger_sort_key(
     key
 }
 
-/// Staking ledger sort key to genesis state hash
-/// ```
-/// {genesis}{epoch}{amount}{pk} -> genesis
-/// where
-/// - genesis: [StateHash] bytes
-/// - epoch:   [u32] BE bytes
-/// - amount:  [u64] BE bytes
-/// - pk:      [PublicKey] bytes
-pub fn staking_ledger_sort_key_genesis(key: &[u8]) -> StateHash {
-    assert_eq!(
-        key.len(),
-        StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN
-    );
-
-    StateHash::from_bytes(&key[..StateHash::LEN]).expect("staking ledger sort key genesis hash")
-}
-
-/// Staking ledger sort key to epoch [u32]
-/// ```
-/// {genesis}{epoch}{amount}{pk} -> epoch
-/// where
-/// - genesis: [StateHash] bytes
-/// - epoch:   [u32] BE bytes
-/// - amount:  [u64] BE bytes
-/// - pk:      [PublicKey] bytes
-pub fn staking_ledger_sort_key_epoch(key: &[u8]) -> u32 {
-    assert_eq!(
-        key.len(),
-        StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN
-    );
-
-    u32_from_be_bytes(&key[StateHash::LEN..][..U32_LEN]).expect("staking ledger sort key epoch")
-}
-
 /// Staking ledger account key
 /// ```
 /// {genesis_hash}{epoch}{ledger_hash}{pk}

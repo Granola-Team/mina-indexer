@@ -1,7 +1,7 @@
 use crate::base::numeric::Numeric;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingPermissions {
     edit_state: Permission,
     send: Permission,

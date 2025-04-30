@@ -34,7 +34,7 @@ pub struct StakingLedger {
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,

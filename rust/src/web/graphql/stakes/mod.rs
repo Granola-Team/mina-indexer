@@ -13,9 +13,7 @@ use crate::{
     },
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
-    utility::store::ledger::staking::{
-        staking_ledger_sort_key_epoch, staking_ledger_sort_key_genesis,
-    },
+    utility::store::common::U32_LEN,
     web::graphql::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -38,17 +36,18 @@ pub struct StakesQueryInput {
     username: Option<String>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StakesSortByInput {
-    #[graphql(name = "BALANCE_ASC")]
-    BalanceAsc,
     #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
+    #[graphql(name = "BALANCE_ASC")]
+    BalanceAsc,
 
-    #[graphql(name = "STAKE_ASC")]
-    StakeAsc,
+    #[default]
     #[graphql(name = "STAKE_DESC")]
     StakeDesc,
+    #[graphql(name = "STAKE_ASC")]
+    StakeAsc,
 }
 
 #[derive(SimpleObject, Default)]
@@ -313,20 +312,23 @@ impl StakesQueryRoot {
 
         // username query
         if let Some(username) = query.as_ref().and_then(|q| q.username.as_ref()) {
-            let username_accounts = db.get_username_pks(username)?.unwrap_or_default();
+            let username_pks = db.get_username_pks(username)?.unwrap_or_default();
 
-            for pk in username_accounts {
+            for pk in username_pks {
                 // check limit
                 if accounts.len() >= limit {
                     break;
                 }
 
-                if let Some(account) =
+                if let Some(mut account) =
                     db.get_staking_account(&pk, epoch, Some(&genesis_state_hash))?
                 {
                     if let Some(delegation) =
                         db.get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
                     {
+                        // add username to account
+                        account.username = db.get_username(&pk)?.map(|u| u.0);
+
                         if StakesQueryInput::matches_staking_account(
                             query.as_ref(),
                             &account,
@@ -365,23 +367,23 @@ impl StakesQueryRoot {
         }
 
         // balance/stake-sorted queries
-        let iter = match sort_by {
-            Some(StakeDesc) | None => db.staking_ledger_account_stake_iterator(
+        let iter = match sort_by.unwrap_or_default() {
+            StakeDesc => db.staking_ledger_account_stake_iterator(
                 epoch,
                 &genesis_state_hash,
                 Direction::Reverse,
             ),
-            Some(StakeAsc) => db.staking_ledger_account_stake_iterator(
+            StakeAsc => db.staking_ledger_account_stake_iterator(
                 epoch,
                 &genesis_state_hash,
                 Direction::Forward,
             ),
-            Some(BalanceDesc) => db.staking_ledger_account_balance_iterator(
+            BalanceDesc => db.staking_ledger_account_balance_iterator(
                 epoch,
                 &genesis_state_hash,
                 Direction::Reverse,
             ),
-            Some(BalanceAsc) => db.staking_ledger_account_balance_iterator(
+            BalanceAsc => db.staking_ledger_account_balance_iterator(
                 epoch,
                 &genesis_state_hash,
                 Direction::Forward,
@@ -389,8 +391,8 @@ impl StakesQueryRoot {
         };
 
         for (key, value) in iter.flatten() {
-            if staking_ledger_sort_key_genesis(&key) != genesis_state_hash
-                || staking_ledger_sort_key_epoch(&key) != epoch
+            if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
+                || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
                 || accounts.len() >= limit
             {
                 // no longer the desired staking ledger
