@@ -653,8 +653,7 @@ mod tests {
 
     fn create_indexer_store() -> anyhow::Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(std::env::current_dir()?)?;
-        let store = IndexerStore::new(temp_dir.path())?;
-        Ok(store)
+        IndexerStore::new(temp_dir.path())
     }
 
     #[test]
