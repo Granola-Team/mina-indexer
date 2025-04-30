@@ -716,18 +716,18 @@ async fn recover_missing_blocks(
     };
 
     debug!("Getting missing parent blocks of dangling roots");
-    let min_missing_length = missing_parent_lengths.iter().min().cloned();
-    let max_missing_length = missing_parent_lengths.iter().max().cloned();
-
-    // fetch each missing block
-    missing_parent_lengths
-        .into_iter()
-        .for_each(run_missing_blocks_recovery);
 
     if batch_recovery {
+        let min_missing_length = missing_parent_lengths.iter().min().cloned();
+        let max_missing_length = missing_parent_lengths.iter().max().cloned();
+
         if let (Some(min), Some(max)) = (min_missing_length, max_missing_length) {
             (min..=max).for_each(run_missing_blocks_recovery)
         }
+    } else {
+        missing_parent_lengths
+            .into_iter()
+            .for_each(run_missing_blocks_recovery);
     }
 
     Ok(())
