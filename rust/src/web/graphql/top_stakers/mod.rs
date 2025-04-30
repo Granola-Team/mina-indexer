@@ -2,9 +2,9 @@
 
 use super::db;
 use crate::{
-    base::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
-    ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
+    ledger::{account, store::best::BestLedgerStore, token::TokenAddress, username::Username},
     store::username::UsernameStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };
@@ -15,12 +15,16 @@ use speedb::Direction;
 #[derive(InputObject)]
 pub struct TopStakersQueryInput {
     epoch: u32,
+
+    #[graphql(name = "genesis_state_hash")]
+    genesis_state_hash: Option<String>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum TopStakersSortByInput {
-    NumCanonicalBlocksProducedAsc,
+    #[default]
     NumCanonicalBlocksProducedDesc,
+    NumCanonicalBlocksProducedAsc,
 }
 
 #[derive(Default)]
@@ -28,7 +32,7 @@ pub struct TopStakersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopStakerAccount {
-    username: Option<String>,
+    username: String,
 
     #[graphql(name = "public_key")]
     public_key: String,
@@ -56,65 +60,87 @@ impl TopStakersQueryRoot {
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<TopStakerAccount>> {
         let db = db(ctx);
-        let epoch = query
+        let epoch = query.as_ref().map_or_else(
+            || db.get_current_epoch().expect("current epoch"),
+            |q| q.epoch,
+        );
+
+        let genesis_state_hash = query
             .as_ref()
-            .map_or(db.get_current_epoch().expect("current epoch"), |q| q.epoch);
+            .and_then(|q| q.genesis_state_hash.clone())
+            .or_else(|| {
+                db.get_best_block_genesis_hash()
+                    .expect("best block genesis state hash")
+                    .map(|g| g.0)
+            });
+        let genesis_state_hash = match StateHash::new(genesis_state_hash.unwrap()) {
+            Ok(genesis_state_hash) => genesis_state_hash,
+            Err(e) => return Err(async_graphql::Error::new(e.to_string())),
+        };
 
         let mut accounts = Vec::new();
-        let direction = match sort_by {
-            Some(TopStakersSortByInput::NumCanonicalBlocksProducedAsc) => Direction::Forward,
-            Some(TopStakersSortByInput::NumCanonicalBlocksProducedDesc) | None => {
-                Direction::Reverse
-            }
+        let direction = match sort_by.unwrap_or_default() {
+            TopStakersSortByInput::NumCanonicalBlocksProducedAsc => Direction::Forward,
+            TopStakersSortByInput::NumCanonicalBlocksProducedDesc => Direction::Reverse,
         };
 
         for (key, _) in db
-            .canonical_epoch_blocks_produced_iterator(Some(epoch), direction)
+            .canonical_epoch_blocks_produced_iterator(
+                Some(genesis_state_hash.clone()),
+                Some(epoch),
+                direction,
+            )
             .flatten()
         {
-            let key_epoch = from_be_bytes(key[..U32_LEN].to_vec());
-            if key_epoch != epoch {
+            if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
+                || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
+                || accounts.len() >= limit
+            {
+                // gone beyond desired region or limit
                 break;
             }
 
-            let num = from_be_bytes(key[U32_LEN..][..U32_LEN].to_vec());
-            let pk = PublicKey::from_bytes(&key[U32_LEN..][U32_LEN..])?;
+            let num = from_be_bytes(key[StateHash::LEN..][U32_LEN..][..U32_LEN].to_vec());
+            let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
             let account = db
                 .get_best_account(&pk, &TokenAddress::default())? // always MINA
                 .with_context(|| format!("Account missing {pk}"))
                 .unwrap()
                 .deduct_mina_account_creation_fee();
 
-            let username = match db.get_username(&pk) {
-                Ok(None) | Err(_) => None,
-                Ok(Some(username)) => Some(username.0),
-            };
-
             let account = TopStakerAccount::from((
                 account.clone(),
-                db.get_block_production_pk_epoch_count(&pk, Some(epoch))?,
+                db.get_block_production_pk_epoch_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash.clone()),
+                )?,
                 num,
-                db.get_block_production_pk_supercharged_epoch_count(&pk, Some(epoch))?,
-                db.get_pk_epoch_slots_produced_count(&pk, Some(epoch))?,
-                username,
+                db.get_block_production_pk_supercharged_epoch_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash.clone()),
+                )?,
+                db.get_pk_epoch_slots_produced_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash.clone()),
+                )?,
+                db.get_username(&pk)?,
             ));
 
             accounts.push(account);
-
-            if accounts.len() >= limit {
-                break;
-            }
         }
 
         Ok(accounts)
     }
 }
 
-impl From<(account::Account, u32, u32, u32, u32, Option<String>)> for TopStakerAccount {
-    fn from(value: (account::Account, u32, u32, u32, u32, Option<String>)) -> Self {
+impl From<(account::Account, u32, u32, u32, u32, Option<Username>)> for TopStakerAccount {
+    fn from(value: (account::Account, u32, u32, u32, u32, Option<Username>)) -> Self {
         Self {
             public_key: value.0.public_key.0,
-            username: value.5.or(Some("Unknown".to_string())),
+            username: value.5.unwrap_or_default().0,
             num_blocks_produced: value.1,
             num_canonical_blocks_produced: value.2,
             num_supercharged_blocks_produced: value.3,
