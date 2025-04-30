@@ -247,15 +247,29 @@ pub trait BlockStore {
         -> Result<()>;
 
     /// Index the epoch slot for a block
-    fn add_epoch_slots_produced(&self, epoch: u32, epoch_slot: u32, pk: &PublicKey) -> Result<()>;
+    fn add_epoch_slots_produced(
+        &self,
+        genesis_state_hash: StateHash,
+        epoch: u32,
+        epoch_slot: u32,
+        pk: &PublicKey,
+    ) -> Result<()>;
 
     /// Returns the current slot if blocks were produced there,
     /// otherwise it returns the next slot with blocks produced
-    fn get_next_global_slot_produced(&self, global_slot: u32) -> Result<Option<u32>>;
+    fn get_next_global_slot_produced(
+        &self,
+        genesis_state_hash: &StateHash,
+        global_slot: u32,
+    ) -> Result<Option<u32>>;
 
     /// Returns the current slot if blocks were produced there,
     /// otherwise it returns the previous slot with blocks produced
-    fn get_prev_global_slot_produced(&self, global_slot: u32) -> Result<u32>;
+    fn get_prev_global_slot_produced(
+        &self,
+        genesis_state_hash: &StateHash,
+        global_slot: u32,
+    ) -> Result<u32>;
 
     /// Index the block's minimimal info needed for comparison
     fn set_block_comparison_batch(
@@ -323,12 +337,15 @@ pub trait BlockStore {
     /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator for per epoch number of canonical blocks produced
+    /// Iterator for per epoch counts of canonical blocks produced
     /// ```
-    /// key: {epoch}{num}{pk}
+    /// CF: [block_production_pk_canonical_epoch_sort_cf]
+    ///
+    /// key: {genesis}{epoch}{num}{pk}
     /// val: b""
     fn canonical_epoch_blocks_produced_iterator(
         &self,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         direction: Direction,
     ) -> DBIterator<'_>;
@@ -358,6 +375,7 @@ pub trait BlockStore {
     /// Increment the canonical block production sort data
     fn increment_block_canonical_production_count_sort(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         num: u32,
         pk: &PublicKey,
@@ -369,6 +387,7 @@ pub trait BlockStore {
     /// Decrement the canonical block production sort data
     fn decrement_block_canonical_production_count_sort(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         num: u32,
         pk: &PublicKey,
@@ -380,6 +399,7 @@ pub trait BlockStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        genesis_state_hash: Option<StateHash>,
     ) -> Result<u32>;
 
     /// Get the canonical block production count for `pk` in `epoch`
@@ -388,6 +408,7 @@ pub trait BlockStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        genesis_state_hash: Option<StateHash>,
     ) -> Result<u32>;
 
     /// Get the supercharged block production count for `pk` in `epoch`
@@ -396,6 +417,7 @@ pub trait BlockStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
+        genesis_state_hash: Option<StateHash>,
     ) -> Result<u32>;
 
     /// Get the total block production count for `pk`
@@ -409,15 +431,27 @@ pub trait BlockStore {
 
     /// Get the total block production count for `epoch`
     /// (default: current epoch)
-    fn get_block_production_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_block_production_epoch_count(
+        &self,
+        genesis_state_hash: Option<StateHash>,
+        epoch: Option<u32>,
+    ) -> Result<u32>;
 
     /// Get the total canonical block production count for `epoch`
     /// (default: current epoch)
-    fn get_block_production_canonical_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_block_production_canonical_epoch_count(
+        &self,
+        genesis_state_hash: Option<StateHash>,
+        epoch: Option<u32>,
+    ) -> Result<u32>;
 
     /// Get the total supercharged block production count for `epoch`
     /// (default: current epoch)
-    fn get_block_production_supercharged_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_block_production_supercharged_epoch_count(
+        &self,
+        genesis_state_hash: Option<StateHash>,
+        epoch: Option<u32>,
+    ) -> Result<u32>;
 
     /// Get the total block production count
     fn get_block_production_total_count(&self) -> Result<u32>;
@@ -430,10 +464,19 @@ pub trait BlockStore {
     fn get_block_production_supercharged_total_count(&self) -> Result<u32>;
 
     /// Get the number of pk block production slots in the given epoch
-    fn get_pk_epoch_slots_produced_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32>;
+    fn get_pk_epoch_slots_produced_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<StateHash>,
+    ) -> Result<u32>;
 
     /// Get the number of block production slots in the given epoch
-    fn get_epoch_slots_produced_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_epoch_slots_produced_count(
+        &self,
+        genesis_state_hash: Option<StateHash>,
+        epoch: Option<u32>,
+    ) -> Result<u32>;
 
     ///////////////////////////////
     // Dump block store contents //

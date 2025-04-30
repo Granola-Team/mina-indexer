@@ -180,11 +180,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch slots produced
     /// ```
-    /// key: {epoch}{slot}
+    /// key: {genesis}{epoch}{slot}
     /// val: b""
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - slot:  [u32] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - slot:    [u32] BE bytes
+    /// ```
+    /// Use [epoch_num_key]
     fn block_epoch_slots_produced_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-epoch-slots-produced")
@@ -193,12 +196,13 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch per account slots produced
     /// ```
-    /// key: {epoch}{pk}{slot}
+    /// key: {genesis}{epoch}{slot}
     /// val: b""
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
-    /// - slot:  [u32] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// - slot:    [u32] BE bytes
     /// ```
     /// Use [epoch_pk_num_key]
     fn block_pk_epoch_slots_produced_cf(&self) -> &ColumnFamily {
@@ -1557,14 +1561,16 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("snark-prover-fees column family exists")
     }
 
-    /// CF for storing per epoch SNARK total fees by prover
+    /// CF for storing per epoch per prover SNARK total fees
     /// ```
-    /// key: {epoch}{prover}
-    /// val: fees
+    /// key: {genesis}{epoch}{prover}
+    /// val: [u64] BE bytes
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - prover: [PublicKey] bytes
-    /// - fees:   [u64] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - prover:  [PublicKey] bytes
+    /// ```
+    /// Use [snark_epoch_key]
     fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-epoch")
@@ -1875,30 +1881,47 @@ impl ColumnFamilyHelpers for IndexerStore {
     // Data count CFs //
     ////////////////////
 
-    /// CF for storing per epoch per account block prodution info
+    /// CF for storing per epoch per account block prodution counts
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of blocks produced by pk in epoch
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn block_production_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-epoch")
             .expect("block-production-pk-epoch column family exists")
     }
 
-    /// CF for storing per epoch per account canonical block prodution info
+    /// CF for storing per epoch per account canonical block production counts
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of canonical blocks produced by pk in epoch
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn block_production_pk_canonical_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-canonical-epoch")
             .expect("block-production-pk-canonical-epoch column family exists")
     }
 
-    /// CF for sorting per epoch per account canonical block prodution info
+    /// CF for sorting per epoch per account canonical block production counts
     /// ```
-    /// - key: {epoch BE bytes}{num BE bytes}{pk}
-    /// - value: b""
+    /// key: {genesis}{epoch}{count}{pk}
+    /// val: b""
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - count:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
     /// ```
     /// Use [epoch_block_num_key]
     fn block_production_pk_canonical_epoch_sort_cf(&self) -> &ColumnFamily {
@@ -1907,70 +1930,91 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-production-pk-canonical-epoch-sort column family exists")
     }
 
-    /// CF for storing per epoch per account supercharged block prodution info
+    /// CF for storing per epoch per account supercharged block prodution counts
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of supercharged blocks produced by pk in epoch
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn block_production_pk_supercharged_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-supercharged-epoch")
             .expect("block-production-pk-supercharged-epoch column family exists")
     }
 
-    /// CF for storing per account total block prodution info
+    /// CF for storing per account total block prodution counts
     /// ```
-    /// - key: pk
-    /// - value: total number of blocks produced by pk
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn block_production_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-total")
             .expect("block-production-pk-total column family exists")
     }
 
-    /// CF for storing per account total canonical block prodution info
+    /// CF for storing per account total canonical block prodution counts
     /// ```
-    /// - key: pk
-    /// - value: total number of canonical blocks produced by pk
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn block_production_pk_canonical_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-canonical-total")
             .expect("block-production-pk-canonical-total column family exists")
     }
 
-    /// CF for storing per account total supercharged block prodution info
+    /// CF for storing per account total supercharged block prodution counts
     /// ```
-    /// - key: pk
-    /// - value: total number of supercharged blocks produced by pk
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn block_production_pk_supercharged_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-supercharged-total")
             .expect("block-production-pk-supercharged-total column family exists")
     }
 
-    /// CF for storing per epoch block production totals
+    /// CF for storing per epoch block production counts
     /// ```
-    /// - key: epoch
-    /// - value: number of blocks produced in epoch
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn block_production_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-epoch")
             .expect("block-production-epoch column family exists")
     }
 
-    /// CF for storing per epoch canonical block production totals
+    /// CF for storing per epoch canonical block production counts
     /// ```
-    /// - key: epoch
-    /// - value: number of canonical blocks produced in epoch
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn block_production_canonical_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-canonical-epoch")
             .expect("block-production-canonical-epoch column family exists")
     }
 
-    /// CF for storing per epoch supercharged block production totals
+    /// CF for storing per epoch supercharged block production counts
     /// ```
-    /// - key: epoch
-    /// - value: number of supercharged blocks produced in epoch
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn block_production_supercharged_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-supercharged-epoch")
@@ -1978,8 +2022,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for storing per block SNARK counts
-    /// - key: state hash
-    /// - value: number of SNARKs in block
+    /// ```
+    /// key: [StateHash] bytes
+    /// val: [u32] BE bytes
     fn block_snark_counts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-snark-counts")
@@ -1988,8 +2033,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for stoing per block user command counts
     /// ```
-    /// - key: state hash
-    /// - value: number of user commands in block
+    /// key: [StateHash] bytes
+    /// val: [u32] BE bytes
     fn block_user_command_counts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-user-command-counts")
@@ -1998,8 +2043,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for stoing per block zkapp command counts
     /// ```
-    /// - key: [StateHash] bytes
-    /// - val: [u32] BE bytes
+    /// key: [StateHash] bytes
+    /// val: [u32] BE bytes
     fn block_zkapp_command_counts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-zkapp-command-counts")
@@ -2008,32 +2053,37 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per block internal command counts
     /// ```
-    /// - key: [StateHash] bytes
-    /// - val: [u32] BE bytes
+    /// key: [StateHash] bytes
+    /// val: [u32] BE bytes
     fn block_internal_command_counts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-internal-command-counts")
             .expect("block-internal-command-counts column family exists")
     }
 
-    /// CF for storing per epoch slots produced counts
+    /// CF for storing per epoch slots produced
     /// ```
-    /// key: [u32] BE bytes
+    /// key: {genesis}{epoch}
     /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn block_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-epoch-slots-produced-count")
             .expect("block-epoch-slots-produced-count column family exists")
     }
 
-    /// CF for storing per epoch per account slots produced counts
+    /// CF for storing per epoch per account slots produced
     /// ```
-    /// key: {epoch}{pk}
-    /// val: count
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
-    /// - count: [u32] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
     /// ```
     /// Use [epoch_pk_key]
     fn block_pk_epoch_slots_produced_count_cf(&self) -> &ColumnFamily {
@@ -2042,114 +2092,140 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("block-pk-epoch-slots-produced-count column family exists")
     }
 
-    /// CF for storing per epoch per account slots produced counts
+    /// CF for storing per epoch per account slots produced
     /// ```
-    /// key: {epoch}{count}{pk}
+    /// key: {genesis}{epoch}{count}{pk}
     /// val: b""
-    /// - epoch: [u32] BE bytes
-    /// - count: [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - count:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
     /// ```
-    /// Use [epoch_block_num_key]
+    /// Use [epoch_num_pk_key]
     fn block_pk_epoch_slots_produced_count_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-pk-epoch-slots-produced-count-sort")
             .expect("block-pk-epoch-slots-produced-count-sort column family exists")
     }
 
-    /// CF for storing per epoch per account user commands
+    /// CF for storing per epoch per account user command counts
     /// ```
-    /// - key: {epoch}{pk}
-    /// - val: [u32] BE bytes
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - pk: [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn user_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk-epoch")
             .expect("user-commands-pk-epoch column family exists")
     }
 
-    /// CF for storing per epoch per account zkapp commands
+    /// CF for storing per epoch per account zkapp command counts
     /// ```
-    /// - key: {epoch}{pk}
-    /// - val: [u32] BE bytes
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn zkapp_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-commands-pk-epoch")
             .expect("zkapp-commands-pk-epoch column family exists")
     }
 
-    /// CF for storing per account total user commands
+    /// CF for storing per account total user command counts
     /// ```
-    /// - key: pk
-    /// - value: total number of pk user commands
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn user_commands_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-pk-total")
             .expect("user-commands-pk-total column family exists")
     }
 
-    /// CF for storing per account total zkapp commands
+    /// CF for storing per account total zkapp command counts
     /// ```
-    /// - key: [PublicKey] bytes
-    /// - val: [u32] BE bytes
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn zkapp_commands_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-commands-pk-total")
             .expect("zkapp-commands-pk-total column family exists")
     }
 
-    /// CF for per epoch total user commands
+    /// CF for per epoch user command counts
     /// ```
-    /// - key: [u32] BE bytes
-    /// - val: [u32] BE bytes
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn user_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("user-commands-epoch")
             .expect("user-commands-epoch column family exists")
     }
 
-    /// CF for per epoch total zkapp commands
+    /// CF for per epoch zkapp command counts
     /// ```
-    /// - key: [u32] BE bytes
-    /// - val: [u32] BE bytes
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn zkapp_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("zkapp-commands-epoch")
             .expect("zkapp-commands-epoch column family exists")
     }
 
-    /// CF for storing per epoch per account internal commands
+    /// CF for storing per epoch per account internal command counts
     /// ```
-    /// - key: {epoch}{pk}
-    /// - val: [u32] BE bytes
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
     /// where
-    /// - epoch: [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn internal_commands_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-epoch")
             .expect("internal-commands-pk-epoch column family exists")
     }
 
-    /// CF for storing per account total internal commands
+    /// CF for storing per account total internal command counts
     /// ```
-    /// - key: pk
-    /// - value: total number of pk internal commands
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn internal_commands_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-pk-total")
             .expect("internal-commands-pk-total column family exists")
     }
 
-    /// CF for storing per epoch total internal commands
+    /// CF for storing per epoch total internal command counts
     /// ```
-    /// - key: epoch
-    /// - value: number of internal commands in epoch
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn internal_commands_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("internal-commands-epoch")
@@ -2158,18 +2234,24 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch per account SNARK counts
     /// ```
-    /// - key: {epoch BE bytes}{pk}
-    /// - value: number of pk SNARKs in epoch
+    /// key: {genesis}{epoch}{pk}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - pk:      [PublicKey] bytes
+    /// ```
+    /// Use [epoch_pk_key]
     fn snarks_pk_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-pk-epoch")
             .expect("snarks-pk-epoch column family exists")
     }
 
-    /// CF for storing per account SNARK counts
+    /// CF for storing per account total SNARK counts
     /// ```
-    /// - key: pk
-    /// - value: total number of pk SNARKs
+    /// key: [PublicKey] bytes
+    /// val: [u32] BE bytes
     fn snarks_pk_total_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-pk-total")
@@ -2178,8 +2260,13 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch SNARK counts
     /// ```
-    /// - key: epoch
-    /// - value: number of SNARKs in epoch
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// ```
+    /// Use [epoch_key]
     fn snarks_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-epoch")
