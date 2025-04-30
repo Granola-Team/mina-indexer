@@ -2,11 +2,11 @@
 
 use super::db;
 use crate::{
-    base::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
     snark_work::store::SnarkStore,
     store::username::UsernameStore,
-    utility::store::common::{u32_from_be_bytes, U32_LEN, U64_LEN},
+    utility::store::common::{U32_LEN, U64_LEN},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
@@ -14,15 +14,19 @@ use speedb::Direction;
 #[derive(InputObject)]
 pub struct TopSnarkersQueryInput {
     epoch: u32,
+
+    #[graphql(name = "genesis_state_hash")]
+    genesis_state_hash: Option<String>,
 }
 
 #[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
 pub enum TopSnarkersSortByInput {
     MaxFeeAsc,
     MaxFeeDesc,
-    TotalFeesAsc,
+
     #[default]
     TotalFeesDesc,
+    TotalFeesAsc,
 }
 
 #[derive(Default)]
@@ -64,39 +68,78 @@ impl TopSnarkersQueryRoot {
             .as_ref()
             .map_or(db.get_current_epoch().expect("current epoch"), |q| q.epoch);
 
+        let genesis_state_hash = query
+            .as_ref()
+            .and_then(|q| q.genesis_state_hash.clone())
+            .or_else(|| {
+                db.get_best_block_genesis_hash()
+                    .expect("best block genesis state hash")
+                    .map(|g| g.0)
+            });
+        let genesis_state_hash = match StateHash::new(genesis_state_hash.unwrap()) {
+            Ok(genesis_state_hash) => genesis_state_hash,
+            Err(e) => return Err(async_graphql::Error::from(e)),
+        };
+
         let mut snarkers = vec![];
-        let iter = match sort_by {
-            Some(MaxFeeAsc) => db.snark_prover_max_fee_epoch_iterator(epoch, Direction::Forward),
-            Some(MaxFeeDesc) => db.snark_prover_max_fee_epoch_iterator(epoch, Direction::Reverse),
-            Some(TotalFeesAsc) => {
-                db.snark_prover_total_fees_epoch_iterator(epoch, Direction::Forward)
-            }
-            Some(TotalFeesDesc) | None => {
-                db.snark_prover_total_fees_epoch_iterator(epoch, Direction::Reverse)
-            }
+        let iter = match sort_by.unwrap_or_default() {
+            MaxFeeAsc => db.snark_prover_max_fee_epoch_iterator(
+                &genesis_state_hash,
+                epoch,
+                Direction::Forward,
+            ),
+            MaxFeeDesc => db.snark_prover_max_fee_epoch_iterator(
+                &genesis_state_hash,
+                epoch,
+                Direction::Reverse,
+            ),
+            TotalFeesAsc => db.snark_prover_total_fees_epoch_iterator(
+                &genesis_state_hash,
+                epoch,
+                Direction::Forward,
+            ),
+            TotalFeesDesc => db.snark_prover_total_fees_epoch_iterator(
+                &genesis_state_hash,
+                epoch,
+                Direction::Reverse,
+            ),
         };
 
         for (key, _) in iter.flatten() {
-            let key_epoch = u32_from_be_bytes(&key[..U32_LEN])?;
-            if key_epoch != epoch {
-                // we've gone beyond the desired epoch
+            if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
+                || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
+                || snarkers.len() >= limit
+            {
+                // gone beyond the desired region or limt
                 break;
             }
 
-            let pk = PublicKey::from_bytes(&key[U32_LEN..][U64_LEN..])?;
-            let username = db
-                .get_username(&pk)
-                .ok()
-                .flatten()
-                .map_or("Unknown".to_string(), |u| u.0);
+            let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U64_LEN..])?;
+            let username = db.get_username(&pk)?.unwrap_or_default().0;
+
             let total_fees = db
-                .get_snark_prover_epoch_fees(&pk, Some(epoch), None)?
+                .get_snark_prover_epoch_fees(
+                    &pk,
+                    Some(genesis_state_hash.clone()),
+                    Some(epoch),
+                    None,
+                )?
                 .expect("total fees");
             let min_fee = db
-                .get_snark_prover_epoch_min_fee(&pk, Some(epoch), None)?
+                .get_snark_prover_epoch_min_fee(
+                    &pk,
+                    Some(genesis_state_hash.clone()),
+                    Some(epoch),
+                    None,
+                )?
                 .expect("min fee");
             let max_fee = db
-                .get_snark_prover_epoch_max_fee(&pk, Some(epoch), None)?
+                .get_snark_prover_epoch_max_fee(
+                    &pk,
+                    Some(genesis_state_hash.clone()),
+                    Some(epoch),
+                    None,
+                )?
                 .expect("max fee");
             let snarks_sold = db.get_snarks_pk_epoch_count(&pk, Some(epoch))?;
 
@@ -108,11 +151,8 @@ impl TopSnarkersQueryRoot {
                 max_fee,
                 snarks_sold,
             });
-
-            if snarkers.len() >= limit {
-                break;
-            }
         }
+
         Ok(snarkers)
     }
 }

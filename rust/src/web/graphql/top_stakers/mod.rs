@@ -75,7 +75,7 @@ impl TopStakersQueryRoot {
             });
         let genesis_state_hash = match StateHash::new(genesis_state_hash.unwrap()) {
             Ok(genesis_state_hash) => genesis_state_hash,
-            Err(e) => return Err(async_graphql::Error::new(e.to_string())),
+            Err(e) => return Err(async_graphql::Error::from(e)),
         };
 
         let mut accounts = Vec::new();
