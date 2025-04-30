@@ -7,14 +7,22 @@ use crate::{
 
 /// Key format
 /// ```
-/// {epoch}{prover}
+/// {genesis}{epoch}{prover}
 /// where
-/// epoch:  [u32] BE bytes
-/// prover: [PublicKey] bytes
-pub fn snark_epoch_key(epoch: u32, pk: &PublicKey) -> [u8; U32_LEN + PublicKey::LEN] {
-    let mut key = [0; U32_LEN + PublicKey::LEN];
-    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
-    key[U32_LEN..].copy_from_slice(pk.0.as_bytes());
+/// - genesis: [StateHash] bytes
+/// - epoch:   [u32] BE bytes
+/// - prover:  [PublicKey] bytes
+pub fn snark_epoch_key(
+    genesis_state_hash: &StateHash,
+    epoch: u32,
+    pk: &PublicKey,
+) -> [u8; StateHash::LEN + U32_LEN + PublicKey::LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + PublicKey::LEN];
+
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..].copy_from_slice(pk.0.as_bytes());
+
     key
 }
 
@@ -35,6 +43,7 @@ pub fn snark_fee_sort_key(
     index: u32,
 ) -> [u8; U64_LEN + U32_LEN + PublicKey::LEN + StateHash::LEN + U32_LEN] {
     let mut key = [0; U64_LEN + U32_LEN + PublicKey::LEN + StateHash::LEN + U32_LEN];
+
     key[..U64_LEN].copy_from_slice(&fee.to_be_bytes());
     key[U64_LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[U64_LEN..][U32_LEN..][..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
@@ -42,6 +51,7 @@ pub fn snark_fee_sort_key(
         .copy_from_slice(state_hash.0.as_bytes());
     key[U64_LEN..][U32_LEN..][PublicKey::LEN..][StateHash::LEN..]
         .copy_from_slice(&index.to_be_bytes());
+
     key
 }
 
@@ -58,72 +68,126 @@ pub fn snark_prover_sort_key(
     index: u32,
 ) -> [u8; PublicKey::LEN + U32_LEN + U32_LEN] {
     let mut key = [0; PublicKey::LEN + U32_LEN + U32_LEN];
+
     key[..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
     key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32_sort.to_be_bytes());
     key[PublicKey::LEN..][U32_LEN..].copy_from_slice(&index.to_be_bytes());
+
     key
 }
 
 /// Key format
 /// ```
-/// {epoch}{fee}{prover}
+/// {genesis}{epoch}{fee}{prover}
 /// where
-/// - epoch:  [u32] BE bytes
-/// - fee:    [u64] BE bytes
-/// - prover: [PublicKey] bytes
+/// - genesis: [StateHash] bytes
+/// - epoch:   [u32] BE bytes
+/// - fee:     [u64] BE bytes
+/// - prover:  [PublicKey] bytes
 pub fn snark_fee_epoch_sort_key(
+    genesis_state_hash: &StateHash,
     epoch: u32,
     fee: u64,
     prover: &PublicKey,
-) -> [u8; U32_LEN + U64_LEN + PublicKey::LEN] {
-    let mut key = [0; U32_LEN + U64_LEN + PublicKey::LEN];
-    key[..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
-    key[U32_LEN..][..U64_LEN].copy_from_slice(&fee.to_be_bytes());
-    key[U32_LEN..][U64_LEN..].copy_from_slice(prover.0.as_bytes());
+) -> [u8; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN];
+
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][..U64_LEN].copy_from_slice(&fee.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][U64_LEN..].copy_from_slice(prover.0.as_bytes());
+
     key
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{
+        base::{public_key::PublicKey, state_hash::StateHash},
+        utility::store::common::{U32_LEN, U64_LEN},
+    };
+    use quickcheck::{Arbitrary, Gen};
+
+    const GEN_SIZE: usize = 1000;
 
     #[test]
-    fn test_snark_fee_sort_key() {
-        let fee = 100;
-        let index = 25;
-        let block_height = 50;
-        let pk = PublicKey::default();
-        let state_hash = StateHash::default();
-        let key = snark_fee_sort_key(fee, block_height, &pk, &state_hash, index);
+    fn snark_epoch_key() {
+        let g = &mut Gen::new(GEN_SIZE);
 
-        assert_eq!(&key[..U64_LEN], &fee.to_be_bytes());
-        assert_eq!(&key[U64_LEN..][..U32_LEN], &block_height.to_be_bytes());
+        let genesis_state_hash = StateHash::arbitrary(g);
+        let epoch = u32::arbitrary(g);
+        let prover = PublicKey::arbitrary(g);
+
+        let key = super::snark_epoch_key(&genesis_state_hash, epoch, &prover);
+
+        assert_eq!(key[..StateHash::LEN], *genesis_state_hash.0.as_bytes());
+        assert_eq!(key[StateHash::LEN..][..U32_LEN], epoch.to_be_bytes());
+        assert_eq!(key[StateHash::LEN..][U32_LEN..], *prover.0.as_bytes());
+    }
+
+    #[test]
+    fn snark_fee_sort_key() {
+        let g = &mut Gen::new(GEN_SIZE);
+
+        let fee = u64::arbitrary(g);
+        let index = u32::arbitrary(g);
+        let block_height = u32::arbitrary(g);
+        let pk = PublicKey::arbitrary(g);
+        let state_hash = StateHash::arbitrary(g);
+
+        let key = super::snark_fee_sort_key(fee, block_height, &pk, &state_hash, index);
+
+        assert_eq!(key[..U64_LEN], fee.to_be_bytes());
+        assert_eq!(key[U64_LEN..][..U32_LEN], block_height.to_be_bytes());
         assert_eq!(
-            &key[U64_LEN..][U32_LEN..][..PublicKey::LEN],
-            pk.0.as_bytes()
+            key[U64_LEN..][U32_LEN..][..PublicKey::LEN],
+            *pk.0.as_bytes()
         );
         assert_eq!(
-            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..StateHash::LEN],
-            state_hash.0.as_bytes()
+            key[U64_LEN..][U32_LEN..][PublicKey::LEN..][..StateHash::LEN],
+            *state_hash.0.as_bytes()
         );
         assert_eq!(
-            &key[U64_LEN..][U32_LEN..][PublicKey::LEN..][StateHash::LEN..],
-            &index.to_be_bytes()
+            key[U64_LEN..][U32_LEN..][PublicKey::LEN..][StateHash::LEN..],
+            index.to_be_bytes()
         );
     }
 
     #[test]
-    fn test_snark_prover_sort_key() {
-        let index = 25;
-        let block_height = 50;
-        let pk = PublicKey::default();
-        let key = snark_prover_sort_key(&pk, block_height, index);
+    fn snark_prover_sort_key() {
+        let g = &mut Gen::new(GEN_SIZE);
 
-        assert_eq!(&key[..PublicKey::LEN], pk.0.as_bytes());
+        let index = u32::arbitrary(g);
+        let block_height = u32::arbitrary(g);
+        let pk = PublicKey::arbitrary(g);
+
+        let key = super::snark_prover_sort_key(&pk, block_height, index);
+
+        assert_eq!(key[..PublicKey::LEN], *pk.0.as_bytes());
+        assert_eq!(key[PublicKey::LEN..][..U32_LEN], block_height.to_be_bytes());
+        assert_eq!(key[PublicKey::LEN..][U32_LEN..], index.to_be_bytes());
+    }
+
+    #[test]
+    fn snark_fee_epoch_sort_key() {
+        let g = &mut Gen::new(GEN_SIZE);
+
+        let genesis_state_hash = StateHash::arbitrary(g);
+        let epoch = u32::arbitrary(g);
+        let fee = u64::arbitrary(g);
+        let prover = PublicKey::arbitrary(g);
+
+        let key = super::snark_fee_epoch_sort_key(&genesis_state_hash, epoch, fee, &prover);
+
+        assert_eq!(key[..StateHash::LEN], *genesis_state_hash.0.as_bytes());
+        assert_eq!(key[StateHash::LEN..][..U32_LEN], epoch.to_be_bytes());
         assert_eq!(
-            &key[PublicKey::LEN..][..U32_LEN],
-            &block_height.to_be_bytes()
+            key[StateHash::LEN..][U32_LEN..][..U64_LEN],
+            fee.to_be_bytes()
         );
-        assert_eq!(&key[PublicKey::LEN..][U32_LEN..], &index.to_be_bytes());
+        assert_eq!(
+            key[StateHash::LEN..][U32_LEN..][U64_LEN..],
+            *prover.0.as_bytes()
+        );
     }
 }
