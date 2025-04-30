@@ -86,7 +86,7 @@ impl TopStakersQueryRoot {
 
         for (key, _) in db
             .canonical_epoch_blocks_produced_iterator(
-                Some(genesis_state_hash.clone()),
+                Some(&genesis_state_hash),
                 Some(epoch),
                 direction,
             )
@@ -113,19 +113,15 @@ impl TopStakersQueryRoot {
                 db.get_block_production_pk_epoch_count(
                     &pk,
                     Some(epoch),
-                    Some(genesis_state_hash.clone()),
+                    Some(&genesis_state_hash),
                 )?,
                 num,
                 db.get_block_production_pk_supercharged_epoch_count(
                     &pk,
                     Some(epoch),
-                    Some(genesis_state_hash.clone()),
+                    Some(&genesis_state_hash),
                 )?,
-                db.get_pk_epoch_slots_produced_count(
-                    &pk,
-                    Some(epoch),
-                    Some(genesis_state_hash.clone()),
-                )?,
+                db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(&genesis_state_hash))?,
                 db.get_username(&pk)?,
             ));
 

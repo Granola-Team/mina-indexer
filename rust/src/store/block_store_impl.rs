@@ -155,7 +155,7 @@ impl BlockStore for IndexerStore {
 
         // add epoch produced slot
         self.add_epoch_slots_produced(
-            block.genesis_state_hash(),
+            &block.genesis_state_hash(),
             block.epoch_count(),
             block.global_slot_since_genesis() % MAINNET_EPOCH_SLOT_COUNT,
             &block.block_creator(),
@@ -927,7 +927,7 @@ impl BlockStore for IndexerStore {
 
     fn add_epoch_slots_produced(
         &self,
-        genesis_state_hash: StateHash,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         epoch_slot: u32,
         pk: &PublicKey,
@@ -935,7 +935,7 @@ impl BlockStore for IndexerStore {
         trace!("Adding epoch {epoch} slot {epoch_slot} produced");
 
         // add to total
-        let key = epoch_num_key(&genesis_state_hash, epoch, epoch_slot);
+        let key = epoch_num_key(genesis_state_hash, epoch, epoch_slot);
         if self
             .database
             .get_cf(self.block_epoch_slots_produced_cf(), key)?
@@ -946,17 +946,16 @@ impl BlockStore for IndexerStore {
                 .put_cf(self.block_epoch_slots_produced_cf(), key, b"")?;
 
             // increment epoch slots produced count
-            let acc =
-                self.get_epoch_slots_produced_count(Some(genesis_state_hash.clone()), Some(epoch))?;
+            let acc = self.get_epoch_slots_produced_count(Some(genesis_state_hash), Some(epoch))?;
             self.database.put_cf(
                 self.block_epoch_slots_produced_count_cf(),
-                epoch_key(&genesis_state_hash, epoch),
+                epoch_key(genesis_state_hash, epoch),
                 (acc + 1).to_be_bytes(),
             )?;
         }
 
         // add to account
-        let key = epoch_pk_num_key(&genesis_state_hash, epoch, pk, epoch_slot);
+        let key = epoch_pk_num_key(genesis_state_hash, epoch, pk, epoch_slot);
         if self
             .database
             .get_cf(self.block_pk_epoch_slots_produced_cf(), key)?
@@ -967,7 +966,7 @@ impl BlockStore for IndexerStore {
                 .put_cf(self.block_pk_epoch_slots_produced_cf(), key, b"")?;
 
             // increment epoch slots produced count
-            let key = epoch_pk_key(&genesis_state_hash, epoch, pk);
+            let key = epoch_pk_key(genesis_state_hash, epoch, pk);
             let acc =
                 self.get_pk_epoch_slots_produced_count(pk, Some(epoch), Some(genesis_state_hash))?;
 
@@ -1091,14 +1090,15 @@ impl BlockStore for IndexerStore {
 
     fn canonical_epoch_blocks_produced_iterator(
         &self,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
         direction: Direction,
     ) -> DBIterator<'_> {
         let epoch = epoch.unwrap_or(self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1138,7 +1138,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_epoch_count(
             &creator,
             Some(epoch),
-            Some(genesis_state_hash.clone()),
+            Some(&genesis_state_hash),
         )?;
         batch.put_cf(
             self.block_production_pk_epoch_cf(),
@@ -1155,8 +1155,7 @@ impl BlockStore for IndexerStore {
         );
 
         // increment epoch count
-        let acc =
-            self.get_block_production_epoch_count(Some(genesis_state_hash.clone()), Some(epoch))?;
+        let acc = self.get_block_production_epoch_count(Some(&genesis_state_hash), Some(epoch))?;
         batch.put_cf(
             self.block_production_epoch_cf(),
             epoch_key(&genesis_state_hash, epoch),
@@ -1173,7 +1172,7 @@ impl BlockStore for IndexerStore {
             let acc = self.get_block_production_pk_supercharged_epoch_count(
                 &creator,
                 Some(epoch),
-                Some(genesis_state_hash.clone()),
+                Some(&genesis_state_hash),
             )?;
             batch.put_cf(
                 self.block_production_pk_supercharged_epoch_cf(),
@@ -1191,7 +1190,7 @@ impl BlockStore for IndexerStore {
 
             // epoch supercharged
             let acc = self.get_block_production_supercharged_epoch_count(
-                Some(genesis_state_hash.clone()),
+                Some(&genesis_state_hash),
                 Some(epoch),
             )?;
             batch.put_cf(
@@ -1232,7 +1231,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_epoch_count(
             creator,
             Some(epoch),
-            Some(genesis_state_hash.clone()),
+            Some(&genesis_state_hash),
         )?;
         self.database.put_cf(
             self.block_production_pk_epoch_cf(),
@@ -1249,8 +1248,7 @@ impl BlockStore for IndexerStore {
         )?;
 
         // increment epoch count
-        let acc =
-            self.get_block_production_epoch_count(Some(genesis_state_hash.clone()), Some(epoch))?;
+        let acc = self.get_block_production_epoch_count(Some(&genesis_state_hash), Some(epoch))?;
         self.database.put_cf(
             self.block_production_epoch_cf(),
             epoch_key(&genesis_state_hash, epoch),
@@ -1268,7 +1266,7 @@ impl BlockStore for IndexerStore {
             let acc = self.get_block_production_pk_supercharged_epoch_count(
                 creator,
                 Some(epoch),
-                Some(genesis_state_hash.clone()),
+                Some(&genesis_state_hash),
             )?;
             self.database.put_cf(
                 self.block_production_pk_supercharged_epoch_cf(),
@@ -1286,7 +1284,7 @@ impl BlockStore for IndexerStore {
 
             // epoch supercharged
             let acc = self.get_block_production_supercharged_epoch_count(
-                Some(genesis_state_hash.clone()),
+                Some(&genesis_state_hash),
                 Some(epoch),
             )?;
             self.database.put_cf(
@@ -1319,7 +1317,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_canonical_epoch_count(
             &creator,
             Some(epoch),
-            Some(genesis_state_hash.clone()),
+            Some(&genesis_state_hash),
         )?;
         self.database.put_cf(
             self.block_production_pk_canonical_epoch_cf(),
@@ -1343,10 +1341,8 @@ impl BlockStore for IndexerStore {
         )?;
 
         // increment epoch count
-        let acc = self.get_block_production_canonical_epoch_count(
-            Some(genesis_state_hash.clone()),
-            Some(epoch),
-        )?;
+        let acc = self
+            .get_block_production_canonical_epoch_count(Some(&genesis_state_hash), Some(epoch))?;
         self.database.put_cf(
             self.block_production_canonical_epoch_cf(),
             epoch_key(&genesis_state_hash, epoch),
@@ -1397,7 +1393,7 @@ impl BlockStore for IndexerStore {
         let acc = self.get_block_production_pk_canonical_epoch_count(
             &creator,
             Some(epoch),
-            Some(genesis_state_hash.clone()),
+            Some(&genesis_state_hash),
         )?;
         assert!(acc > 0);
 
@@ -1425,10 +1421,8 @@ impl BlockStore for IndexerStore {
         )?;
 
         // decrement epoch count
-        let acc = self.get_block_production_canonical_epoch_count(
-            Some(genesis_state_hash.clone()),
-            Some(epoch),
-        )?;
+        let acc = self
+            .get_block_production_canonical_epoch_count(Some(&genesis_state_hash), Some(epoch))?;
         assert!(acc > 0);
 
         self.database.put_cf(
@@ -1473,12 +1467,13 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1493,7 +1488,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_pk_epoch_cf(),
-                epoch_pk_key(&genesis_state_hash, epoch, pk),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
             )?
             .map_or(0, from_be_bytes))
     }
@@ -1502,12 +1497,13 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1522,7 +1518,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_pk_canonical_epoch_cf(),
-                epoch_pk_key(&genesis_state_hash, epoch, pk),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
             )?
             .map_or(0, from_be_bytes))
     }
@@ -1531,12 +1527,13 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1550,7 +1547,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_pk_supercharged_epoch_cf(),
-                epoch_pk_key(&genesis_state_hash, epoch, pk),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
             )?
             .map_or(0, from_be_bytes))
     }
@@ -1590,13 +1587,14 @@ impl BlockStore for IndexerStore {
 
     fn get_block_production_epoch_count(
         &self,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1610,20 +1608,21 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_epoch_cf(),
-                epoch_key(&genesis_state_hash, epoch),
+                epoch_key(genesis_state_hash, epoch),
             )?
             .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_canonical_epoch_count(
         &self,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1637,20 +1636,21 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_canonical_epoch_cf(),
-                epoch_key(&genesis_state_hash, epoch),
+                epoch_key(genesis_state_hash, epoch),
             )?
             .map_or(0, from_be_bytes))
     }
 
     fn get_block_production_supercharged_epoch_count(
         &self,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1664,7 +1664,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_production_supercharged_epoch_cf(),
-                epoch_key(&genesis_state_hash, epoch),
+                epoch_key(genesis_state_hash, epoch),
             )?
             .map_or(0, from_be_bytes))
     }
@@ -1698,12 +1698,13 @@ impl BlockStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: Option<u32>,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1718,20 +1719,21 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_pk_epoch_slots_produced_count_cf(),
-                epoch_pk_key(&genesis_state_hash, epoch, pk),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
             )?
             .map_or(0, from_be_bytes))
     }
 
     fn get_epoch_slots_produced_count(
         &self,
-        genesis_state_hash: Option<StateHash>,
+        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
     ) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
         let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            self.get_best_block_genesis_hash()
-                .unwrap()
+            best_block_genesis_hash
+                .as_ref()
                 .expect("best block genesis state hash")
         });
 
@@ -1745,7 +1747,7 @@ impl BlockStore for IndexerStore {
             .database
             .get_cf(
                 self.block_epoch_slots_produced_count_cf(),
-                epoch_key(&genesis_state_hash, epoch),
+                epoch_key(genesis_state_hash, epoch),
             )?
             .map_or(0, from_be_bytes))
     }

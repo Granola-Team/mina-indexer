@@ -632,7 +632,7 @@ impl StakesLedgerAccountWithMeta {
 
         // pk data counts
         let pk_epoch_num_blocks = db
-            .get_block_production_pk_epoch_count(pk, Some(epoch), Some(genesis_state_hash.clone()))
+            .get_block_production_pk_epoch_count(pk, Some(epoch), Some(&genesis_state_hash))
             .expect("pk epoch num blocks");
         let pk_total_num_blocks = db
             .get_block_production_pk_total_count(pk)
@@ -641,7 +641,7 @@ impl StakesLedgerAccountWithMeta {
             .get_block_production_pk_supercharged_epoch_count(
                 pk,
                 Some(epoch),
-                Some(genesis_state_hash),
+                Some(&genesis_state_hash),
             )
             .expect("pk epoch num supercharged blocks");
         let pk_total_num_supercharged_blocks = db
@@ -699,11 +699,11 @@ impl StakesLedgerAccountWithMeta {
             },
             timing,
             epoch_num_blocks: db
-                .get_block_production_epoch_count(Some(genesis_state_hash.clone()), Some(epoch))
+                .get_block_production_epoch_count(Some(&genesis_state_hash), Some(epoch))
                 .expect("epoch block count"),
             epoch_num_supercharged_blocks: db
                 .get_block_production_supercharged_epoch_count(
-                    Some(genesis_state_hash),
+                    Some(&genesis_state_hash),
                     Some(epoch),
                 )
                 .expect("epoch supercharged block count"),
