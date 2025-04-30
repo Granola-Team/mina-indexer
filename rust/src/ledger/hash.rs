@@ -105,6 +105,31 @@ impl std::fmt::Display for LedgerHash {
     }
 }
 
+///////////////
+// arbitrary //
+///////////////
+
+#[cfg(test)]
+impl quickcheck::Arbitrary for LedgerHash {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        let prefix = {
+            let idx = u8::arbitrary(g) % Self::PREFIX.len() as u8;
+            Self::PREFIX.get(idx as usize).expect("ledger hash prefix")
+        };
+
+        let mut chars = vec![];
+        let alphabet: Vec<_> = ('a'..='z').chain('A'..='Z').chain('0'..='9').collect();
+
+        for _ in 0..Self::LEN - 2 {
+            let idx = usize::arbitrary(g) % alphabet.len();
+
+            chars.push(alphabet.get(idx).cloned().unwrap());
+        }
+
+        Self(prefix.to_string() + &chars.iter().collect::<String>())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::LedgerHash;
