@@ -136,7 +136,7 @@ pub struct StakesLedgerAccount {
     pub pk: String,
 
     /// Value username
-    pub username: Option<String>,
+    pub username: String,
 
     /// Value public key
     #[graphql(name = "public_key")]
@@ -458,7 +458,7 @@ impl
         u32,            //  8 - pk total num user commands
         u32,            //  9 - pk epoch num internal commands
         u32,            // 10 - pk total num internal commands
-        Option<String>, // 11 - username
+        String,         // 11 - username
     )> for StakesLedgerAccount
 {
     fn from(
@@ -474,7 +474,7 @@ impl
             u32,            //  8 - pk total num user commands
             u32,            //  9 - pk epoch num internal commands
             u32,            // 10 - pk total num internal commands
-            Option<String>, // 11 - username
+            String,         // 11 - username
         ),
     ) -> Self {
         let account = acc.0;
@@ -626,16 +626,21 @@ impl StakesLedgerAccountWithMeta {
             vesting_increment: Some(timing.vesting_increment.0),
             vesting_period: Some(timing.vesting_period.0),
         });
+        let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash);
 
         // pk data counts
         let pk_epoch_num_blocks = db
-            .get_block_production_pk_epoch_count(pk, Some(epoch))
+            .get_block_production_pk_epoch_count(pk, Some(epoch), Some(genesis_state_hash.clone()))
             .expect("pk epoch num blocks");
         let pk_total_num_blocks = db
             .get_block_production_pk_total_count(pk)
             .expect("pk total num blocks");
         let pk_epoch_num_supercharged_blocks = db
-            .get_block_production_pk_supercharged_epoch_count(pk, Some(epoch))
+            .get_block_production_pk_supercharged_epoch_count(
+                pk,
+                Some(epoch),
+                Some(genesis_state_hash),
+            )
             .expect("pk epoch num supercharged blocks");
         let pk_total_num_supercharged_blocks = db
             .get_block_production_pk_supercharged_total_count(pk)
@@ -658,10 +663,7 @@ impl StakesLedgerAccountWithMeta {
         let pk_total_num_internal_commands = db
             .get_internal_commands_pk_total_count(pk)
             .expect("pk total num internal commands");
-        let username = match db.get_username(pk) {
-            Ok(None) | Err(_) => Some("Unknown".to_string()),
-            Ok(username) => username.map(|u| u.0),
-        };
+        let username = db.get_username(pk).expect("username").unwrap_or_default().0;
 
         let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash);
         let num_accounts = db
@@ -695,10 +697,13 @@ impl StakesLedgerAccountWithMeta {
             },
             timing,
             epoch_num_blocks: db
-                .get_block_production_epoch_count(Some(epoch))
+                .get_block_production_epoch_count(Some(genesis_state_hash.clone()), Some(epoch))
                 .expect("epoch block count"),
             epoch_num_supercharged_blocks: db
-                .get_block_production_supercharged_epoch_count(Some(epoch))
+                .get_block_production_supercharged_epoch_count(
+                    Some(genesis_state_hash),
+                    Some(epoch),
+                )
                 .expect("epoch supercharged block count"),
             total_num_blocks: db
                 .get_block_production_total_count()

@@ -1046,9 +1046,14 @@ impl TransactionQueryInput {
         use TransactionSortByInput::*;
 
         let query = query.expect("query input");
+        let genesis_state_hash = db
+            .get_best_block_genesis_hash()?
+            .expect("best block genesis state hash");
+
         let (min, max) = {
             let (min_bound, max_bound) = Self::calculate_inclusive_slot_bounds(
                 db,
+                &genesis_state_hash,
                 [
                     query.global_slot_gt,
                     query.global_slot_gte,
@@ -1352,6 +1357,7 @@ impl TransactionQueryInput {
 
     pub fn calculate_inclusive_slot_bounds(
         db: &Arc<IndexerStore>,
+        genesis_state_hash: &StateHash,
         global_slot: [Option<u32>; 4],
         date_time: [&Option<DateTime>; 4],
     ) -> anyhow::Result<(u32, u32)> {
@@ -1379,7 +1385,7 @@ impl TransactionQueryInput {
             (None, None) => 0,
         };
         let min_bound = db
-            .get_next_global_slot_produced(min_bound)?
+            .get_next_global_slot_produced(genesis_state_hash, min_bound)?
             .expect("min global slot produced");
 
         let max_bound = match (
@@ -1397,7 +1403,7 @@ impl TransactionQueryInput {
                 .get_best_block_global_slot()?
                 .expect("best block global slot"),
         };
-        let max_bound = db.get_prev_global_slot_produced(max_bound)?;
+        let max_bound = db.get_prev_global_slot_produced(genesis_state_hash, max_bound)?;
 
         Ok((min_bound, max_bound))
     }

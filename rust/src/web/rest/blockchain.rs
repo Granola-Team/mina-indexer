@@ -363,14 +363,14 @@ pub async fn get_blockchain_summary(
 
         // epoch & total data counts
         let epoch_num_blocks = store
-            .get_block_production_epoch_count(None)
+            .get_block_production_epoch_count(None, None)
             .expect("epoch blocks count");
         let total_num_blocks = store
             .get_block_production_total_count()
             .expect("total blocks count");
 
         let epoch_num_canonical_blocks = store
-            .get_block_production_canonical_epoch_count(None)
+            .get_block_production_canonical_epoch_count(None, None)
             .expect("epoch canonical blocks count");
         let total_num_canonical_blocks = store
             .get_block_production_canonical_total_count()

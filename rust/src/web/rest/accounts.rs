@@ -72,7 +72,7 @@ pub async fn get_account(
 
             // blocks
             epoch_num_blocks: db
-                .get_block_production_pk_epoch_count(&pk, None)
+                .get_block_production_pk_epoch_count(&pk, None, None)
                 .unwrap_or_default(),
             total_num_blocks: db
                 .get_block_production_pk_total_count(&pk)

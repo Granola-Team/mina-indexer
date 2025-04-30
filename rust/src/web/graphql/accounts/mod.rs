@@ -162,7 +162,7 @@ pub struct AccountWithMeta {
     #[graphql(name = "block_height")]
     block_height: u32,
 
-    username: Option<String>,
+    username: String,
 }
 
 #[derive(Default)]
@@ -436,7 +436,7 @@ impl AccountWithMeta {
             is_genesis_account: account.genesis_account.is_some(),
             genesis_account: account.genesis_account.map(|amt| amt.0),
             pk_epoch_num_blocks: db
-                .get_block_production_pk_epoch_count(pk, None)
+                .get_block_production_pk_epoch_count(pk, None, None)
                 .expect("pk epoch block count"),
             pk_total_num_blocks: db
                 .get_block_production_pk_total_count(pk)
@@ -469,11 +469,7 @@ impl AccountWithMeta {
                 .get_best_block_height()
                 .unwrap()
                 .expect("best block height"),
-            username: db
-                .get_username(pk)
-                .expect("username")
-                .map(|user| user.0)
-                .or(Some("Unknown".to_string())),
+            username: db.get_username(pk).expect("username").unwrap_or_default().0,
             account: account.into(),
         }
     }

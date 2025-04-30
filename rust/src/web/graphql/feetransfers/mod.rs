@@ -67,15 +67,16 @@ impl FeetransferWithMeta {
         let db = db(ctx);
 
         // blocks
-        let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
+        let epoch_num_blocks = db.get_block_production_epoch_count(None, None)?;
         let total_num_blocks = db.get_block_production_total_count()?;
 
         // canonical blocks
-        let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
+        let epoch_num_canonical_blocks =
+            db.get_block_production_canonical_epoch_count(None, None)?;
 
         // supercharged
         let epoch_num_supercharged_blocks =
-            db.get_block_production_supercharged_epoch_count(None)?;
+            db.get_block_production_supercharged_epoch_count(None, None)?;
         let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
         // all user commands
@@ -87,7 +88,7 @@ impl FeetransferWithMeta {
         let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
 
         // slot produced
-        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
+        let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None, None)?;
 
         if let Some(block) = self.block.as_ref() {
             let block_num_snarks = db

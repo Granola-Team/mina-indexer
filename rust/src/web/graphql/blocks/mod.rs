@@ -745,13 +745,14 @@ fn precomputed_matches_query(
 }
 
 pub fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
-    let epoch_num_blocks = db.get_block_production_epoch_count(None)?;
+    let epoch_num_blocks = db.get_block_production_epoch_count(None, None)?;
     let total_num_blocks = db.get_block_production_total_count()?;
 
-    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None)?;
+    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None, None)?;
     let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
 
-    let epoch_num_supercharged_blocks = db.get_block_production_supercharged_epoch_count(None)?;
+    let epoch_num_supercharged_blocks =
+        db.get_block_production_supercharged_epoch_count(None, None)?;
     let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
     let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
@@ -778,7 +779,7 @@ pub fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
         .get_internal_commands_total_count()
         .expect("total internal command count");
 
-    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None)?;
+    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None, None)?;
 
     Ok([
         epoch_num_blocks,
