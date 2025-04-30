@@ -675,6 +675,7 @@ async fn recover_missing_blocks(
 
     // exit early if no missing blocks
     if missing_parent_lengths.is_empty() {
+        debug!("No missing blocks found");
         return Ok(());
     }
 
