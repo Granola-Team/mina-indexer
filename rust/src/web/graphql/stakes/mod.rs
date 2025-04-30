@@ -735,9 +735,23 @@ impl StakesLedgerAccountWithMeta {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tier2"))]
 mod tests {
-    use super::*;
+    use super::{StakesDelegationTotals, StakesLedgerAccountWithMeta, StakesQueryInput};
+    use crate::{
+        base::{public_key::PublicKey, state_hash::StateHash},
+        chain::Network,
+        ledger::{
+            hash::LedgerHash,
+            staking::{StakingAccount, StakingLedger},
+            store::staking::StakingLedgerStore,
+            username::Username,
+        },
+        store::{username::UsernameStore, IndexerStore},
+    };
+    use quickcheck::{Arbitrary, Gen};
+    use std::collections::HashMap;
+    use tempfile::TempDir;
 
     #[test]
     fn test_matches_stake_lte_filter() {
@@ -801,5 +815,97 @@ mod tests {
             Some(&query_input_none),
             &stakes_ledger_account
         ));
+    }
+
+    const GEN_SIZE: usize = 1000;
+    fn create_indexer_store() -> anyhow::Result<IndexerStore> {
+        let temp_dir = TempDir::with_prefix(std::env::current_dir()?)?;
+        IndexerStore::new(temp_dir.path())
+    }
+
+    #[test]
+    fn query_username() -> anyhow::Result<()> {
+        let g = &mut Gen::new(GEN_SIZE);
+        let store = std::sync::Arc::new(create_indexer_store()?);
+
+        let pk = PublicKey::arbitrary(g);
+        let account = StakingAccount {
+            pk: pk.clone(),
+            ..Default::default()
+        };
+
+        let epoch = u32::arbitrary(g);
+        let ledger_hash = LedgerHash::arbitrary(g);
+        let genesis_state_hash = StateHash::arbitrary(g);
+        let total_currency = u64::arbitrary(g);
+
+        let staking_ledger = StakingLedger {
+            epoch,
+            network: Network::arbitrary(g),
+            ledger_hash: ledger_hash.clone(),
+            total_currency,
+            genesis_state_hash: genesis_state_hash.clone(),
+            staking_ledger: HashMap::from([(pk.clone(), account)]),
+        };
+
+        // add staking ledger
+        store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
+
+        // add username
+        let username = Username::arbitrary(g);
+        store.add_username(pk.clone(), &username)?;
+
+        // query the stakes endpoint by username
+        let query = || {
+            let mut accounts = vec![];
+            let username_pks = store.get_username_pks(&username.0)?.unwrap_or_default();
+
+            for pk in username_pks {
+                if let Some(account) =
+                    store.get_staking_account(&pk, epoch, Some(&genesis_state_hash))?
+                {
+                    if let Some(delegation) =
+                        store.get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
+                    {
+                        let account = StakesLedgerAccountWithMeta::new(
+                            &store,
+                            account,
+                            &delegation,
+                            epoch,
+                            ledger_hash.to_owned(),
+                            total_currency,
+                        );
+
+                        accounts.push(account);
+                    } else {
+                        return Err(async_graphql::Error::new(format!(
+                            "No staking delegations found for pk {} epoch {} genesis {}",
+                            pk, epoch, genesis_state_hash,
+                        )));
+                    }
+                } else {
+                    return Err(async_graphql::Error::new(format!(
+                        "No staking account found for pk {} epoch {} genesis {}",
+                        pk, epoch, genesis_state_hash,
+                    )));
+                }
+            }
+
+            Ok(accounts)
+        };
+
+        let res = query()
+            .unwrap()
+            .iter()
+            .map(|account| {
+                (
+                    account.account.public_key.clone(),
+                    account.account.username.clone(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(res, vec![(pk.to_string(), username.to_string())]);
+        Ok(())
     }
 }
