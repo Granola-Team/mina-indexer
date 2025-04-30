@@ -698,6 +698,11 @@ impl PrecomputedBlock {
     }
 
     pub fn genesis_state_hash(&self) -> StateHash {
+        let state_hash = self.state_hash();
+        if state_hash.0 == MAINNET_GENESIS_HASH || state_hash.0 == HARDFORK_GENESIS_HASH {
+            return state_hash;
+        }
+
         match self {
             Self::V1(v1) => {
                 StateHash::from_hashv1(v1.protocol_state.body.t.t.genesis_state_hash.to_owned())
