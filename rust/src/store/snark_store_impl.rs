@@ -11,6 +11,7 @@ use crate::{
         store::{DbSnarkUpdate, SnarkApplication, SnarkProverFees, SnarkStore, SnarkUpdate},
         SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
     },
+    store::Result,
     utility::store::{
         common::{
             block_index_key, pk_index_key, u32_from_be_bytes, u32_prefix_key, u64_from_be_bytes,
@@ -39,7 +40,7 @@ pub struct SnarkEpochFees {
 }
 
 impl SnarkStore for IndexerStore {
-    fn add_snark_work(&self, block: &PrecomputedBlock) -> anyhow::Result<()> {
+    fn add_snark_work(&self, block: &PrecomputedBlock) -> Result<()> {
         trace!("Adding SNARK work from block {}", block.summary());
         let state_hash = block.state_hash();
         let epoch = block.epoch_count();
@@ -138,7 +139,7 @@ impl SnarkStore for IndexerStore {
     fn get_snark_work_by_public_key(
         &self,
         pk: &PublicKey,
-    ) -> anyhow::Result<Vec<SnarkWorkSummaryWithStateHash>> {
+    ) -> Result<Vec<SnarkWorkSummaryWithStateHash>> {
         trace!("Getting SNARK work for public key {pk}");
         let mut snarks = vec![];
         for index in 0..self.get_snarks_pk_total_count(pk)? {
@@ -158,7 +159,7 @@ impl SnarkStore for IndexerStore {
     fn get_block_snark_work(
         &self,
         state_hash: &StateHash,
-    ) -> anyhow::Result<Option<Vec<SnarkWorkSummary>>> {
+    ) -> Result<Option<Vec<SnarkWorkSummary>>> {
         trace!("Getting SNARK work in block {state_hash}");
         let mut snarks: Vec<SnarkWorkSummary> = vec![];
         if let Some(num) = self.get_block_snarks_count(state_hash)? {
@@ -179,7 +180,7 @@ impl SnarkStore for IndexerStore {
 
     fn snark_prover_fees(
         snarks: &[SnarkWorkSummary],
-    ) -> anyhow::Result<HashMap<PublicKey, SnarkProverFees>> {
+    ) -> Result<HashMap<PublicKey, SnarkProverFees>> {
         trace!("Calculating SNARK prover fees");
         let mut prover_fees = <HashMap<PublicKey, SnarkProverFees>>::new();
         for snark in snarks.iter() {
@@ -210,10 +211,12 @@ impl SnarkStore for IndexerStore {
         &self,
         block_height: u32,
         global_slot: u32,
+        genesis_state_hash: StateHash,
         snarks: &[SnarkWorkSummary],
         apply: SnarkApplication,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Updating SNARK prover fees");
+
         let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
         let block_height_opt = match apply {
             SnarkApplication::Apply => None,
@@ -238,15 +241,31 @@ impl SnarkStore for IndexerStore {
 
                 // delete old epoch fees
                 let old_epoch_total = self
-                    .get_snark_prover_epoch_fees(&snark.prover, Some(epoch), block_height_opt)?
+                    .get_snark_prover_epoch_fees(
+                        &snark.prover,
+                        Some(genesis_state_hash.clone()),
+                        Some(epoch),
+                        block_height_opt,
+                    )?
                     .unwrap_or_default();
                 let old_epoch_max = self
-                    .get_snark_prover_epoch_max_fee(&snark.prover, Some(epoch), block_height_opt)?
+                    .get_snark_prover_epoch_max_fee(
+                        &snark.prover,
+                        Some(genesis_state_hash.clone()),
+                        Some(epoch),
+                        block_height_opt,
+                    )?
                     .unwrap_or_default();
                 let old_epoch_min = self
-                    .get_snark_prover_epoch_min_fee(&snark.prover, Some(epoch), block_height_opt)?
+                    .get_snark_prover_epoch_min_fee(
+                        &snark.prover,
+                        Some(genesis_state_hash.clone()),
+                        Some(epoch),
+                        block_height_opt,
+                    )?
                     .unwrap_or(u64::MAX);
                 self.delete_old_epoch_snark_fees(
+                    genesis_state_hash.clone(),
                     epoch,
                     &snark.prover,
                     old_epoch_total,
@@ -305,6 +324,7 @@ impl SnarkStore for IndexerStore {
                     let epoch_min_fee = *old_epoch_min.min(min);
 
                     self.delete_old_epoch_snark_fees(
+                        genesis_state_hash.clone(),
                         epoch,
                         prover,
                         *old_epoch_total,
@@ -312,6 +332,7 @@ impl SnarkStore for IndexerStore {
                         *old_epoch_min,
                     )?;
                     self.store_epoch_snark_fees(
+                        genesis_state_hash.clone(),
                         epoch,
                         prover,
                         epoch_total_fees,
@@ -319,6 +340,7 @@ impl SnarkStore for IndexerStore {
                         epoch_min_fee,
                     )?;
                     self.sort_epoch_snark_fees(
+                        genesis_state_hash.clone(),
                         epoch,
                         prover,
                         epoch_total_fees,
@@ -373,7 +395,7 @@ impl SnarkStore for IndexerStore {
         total_fees: u64,
         max_fee: u64,
         min_fee: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.put_cf(
             self.snark_prover_fees_cf(),
             prover.0.as_bytes(),
@@ -398,7 +420,7 @@ impl SnarkStore for IndexerStore {
         total_fees: u64,
         max_fee: u64,
         min_fee: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.put_cf(
             self.snark_prover_total_fees_sort_cf(),
             u64_prefix_key(total_fees, prover),
@@ -423,7 +445,7 @@ impl SnarkStore for IndexerStore {
         old_total: u64,
         old_max: u64,
         old_min: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.delete_cf(
             self.snark_prover_total_fees_sort_cf(),
             u64_prefix_key(old_total, prover),
@@ -441,25 +463,26 @@ impl SnarkStore for IndexerStore {
 
     fn store_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         epoch_total_fees: u64,
         epoch_max_fee: u64,
         epoch_min_fee: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.put_cf(
             self.snark_prover_fees_epoch_cf(),
-            snark_epoch_key(epoch, prover),
+            snark_epoch_key(&genesis_state_hash, epoch, prover),
             epoch_total_fees.to_be_bytes(),
         )?;
         self.database.put_cf(
             self.snark_prover_max_fee_epoch_cf(),
-            snark_epoch_key(epoch, prover),
+            snark_epoch_key(&genesis_state_hash, epoch, prover),
             epoch_max_fee.to_be_bytes(),
         )?;
         self.database.put_cf(
             self.snark_prover_min_fee_epoch_cf(),
-            snark_epoch_key(epoch, prover),
+            snark_epoch_key(&genesis_state_hash, epoch, prover),
             epoch_min_fee.to_be_bytes(),
         )?;
         Ok(())
@@ -467,25 +490,26 @@ impl SnarkStore for IndexerStore {
 
     fn sort_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         epoch_total_fees: u64,
         epoch_max_fee: u64,
         epoch_min_fee: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.put_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, epoch_total_fees, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, epoch_total_fees, prover),
             b"",
         )?;
         self.database.put_cf(
             self.snark_prover_max_fee_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, epoch_max_fee, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, epoch_max_fee, prover),
             b"",
         )?;
         self.database.put_cf(
             self.snark_prover_min_fee_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, epoch_min_fee, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, epoch_min_fee, prover),
             b"",
         )?;
         Ok(())
@@ -493,28 +517,30 @@ impl SnarkStore for IndexerStore {
 
     fn delete_old_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         old_epoch_total: u64,
         old_epoch_max: u64,
         old_epoch_min: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.database.delete_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, old_epoch_total, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, old_epoch_total, prover),
         )?;
         self.database.delete_cf(
             self.snark_prover_max_fee_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, old_epoch_max, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, old_epoch_max, prover),
         )?;
         self.database.delete_cf(
             self.snark_prover_min_fee_epoch_sort_cf(),
-            snark_fee_epoch_sort_key(epoch, old_epoch_min, prover),
+            snark_fee_epoch_sort_key(&genesis_state_hash, epoch, old_epoch_min, prover),
         )?;
+
         Ok(())
     }
 
-    fn get_top_snark_provers_by_total_fees(&self, n: usize) -> anyhow::Result<Vec<SnarkWorkTotal>> {
+    fn get_top_snark_provers_by_total_fees(&self, n: usize) -> Result<Vec<SnarkWorkTotal>> {
         trace!("Getting top {n} SNARK workers by fees");
         Ok(self
             .snark_prover_total_fees_iterator(IteratorMode::End)
@@ -538,11 +564,12 @@ impl SnarkStore for IndexerStore {
         snark: &SnarkWorkSummary,
         block_height: u32,
         index: u32,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!(
             "Setting SNARK block height {block_height} at index {index} for prover {}",
             snark.prover
         );
+
         Ok(self.database.put_cf(
             self.snark_prover_block_height_sort_cf(),
             snark_prover_sort_key(&snark.prover, block_height, index),
@@ -555,11 +582,12 @@ impl SnarkStore for IndexerStore {
         snark: &SnarkWorkSummary,
         global_slot: u32,
         index: u32,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!(
             "Setting SNARK global slot {global_slot} at index {index} for prover {}",
             snark.prover
         );
+
         Ok(self.database.put_cf(
             self.snark_prover_global_slot_sort_cf(),
             snark_prover_sort_key(&snark.prover, global_slot, index),
@@ -571,8 +599,9 @@ impl SnarkStore for IndexerStore {
         &self,
         pk: &PublicKey,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         trace!("Getting SNARK total fees for {pk}");
+
         Ok(match block_height {
             None => self
                 .database
@@ -591,17 +620,31 @@ impl SnarkStore for IndexerStore {
     fn get_snark_prover_epoch_fees(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
-        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            self.get_best_block_genesis_hash()
+                .unwrap()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting SNARK fees pk {} epoch {} genesis {} max height {:?}",
+            pk,
+            epoch,
+            genesis_state_hash,
+            block_height
+        );
+
         Ok(match block_height {
             None => self
                 .database
                 .get_cf(
                     self.snark_prover_fees_epoch_cf(),
-                    snark_epoch_key(epoch, pk),
+                    snark_epoch_key(&genesis_state_hash, epoch, pk),
                 )?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch total fees")),
             Some(block_height) => self
@@ -618,8 +661,9 @@ impl SnarkStore for IndexerStore {
         &self,
         pk: &PublicKey,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         trace!("Getting SNARK max fee for {pk}");
+
         Ok(match block_height {
             None => self
                 .database
@@ -638,17 +682,31 @@ impl SnarkStore for IndexerStore {
     fn get_snark_prover_epoch_max_fee(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
-        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            self.get_best_block_genesis_hash()
+                .unwrap()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting SNARK fees pk {} epoch {} genesis {} max height {:?}",
+            pk,
+            epoch,
+            genesis_state_hash,
+            block_height
+        );
+
         Ok(match block_height {
             None => self
                 .database
                 .get_cf(
                     self.snark_prover_max_fee_epoch_cf(),
-                    snark_epoch_key(epoch, pk),
+                    snark_epoch_key(&genesis_state_hash, epoch, pk),
                 )?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch max fee")),
             Some(block_height) => self
@@ -665,8 +723,9 @@ impl SnarkStore for IndexerStore {
         &self,
         pk: &PublicKey,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         trace!("Getting SNARK min fee for {pk}");
+
         Ok(match block_height {
             None => self
                 .database
@@ -685,17 +744,30 @@ impl SnarkStore for IndexerStore {
     fn get_snark_prover_epoch_min_fee(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
-    ) -> anyhow::Result<Option<u64>> {
+    ) -> Result<Option<u64>> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
-        trace!("Getting SNARK epoch {epoch} fees for {pk}");
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            self.get_best_block_genesis_hash()
+                .unwrap()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting SNARK fees pk {} epoch {} genesis {:?}",
+            pk,
+            epoch,
+            genesis_state_hash
+        );
+
         Ok(match block_height {
             None => self
                 .database
                 .get_cf(
                     self.snark_prover_min_fee_epoch_cf(),
-                    snark_epoch_key(epoch, pk),
+                    snark_epoch_key(&genesis_state_hash, epoch, pk),
                 )?
                 .map(|bytes| u64_from_be_bytes(&bytes).expect("SNARK epoch min fee")),
             Some(block_height) => self
@@ -708,7 +780,7 @@ impl SnarkStore for IndexerStore {
         })
     }
 
-    fn update_block_snarks(&self, blocks: &DbBlockUpdate) -> anyhow::Result<()> {
+    fn update_block_snarks(&self, blocks: &DbBlockUpdate) -> Result<()> {
         let snark_updates = DbUpdate {
             apply: blocks
                 .apply
@@ -753,15 +825,20 @@ impl SnarkStore for IndexerStore {
         self.update_snarks(snark_updates)
     }
 
-    fn update_snarks(&self, update: DbSnarkUpdate) -> anyhow::Result<()> {
+    fn update_snarks(&self, update: DbSnarkUpdate) -> Result<()> {
         trace!("Updating SNARKs");
 
         // unapply
         for snark_update in update.unapply {
+            let genesis_state_hash = self
+                .get_block_genesis_state_hash(&snark_update.state_hash)?
+                .expect("block genesis state hash");
+
             self.decrement_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
                 snark_update.blockchain_length,
                 snark_update.global_slot_since_genesis,
+                genesis_state_hash.clone(),
                 &snark_update.works,
                 SnarkApplication::Unapply,
             )?;
@@ -769,10 +846,15 @@ impl SnarkStore for IndexerStore {
 
         // apply
         for snark_update in update.apply {
+            let genesis_state_hash = self
+                .get_block_genesis_state_hash(&snark_update.state_hash)?
+                .expect("block genesis state hash");
+
             self.increment_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
                 snark_update.blockchain_length,
                 snark_update.global_slot_since_genesis,
+                genesis_state_hash.clone(),
                 &snark_update.works,
                 SnarkApplication::Apply,
             )?;
@@ -786,7 +868,7 @@ impl SnarkStore for IndexerStore {
         prover: &PublicKey,
         block_height: u32,
         epoch: Option<u32>,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>> {
         // start at the previous block height
         let mut start = [0; PublicKey::LEN + U32_LEN];
         start[..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
@@ -858,12 +940,13 @@ impl SnarkStore for IndexerStore {
 
     fn snark_prover_max_fee_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_> {
         self.database.iterator_cf(
             self.snark_prover_max_fee_epoch_sort_cf(),
-            IteratorMode::From(&start_key(epoch, direction), direction),
+            IteratorMode::From(&start_key(genesis_state_hash, epoch, direction), direction),
         )
     }
 
@@ -874,12 +957,13 @@ impl SnarkStore for IndexerStore {
 
     fn snark_prover_min_fee_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_> {
         self.database.iterator_cf(
             self.snark_prover_min_fee_epoch_sort_cf(),
-            IteratorMode::From(&start_key(epoch, direction), direction),
+            IteratorMode::From(&start_key(genesis_state_hash, epoch, direction), direction),
         )
     }
 
@@ -890,12 +974,13 @@ impl SnarkStore for IndexerStore {
 
     fn snark_prover_total_fees_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_> {
         self.database.iterator_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
-            IteratorMode::From(&start_key(epoch, direction), direction),
+            IteratorMode::From(&start_key(genesis_state_hash, epoch, direction), direction),
         )
     }
 
@@ -931,7 +1016,7 @@ impl SnarkStore for IndexerStore {
     // SNARK counts //
     //////////////////
 
-    fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> anyhow::Result<u32> {
+    fn get_snarks_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting epoch {epoch} SNARKs count");
         Ok(self
@@ -942,7 +1027,7 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
-    fn increment_snarks_epoch_count(&self, epoch: u32) -> anyhow::Result<()> {
+    fn increment_snarks_epoch_count(&self, epoch: u32) -> Result<()> {
         trace!("Incrementing epoch {epoch} SNARKs count");
         let old = self.get_snarks_epoch_count(Some(epoch))?;
         Ok(self.database.put_cf(
@@ -952,7 +1037,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_snarks_total_count(&self) -> anyhow::Result<u32> {
+    fn get_snarks_total_count(&self) -> Result<u32> {
         trace!("Getting total SNARKs count");
         Ok(self
             .database
@@ -962,7 +1047,7 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
-    fn get_snarks_total_canonical_count(&self) -> anyhow::Result<u32> {
+    fn get_snarks_total_canonical_count(&self) -> Result<u32> {
         trace!("Getting total canonical SNARKs count");
         Ok(self
             .database
@@ -972,7 +1057,7 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
-    fn increment_snarks_total_canonical_count(&self, incr: u32) -> anyhow::Result<()> {
+    fn increment_snarks_total_canonical_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing total canonical SNARKs count");
         let old = self
             .get_snarks_total_canonical_count()
@@ -984,7 +1069,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn decrement_snarks_total_canonical_count(&self, decr: u32) -> anyhow::Result<()> {
+    fn decrement_snarks_total_canonical_count(&self, decr: u32) -> Result<()> {
         trace!("Incrementing total canonical SNARKs count");
         let old = self
             .get_snarks_total_canonical_count()
@@ -996,7 +1081,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn increment_snarks_total_count(&self) -> anyhow::Result<()> {
+    fn increment_snarks_total_count(&self) -> Result<()> {
         trace!("Incrementing total SNARKs count");
         let old = self.get_snarks_total_count()?;
         Ok(self
@@ -1004,9 +1089,10 @@ impl SnarkStore for IndexerStore {
             .put(Self::TOTAL_NUM_SNARKS_KEY, (old + 1).to_be_bytes())?)
     }
 
-    fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> anyhow::Result<u32> {
+    fn get_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32> {
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
         trace!("Getting pk epoch {epoch} SNARKs count {pk}");
+
         Ok(self
             .database
             .get_cf(self.snarks_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
@@ -1015,8 +1101,9 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
-    fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> anyhow::Result<()> {
+    fn increment_snarks_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()> {
         trace!("Incrementing pk epoch {epoch} SNARKs count {pk}");
+
         let old = self.get_snarks_pk_epoch_count(pk, Some(epoch))?;
         Ok(self.database.put_cf(
             self.snarks_pk_epoch_cf(),
@@ -1025,8 +1112,9 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<u32> {
+    fn get_snarks_pk_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total SNARKs count {pk}");
+
         Ok(self
             .database
             .get_cf(self.snarks_pk_total_cf(), pk.0.as_bytes())?
@@ -1035,7 +1123,7 @@ impl SnarkStore for IndexerStore {
             }))
     }
 
-    fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> anyhow::Result<()> {
+    fn increment_snarks_pk_total_count(&self, pk: &PublicKey) -> Result<()> {
         trace!("Incrementing pk total SNARKs count {pk}");
         let old = self.get_snarks_pk_total_count(pk)?;
         Ok(self.database.put_cf(
@@ -1045,7 +1133,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn get_block_snarks_count(&self, state_hash: &StateHash) -> anyhow::Result<Option<u32>> {
+    fn get_block_snarks_count(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block SNARKs count {state_hash}");
         Ok(self
             .database
@@ -1053,7 +1141,7 @@ impl SnarkStore for IndexerStore {
             .map(|bytes| u32_from_be_bytes(&bytes).expect("block SNARK count")))
     }
 
-    fn set_block_snarks_count(&self, state_hash: &StateHash, count: u32) -> anyhow::Result<()> {
+    fn set_block_snarks_count(&self, state_hash: &StateHash, count: u32) -> Result<()> {
         trace!("Setting block SNARKs count {state_hash} -> {count}");
         Ok(self.database.put_cf(
             self.block_snark_counts_cf(),
@@ -1062,7 +1150,7 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> anyhow::Result<()> {
+    fn increment_snarks_counts(&self, snark: &SnarkWorkSummary, epoch: u32) -> Result<()> {
         trace!("Incrementing SNARKs count {snark:?}");
 
         // prover epoch & total
@@ -1075,49 +1163,57 @@ impl SnarkStore for IndexerStore {
     }
 }
 
-fn start_key(epoch: u32, direction: Direction) -> [u8; U32_LEN + U64_LEN + PublicKey::LEN] {
-    let mut start = [0; U32_LEN + U64_LEN + PublicKey::LEN];
-    let fstart = snark_fee_epoch_sort_key(epoch, 0, &PublicKey::lower_bound());
-    let rstart = snark_fee_epoch_sort_key(epoch, u64::MAX, &PublicKey::upper_bound());
-    match direction {
-        Direction::Forward => start.copy_from_slice(fstart.as_slice()),
-        Direction::Reverse => start.copy_from_slice(rstart.as_slice()),
+fn start_key(
+    genesis_state_hash: &StateHash,
+    epoch: u32,
+    direction: Direction,
+) -> [u8; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN] {
+    let mut start = [0; StateHash::LEN + U32_LEN + U64_LEN + PublicKey::LEN];
+
+    // start in the desired epoch
+    start[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    start[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+
+    if let Direction::Reverse = direction {
+        start[StateHash::LEN..][U32_LEN..][..U64_LEN].copy_from_slice(&u64::MAX.to_be_bytes());
+        start[StateHash::LEN..][U32_LEN..][U64_LEN..]
+            .copy_from_slice(PublicKey::upper_bound().0.as_bytes());
     }
+
     start
 }
 
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
-    use super::*;
+    use super::SnarkStore;
     use crate::store::IndexerStore;
-    use anyhow::Result;
     use std::env;
     use tempfile::TempDir;
 
-    fn create_indexer_store() -> Result<IndexerStore> {
+    fn create_indexer_store() -> anyhow::Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
         let store = IndexerStore::new(temp_dir.path())?;
         Ok(store)
     }
 
     #[test]
-    fn test_incr_dec_snarks_total_canonical_count() -> Result<()> {
-        let indexer = create_indexer_store()?;
+    fn test_incr_dec_snarks_total_canonical_count() -> anyhow::Result<()> {
+        let store = create_indexer_store()?;
 
-        indexer.increment_snarks_total_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+        store.increment_snarks_total_canonical_count(1)?;
+        assert_eq!(store.get_snarks_total_canonical_count()?, 1);
 
-        indexer.increment_snarks_total_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 2);
+        store.increment_snarks_total_canonical_count(1)?;
+        assert_eq!(store.get_snarks_total_canonical_count()?, 2);
 
-        indexer.decrement_snarks_total_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 1);
+        store.decrement_snarks_total_canonical_count(1)?;
+        assert_eq!(store.get_snarks_total_canonical_count()?, 1);
 
-        indexer.decrement_snarks_total_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+        store.decrement_snarks_total_canonical_count(1)?;
+        assert_eq!(store.get_snarks_total_canonical_count()?, 0);
 
-        indexer.decrement_snarks_total_canonical_count(1)?;
-        assert_eq!(indexer.get_snarks_total_canonical_count()?, 0);
+        store.decrement_snarks_total_canonical_count(1)?;
+        assert_eq!(store.get_snarks_total_canonical_count()?, 0);
 
         Ok(())
     }

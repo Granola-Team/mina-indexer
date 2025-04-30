@@ -55,6 +55,7 @@ pub trait SnarkStore {
         &self,
         block_height: u32,
         global_slot: u32,
+        genesis_state_hash: StateHash,
         snarks: &[SnarkWorkSummary],
         apply: SnarkApplication,
     ) -> anyhow::Result<()>;
@@ -92,6 +93,7 @@ pub trait SnarkStore {
     fn get_snark_prover_epoch_fees(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
@@ -110,6 +112,7 @@ pub trait SnarkStore {
     fn get_snark_prover_epoch_max_fee(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
@@ -128,6 +131,7 @@ pub trait SnarkStore {
     fn get_snark_prover_epoch_min_fee(
         &self,
         pk: &PublicKey,
+        genesis_state_hash: Option<StateHash>,
         epoch: Option<u32>,
         block_height: Option<u32>,
     ) -> anyhow::Result<Option<u64>>;
@@ -170,6 +174,7 @@ pub trait SnarkStore {
     /// Stores the epoch fee data
     fn store_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         epoch_total_fees: u64,
@@ -181,6 +186,7 @@ pub trait SnarkStore {
     /// Used in combination with [delete_old_epoch_snark_fees] for updates
     fn sort_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         epoch_total_fees: u64,
@@ -192,6 +198,7 @@ pub trait SnarkStore {
     /// Used in combination with [sort_epoch_snark_fees] for updates
     fn delete_old_epoch_snark_fees(
         &self,
+        genesis_state_hash: StateHash,
         epoch: u32,
         prover: &PublicKey,
         old_epoch_total: u64,
@@ -223,6 +230,7 @@ pub trait SnarkStore {
     /// Iterator over SNARK provers per epoch by max fee
     fn snark_prover_max_fee_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_>;
@@ -233,6 +241,7 @@ pub trait SnarkStore {
     /// Iterator over SNARK provers per epoch by min fee
     fn snark_prover_min_fee_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_>;
@@ -243,6 +252,7 @@ pub trait SnarkStore {
     /// Iterator over SNARK provers per epoch by accumulated fees
     fn snark_prover_total_fees_epoch_iterator(
         &self,
+        genesis_state_hash: &StateHash,
         epoch: u32,
         direction: Direction,
     ) -> DBIterator<'_>;
