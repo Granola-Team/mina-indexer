@@ -1,0 +1,81 @@
+#!/usr/bin/env -S ruby -w
+
+require "json"
+
+class Transformer
+  def initialize(output_dir)
+    @queue = Queue.new
+    @output_dir = output_dir
+  end
+
+  def add(path)
+    stat = File.stat(path)
+    if stat.file?
+      @queue << path
+    elsif stat.directory?
+      Dir.children(path).each do |f|
+        add(File.join(path, f))
+      end
+    elsif stat.symlink?
+      abort("Can't operate on symlinks. Aborting.")
+    else
+      abort("Invalid file #{path}. Aborting.")
+    end
+  end
+
+  def sanitize_utf8(string)
+    # Replace invalid UTF-8 sequences with the Unicode replacement character
+    string.encode("UTF-8", "binary", invalid: :replace, undef: :replace, replace: "")
+  end
+
+  def remove_proofs(obj)
+    case obj
+    when Hash
+      obj.delete("proofs")
+      obj.delete("protocol_state_proof")
+      obj.each_value { |v| remove_proofs(v) }
+    when Array
+      obj.each { |v| remove_proofs(v) }
+    end
+  end
+
+  def process_file(path)
+    print "Processing file #{path}... "
+    contents = File.read(path)
+    sanitize_utf8(contents)
+    json_data = JSON.parse(contents)
+    remove_proofs(json_data)
+    outfile = File.join(@output_dir, File.basename(path))
+    File.write(outfile, JSON.pretty_generate(json_data))
+    puts "Done."
+  rescue => e
+    abort "Error processing #{path}: #{e.message}"
+  end
+
+  def process_files
+    until @queue.empty?
+      path = begin
+        @queue.pop(true)
+      rescue
+        nil
+      end
+      break unless path
+      process_file(path)
+    end
+  end
+end
+
+def main
+  if ARGV.size != 2
+    puts "Usage: #{$0} <FILE_OR_DIRECTORY> <output_dir>"
+    exit 1
+  end
+
+  processor = Transformer.new(ARGV[1])
+  processor.add(ARGV[0])
+  puts "Processing..."
+  processor.process_files
+end
+
+# Only execute main when this script is run directly, not when required
+main if __FILE__ == $0

@@ -26,7 +26,14 @@ CARGO_DEPS = [
   "flake.nix",
   "flake.lock"
 ] + RUST_SRC_FILES
-RUBY_SRC_FILES = Dir.glob("#{TOP}/ops/**/*.rb") + Dir.glob("#{TOP}/ops/**/*.rake") + ["Rakefile"]
+RUBY_SRC_FILES = Dir.glob("#{TOP}/ops/**/*.rb") +
+  Dir.glob("#{TOP}/ops/**/*.rake") +
+  %W[
+    Rakefile
+    ops/download-o1labs-blocks
+    ops/prune-o1labs-blocks
+    ops/transform-o1labs-blocks
+  ]
 NIX_FILES = %W[
   flake.nix
   ops/mina/mina_txn_hasher.nix
