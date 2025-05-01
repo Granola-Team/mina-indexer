@@ -33,6 +33,7 @@ RUBY_SRC_FILES = Dir.glob("#{TOP}/ops/**/*.rb") +
     ops/download-o1labs-blocks
     ops/prune-o1labs-blocks
     ops/transform-o1labs-blocks
+    ops/hash-o1labs-blocks
   ]
 NIX_FILES = %W[
   flake.nix

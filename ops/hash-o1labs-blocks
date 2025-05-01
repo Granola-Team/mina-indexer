@@ -1,0 +1,167 @@
+#!/usr/bin/env -S ruby -w
+
+require "etc"
+require "json"
+require "open3"
+
+class Rehasher
+  MINA_TXN_HASHER = "mina_txn_hasher.exe"
+
+  # Add transaction hashes starting from this block height
+  V2_BLOCKCHAIN_START = 359605
+
+  def initialize(output_dir)
+    @output_dir = output_dir
+    @queue = Queue.new
+    @num_workers = Etc.nprocessors * 4
+  end
+
+  def add(path)
+    stat = File.stat(path)
+    if stat.file?
+      @queue << path
+    elsif stat.directory?
+      Dir.children(path).each do |f|
+        add(File.join(path, f))
+      end
+    elsif stat.symlink?
+      abort("Can't operate on symlinks. Aborting.")
+    else
+      abort("Invalid file #{path}. Aborting.")
+    end
+  end
+
+  def get_blockchain_length(json_data)
+    len = json_data.dig("protocol_state", "body", "consensus_state", "blockchain_length")
+    if len
+      len.to_i
+    else
+      len = json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")
+      if len
+        len.to_i
+      else
+        abort("Error extracting blockchain length")
+      end
+    end
+  end
+
+  def add_transaction_hashes(json_data, filename)
+    transactions = find_transactions(json_data)
+
+    if transactions.empty?
+      return
+    end
+
+    puts "Adding transaction hashes for #{filename}"
+    # Process all transactions and update the JSON
+    transactions.each do |command_obj, txn_data|
+      # Skip if already has a hash
+      next if command_obj.key?("txn_hash")
+
+      hash = compute_hash(txn_data)
+      if hash
+        command_obj["txn_hash"] = hash
+      else
+        abort("Problems computing the hash for #{filename}")
+      end
+    end
+  end
+
+  # Find all transactions and return a hash of {command_obj => txn_data}
+  def find_transactions(json_data)
+    transactions = {}
+    queue = [[json_data, []]]
+
+    until queue.empty?
+      obj, path = queue.shift
+
+      case obj
+      when Hash
+        if obj["data"]&.is_a?(Array) &&
+            (obj["data"][0] == "Signed_command" || obj["data"][0] == "Zkapp_command")
+          # Found a transaction (either signed_command or zkapp_command)
+          transactions[obj] = obj["data"][1]
+        else
+          # Continue searching in all values
+          obj.each do |key, value|
+            queue << [value, path + [key]]
+          end
+        end
+      when Array
+        # Continue searching in all array elements
+        obj.each_with_index do |item, index|
+          queue << [item, path + [index]]
+        end
+      end
+    end
+
+    transactions
+  end
+
+  # Compute hash for a transaction
+  def compute_hash(txn_data)
+    cmd = "#{MINA_TXN_HASHER} '#{JSON.generate(txn_data)}'"
+    puts "Invoking #{MINA_TXN_HASHER}"
+    stdout, stderr, status = Open3.capture3(cmd)
+
+    if status.success?
+      stdout.strip
+    else
+      # Report filename when hasher fails
+      puts "Error running hasher: #{stderr}"
+      nil
+    end
+  end
+
+  def process_file(path)
+    puts "Processing file #{path}... "
+    contents = File.read(path)
+    json_data = JSON.parse(contents)
+    outfile = File.join(@output_dir, File.basename(path))
+
+    blockchain_length = get_blockchain_length(json_data)
+    if blockchain_length.to_i >= V2_BLOCKCHAIN_START
+      add_transaction_hashes(json_data, File.basename(path))
+      File.write(outfile, JSON.pretty_generate(json_data))
+    else
+      # Don't do anything - no need to copy the file.
+      File.link(path, outfile)
+    end
+    puts "Done."
+  rescue => e
+    abort "Error processing #{path}: #{e.message}"
+  end
+
+  def process_files
+    threads = []
+    @num_workers.times do
+      threads << Thread.new do
+        until @queue.empty?
+          path = begin
+            @queue.pop(true)
+          rescue
+            nil
+          end
+          break unless path
+          process_file(path)
+        end
+      end
+    end
+    puts "Processing with #{@num_workers} worker threads"
+    threads.each(&:join)
+  end
+end
+
+def main
+  if ARGV.size != 2
+    puts "Usage: #{$0} <FILE_OR_DIRECTORY> <output_dir>"
+    exit 1
+  end
+
+  processor = Rehasher.new(ARGV[1])
+  processor.add(ARGV[0])
+  processor.process_files
+end
+
+# Only execute main when this script is run directly, not when required
+main if __FILE__ == $0
