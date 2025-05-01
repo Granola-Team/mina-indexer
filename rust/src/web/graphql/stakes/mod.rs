@@ -296,7 +296,7 @@ impl StakesQueryRoot {
             }
             _ => (
                 if let Some(ledger_hash) =
-                    db.get_staking_ledger_hash_by_epoch(epoch, Some(&genesis_state_hash))?
+                    db.get_staking_ledger_hash_by_epoch(epoch, &genesis_state_hash)?
                 {
                     ledger_hash
                 } else {
@@ -321,10 +321,10 @@ impl StakesQueryRoot {
                 }
 
                 if let Some(mut account) =
-                    db.get_staking_account(&pk, epoch, Some(&genesis_state_hash))?
+                    db.get_staking_account(&pk, epoch, &genesis_state_hash)?
                 {
                     if let Some(delegation) =
-                        db.get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
+                        db.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
                     {
                         // add username to account
                         account.username = db.get_username(&pk)?.map(|u| u.0);
@@ -699,12 +699,12 @@ impl StakesLedgerAccountWithMeta {
             },
             timing,
             epoch_num_blocks: db
-                .get_block_production_epoch_count(Some(&genesis_state_hash), Some(epoch))
+                .get_block_production_epoch_count(Some(epoch), Some(&genesis_state_hash))
                 .expect("epoch block count"),
             epoch_num_supercharged_blocks: db
                 .get_block_production_supercharged_epoch_count(
-                    Some(&genesis_state_hash),
                     Some(epoch),
+                    Some(&genesis_state_hash),
                 )
                 .expect("epoch supercharged block count"),
             total_num_blocks: db
@@ -714,7 +714,7 @@ impl StakesLedgerAccountWithMeta {
                 .get_block_production_supercharged_total_count()
                 .expect("total supercharged block count"),
             epoch_num_snarks: db
-                .get_snarks_epoch_count(Some(epoch))
+                .get_snarks_epoch_count(Some(epoch), Some(&genesis_state_hash))
                 .expect("epoch snark count"),
             total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
             epoch_num_user_commands: db
@@ -849,7 +849,7 @@ mod tests {
         };
 
         // add staking ledger
-        store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
+        store.add_staking_ledger(staking_ledger)?;
 
         // add username
         let username = Username::arbitrary(g);
@@ -861,11 +861,9 @@ mod tests {
             let username_pks = store.get_username_pks(&username.0)?.unwrap_or_default();
 
             for pk in username_pks {
-                if let Some(account) =
-                    store.get_staking_account(&pk, epoch, Some(&genesis_state_hash))?
-                {
+                if let Some(account) = store.get_staking_account(&pk, epoch, &genesis_state_hash)? {
                     if let Some(delegation) =
-                        store.get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
+                        store.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
                     {
                         let account = StakesLedgerAccountWithMeta::new(
                             &store,

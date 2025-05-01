@@ -744,7 +744,7 @@ pub async fn handle_connection(
                 if !StateHash::is_valid(&genesis_state_hash) {
                     invalid_state_hash(&genesis_state_hash)
                 } else if let Some(staking_ledger) =
-                    db.build_staking_ledger(epoch, Some(&genesis_state_hash.into()))?
+                    db.build_staking_ledger(epoch, &genesis_state_hash.into())?
                 {
                     let ledger_json = serde_json::to_string_pretty(&staking_ledger)?;
                     if path.is_none() {
@@ -779,7 +779,7 @@ pub async fn handle_connection(
                 } else if !PublicKey::is_valid(&pk) {
                     invalid_public_key(&pk)
                 } else if let Some(aggregated_delegations) =
-                    db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?
+                    db.build_aggregated_delegations(epoch, &genesis_state_hash.into())?
                 {
                     let pk: PublicKey = pk.into();
                     let epoch = aggregated_delegations.epoch;
@@ -823,7 +823,7 @@ pub async fn handle_connection(
             }) => {
                 debug!("Received staking-delegations command for epoch {epoch}");
                 let aggregated_delegations =
-                    db.build_aggregated_delegations(epoch, Some(&genesis_state_hash.into()))?;
+                    db.build_aggregated_delegations(epoch, &genesis_state_hash.into())?;
                 if let Some(agg_del_str) = aggregated_delegations
                     .map(|agg_del| serde_json::to_string_pretty(&agg_del).unwrap())
                 {

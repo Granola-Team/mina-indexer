@@ -433,24 +433,24 @@ pub trait BlockStore {
     /// (default: current epoch)
     fn get_block_production_epoch_count(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32>;
 
     /// Get the total canonical block production count for `epoch`
     /// (default: current epoch)
     fn get_block_production_canonical_epoch_count(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32>;
 
     /// Get the total supercharged block production count for `epoch`
     /// (default: current epoch)
     fn get_block_production_supercharged_epoch_count(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32>;
 
     /// Get the total block production count
@@ -474,8 +474,8 @@ pub trait BlockStore {
     /// Get the number of block production slots in the given epoch
     fn get_epoch_slots_produced_count(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
     ) -> Result<u32>;
 
     ///////////////////////////////

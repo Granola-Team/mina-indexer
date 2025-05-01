@@ -540,10 +540,7 @@ async fn process_event(event: Event, state: &Arc<RwLock<IndexerState>>) -> anyho
 
                             info!("Adding staking ledger {}", ledger_summary);
                             store
-                                .add_staking_ledger(
-                                    staking_ledger,
-                                    &state.version.genesis.state_hash,
-                                )
+                                .add_staking_ledger(staking_ledger)
                                 .unwrap_or_else(|e| {
                                     error!("Error adding staking ledger {}: {}", ledger_summary, e)
                                 });

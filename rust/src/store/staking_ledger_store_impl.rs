@@ -13,6 +13,7 @@ use crate::{
         store::staking::{StakingAccountWithEpochDelegation, StakingLedgerStore},
         LedgerHash,
     },
+    store::Result,
     utility::store::{
         common::{from_be_bytes, u64_from_be_bytes},
         ledger::staking::*,
@@ -28,22 +29,19 @@ impl StakingLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<StakingAccount>> {
+        genesis_state_hash: &StateHash,
+    ) -> Result<Option<StakingAccount>> {
         trace!("Getting staking account {pk}");
 
         if let Some(ledger_hash) =
             self.get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
         {
-            let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
-            let genesis_state_hash = genesis_state_hash
-                .or(best_block_genesis_hash.as_ref())
-                .unwrap();
-            let key = staking_ledger_account_key(genesis_state_hash, epoch, &ledger_hash, pk);
-
             return Ok(self
                 .database
-                .get_cf(self.staking_ledger_accounts_cf(), key)?
+                .get_cf(
+                    self.staking_ledger_accounts_cf(),
+                    staking_ledger_account_key(genesis_state_hash, epoch, &ledger_hash, pk),
+                )?
                 .and_then(|bytes| {
                     serde_json::from_slice(&bytes).expect("staking ledger account")
                 }));
@@ -60,7 +58,7 @@ impl StakingLedgerStore for IndexerStore {
         ledger_hash: &LedgerHash,
         genesis_state_hash: &StateHash,
         staking_account_with_delegation: StakingAccountWithEpochDelegation,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting staking account {pk} (epoch {epoch}): {ledger_hash}");
 
         // add staking account
@@ -112,8 +110,20 @@ impl StakingLedgerStore for IndexerStore {
         ledger_hash: &LedgerHash,
         epoch: Option<u32>,
         genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<StakingLedger>> {
-        trace!("Getting staking ledger {ledger_hash}");
+    ) -> Result<Option<StakingLedger>> {
+        trace!(
+            "Getting staking ledger {} epoch {:?} genesis {:?}",
+            ledger_hash,
+            epoch,
+            genesis_state_hash
+        );
+
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
 
         match epoch {
             None => {
@@ -143,17 +153,14 @@ impl StakingLedgerStore for IndexerStore {
         }
     }
 
-    fn add_staking_ledger(
-        &self,
-        staking_ledger: StakingLedger,
-        genesis_state_hash: &StateHash,
-    ) -> anyhow::Result<()> {
+    fn add_staking_ledger(&self, staking_ledger: StakingLedger) -> Result<()> {
         trace!("Adding staking ledger {}", staking_ledger.summary());
 
         let epoch = staking_ledger.epoch;
         let ledger_hash = staking_ledger.ledger_hash.clone();
+        let genesis_state_hash = staking_ledger.genesis_state_hash.clone();
 
-        let key = staking_ledger_epoch_key(genesis_state_hash, epoch, &ledger_hash);
+        let key = staking_ledger_epoch_key(&genesis_state_hash, epoch, &ledger_hash);
         let is_new = self
             .database
             .get_cf(self.staking_ledger_persisted_cf(), key)?
@@ -166,13 +173,13 @@ impl StakingLedgerStore for IndexerStore {
         }
 
         // additional indices
-        self.set_staking_ledger_hash_epoch_pair(&ledger_hash, epoch, Some(genesis_state_hash))?;
-        self.set_staking_ledger_hash_genesis_pair(&ledger_hash, genesis_state_hash)?;
+        self.set_staking_ledger_hash_epoch_pair(&ledger_hash, epoch, &genesis_state_hash)?;
+        self.set_staking_ledger_hash_genesis_pair(&ledger_hash, &genesis_state_hash)?;
         self.set_total_currency(&ledger_hash, staking_ledger.total_currency)?;
 
         // add staking ledger count at epoch
         let count = staking_ledger.staking_ledger.len();
-        self.set_staking_ledger_accounts_count_epoch(epoch, genesis_state_hash, count as u32)?;
+        self.set_staking_ledger_accounts_count_epoch(epoch, &genesis_state_hash, count as u32)?;
 
         // add staking ledger accounts & per epoch balance-sorted data
         let aggregated_delegations = staking_ledger.aggregate_delegations()?;
@@ -187,7 +194,7 @@ impl StakingLedgerStore for IndexerStore {
                 &pk,
                 epoch,
                 &ledger_hash,
-                genesis_state_hash,
+                &genesis_state_hash,
                 StakingAccountWithEpochDelegation {
                     account,
                     delegation,
@@ -221,18 +228,12 @@ impl StakingLedgerStore for IndexerStore {
         &self,
         pk: &PublicKey,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<EpochStakeDelegation>> {
+        genesis_state_hash: &StateHash,
+    ) -> Result<Option<EpochStakeDelegation>> {
         trace!("Getting epoch {epoch} aggregated delegations for {pk}");
 
-        let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
-        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
-            best_block_genesis_hash
-                .as_ref()
-                .expect("best block genesis hash")
-        });
         let ledger_hash = self
-            .get_staking_ledger_hash_by_epoch(epoch, Some(genesis_state_hash))?
+            .get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
             .expect("staking ledger hash");
 
         Ok(self
@@ -244,7 +245,7 @@ impl StakingLedgerStore for IndexerStore {
             .map(|bytes| serde_json::from_slice(&bytes).expect("epoch staking delegation bytes")))
     }
 
-    fn get_epoch(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u32>> {
+    fn get_epoch(&self, ledger_hash: &LedgerHash) -> Result<Option<u32>> {
         trace!("Getting epoch for staking ledger {ledger_hash}");
 
         Ok(self
@@ -259,14 +260,13 @@ impl StakingLedgerStore for IndexerStore {
     fn get_staking_ledger_hash_by_epoch(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<LedgerHash>> {
-        trace!("Getting staking ledger hash for epoch {epoch}");
-
-        let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
-        let genesis_state_hash = genesis_state_hash
-            .or(best_block_genesis_hash.as_ref())
-            .unwrap();
+        genesis_state_hash: &StateHash,
+    ) -> Result<Option<LedgerHash>> {
+        trace!(
+            "Getting staking ledger hash for epoch {} genesis {}",
+            epoch,
+            genesis_state_hash,
+        );
 
         Ok(self
             .database
@@ -281,13 +281,8 @@ impl StakingLedgerStore for IndexerStore {
         &self,
         ledger_hash: &LedgerHash,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<()> {
-        let best_block_genesis_hash = self.get_best_block_genesis_hash()?;
-        let genesis_state_hash = genesis_state_hash
-            .or(best_block_genesis_hash.as_ref())
-            .unwrap();
-
+        genesis_state_hash: &StateHash,
+    ) -> Result<()> {
         trace!(
             "Setting epoch {epoch} for staking ledger {ledger_hash} genesis {genesis_state_hash}"
         );
@@ -309,7 +304,7 @@ impl StakingLedgerStore for IndexerStore {
         &self,
         ledger_hash: &LedgerHash,
         genesis_state_hash: &StateHash,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting genesis state hash {genesis_state_hash} for staking ledger {ledger_hash}");
 
         Ok(self.database.put_cf(
@@ -319,10 +314,7 @@ impl StakingLedgerStore for IndexerStore {
         )?)
     }
 
-    fn get_genesis_state_hash(
-        &self,
-        ledger_hash: &LedgerHash,
-    ) -> anyhow::Result<Option<StateHash>> {
+    fn get_genesis_state_hash(&self, ledger_hash: &LedgerHash) -> Result<Option<StateHash>> {
         trace!("Getting genesis state hash for staking ledger {ledger_hash}");
 
         Ok(self
@@ -334,11 +326,7 @@ impl StakingLedgerStore for IndexerStore {
             .map(StateHash::from_bytes_or_panic))
     }
 
-    fn set_total_currency(
-        &self,
-        ledger_hash: &LedgerHash,
-        total_currency: u64,
-    ) -> anyhow::Result<()> {
+    fn set_total_currency(&self, ledger_hash: &LedgerHash, total_currency: u64) -> Result<()> {
         trace!("Setting total currency {total_currency} for staking ledger {ledger_hash}");
 
         Ok(self.database.put_cf(
@@ -348,7 +336,7 @@ impl StakingLedgerStore for IndexerStore {
         )?)
     }
 
-    fn get_total_currency(&self, ledger_hash: &LedgerHash) -> anyhow::Result<Option<u64>> {
+    fn get_total_currency(&self, ledger_hash: &LedgerHash) -> Result<Option<u64>> {
         trace!("Getting total currency for staking ledger {ledger_hash}");
 
         Ok(self
@@ -364,7 +352,7 @@ impl StakingLedgerStore for IndexerStore {
         &self,
         epoch: u32,
         genesis_state_hash: &StateHash,
-    ) -> anyhow::Result<u32> {
+    ) -> Result<u32> {
         trace!("Getting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}");
 
         Ok(self
@@ -381,7 +369,7 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         genesis_state_hash: &StateHash,
         count: u32,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         trace!("Setting staking ledger accounts count for epoch {epoch} {genesis_state_hash:?}: {count}");
 
         Ok(self.database.put_cf(
@@ -394,8 +382,8 @@ impl StakingLedgerStore for IndexerStore {
     fn build_staking_ledger(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<StakingLedger>> {
+        genesis_state_hash: &StateHash,
+    ) -> Result<Option<StakingLedger>> {
         trace!("Building staking ledger epoch {epoch}");
 
         if let Some(ledger_hash) =
@@ -407,9 +395,7 @@ impl StakingLedgerStore for IndexerStore {
                 self.get_genesis_state_hash(&ledger_hash)?,
             ) {
                 trace!("Staking ledger {network} (epoch {epoch}): {ledger_hash}");
-                if let Some(genesis_state_hash) = genesis_state_hash {
-                    assert_eq!(genesis_hash, *genesis_state_hash);
-                }
+                assert_eq!(genesis_hash, *genesis_state_hash);
 
                 let mut staking_ledger = HashMap::new();
                 for (key, _) in self
@@ -436,6 +422,7 @@ impl StakingLedgerStore for IndexerStore {
                             )
                         })
                         .expect("staking account exists");
+
                     assert_eq!(account.balance, balance);
                     staking_ledger.insert(pk, account);
                 }
@@ -457,8 +444,8 @@ impl StakingLedgerStore for IndexerStore {
     fn build_aggregated_delegations(
         &self,
         epoch: u32,
-        genesis_state_hash: Option<&StateHash>,
-    ) -> anyhow::Result<Option<AggregatedEpochStakeDelegations>> {
+        genesis_state_hash: &StateHash,
+    ) -> Result<Option<AggregatedEpochStakeDelegations>> {
         trace!("Building epoch {epoch} aggregated delegations");
 
         if let Some(ledger_hash) =
@@ -469,8 +456,10 @@ impl StakingLedgerStore for IndexerStore {
                 self.get_genesis_state_hash(&ledger_hash)?,
             ) {
                 trace!("Staking ledger {network} (epoch {epoch}): {ledger_hash}");
+
                 let mut delegations = HashMap::new();
                 let mut total_delegations = 0;
+
                 for (key, _value) in self
                     .staking_ledger_account_stake_iterator(
                         epoch,
@@ -486,14 +475,16 @@ impl StakingLedgerStore for IndexerStore {
                     }
 
                     let account = self
-                        .get_epoch_delegations(&pk, epoch, Some(&genesis_state_hash))?
+                        .get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
                         .with_context(|| format!("epoch {epoch}, account {pk}"))?;
                     if let Some(total_delegated) = account.total_delegated {
                         assert_eq!(stake, total_delegated);
                         total_delegations += total_delegated;
                     }
+
                     delegations.insert(pk, account.clone());
                 }
+
                 return Ok(Some(AggregatedEpochStakeDelegations {
                     epoch,
                     network,

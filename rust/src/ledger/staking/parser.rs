@@ -53,7 +53,7 @@ impl StakingLedgerParser {
                 if store
                     .get_staking_ledger_hash_by_epoch(
                         epoch,
-                        Some(&StakingLedger::genesis_state_hash(&hash)),
+                        &StakingLedger::genesis_state_hash(&hash),
                     )?
                     .is_none()
                 {

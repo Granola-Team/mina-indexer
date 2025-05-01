@@ -25,7 +25,7 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
     // check sorted store balances equal best ledger balances
     let mut curr_ledger_balance = None;
     let staking_ledger = store
-        .build_staking_ledger(epoch, Some(&genesis_state_hash))?
+        .build_staking_ledger(epoch, &genesis_state_hash)?
         .unwrap();
 
     for (n, (key, _)) in store
@@ -42,7 +42,9 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
             break;
         }
 
-        let pk_store_account = store.get_staking_account(&pk, epoch, None)?.unwrap();
+        let pk_store_account = store
+            .get_staking_account(&pk, epoch, &genesis_state_hash)?
+            .unwrap();
         let pk_staking_account = staking_ledger
             .staking_ledger
             .get(&pk)
@@ -69,7 +71,12 @@ async fn check_staking_accounts() -> anyhow::Result<()> {
 
     // check staking ledger accounts equal balance-sorted store accounts
     for (pk, acct) in staking_ledger.staking_ledger {
-        assert_eq!(acct, store.get_staking_account(&pk, epoch, None)?.unwrap());
+        assert_eq!(
+            acct,
+            store
+                .get_staking_account(&pk, epoch, &genesis_state_hash)?
+                .unwrap()
+        );
     }
     Ok(())
 }

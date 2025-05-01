@@ -1107,19 +1107,14 @@ impl IndexerState {
         let hash: LedgerHash = hash.into();
 
         if store
-            .get_staking_ledger_hash_by_epoch(
-                epoch,
-                Some(&StakingLedger::genesis_state_hash(&hash)),
-            )?
+            .get_staking_ledger_hash_by_epoch(epoch, &StakingLedger::genesis_state_hash(&hash))?
             .is_none()
         {
             let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
 
             staking_ledgers.insert((staking_ledger.epoch, staking_ledger.ledger_hash.to_owned()));
-
-            let genesis_state_hash = staking_ledger.genesis_state_hash.to_owned();
-            store.add_staking_ledger(staking_ledger, &genesis_state_hash)?;
+            store.add_staking_ledger(staking_ledger)?;
 
             info!("Added staking ledger {summary}");
         } else {
@@ -1438,7 +1433,7 @@ impl IndexerState {
                 }) => {
                     self.staking_ledgers
                         .insert((*epoch, ledger_hash.to_owned()));
-                    self.replay_staking_ledger(epoch, ledger_hash, Some(genesis_state_hash))
+                    self.replay_staking_ledger(epoch, ledger_hash, genesis_state_hash)
                 }
                 DbEvent::StakingLedger(DbStakingLedgerEvent::AggregateDelegations {
                     epoch,
@@ -1447,11 +1442,11 @@ impl IndexerState {
                     info!("Replaying aggregate delegations epoch {epoch}");
                     let indexer_store = self.indexer_store_or_panic();
 
-                    if let Some(aggregated_delegations) = indexer_store
-                        .build_aggregated_delegations(*epoch, Some(genesis_state_hash))?
+                    if let Some(aggregated_delegations) =
+                        indexer_store.build_aggregated_delegations(*epoch, genesis_state_hash)?
                     {
                         if let Some(staking_ledger) =
-                            indexer_store.build_staking_ledger(*epoch, Some(genesis_state_hash))?
+                            indexer_store.build_staking_ledger(*epoch, genesis_state_hash)?
                         {
                             // check delegation calculations
                             assert_eq!(
@@ -1504,14 +1499,14 @@ impl IndexerState {
         &self,
         epoch: &u32,
         ledger_hash: &LedgerHash,
-        genesis_state_hash: Option<&StateHash>,
+        genesis_state_hash: &StateHash,
     ) -> Result<()> {
         info!("Replaying staking ledger (epoch {epoch}): {ledger_hash}");
 
         // check ledger at hash & epoch
         let indexer_store = self.indexer_store_or_panic();
         if let Some(staking_ledger_hash) =
-            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), genesis_state_hash)?
+            indexer_store.get_staking_ledger(ledger_hash, Some(*epoch), Some(genesis_state_hash))?
         {
             assert_eq!(staking_ledger_hash.epoch, *epoch, "Invalid epoch");
             assert_eq!(
@@ -1520,7 +1515,7 @@ impl IndexerState {
             );
 
             if let Some(staking_ledger_epoch) = indexer_store
-                .build_staking_ledger(*epoch, Some(&staking_ledger_hash.genesis_state_hash))?
+                .build_staking_ledger(*epoch, &staking_ledger_hash.genesis_state_hash)?
             {
                 assert_eq!(staking_ledger_epoch.epoch, *epoch, "Invalid epoch");
                 assert_eq!(
