@@ -1,3 +1,5 @@
+//! Canonicity store trait
+
 use crate::{
     base::state_hash::StateHash,
     block::store::DbBlockUpdate,

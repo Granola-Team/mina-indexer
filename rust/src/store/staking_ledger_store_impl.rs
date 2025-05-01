@@ -1,3 +1,5 @@
+//! Staking ledger store impl
+
 use super::{column_families::ColumnFamilyHelpers, IndexerStore};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

@@ -1,3 +1,5 @@
+//! Chain store trait
+
 use super::{ChainId, Network};
 
 pub trait ChainStore {

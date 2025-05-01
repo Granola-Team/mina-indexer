@@ -1,3 +1,5 @@
+//! Fixed keys trait/impl
+
 pub trait FixedKeys {
     const CHAIN_ID_KEY: &'static [u8] = "current_chain_id".as_bytes();
     const BEST_TIP_STATE_HASH_KEY: &'static [u8] = "best_tip_state_hash".as_bytes();

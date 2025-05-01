@@ -1,3 +1,5 @@
+//! Username store impl
+
 use super::{
     column_families::ColumnFamilyHelpers,
     username::{UsernameAccountUpdate, UsernameStore, UsernameUpdate},

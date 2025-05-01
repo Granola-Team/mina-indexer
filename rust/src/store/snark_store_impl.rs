@@ -1,3 +1,5 @@
+//! SNARK store impl
+
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, DbUpdate, IndexerStore};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

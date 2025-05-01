@@ -1,3 +1,5 @@
+//! Chain store impl
+
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::chain::{store::ChainStore, ChainId, Network};
 use log::trace;

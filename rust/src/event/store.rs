@@ -1,3 +1,5 @@
+//! Event store trait
+
 use crate::event::IndexerEvent;
 use speedb::{DBIterator, IteratorMode};
 

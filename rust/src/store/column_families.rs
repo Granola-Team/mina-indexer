@@ -1,4 +1,4 @@
-//! Indexer store column family helper trait
+//! Column family helpers trait
 
 use speedb::ColumnFamily;
 

@@ -1,3 +1,5 @@
+//! Staged ledger store impl
+
 use super::{column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, IndexerStore};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

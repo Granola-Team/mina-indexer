@@ -1,4 +1,5 @@
-//! Store for internal commands
+//! Internal command store trait
+
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::DbBlockUpdate},

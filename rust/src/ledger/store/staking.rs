@@ -1,4 +1,4 @@
-//! Store of staking ledgers and delegations
+//! Staking ledger store trait
 
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

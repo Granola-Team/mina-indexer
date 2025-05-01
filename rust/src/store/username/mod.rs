@@ -1,3 +1,5 @@
+//! Username store trait
+
 use super::DbUpdate;
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

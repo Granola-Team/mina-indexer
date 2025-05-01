@@ -1,4 +1,4 @@
-//! Store of staged ledgers
+//! Staged ledger store trait
 
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

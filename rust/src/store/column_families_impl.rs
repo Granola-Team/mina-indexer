@@ -1,3 +1,5 @@
+//! Column family helpers impl
+
 use crate::store::{column_families::ColumnFamilyHelpers, IndexerStore};
 use speedb::ColumnFamily;
 
@@ -1459,7 +1461,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for storing staking ledger epochs
     /// ```
     /// - key: [LedgerHash] bytes
-    /// - val: epoch ([u32] BE bytes)
+    /// - val: [u32] BE bytes
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-hash-to-epoch")
@@ -1528,6 +1530,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - hash:  [StateHash] bytes
     /// - index: [u32] BE bytes
     /// - snark: [SnarkWorkSummary] serde bytes
+    /// ```
+    /// Use [block_index_key]
     fn snarks_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks")
@@ -1542,6 +1546,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - prover: [PublicKey] bytes
     /// - index:  [u32] BE bytes
     /// - snark:  [SnarkWorkSummaryWithStateHash] serde bytes
+    /// ```
+    /// Use [pk_index_key]
     fn snarks_prover_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snarks-prover")
@@ -1550,11 +1556,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing SNARK total fees by prover
     /// ```
-    /// key: prover
-    /// val: fees
-    /// where
-    /// - prover: [PublicKey] bytes
-    /// - fees:   [u64] BE bytes
+    /// key: [PublicKey] bytes
+    /// val: [u64] BE bytes
     fn snark_prover_fees_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees")
@@ -1570,7 +1573,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - epoch:   [u32] BE bytes
     /// - prover:  [PublicKey] bytes
     /// ```
-    /// Use [snark_epoch_key]
+    /// Use [snarks_pk_epoch_key]
     fn snark_prover_fees_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-epoch")
@@ -1584,6 +1587,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - prover: [PublicKey] bytes
     /// - height: [u32] BE bytes
+    /// ```
+    /// Use [pk_index_key]
     fn snark_prover_fees_historical_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-historical")
@@ -1592,11 +1597,15 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing historical SNARK epoch fee updates
     /// ```
-    /// key: {prover}{height}
+    /// key: {genesis}{epoch}{prover}{height}
     /// val: [SnarkEpochFees] serde bytes
     /// where
-    /// - prover: [PublicKey] bytes
-    /// - height: [u32] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - prover:  [PublicKey] bytes
+    /// - height:  [u32] BE bytes
+    /// ```
+    /// Use [snarks_epoch_pk_index_key]
     fn snark_prover_fees_epoch_historical_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-fees-epoch-historical")
@@ -1610,6 +1619,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// where
     /// - fees:   [u64] BE bytes
     /// - prover: [PublicKey] bytes
+    /// ```
+    /// Use [u64_prefix_key]
     fn snark_prover_total_fees_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-total-fees-sort")
@@ -1618,12 +1629,15 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting per epoch SNARK provers by total fees
     /// ```
-    /// key: {epoch}{fees}{prover}
+    /// key: {genesis}{epoch}{fees}{prover}
     /// val: b""
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - fees:   [u64] BE bytes
-    /// - prover: [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fees:    [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
+    /// ```
+    /// Use [snark_fee_epoch_sort_key]
     fn snark_prover_total_fees_epoch_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-total-fees-epoch-sort")
@@ -1632,11 +1646,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing SNARK prover max fees
     /// ```
-    /// key: prover
-    /// val: fee
-    /// where
-    /// - prover: [PublicKey] bytes
-    /// - fee:    [u64] BE bytes
+    /// key: [PublicKey] bytes
+    /// val: [u64] BE bytes
     fn snark_prover_max_fee_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-max-fee")
@@ -1645,12 +1656,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch SNARK prover max fees
     /// ```
-    /// key: {epoch}{prover}
-    /// val: fee
+    /// key: {genesis}{epoch}{prover}
+    /// val: [u64] BE bytes
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - prover: [PublicKey] bytes
-    /// - fee:    [u64] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - prover:  [PublicKey] bytes
+    /// ```
+    /// Use [snarks_pk_epoch_key]
     fn snark_prover_max_fee_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-max-fee-epoch")
@@ -1665,7 +1678,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
-    /// Use [snark_fee_sort_key]
+    /// Use [u64_prefix_key]
     fn snark_prover_max_fee_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-max-fee-sort")
@@ -1674,12 +1687,13 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting per epoch SNARK provers by max fee
     /// ```
-    /// key:{epoch}{fee}{prover}
+    /// key: {genesis}{epoch}{fee}{prover}
     /// val: b""
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - fee:    [u64] BE bytes
-    /// - prover: [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fee:     [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
     /// ```
     /// Use [snark_fee_epoch_sort_key]
     fn snark_prover_max_fee_epoch_sort_cf(&self) -> &ColumnFamily {
@@ -1690,11 +1704,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing SNARK prover min fees
     /// ```
-    /// key: prover
-    /// val: fee
-    /// where
-    /// - prover: [PublicKey] bytes
-    /// - fee:    [u64] BE bytes
+    /// key: [PublicKey] bytes
+    /// val: [u64] BE bytes
     fn snark_prover_min_fee_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-min-fee")
@@ -1703,12 +1714,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch SNARK prover min fees
     /// ```
-    /// key: {epoch}{prover}
-    /// val: fee
+    /// key: {genesis}{epoch}{prover}
+    /// val: [u64] BE bytes
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - prover: [PublicKey] bytes
-    /// - fee:    [u64] BE bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - prover:  [PublicKey] bytes
+    /// ```
+    /// Use [snarks_pk_epoch_key]
     fn snark_prover_min_fee_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-min-fee-epoch")
@@ -1723,7 +1736,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - fee:    [u64] BE bytes
     /// - prover: [PublicKey] bytes
     /// ```
-    /// Use [snark_fee_sort_key]
+    /// Use [u64_prefix_key]
     fn snark_prover_min_fee_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-min-fee-sort")
@@ -1732,12 +1745,13 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting per epoch SNARK provers by min fee
     /// ```
-    /// key: {epoch}{fee}{prover}
+    /// key: {genesis}{epoch}{fee}{prover}
     /// val: b""
     /// where
-    /// - epoch:  [u32] BE bytes
-    /// - fee:    [u64] BE bytes
-    /// - prover: [PublicKey] bytes
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fee:     [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
     /// ```
     /// Use [snark_fee_epoch_sort_key]
     fn snark_prover_min_fee_epoch_sort_cf(&self) -> &ColumnFamily {
@@ -1755,6 +1769,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - block height: [u32] BE bytes
     /// - index:        [u32] BE bytes
     /// - snark:        [SnarkWorkSummary] serde bytes
+    /// ```
+    /// Use [snark_prover_sort_key]
     fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-block-height-sort")
@@ -1770,6 +1786,8 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - global_slot: [u32] BE bytes
     /// - index:       [u32] BE bytes
     /// - snark:       [SnarkWorkSummary] serde bytes
+    /// ```
+    /// Use [ snark_prover_sort_key]
     fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("snark-prover-global-slot-sort")
@@ -1778,13 +1796,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting snark fees by block height
     /// ```
-    /// {fee}{sort}{pk}{hash}{index}
+    /// key: {fee}{sort}{pk}{hash}{index}
+    /// val: b""
     /// where
-    /// fee:   [u64] BE bytes
-    /// sort:  [u32] BE bytes
-    /// pk:    [PublicKey] bytes
-    /// hash:  [StateHash] bytes
-    /// index: [u32] BE bytes
+    /// - fee:   [u64] BE bytes
+    /// - sort:  [u32] BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// - hash:  [StateHash] bytes
+    /// - index: [u32] BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
     fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily {
@@ -1795,13 +1814,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting snark fees by global slot
     /// ```
-    /// {fee}{sort}{pk}{hash}{index}
+    /// key: {fee}{sort}{pk}{hash}{index}
+    /// val: b""
     /// where
-    /// fee:   [u64] BE bytes
-    /// sort:  [u32] BE bytes
-    /// pk:    [PublicKey] bytes
-    /// hash:  [StateHash] bytes
-    /// index: [u32] BE bytes
+    /// - fee:   [u64] BE bytes
+    /// - sort:  [u32] BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// - hash:  [StateHash] bytes
+    /// - index: [u32] BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
     fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily {

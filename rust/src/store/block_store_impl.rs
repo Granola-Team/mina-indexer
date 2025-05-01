@@ -1,3 +1,5 @@
+//! Block store impl
+
 use super::{
     column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, username::UsernameStore, DbUpdate,
     IndexerStore, Result,

@@ -1,3 +1,5 @@
+//! Version store impl
+
 use super::{
     fixed_keys::FixedKeys,
     version::{IndexerStoreVersion, VersionStore},

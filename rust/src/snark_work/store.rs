@@ -1,3 +1,5 @@
+//! SNARK store trait
+
 use super::{SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},

@@ -1,3 +1,5 @@
+//! Version store trait
+
 use crate::constants::GIT_COMMIT_HASH;
 use serde::{Deserialize, Serialize};
 

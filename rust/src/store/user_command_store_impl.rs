@@ -1,4 +1,4 @@
-//! User command store trait implementation
+//! User command store impl
 
 use super::{
     column_families::ColumnFamilyHelpers, fixed_keys::FixedKeys, user_command_db_key_pk,
