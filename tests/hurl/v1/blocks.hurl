@@ -695,3 +695,35 @@ jsonpath "$.data.blocks" count == 1
 jsonpath "$.data.blocks[0].epoch_num_slots_produced" == 120
 
 duration < 1000
+
+#
+# Per epoch blocks query
+#
+
+POST {{url}}
+```graphql
+{
+  blocks(
+    limit: 1
+    query: { protocolState: { consensusState: { epoch: 0 } } }
+  ) {
+    stateHash
+    protocolState {
+      consensusState {
+        epoch
+      }
+    }
+  }
+}
+```
+HTTP 200
+[Asserts]
+
+# total data count
+jsonpath "$.data.blocks" count == 1
+
+# only datum
+jsonpath "$.data.blocks[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
+jsonpath "$.data.blocks[0].protocolState.consensusState.epoch" == 0
+
+duration < 1000
