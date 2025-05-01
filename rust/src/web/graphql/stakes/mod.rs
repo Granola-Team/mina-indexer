@@ -648,7 +648,7 @@ impl StakesLedgerAccountWithMeta {
             .get_block_production_pk_supercharged_total_count(pk)
             .expect("pk total num supercharged blocks");
         let pk_epoch_num_snarks = db
-            .get_snarks_pk_epoch_count(pk, Some(epoch))
+            .get_snarks_pk_epoch_count(pk, Some(epoch), Some(&genesis_state_hash))
             .expect("pk epoch num snarks");
         let pk_total_num_snarks = db
             .get_snarks_pk_total_count(pk)

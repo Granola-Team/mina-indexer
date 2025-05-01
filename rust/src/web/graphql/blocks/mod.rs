@@ -806,7 +806,9 @@ pub fn get_counts(
         db.get_block_production_supercharged_epoch_count(epoch, genesis_state_hash)?;
     let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
-    let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
+    let epoch_num_snarks = db
+        .get_snarks_epoch_count(epoch, genesis_state_hash)
+        .expect("epoch SNARK count");
     let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
 
     let epoch_num_user_commands = db

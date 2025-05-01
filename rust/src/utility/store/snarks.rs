@@ -7,12 +7,30 @@ use crate::{
 
 /// Key format
 /// ```
+/// {genesis}{epoch}
+/// where
+/// - genesis: [StateHash] bytes
+/// - epoch:   [u32] BE bytes
+pub fn snarks_epoch_key(
+    genesis_state_hash: &StateHash,
+    epoch: u32,
+) -> [u8; StateHash::LEN + U32_LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN];
+
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..].copy_from_slice(&epoch.to_be_bytes());
+
+    key
+}
+
+/// Key format
+/// ```
 /// {genesis}{epoch}{prover}
 /// where
 /// - genesis: [StateHash] bytes
 /// - epoch:   [u32] BE bytes
 /// - prover:  [PublicKey] bytes
-pub fn snark_epoch_key(
+pub fn snarks_pk_epoch_key(
     genesis_state_hash: &StateHash,
     epoch: u32,
     pk: &PublicKey,
@@ -22,6 +40,30 @@ pub fn snark_epoch_key(
     key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
     key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
     key[StateHash::LEN..][U32_LEN..].copy_from_slice(pk.0.as_bytes());
+
+    key
+}
+
+/// Key format
+/// ```
+/// {genesis}{epoch}{prover}{height}
+/// where
+/// - genesis: [StateHash] bytes
+/// - epoch:   [u32] BE bytes
+/// - prover:  [PublicKey] bytes
+/// - height:  [u32] BE bytes
+pub fn snarks_epoch_pk_height_key(
+    genesis_state_hash: &StateHash,
+    epoch: u32,
+    prover: &PublicKey,
+    block_height: u32,
+) -> [u8; StateHash::LEN + U32_LEN + PublicKey::LEN + U32_LEN] {
+    let mut key = [0; StateHash::LEN + U32_LEN + PublicKey::LEN + U32_LEN];
+
+    key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..][U32_LEN..][..PublicKey::LEN].copy_from_slice(prover.0.as_bytes());
+    key[StateHash::LEN..][U32_LEN..][PublicKey::LEN..].copy_from_slice(&block_height.to_be_bytes());
 
     key
 }
@@ -111,18 +153,55 @@ mod tests {
     const GEN_SIZE: usize = 1000;
 
     #[test]
-    fn snark_epoch_key() {
+    fn snarks_epoch_key() {
+        let g = &mut Gen::new(GEN_SIZE);
+
+        let genesis_state_hash = StateHash::arbitrary(g);
+        let epoch = u32::arbitrary(g);
+
+        let key = super::snarks_epoch_key(&genesis_state_hash, epoch);
+
+        assert_eq!(key[..StateHash::LEN], *genesis_state_hash.0.as_bytes());
+        assert_eq!(key[StateHash::LEN..], epoch.to_be_bytes());
+    }
+
+    #[test]
+    fn snarks_pk_epoch_key() {
         let g = &mut Gen::new(GEN_SIZE);
 
         let genesis_state_hash = StateHash::arbitrary(g);
         let epoch = u32::arbitrary(g);
         let prover = PublicKey::arbitrary(g);
 
-        let key = super::snark_epoch_key(&genesis_state_hash, epoch, &prover);
+        let key = super::snarks_pk_epoch_key(&genesis_state_hash, epoch, &prover);
 
         assert_eq!(key[..StateHash::LEN], *genesis_state_hash.0.as_bytes());
         assert_eq!(key[StateHash::LEN..][..U32_LEN], epoch.to_be_bytes());
         assert_eq!(key[StateHash::LEN..][U32_LEN..], *prover.0.as_bytes());
+    }
+
+    #[test]
+    fn snarks_epoch_pk_height_key() {
+        let g = &mut Gen::new(GEN_SIZE);
+
+        let genesis_state_hash = StateHash::arbitrary(g);
+        let epoch = u32::arbitrary(g);
+        let prover = PublicKey::arbitrary(g);
+        let block_height = u32::arbitrary(g);
+
+        let key =
+            super::snarks_epoch_pk_height_key(&genesis_state_hash, epoch, &prover, block_height);
+
+        assert_eq!(key[..StateHash::LEN], *genesis_state_hash.0.as_bytes());
+        assert_eq!(key[StateHash::LEN..][..U32_LEN], epoch.to_be_bytes());
+        assert_eq!(
+            key[StateHash::LEN..][U32_LEN..][..PublicKey::LEN],
+            *prover.0.as_bytes()
+        );
+        assert_eq!(
+            key[StateHash::LEN..][U32_LEN..][PublicKey::LEN..],
+            block_height.to_be_bytes()
+        );
     }
 
     #[test]

@@ -381,7 +381,7 @@ pub async fn get_blockchain_summary(
                 .expect("unique block producers");
 
         let epoch_num_snarks = store
-            .get_snarks_epoch_count(None)
+            .get_snarks_epoch_count(None, None)
             .expect("epoch snarks count");
         let total_num_snarks = store.get_snarks_total_count().expect("total snarks count");
         let total_num_canonical_snarks = store

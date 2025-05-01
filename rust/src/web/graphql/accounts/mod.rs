@@ -442,7 +442,7 @@ impl AccountWithMeta {
                 .get_block_production_pk_total_count(pk)
                 .expect("pk total block count"),
             pk_epoch_num_snarks: db
-                .get_snarks_pk_epoch_count(pk, None)
+                .get_snarks_pk_epoch_count(pk, None, None)
                 .expect("pk epoch snark count"),
             pk_total_num_snarks: db
                 .get_snarks_pk_total_count(pk)

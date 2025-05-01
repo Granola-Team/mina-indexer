@@ -79,7 +79,9 @@ pub async fn get_account(
                 .unwrap_or_default(),
 
             // SNARKs
-            epoch_num_snarks: db.get_snarks_pk_epoch_count(&pk, None).unwrap_or_default(),
+            epoch_num_snarks: db
+                .get_snarks_pk_epoch_count(&pk, None, None)
+                .unwrap_or_default(),
             total_num_snarks: db.get_snarks_pk_total_count(&pk).unwrap_or_default(),
 
             // all user commands

@@ -84,23 +84,23 @@ impl TopSnarkersQueryRoot {
         let mut snarkers = vec![];
         let iter = match sort_by.unwrap_or_default() {
             MaxFeeAsc => db.snark_prover_max_fee_epoch_iterator(
-                &genesis_state_hash,
                 epoch,
+                &genesis_state_hash,
                 Direction::Forward,
             ),
             MaxFeeDesc => db.snark_prover_max_fee_epoch_iterator(
-                &genesis_state_hash,
                 epoch,
+                &genesis_state_hash,
                 Direction::Reverse,
             ),
             TotalFeesAsc => db.snark_prover_total_fees_epoch_iterator(
-                &genesis_state_hash,
                 epoch,
+                &genesis_state_hash,
                 Direction::Forward,
             ),
             TotalFeesDesc => db.snark_prover_total_fees_epoch_iterator(
-                &genesis_state_hash,
                 epoch,
+                &genesis_state_hash,
                 Direction::Reverse,
             ),
         };
@@ -118,30 +118,16 @@ impl TopSnarkersQueryRoot {
             let username = db.get_username(&pk)?.unwrap_or_default().0;
 
             let total_fees = db
-                .get_snark_prover_epoch_fees(
-                    &pk,
-                    Some(genesis_state_hash.clone()),
-                    Some(epoch),
-                    None,
-                )?
+                .get_snark_prover_epoch_fees(&pk, Some(epoch), Some(&genesis_state_hash), None)?
                 .expect("total fees");
             let min_fee = db
-                .get_snark_prover_epoch_min_fee(
-                    &pk,
-                    Some(genesis_state_hash.clone()),
-                    Some(epoch),
-                    None,
-                )?
+                .get_snark_prover_epoch_min_fee(&pk, Some(epoch), Some(&genesis_state_hash), None)?
                 .expect("min fee");
             let max_fee = db
-                .get_snark_prover_epoch_max_fee(
-                    &pk,
-                    Some(genesis_state_hash.clone()),
-                    Some(epoch),
-                    None,
-                )?
+                .get_snark_prover_epoch_max_fee(&pk, Some(epoch), Some(&genesis_state_hash), None)?
                 .expect("max fee");
-            let snarks_sold = db.get_snarks_pk_epoch_count(&pk, Some(epoch))?;
+            let snarks_sold =
+                db.get_snarks_pk_epoch_count(&pk, Some(epoch), Some(&genesis_state_hash))?;
 
             snarkers.push(TopSnarker {
                 username,

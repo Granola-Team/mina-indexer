@@ -225,7 +225,8 @@ impl SnarkQueryRoot {
                             snark: (
                                 snark,
                                 state_hash,
-                                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                db.get_snarks_epoch_count(None, None)
+                                    .expect("epoch snarks count"),
                                 db.get_snarks_total_count().expect("total snarks count"),
                             )
                                 .into(),
@@ -293,7 +294,8 @@ impl SnarkQueryRoot {
                             snark: (
                                 snark,
                                 state_hash,
-                                db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                db.get_snarks_epoch_count(None, None)
+                                    .expect("epoch snarks count"),
                                 db.get_snarks_total_count().expect("total snarks count"),
                             )
                                 .into(),
@@ -375,7 +377,8 @@ impl SnarkQueryRoot {
                                 snark: (
                                     snark,
                                     state_hash.clone(),
-                                    db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                                    db.get_snarks_epoch_count(None, None)
+                                        .expect("epoch snarks count"),
                                     db.get_snarks_total_count().expect("total snarks count"),
                                 )
                                     .into(),
@@ -425,7 +428,8 @@ impl SnarkQueryRoot {
                         snark: (
                             snark,
                             state_hash.clone(),
-                            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+                            db.get_snarks_epoch_count(None, None)
+                                .expect("epoch snarks count"),
                             db.get_snarks_total_count().expect("total snarks count"),
                         )
                             .into(),
@@ -459,7 +463,8 @@ fn snark_summary_matches_query(
         canonical,
         snark: (
             snark,
-            db.get_snarks_epoch_count(None).expect("epoch snarks count"),
+            db.get_snarks_epoch_count(None, None)
+                .expect("epoch snarks count"),
             db.get_snarks_total_count().expect("total snarks count"),
         )
             .into(),
