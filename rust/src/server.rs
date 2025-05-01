@@ -426,18 +426,15 @@ async fn run_indexer<P: AsRef<Path>>(
                 }
             }
 
-            // fetch new blocks
-            _ = tokio::time::sleep(std::time::Duration::from_secs(fetch_new_blocks_delay.unwrap_or(180))) => {
+            // fetch new blocks & recover missing blocks
+            _ = tokio::time::sleep(std::time::Duration::from_secs(
+                fetch_new_blocks_delay.unwrap_or(180).min(missing_block_recovery_delay.unwrap_or(180))
+            )) => {
                 if let Some(ref blocks_dir) = blocks_dir {
                     if let Some(ref fetch_new_blocks_exe) = fetch_new_blocks_exe {
                         fetch_new_blocks(&state, &blocks_dir, fetch_new_blocks_exe).await?
                     }
-                }
-            }
 
-            // recover missing blocks
-            _ = tokio::time::sleep(std::time::Duration::from_secs(missing_block_recovery_delay.unwrap_or(180))) => {
-                if let Some(ref blocks_dir) = blocks_dir {
                     if let Some(ref missing_block_recovery_exe) = missing_block_recovery_exe {
                         recover_missing_blocks(&state, &blocks_dir, missing_block_recovery_exe, missing_block_recovery_batch).await?
                     }
