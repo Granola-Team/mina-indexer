@@ -18,7 +18,7 @@ use crate::{
         },
     },
 };
-use async_graphql::{self, Object, Result};
+use async_graphql::{self, Context, Object, Result};
 use block::{Block, BlockSortByInput};
 use std::sync::Arc;
 
@@ -34,14 +34,24 @@ impl BlocksQueryRoot {
     #[graphql(cache_control(max_age = 3600))]
     async fn block(
         &self,
-        ctx: &async_graphql::Context<'_>,
+        ctx: &Context<'_>,
         query: Option<BlockQueryInput>,
     ) -> Result<Option<Block>> {
         let db = db(ctx);
 
+        let epoch = query.as_ref().and_then(|q| {
+            q.protocol_state
+                .as_ref()
+                .and_then(|ps| ps.consensus_state.as_ref().and_then(|cs| cs.epoch))
+        });
+        let genesis_state_hash = query
+            .as_ref()
+            .and_then(|q| q.genesis_state_hash.clone())
+            .map(Into::into);
+
         // no query filters => get the best block
         if query.is_none() {
-            let counts = get_counts(db)?;
+            let counts = get_counts(db, epoch, genesis_state_hash.as_ref())?;
 
             return Ok(db
                 .get_best_block()
@@ -65,7 +75,11 @@ impl BlocksQueryRoot {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
-            let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
+            let block = Block::from_precomputed(
+                db,
+                &pcb,
+                get_counts(db, epoch, genesis_state_hash.as_ref())?,
+            );
 
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
@@ -81,7 +95,11 @@ impl BlocksQueryRoot {
         {
             let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
-            let block = Block::from_precomputed(db, &pcb, get_counts(db)?);
+            let block = Block::from_precomputed(
+                db,
+                &pcb,
+                get_counts(db, epoch, genesis_state_hash.as_ref())?,
+            );
 
             if query.as_ref().is_none_or(|q| q.matches(&block)) {
                 return Ok(Some(block));
@@ -118,7 +136,17 @@ impl BlocksQueryRoot {
             };
         }
 
-        let counts = get_counts(db)?;
+        let epoch = query.as_ref().and_then(|q| {
+            q.protocol_state
+                .as_ref()
+                .and_then(|ps| ps.consensus_state.as_ref().and_then(|cs| cs.epoch))
+        });
+        let genesis_state_hash = query
+            .as_ref()
+            .and_then(|q| q.genesis_state_hash.clone())
+            .map(Into::into);
+
+        let counts = get_counts(db, epoch, genesis_state_hash.as_ref())?;
         let mut blocks = Vec::new();
         let sort_by = sort_by.unwrap_or(BlockHeightDesc);
 
@@ -495,6 +523,7 @@ impl BlockQueryInput {
             state_hash,
             block_height: blockchain_length,
             global_slot_since_genesis,
+            genesis_state_hash,
             block_height_gt,
             block_height_gte,
             block_height_lt,
@@ -542,7 +571,7 @@ impl BlockQueryInput {
             return false;
         }
 
-        // epoch slot
+        // slot
         if protocol_state
             .as_ref()
             .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
@@ -550,6 +579,23 @@ impl BlockQueryInput {
             .is_some_and(|slot| block.block.protocol_state.consensus_state.slot != slot)
         {
             return false;
+        }
+
+        // epoch
+        if protocol_state
+            .as_ref()
+            .and_then(|protocol_state| protocol_state.consensus_state.as_ref())
+            .and_then(|consensus_state| consensus_state.epoch)
+            .is_some_and(|epoch| block.block.protocol_state.consensus_state.epoch != epoch)
+        {
+            return false;
+        }
+
+        // genesis state hash
+        if let Some(genesis_state_hash) = genesis_state_hash {
+            if block.block.genesis_state_hash != *genesis_state_hash {
+                return false;
+            }
         }
 
         // block_height_gt(e) & block_height_lt(e)
@@ -744,15 +790,20 @@ fn precomputed_matches_query(
     }
 }
 
-pub fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
-    let epoch_num_blocks = db.get_block_production_epoch_count(None, None)?;
+pub fn get_counts(
+    db: &Arc<IndexerStore>,
+    epoch: Option<u32>,
+    genesis_state_hash: Option<&StateHash>,
+) -> Result<[u32; 15]> {
+    let epoch_num_blocks = db.get_block_production_epoch_count(epoch, genesis_state_hash)?;
     let total_num_blocks = db.get_block_production_total_count()?;
 
-    let epoch_num_canonical_blocks = db.get_block_production_canonical_epoch_count(None, None)?;
+    let epoch_num_canonical_blocks =
+        db.get_block_production_canonical_epoch_count(epoch, genesis_state_hash)?;
     let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
 
     let epoch_num_supercharged_blocks =
-        db.get_block_production_supercharged_epoch_count(None, None)?;
+        db.get_block_production_supercharged_epoch_count(epoch, genesis_state_hash)?;
     let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
     let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
@@ -779,7 +830,7 @@ pub fn get_counts(db: &Arc<IndexerStore>) -> Result<[u32; 15]> {
         .get_internal_commands_total_count()
         .expect("total internal command count");
 
-    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None, None)?;
+    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(epoch, genesis_state_hash)?;
 
     Ok([
         epoch_num_blocks,

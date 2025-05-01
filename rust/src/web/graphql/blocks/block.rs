@@ -86,14 +86,17 @@ pub enum BlockSortByInput {
 
 #[derive(Default, SimpleObject, Serialize)]
 pub struct BlockWithoutCanonicity {
-    /// Value state_hash
+    /// Value state hash
     pub state_hash: String,
 
-    /// Value block_height
+    /// Value block height
     pub block_height: u32,
 
-    /// Value global_slot_since_genesis
+    /// Value global slot since genesis
     pub global_slot_since_genesis: u32,
+
+    /// Value genesis state hash
+    pub genesis_state_hash: String,
 
     /// The public_key for the winner account
     pub winner_account: PK,
@@ -181,9 +184,6 @@ pub struct ConsensusState {
 
     /// Value block height
     pub block_height: u32,
-
-    /// Value epoch count
-    pub epoch_count: u32,
 
     /// Value epoch count
     pub epoch: u32,
@@ -391,8 +391,7 @@ impl BlockWithoutCanonicity {
         let total_currency = block.total_currency();
         let blockchain_length = block.blockchain_length();
         let block_height = blockchain_length;
-        let epoch_count = block.epoch_count();
-        let epoch = epoch_count;
+        let epoch = block.epoch_count();
         let has_ancestor_in_same_checkpoint_window = block.has_ancestor_in_same_checkpoint_window();
         let last_vrf_output = block.last_vrf_output();
         let min_window_density = block.min_window_density();
@@ -443,6 +442,7 @@ impl BlockWithoutCanonicity {
             state_hash: block.state_hash().0,
             block_height: block.blockchain_length(),
             global_slot_since_genesis: block.global_slot_since_genesis(),
+            genesis_state_hash: block.genesis_state_hash().0,
             coinbase_receiver: PK {
                 public_key: block.coinbase_receiver().0,
             },
@@ -467,7 +467,6 @@ impl BlockWithoutCanonicity {
                     blockchain_length,
                     block_height,
                     epoch,
-                    epoch_count,
                     has_ancestor_in_same_checkpoint_window,
                     last_vrf_output,
                     min_window_density,
