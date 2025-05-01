@@ -20,6 +20,7 @@ use crate::{
     ledger::token::TokenAddress,
     store::zkapp::tokens::ZkappTokenStore,
     utility::store::{
+        block::{epoch_key, epoch_pk_key},
         command::user::{
             pk_txn_sort_key, pk_txn_sort_key_nonce, token_txn_sort_key, txn_block_key,
             txn_hash_of_key, txn_sort_key,
@@ -42,6 +43,8 @@ impl UserCommandStore for IndexerStore {
 
         let epoch = block.epoch_count();
         let state_hash = block.state_hash();
+        let genesis_state_hash = block.genesis_state_hash();
+
         let user_commands = block.commands();
         let zkapp_commands = block.zkapp_commands();
 
@@ -135,10 +138,10 @@ impl UserCommandStore for IndexerStore {
             }
 
             // increment counts
-            self.increment_user_commands_counts(command, epoch)?;
+            self.increment_user_commands_counts(command, epoch, &genesis_state_hash)?;
 
             if is_zkapp {
-                self.increment_zkapp_commands_counts(command, epoch)?;
+                self.increment_zkapp_commands_counts(command, epoch, &genesis_state_hash)?;
             }
 
             // add: `txn_hash -> global_slot`
@@ -752,46 +755,96 @@ impl UserCommandStore for IndexerStore {
             .map(from_be_bytes))
     }
 
-    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
+    fn get_user_commands_epoch_count(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
-        trace!("Getting user command count epoch {epoch}");
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting user command count epoch {} genesis {}",
+            epoch,
+            genesis_state_hash,
+        );
+
         Ok(self
             .database
-            .get_cf(self.user_commands_epoch_cf(), epoch.to_be_bytes())?
+            .get_cf(
+                self.user_commands_epoch_cf(),
+                epoch_key(genesis_state_hash, epoch),
+            )?
             .map_or(0, from_be_bytes))
     }
 
-    fn get_zkapp_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32> {
+    fn get_zkapp_commands_epoch_count(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
-        trace!("Getting zkapp command count epoch {epoch}");
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting zkapp command count epoch {} genesis {}",
+            epoch,
+            genesis_state_hash,
+        );
+
         Ok(self
             .database
             .get_cf(self.zkapp_commands_epoch_cf(), epoch.to_be_bytes())?
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_user_commands_epoch_count(&self, epoch: u32) -> Result<()> {
-        trace!("Incrementing user command count epoch {epoch}");
-        let old = self.get_user_commands_epoch_count(Some(epoch))?;
+    fn increment_user_commands_epoch_count(
+        &self,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()> {
+        trace!(
+            "Incrementing user command count epoch {} genesis {}",
+            epoch,
+            genesis_state_hash,
+        );
+
+        let old = self.get_user_commands_epoch_count(Some(epoch), Some(genesis_state_hash))?;
         Ok(self.database.put_cf(
             self.user_commands_epoch_cf(),
-            epoch.to_be_bytes(),
+            epoch_key(genesis_state_hash, epoch),
             (old + 1).to_be_bytes(),
         )?)
     }
 
-    fn increment_zkapp_commands_epoch_count(&self, epoch: u32) -> Result<()> {
+    fn increment_zkapp_commands_epoch_count(
+        &self,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()> {
         trace!("Incrementing zkapp command count epoch {epoch}");
-        let old = self.get_zkapp_commands_epoch_count(Some(epoch))?;
+
+        let old = self.get_zkapp_commands_epoch_count(Some(epoch), Some(genesis_state_hash))?;
         Ok(self.database.put_cf(
             self.zkapp_commands_epoch_cf(),
-            epoch.to_be_bytes(),
+            epoch_key(genesis_state_hash, epoch),
             (old + 1).to_be_bytes(),
         )?)
     }
 
     fn get_user_commands_total_count(&self) -> Result<u32> {
         trace!("Getting user command total");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_USER_COMMANDS_KEY)?
@@ -800,6 +853,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_zkapp_commands_total_count(&self) -> Result<u32> {
         trace!("Getting zkapp command total");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_ZKAPP_COMMANDS_KEY)?
@@ -808,6 +862,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_user_commands_total_count(&self) -> Result<()> {
         trace!("Incrementing user command total");
+
         let old = self.get_user_commands_total_count()?;
         Ok(self
             .database
@@ -816,52 +871,117 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_zkapp_commands_total_count(&self) -> Result<()> {
         trace!("Incrementing zkapp command total");
+
         let old = self.get_zkapp_commands_total_count()?;
         Ok(self
             .database
             .put(Self::TOTAL_NUM_ZKAPP_COMMANDS_KEY, (old + 1).to_be_bytes())?)
     }
 
-    fn get_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32> {
+    fn get_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
-        trace!("Getting user command epoch {epoch} num {pk}");
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting user command count pk {} epoch {} genesis {}",
+            pk,
+            epoch,
+            genesis_state_hash,
+        );
+
         Ok(self
             .database
-            .get_cf(self.user_commands_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
+            .get_cf(
+                self.user_commands_pk_epoch_cf(),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
+            )?
             .map_or(0, from_be_bytes))
     }
 
-    fn get_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32> {
+    fn get_zkapp_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32> {
         let epoch = epoch.unwrap_or(self.get_current_epoch()?);
-        trace!("Getting zkapp command epoch {epoch} num {pk}");
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
+
+        trace!(
+            "Getting zkapp command count pk {} epoch {} genesis {}",
+            pk,
+            epoch,
+            genesis_state_hash,
+        );
+
         Ok(self
             .database
             .get_cf(self.zkapp_commands_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
             .map_or(0, from_be_bytes))
     }
 
-    fn increment_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()> {
-        trace!("Incrementing pk epoch {epoch} user commands count {pk}");
-        let old = self.get_user_commands_pk_epoch_count(pk, Some(epoch))?;
+    fn increment_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()> {
+        trace!(
+            "Incrementing user command count pk {} epoch {} genesis {}",
+            pk,
+            epoch,
+            genesis_state_hash,
+        );
+
+        let old =
+            self.get_user_commands_pk_epoch_count(pk, Some(epoch), Some(genesis_state_hash))?;
         Ok(self.database.put_cf(
             self.user_commands_pk_epoch_cf(),
-            u32_prefix_key(epoch, pk),
+            epoch_pk_key(genesis_state_hash, epoch, pk),
             (old + 1).to_be_bytes(),
         )?)
     }
 
-    fn increment_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()> {
-        trace!("Incrementing pk epoch {epoch} zkapp commands count {pk}");
-        let old = self.get_zkapp_commands_pk_epoch_count(pk, Some(epoch))?;
+    fn increment_zkapp_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()> {
+        trace!(
+            "Incrementing zkapp command count pk {} epoch {} genesis {}",
+            pk,
+            epoch,
+            genesis_state_hash,
+        );
+
+        let old =
+            self.get_zkapp_commands_pk_epoch_count(pk, Some(epoch), Some(genesis_state_hash))?;
         Ok(self.database.put_cf(
             self.zkapp_commands_pk_epoch_cf(),
-            u32_prefix_key(epoch, pk),
+            epoch_pk_key(genesis_state_hash, epoch, pk),
             (old + 1).to_be_bytes(),
         )?)
     }
 
     fn get_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total user commands count {pk}");
+
         Ok(self
             .database
             .get_cf(self.user_commands_pk_total_cf(), pk.0.as_bytes())?
@@ -870,6 +990,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_zkapp_commands_pk_total_count(&self, pk: &PublicKey) -> Result<u32> {
         trace!("Getting pk total zkapp commands count {pk}");
+
         Ok(self
             .database
             .get_cf(self.zkapp_commands_pk_total_cf(), pk.0.as_bytes())?
@@ -878,6 +999,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()> {
         trace!("Incrementing user command pk total num {pk}");
+
         let old = self.get_user_commands_pk_total_count(pk)?;
         Ok(self.database.put_cf(
             self.user_commands_pk_total_cf(),
@@ -888,6 +1010,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_zkapp_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()> {
         trace!("Incrementing zkapp command pk total num {pk}");
+
         let old = self.get_zkapp_commands_pk_total_count(pk)?;
         Ok(self.database.put_cf(
             self.zkapp_commands_pk_total_cf(),
@@ -903,11 +1026,13 @@ impl UserCommandStore for IndexerStore {
         batch: &mut WriteBatch,
     ) -> Result<()> {
         trace!("Setting block user command count {state_hash} -> {count}");
+
         batch.put_cf(
             self.block_user_command_counts_cf(),
             state_hash.0.as_bytes(),
             count.to_be_bytes(),
         );
+
         Ok(())
     }
 
@@ -918,16 +1043,19 @@ impl UserCommandStore for IndexerStore {
         batch: &mut WriteBatch,
     ) -> Result<()> {
         trace!("Setting block zkapp command count {state_hash} -> {count}");
+
         batch.put_cf(
             self.block_zkapp_command_counts_cf(),
             state_hash.0.as_bytes(),
             count.to_be_bytes(),
         );
+
         Ok(())
     }
 
     fn get_block_user_commands_count(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block user command count {state_hash}");
+
         Ok(self
             .database
             .get_cf(self.block_user_command_counts_cf(), state_hash.0.as_bytes())?
@@ -936,6 +1064,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_block_zkapp_commands_count(&self, state_hash: &StateHash) -> Result<Option<u32>> {
         trace!("Getting block zkapp command count {state_hash}");
+
         Ok(self
             .database
             .get_cf(
@@ -949,6 +1078,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
+        genesis_state_hash: &StateHash,
     ) -> Result<()> {
         if command.is_applied() {
             self.increment_applied_user_commands_count(1)?;
@@ -958,19 +1088,19 @@ impl UserCommandStore for IndexerStore {
 
         // sender epoch & total
         let sender = command.sender();
-        self.increment_user_commands_pk_epoch_count(&sender, epoch)?;
+        self.increment_user_commands_pk_epoch_count(&sender, epoch, genesis_state_hash)?;
         self.increment_user_commands_pk_total_count(&sender)?;
 
         // receiver epoch & total
         for receiver in command.receiver() {
             if sender != receiver {
-                self.increment_user_commands_pk_epoch_count(&receiver, epoch)?;
+                self.increment_user_commands_pk_epoch_count(&receiver, epoch, genesis_state_hash)?;
                 self.increment_user_commands_pk_total_count(&receiver)?;
             }
         }
 
         // epoch & total counts
-        self.increment_user_commands_epoch_count(epoch)?;
+        self.increment_user_commands_epoch_count(epoch, genesis_state_hash)?;
         self.increment_user_commands_total_count()
     }
 
@@ -978,6 +1108,7 @@ impl UserCommandStore for IndexerStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
+        genesis_state_hash: &StateHash,
     ) -> Result<()> {
         if command.is_applied() {
             self.increment_applied_zkapp_commands_count(1)?;
@@ -987,24 +1118,25 @@ impl UserCommandStore for IndexerStore {
 
         // sender epoch & total
         let sender = command.sender();
-        self.increment_zkapp_commands_pk_epoch_count(&sender, epoch)?;
+        self.increment_zkapp_commands_pk_epoch_count(&sender, epoch, genesis_state_hash)?;
         self.increment_zkapp_commands_pk_total_count(&sender)?;
 
         // receiver epoch & total
         for receiver in command.receiver() {
             if sender != receiver {
-                self.increment_zkapp_commands_pk_epoch_count(&receiver, epoch)?;
+                self.increment_zkapp_commands_pk_epoch_count(&receiver, epoch, genesis_state_hash)?;
                 self.increment_zkapp_commands_pk_total_count(&receiver)?;
             }
         }
 
         // epoch & total counts
-        self.increment_zkapp_commands_epoch_count(epoch)?;
+        self.increment_zkapp_commands_epoch_count(epoch, genesis_state_hash)?;
         self.increment_zkapp_commands_total_count()
     }
 
     fn get_applied_user_commands_count(&self) -> Result<u32> {
         trace!("Getting applied user command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY)?
@@ -1013,6 +1145,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_applied_zkapp_commands_count(&self) -> Result<u32> {
         trace!("Getting applied zkapp command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_APPLIED_ZKAPP_COMMANDS_KEY)?
@@ -1021,6 +1154,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_failed_user_commands_count(&self) -> Result<u32> {
         trace!("Getting failed user command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY)?
@@ -1029,6 +1163,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_failed_zkapp_commands_count(&self) -> Result<u32> {
         trace!("Getting failed zkapp command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_FAILED_ZKAPP_COMMANDS_KEY)?
@@ -1037,6 +1172,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_applied_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing applied user command count");
+
         let old = self.get_applied_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY,
@@ -1046,6 +1182,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_applied_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing applied zkapp command count");
+
         let old = self.get_applied_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_APPLIED_ZKAPP_COMMANDS_KEY,
@@ -1055,6 +1192,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_failed_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing failed user command count");
+
         let old = self.get_failed_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY,
@@ -1064,6 +1202,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_failed_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing failed zkapp command count");
+
         let old = self.get_failed_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_FAILED_ZKAPP_COMMANDS_KEY,
@@ -1073,6 +1212,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_applied_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing applied user command count");
+
         let old = self.get_applied_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_APPLIED_USER_COMMANDS_KEY,
@@ -1082,6 +1222,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_applied_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing applied zkapp command count");
+
         let old = self.get_applied_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_APPLIED_ZKAPP_COMMANDS_KEY,
@@ -1091,6 +1232,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_failed_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing failed user command count");
+
         let old = self.get_failed_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_FAILED_USER_COMMANDS_KEY,
@@ -1100,6 +1242,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_failed_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing failed zkapp command count");
+
         let old = self.get_failed_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_FAILED_ZKAPP_COMMANDS_KEY,
@@ -1111,6 +1254,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_canonical_user_commands_count(&self) -> Result<u32> {
         trace!("Getting canonical user command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY)?
@@ -1119,6 +1263,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_canonical_zkapp_commands_count(&self) -> Result<u32> {
         trace!("Getting canonical zkapp command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_CANONICAL_ZKAPP_COMMANDS_KEY)?
@@ -1127,6 +1272,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing canonical user command count");
+
         let old = self.get_canonical_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY,
@@ -1136,6 +1282,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_canonical_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing canonical zkapp command count");
+
         let old = self.get_canonical_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_ZKAPP_COMMANDS_KEY,
@@ -1145,6 +1292,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing canonical user command count");
+
         let old = self.get_canonical_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_USER_COMMANDS_KEY,
@@ -1154,6 +1302,7 @@ impl UserCommandStore for IndexerStore {
 
     fn decrement_canonical_zkapp_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Decrementing canonical zkapp command count");
+
         let old = self.get_canonical_zkapp_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_CANONICAL_ZKAPP_COMMANDS_KEY,
@@ -1165,6 +1314,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_applied_canonical_user_commands_count(&self) -> Result<u32> {
         trace!("Getting applied canonical user command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY)?
@@ -1173,6 +1323,7 @@ impl UserCommandStore for IndexerStore {
 
     fn get_applied_canonical_zkapp_commands_count(&self) -> Result<u32> {
         trace!("Getting applied canonical zkapp command count");
+
         Ok(self
             .database
             .get(Self::TOTAL_NUM_APPLIED_CANONICAL_ZKAPP_COMMANDS_KEY)?
@@ -1181,6 +1332,7 @@ impl UserCommandStore for IndexerStore {
 
     fn increment_applied_canonical_user_commands_count(&self, incr: u32) -> Result<()> {
         trace!("Incrementing applied canonical user command count");
+
         let old = self.get_applied_canonical_user_commands_count()?;
         Ok(self.database.put(
             Self::TOTAL_NUM_APPLIED_CANONICAL_USER_COMMANDS_KEY,
@@ -1385,17 +1537,19 @@ mod tests {
 
     #[test]
     fn increment_non_zkapp_commands_counts() -> Result<()> {
-        let indexer = create_indexer_store()?;
+        let store = create_indexer_store()?;
 
-        let epoch = 1;
         let path = Path::new("./tests/data/misc_blocks/mainnet-278424-3NLbUZF8568pK56NJuSpCkfLTQTKpoiNiruju1Hpr6qpoAbuN9Yr.json");
         let pcb = PrecomputedBlock::parse_file(path, PcbVersion::V1)?;
 
         for (num, cmd) in pcb.zkapp_commands().iter().enumerate() {
-            indexer.increment_user_commands_counts(cmd, epoch)?;
+            let epoch = pcb.epoch_count();
+            let genesis_state_hash = pcb.genesis_state_hash();
 
-            assert_eq!(indexer.get_applied_user_commands_count()?, num as u32 + 1);
-            assert_eq!(indexer.get_failed_user_commands_count()?, 0);
+            store.increment_user_commands_counts(cmd, epoch, &genesis_state_hash)?;
+
+            assert_eq!(store.get_applied_user_commands_count()?, num as u32 + 1);
+            assert_eq!(store.get_failed_user_commands_count()?, 0);
         }
 
         Ok(())
@@ -1403,17 +1557,19 @@ mod tests {
 
     #[test]
     fn increment_zkapp_commands_counts() -> Result<()> {
-        let indexer = create_indexer_store()?;
+        let store = create_indexer_store()?;
 
-        let epoch = 0;
         let path = Path::new("./tests/data/hardfork/mainnet-359617-3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW.json");
         let pcb = PrecomputedBlock::parse_file(path, PcbVersion::V2)?;
 
         for (num, zkapp_cmd) in pcb.zkapp_commands().iter().enumerate() {
-            indexer.increment_zkapp_commands_counts(zkapp_cmd, epoch)?;
+            let epoch = pcb.epoch_count();
+            let genesis_state_hash = pcb.genesis_state_hash();
 
-            assert_eq!(indexer.get_applied_zkapp_commands_count()?, num as u32 + 1);
-            assert_eq!(indexer.get_failed_zkapp_commands_count()?, 0);
+            store.increment_zkapp_commands_counts(zkapp_cmd, epoch, &genesis_state_hash)?;
+
+            assert_eq!(store.get_applied_zkapp_commands_count()?, num as u32 + 1);
+            assert_eq!(store.get_failed_zkapp_commands_count()?, 0);
         }
 
         Ok(())

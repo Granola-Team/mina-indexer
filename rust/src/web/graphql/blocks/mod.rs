@@ -812,21 +812,21 @@ pub fn get_counts(
     let total_num_snarks = db.get_snarks_total_count().expect("total SNARK count");
 
     let epoch_num_user_commands = db
-        .get_user_commands_epoch_count(None)
+        .get_user_commands_epoch_count(epoch, genesis_state_hash)
         .expect("epoch user command count");
     let total_num_user_commands = db
         .get_user_commands_total_count()
         .expect("total user command count");
 
     let epoch_num_zkapp_commands = db
-        .get_zkapp_commands_epoch_count(None)
+        .get_zkapp_commands_epoch_count(epoch, genesis_state_hash)
         .expect("epoch zkapp command count");
     let total_num_zkapp_commands = db
         .get_zkapp_commands_total_count()
         .expect("total zkapp command count");
 
     let epoch_num_internal_commands = db
-        .get_internal_commands_epoch_count(None)
+        .get_internal_commands_epoch_count(epoch)
         .expect("epoch internal command count");
     let total_num_internal_commands = db
         .get_internal_commands_total_count()

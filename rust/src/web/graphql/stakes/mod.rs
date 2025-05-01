@@ -654,7 +654,7 @@ impl StakesLedgerAccountWithMeta {
             .get_snarks_pk_total_count(pk)
             .expect("pk total num snarks");
         let pk_epoch_num_user_commands = db
-            .get_user_commands_pk_epoch_count(pk, Some(epoch))
+            .get_user_commands_pk_epoch_count(pk, Some(epoch), Some(&genesis_state_hash))
             .expect("pk epoch num user commands");
         let pk_total_num_user_commands = db
             .get_user_commands_pk_total_count(pk)
@@ -718,7 +718,7 @@ impl StakesLedgerAccountWithMeta {
                 .expect("epoch snark count"),
             total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
             epoch_num_user_commands: db
-                .get_user_commands_epoch_count(Some(epoch))
+                .get_user_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))
                 .expect("epoch user command count"),
             total_num_user_commands: db
                 .get_user_commands_total_count()

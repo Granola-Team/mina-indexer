@@ -86,13 +86,13 @@ pub async fn get_account(
 
             // all user commands
             epoch_num_user_commands: db
-                .get_user_commands_pk_epoch_count(&pk, None)
+                .get_user_commands_pk_epoch_count(&pk, None, None)
                 .unwrap_or_default(),
             total_num_user_commands: db.get_user_commands_pk_total_count(&pk).unwrap_or_default(),
 
             // zkapp user commands
             epoch_num_zkapp_commands: db
-                .get_zkapp_commands_pk_epoch_count(&pk, None)
+                .get_zkapp_commands_pk_epoch_count(&pk, None, None)
                 .unwrap_or_default(),
             total_num_zkapp_commands: db
                 .get_zkapp_commands_pk_total_count(&pk)

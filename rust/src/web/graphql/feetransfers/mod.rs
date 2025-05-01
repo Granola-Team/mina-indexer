@@ -80,11 +80,11 @@ impl FeetransferWithMeta {
         let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
         // all user commands
-        let epoch_num_user_commands = db.get_user_commands_epoch_count(None)?;
+        let epoch_num_user_commands = db.get_user_commands_epoch_count(None, None)?;
         let total_num_user_commands = db.get_user_commands_total_count()?;
 
         // zkapp commands
-        let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None)?;
+        let epoch_num_zkapp_commands = db.get_zkapp_commands_epoch_count(None, None)?;
         let total_num_zkapp_commands = db.get_zkapp_commands_total_count()?;
 
         // slot produced

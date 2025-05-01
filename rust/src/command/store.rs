@@ -132,16 +132,32 @@ pub trait UserCommandStore {
     fn get_pk_num_user_commands_blocks(&self, pk: &PublicKey) -> Result<Option<u32>>;
 
     /// Increment user commands per epoch count
-    fn increment_user_commands_epoch_count(&self, epoch: u32) -> Result<()>;
+    fn increment_user_commands_epoch_count(
+        &self,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()>;
 
     /// Increment zkapp commands per epoch count
-    fn increment_zkapp_commands_epoch_count(&self, epoch: u32) -> Result<()>;
+    fn increment_zkapp_commands_epoch_count(
+        &self,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()>;
 
     /// Get user commands per epoch count
-    fn get_user_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_user_commands_epoch_count(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32>;
 
     /// Get zkapp commands per epoch count
-    fn get_zkapp_commands_epoch_count(&self, epoch: Option<u32>) -> Result<u32>;
+    fn get_zkapp_commands_epoch_count(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32>;
 
     /// Increment user commands total count
     fn increment_user_commands_total_count(&self) -> Result<()>;
@@ -156,16 +172,36 @@ pub trait UserCommandStore {
     fn get_zkapp_commands_total_count(&self) -> Result<u32>;
 
     /// Increment user commands per epoch per account count
-    fn increment_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()>;
+    fn increment_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()>;
 
     /// Increment zkapp commands per epoch per account count
-    fn increment_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: u32) -> Result<()>;
+    fn increment_zkapp_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+    ) -> Result<()>;
 
     /// Get user commands per epoch per account count
-    fn get_user_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32>;
+    fn get_user_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32>;
 
     /// Get zkapp commands per epoch per account count
-    fn get_zkapp_commands_pk_epoch_count(&self, pk: &PublicKey, epoch: Option<u32>) -> Result<u32>;
+    fn get_zkapp_commands_pk_epoch_count(
+        &self,
+        pk: &PublicKey,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+    ) -> Result<u32>;
 
     /// Increment user commands per account total
     fn increment_user_commands_pk_total_count(&self, pk: &PublicKey) -> Result<()>;
@@ -206,6 +242,7 @@ pub trait UserCommandStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
+        genesis_state_hash: &StateHash,
     ) -> Result<()>;
 
     /// Increment zkapp commands counts given `command` in `epoch`
@@ -213,6 +250,7 @@ pub trait UserCommandStore {
         &self,
         command: &UserCommandWithStatus,
         epoch: u32,
+        genesis_state_hash: &StateHash,
     ) -> Result<()>;
 
     /// Get applied user commands count

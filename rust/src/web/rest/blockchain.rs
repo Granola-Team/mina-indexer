@@ -390,7 +390,7 @@ pub async fn get_blockchain_summary(
 
         // user commands
         let epoch_num_user_commands = store
-            .get_user_commands_epoch_count(None)
+            .get_user_commands_epoch_count(None, None)
             .expect("epoch user commands count");
         let total_num_user_commands = store
             .get_user_commands_total_count()
@@ -419,7 +419,7 @@ pub async fn get_blockchain_summary(
 
         // zkapp commands
         let epoch_num_zkapp_commands = store
-            .get_zkapp_commands_epoch_count(None)
+            .get_zkapp_commands_epoch_count(None, None)
             .expect("epoch zkapp commands count");
         let total_num_zkapp_commands = store
             .get_zkapp_commands_total_count()

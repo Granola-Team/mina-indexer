@@ -448,13 +448,13 @@ impl AccountWithMeta {
                 .get_snarks_pk_total_count(pk)
                 .expect("pk total snark count"),
             pk_epoch_num_user_commands: db
-                .get_user_commands_pk_epoch_count(pk, None)
+                .get_user_commands_pk_epoch_count(pk, None, None)
                 .expect("pk epoch user command count"),
             pk_total_num_user_commands: db
                 .get_user_commands_pk_total_count(pk)
                 .expect("pk total user command count"),
             pk_epoch_num_zkapp_commands: db
-                .get_zkapp_commands_pk_epoch_count(pk, None)
+                .get_zkapp_commands_pk_epoch_count(pk, None, None)
                 .expect("pk epoch zkapp command count"),
             pk_total_num_zkapp_commands: db
                 .get_zkapp_commands_pk_total_count(pk)

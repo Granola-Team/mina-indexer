@@ -148,9 +148,9 @@ impl TransactionsQueryRoot {
         let db = db(ctx);
 
         let num_commands = [
-            db.get_user_commands_epoch_count(None)?,
+            db.get_user_commands_epoch_count(None, None)?,
             db.get_user_commands_total_count()?,
-            db.get_zkapp_commands_epoch_count(None)?,
+            db.get_zkapp_commands_epoch_count(None, None)?,
             db.get_zkapp_commands_total_count()?,
         ];
 
@@ -182,9 +182,9 @@ impl TransactionsQueryRoot {
     ) -> Result<Vec<Transaction>> {
         let db = db(ctx);
         let num_commands = [
-            db.get_user_commands_epoch_count(None)?,
+            db.get_user_commands_epoch_count(None, None)?,
             db.get_user_commands_total_count()?,
-            db.get_zkapp_commands_epoch_count(None)?,
+            db.get_zkapp_commands_epoch_count(None, None)?,
             db.get_zkapp_commands_total_count()?,
         ];
 
