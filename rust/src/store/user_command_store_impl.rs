@@ -25,7 +25,7 @@ use crate::{
             pk_txn_sort_key, pk_txn_sort_key_nonce, token_txn_sort_key, txn_block_key,
             txn_hash_of_key, txn_sort_key,
         },
-        common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, u32_prefix_key, U32_LEN},
+        common::{from_be_bytes, pk_key_prefix, pk_txn_sort_key_sort, U32_LEN},
     },
 };
 use anyhow::{bail, Context, Result};
@@ -804,7 +804,10 @@ impl UserCommandStore for IndexerStore {
 
         Ok(self
             .database
-            .get_cf(self.zkapp_commands_epoch_cf(), epoch.to_be_bytes())?
+            .get_cf(
+                self.zkapp_commands_epoch_cf(),
+                epoch_key(genesis_state_hash, epoch),
+            )?
             .map_or(0, from_be_bytes))
     }
 
@@ -931,7 +934,10 @@ impl UserCommandStore for IndexerStore {
 
         Ok(self
             .database
-            .get_cf(self.zkapp_commands_pk_epoch_cf(), u32_prefix_key(epoch, pk))?
+            .get_cf(
+                self.zkapp_commands_pk_epoch_cf(),
+                epoch_pk_key(genesis_state_hash, epoch, pk),
+            )?
             .map_or(0, from_be_bytes))
     }
 
