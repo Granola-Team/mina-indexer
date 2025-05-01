@@ -795,15 +795,15 @@ pub fn get_counts(
     epoch: Option<u32>,
     genesis_state_hash: Option<&StateHash>,
 ) -> Result<[u32; 15]> {
-    let epoch_num_blocks = db.get_block_production_epoch_count(epoch, genesis_state_hash)?;
+    let epoch_num_blocks = db.get_block_production_epoch_count(genesis_state_hash, epoch)?;
     let total_num_blocks = db.get_block_production_total_count()?;
 
     let epoch_num_canonical_blocks =
-        db.get_block_production_canonical_epoch_count(epoch, genesis_state_hash)?;
+        db.get_block_production_canonical_epoch_count(genesis_state_hash, epoch)?;
     let total_num_canonical_blocks = db.get_block_production_canonical_total_count()?;
 
     let epoch_num_supercharged_blocks =
-        db.get_block_production_supercharged_epoch_count(epoch, genesis_state_hash)?;
+        db.get_block_production_supercharged_epoch_count(genesis_state_hash, epoch)?;
     let total_num_supercharged_blocks = db.get_block_production_supercharged_total_count()?;
 
     let epoch_num_snarks = db.get_snarks_epoch_count(None).expect("epoch SNARK count");
@@ -830,7 +830,7 @@ pub fn get_counts(
         .get_internal_commands_total_count()
         .expect("total internal command count");
 
-    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(epoch, genesis_state_hash)?;
+    let epoch_num_slots_produced = db.get_epoch_slots_produced_count(genesis_state_hash, epoch)?;
 
     Ok([
         epoch_num_blocks,
