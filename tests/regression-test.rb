@@ -23,6 +23,7 @@ test_names = %w[
   missing_blocks
   missing_block_recovery
   fetch_new_blocks
+  fetch_new_and_recover_missing_blocks
   best_chain_v1
   best_chain_v2
   block_children

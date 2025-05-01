@@ -1755,6 +1755,37 @@ test_missing_block_recovery() {
 	assert '3NKZ6DTHiMtuaeP3tJq2xe4uujVRnGT9FX1rBiZY521uNToSppUZ' $best_tip_hash
 }
 
+test_fetch_new_and_recover_missing_blocks() {
+	stage_blocks v1 10 "$BLOCKS_DIR"
+	stage_blocks v1_single 12 "$BLOCKS_DIR"
+
+	idxr database create \
+		--blocks-dir ./blocks \
+		--database-dir ./database
+
+	start \
+		--blocks-dir ./blocks \
+		--database-dir ./database \
+		--fetch-new-blocks-exe "$SRC"/tests/recovery.sh \
+		--fetch-new-blocks-delay 6 \
+		--missing-block-recovery-exe "$SRC"/tests/recovery.sh \
+		--missing-block-recovery-delay 6 \
+		--missing-block-recovery-batch true
+
+	best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+	assert 3 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+	assert 10 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+	assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' $best_tip_hash
+
+	# wait for the blocks
+	sleep 11
+	
+	best_tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+	assert 0 $(idxr summary --json | jq -r .witness_tree.num_dangling)
+	assert 13 $(idxr summary --json | jq -r .witness_tree.best_tip_length)
+	assert '3NKXzc1hAE1bK9BSkJUhBBSznMhwW3ZxUTgdoLoqzW6SvqVFcAw5' $best_tip_hash
+}
+
 # Create an indexer database & start indexing
 test_database_create() {
 	stage_blocks v1 10 "$BLOCKS_DIR"
@@ -1894,6 +1925,7 @@ for test_name in "$@"; do
 	"test_missing_blocks") test_missing_blocks ;;
 	"test_missing_block_recovery") test_missing_block_recovery ;;
 	"test_fetch_new_blocks") test_fetch_new_blocks ;;
+	"test_fetch_new_and_recover_missing_blocks") test_fetch_new_and_recover_missing_blocks ;;
 	"test_best_chain_v1") test_best_chain_v1 ;;
 	"test_best_chain_v2") test_best_chain_v2 ;;
 	"test_block_children") test_block_children ;;
