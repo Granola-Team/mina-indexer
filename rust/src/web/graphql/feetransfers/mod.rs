@@ -202,7 +202,7 @@ impl FeetransferQueryRoot {
         let db = db(ctx);
         let sort_by = sort_by.unwrap_or_default();
 
-        let epoch_num_internal_commands = db.get_internal_commands_epoch_count(None)?;
+        let epoch_num_internal_commands = db.get_internal_commands_epoch_count(None, None)?;
         let total_num_internal_commands = db.get_internal_commands_total_count()?;
 
         // state_hash query

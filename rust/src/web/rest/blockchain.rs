@@ -448,7 +448,7 @@ pub async fn get_blockchain_summary(
 
         // internal commands
         let epoch_num_internal_commands = store
-            .get_internal_commands_epoch_count(None)
+            .get_internal_commands_epoch_count(None, None)
             .expect("epoch internal commands count");
         let total_num_internal_commands = store
             .get_internal_commands_total_count()

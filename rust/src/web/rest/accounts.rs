@@ -100,7 +100,7 @@ pub async fn get_account(
 
             // internal commands
             epoch_num_internal_commands: db
-                .get_internal_commands_pk_epoch_count(&pk, None)
+                .get_internal_commands_pk_epoch_count(&pk, None, None)
                 .unwrap_or_default(),
             total_num_internal_commands: db
                 .get_internal_commands_pk_total_count(&pk)

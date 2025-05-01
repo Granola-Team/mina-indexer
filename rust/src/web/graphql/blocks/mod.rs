@@ -826,7 +826,7 @@ pub fn get_counts(
         .expect("total zkapp command count");
 
     let epoch_num_internal_commands = db
-        .get_internal_commands_epoch_count(epoch)
+        .get_internal_commands_epoch_count(epoch, genesis_state_hash)
         .expect("epoch internal command count");
     let total_num_internal_commands = db
         .get_internal_commands_total_count()

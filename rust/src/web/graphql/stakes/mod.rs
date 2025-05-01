@@ -660,7 +660,7 @@ impl StakesLedgerAccountWithMeta {
             .get_user_commands_pk_total_count(pk)
             .expect("pk total num user commands");
         let pk_epoch_num_internal_commands = db
-            .get_internal_commands_pk_epoch_count(pk, Some(epoch))
+            .get_internal_commands_pk_epoch_count(pk, Some(epoch), Some(&genesis_state_hash))
             .expect("pk epoch num internal commands");
         let pk_total_num_internal_commands = db
             .get_internal_commands_pk_total_count(pk)
@@ -724,7 +724,7 @@ impl StakesLedgerAccountWithMeta {
                 .get_user_commands_total_count()
                 .expect("total user command count"),
             epoch_num_internal_commands: db
-                .get_internal_commands_epoch_count(Some(epoch))
+                .get_internal_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))
                 .expect("epoch internal command count"),
             total_num_internal_commands: db
                 .get_internal_commands_total_count()
