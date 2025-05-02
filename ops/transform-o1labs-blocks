@@ -33,6 +33,8 @@ class Transformer
     when Hash
       obj.delete("proofs")
       obj.delete("protocol_state_proof")
+      # TODO: also prune this field
+      # obj.delete("sok_digest")
       obj.each_value { |v| remove_proofs(v) }
     when Array
       obj.each { |v| remove_proofs(v) }
