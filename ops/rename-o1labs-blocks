@@ -1,0 +1,109 @@
+#!/usr/bin/env -S ruby -w
+
+require "etc"
+require "json"
+require "open3"
+
+class Renamer
+  def initialize(output_dir)
+    @output_dir = output_dir
+    @queue = Queue.new
+    @num_workers = Etc.nprocessors * 4
+    @differing_files = []
+  end
+
+  def add(path)
+    stat = File.stat(path)
+    if stat.file?
+      @queue << path
+    elsif stat.directory?
+      Dir.children(path).each do |f|
+        add(File.join(path, f))
+      end
+    elsif stat.symlink?
+      abort("Can't operate on symlinks. Aborting.")
+    else
+      abort("Invalid file #{path}. Aborting.")
+    end
+  end
+
+  def get_blockchain_length(json_data)
+    len = json_data.dig("protocol_state", "body", "consensus_state", "blockchain_length")
+    if len
+      len
+    else
+      len = json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")
+      if len
+        len
+      else
+        abort("Error extracting blockchain length")
+      end
+    end
+  end
+
+  def process_file(path)
+    puts "Processing file #{path}... "
+    contents = File.read(path)
+    json_data = JSON.parse(contents)
+
+    blockchain_length = get_blockchain_length(json_data)
+
+    network, rest = File.basename(path).split("-", 2)
+    abort("invalid network: #{network}") unless network == "mainnet"
+    lhs, rhs = rest.split("-", 2)
+
+    outfile = nil
+    if lhs == blockchain_length
+      outfile = File.join(@output_dir, "#{network}-#{lhs}-#{rhs}")
+    else
+      abort("misunderstood filename: #{path}") unless rhs.nil?
+      outfile = File.join(@output_dir, "#{network}-#{blockchain_length}-#{lhs}")
+    end
+
+    if File.exist?(outfile)
+      unless system("cmp", "-s", path, outfile)
+        @differing_files << outfile
+      end
+    else
+      File.link(path, outfile)
+    end
+    puts "Done processing #{path} (#{outfile})."
+  rescue => e
+    abort "Error processing #{path}: #{e.message}"
+  end
+
+  def process_files
+    threads = []
+    @num_workers.times do
+      threads << Thread.new do
+        until @queue.empty?
+          path = begin
+            @queue.pop(true)
+          rescue
+            nil
+          end
+          break unless path
+          process_file(path)
+        end
+      end
+    end
+    puts "Processing with #{@num_workers} worker threads"
+    threads.each(&:join)
+    puts "The following files differ from their corresponding input files:"
+    puts @differing_files.join("\n")
+  end
+end
+
+def main
+  if ARGV.size != 2
+    puts "Usage: #{$0} <FILE_OR_DIRECTORY> <output_dir>"
+    exit 1
+  end
+
+  processor = Renamer.new(ARGV[1])
+  processor.add(ARGV[0])
+  processor.process_files
+end
+
+# Only execute main when this script is run directly, not when required
+main if __FILE__ == $0
