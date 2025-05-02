@@ -976,7 +976,7 @@ impl SnarkStore for IndexerStore {
                     }
 
                     let block_height =
-                        u32_from_be_bytes(&key[StateHash::LEN..][..U32_LEN][PublicKey::LEN..])
+                        u32_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][PublicKey::LEN..])
                             .expect("u32 block height");
                     if let Some(state_hash) = self.get_canonical_hash_at_height(block_height)? {
                         if let Some(block_epoch) = self.get_block_epoch(&state_hash)? {
