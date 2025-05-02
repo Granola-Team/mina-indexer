@@ -13,6 +13,7 @@ pub fn split_staking_ledger_epoch_key(key: &[u8]) -> anyhow::Result<(StateHash, 
         let genesis_state_hash = StateHash::from_bytes(&key[..StateHash::LEN])?;
         let epoch = u32_from_be_bytes(&key[StateHash::LEN..][..U32_LEN])?;
         let ledger_hash = LedgerHash::from_bytes(key[StateHash::LEN..][U32_LEN..].to_vec())?;
+
         return Ok((genesis_state_hash, epoch, ledger_hash));
     }
 

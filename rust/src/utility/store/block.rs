@@ -52,7 +52,7 @@ pub fn pk_block_sort_key(
 
     key[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
     key[PublicKey::LEN..][..U32_LEN].copy_from_slice(&sort_value.to_be_bytes());
-    key[PublicKey::LEN..][U32_LEN..][..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
+    key[PublicKey::LEN..][U32_LEN..].copy_from_slice(state_hash.0.as_bytes());
 
     key
 }
@@ -82,7 +82,7 @@ pub fn epoch_key(genesis_state_hash: &StateHash, epoch: u32) -> [u8; StateHash::
     let mut key = [0; StateHash::LEN + U32_LEN];
 
     key[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
-    key[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+    key[StateHash::LEN..].copy_from_slice(&epoch.to_be_bytes());
 
     key
 }

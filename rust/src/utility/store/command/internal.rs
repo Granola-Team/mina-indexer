@@ -28,7 +28,7 @@ pub fn internal_commmand_sort_key(
     let mut bytes = [0; U32_LEN + StateHash::LEN + U32_LEN];
     bytes[..U32_LEN].copy_from_slice(&prefix.to_be_bytes());
     bytes[U32_LEN..][..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
-    bytes[U32_LEN + StateHash::LEN..].copy_from_slice(&index.to_be_bytes());
+    bytes[U32_LEN..][StateHash::LEN..].copy_from_slice(&index.to_be_bytes());
     bytes
 }
 

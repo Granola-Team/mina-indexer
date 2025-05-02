@@ -21,6 +21,7 @@ pub fn staged_account_key(
     key[..StateHash::LEN].copy_from_slice(state_hash.0.as_bytes());
     key[StateHash::LEN..][..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
     key[StateHash::LEN..][TokenAddress::LEN..].copy_from_slice(pk.0.as_bytes());
+
     key
 }
 
@@ -44,6 +45,7 @@ pub fn staged_account_balance_sort_key(
     key[StateHash::LEN..][..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
     key[StateHash::LEN..][TokenAddress::LEN..][..U64_LEN].copy_from_slice(&balance.to_be_bytes());
     key[StateHash::LEN..][TokenAddress::LEN..][U64_LEN..].copy_from_slice(pk.0.as_bytes());
+
     key
 }
 

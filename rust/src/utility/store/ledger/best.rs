@@ -18,6 +18,7 @@ pub fn best_account_key(
 
     key[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
     key[TokenAddress::LEN..].copy_from_slice(pk.0.as_bytes());
+
     key
 }
 
@@ -38,6 +39,7 @@ pub fn best_account_sort_key(
     key[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
     key[TokenAddress::LEN..][..U64_LEN].copy_from_slice(&balance.to_be_bytes());
     key[TokenAddress::LEN..][U64_LEN..].copy_from_slice(pk.0.as_bytes());
+
     key
 }
 
