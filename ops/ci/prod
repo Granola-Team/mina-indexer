@@ -3,4 +3,4 @@
 # The purpose of this script is to be exactly what is executed by the CI
 # (Buildkite) 'command' for production deployment.
 
-nix develop --command rake 'deploy:local_prod[436391]'
+nix develop --command rake 'deploy:local_prod[444444]'
