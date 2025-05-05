@@ -373,15 +373,16 @@ impl BlockWithoutCanonicity {
         canonical: bool,
         num_commands: [u32; 4],
     ) -> Self {
-        let winner_account = block.block_creator().0;
-        let date_time = millis_to_iso_date_string(block.timestamp() as i64);
-        let creator = block.block_creator().0;
         let scheduled_time = block.scheduled_time();
+        let date_time = millis_to_iso_date_string(block.timestamp() as i64);
+        let utc_date = block.timestamp().to_string();
         let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
         let previous_state_hash = block.previous_state_hash().0;
+
         let tx_fees = block.tx_fees();
         let snark_fees = block.snark_fees();
-        let utc_date = block.timestamp().to_string();
+
+        let creator = block.block_creator();
 
         // blockchain state
         let snarked_ledger_hash = block.snarked_ledger_hash().0;
@@ -443,16 +444,10 @@ impl BlockWithoutCanonicity {
             block_height: block.blockchain_length(),
             global_slot_since_genesis: block.global_slot_since_genesis(),
             genesis_state_hash: block.genesis_state_hash().0,
-            coinbase_receiver: PK {
-                public_key: block.coinbase_receiver().0,
-            },
-            winner_account: PK {
-                public_key: winner_account,
-            },
-            creator_account: PK {
-                public_key: creator.clone(),
-            },
-            creator,
+            coinbase_receiver: PK::new(db, block.coinbase_receiver()),
+            winner_account: PK::new(db, block.block_stake_winner()),
+            creator_account: PK::new(db, creator.clone()),
+            creator: creator.0,
             received_time,
             protocol_state: ProtocolState {
                 previous_state_hash,
@@ -498,9 +493,7 @@ impl BlockWithoutCanonicity {
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
                 coinbase: coinbase.amount().to_string(),
-                coinbase_receiver_account: PK {
-                    public_key: coinbase.receiver.to_string(),
-                },
+                coinbase_receiver_account: PK::new(db, coinbase.receiver),
                 fee_transfer: fee_transfers,
                 user_commands,
             },
