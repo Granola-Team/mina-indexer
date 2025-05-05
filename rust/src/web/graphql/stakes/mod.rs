@@ -123,7 +123,10 @@ pub struct StakesLedgerAccountWithMeta {
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
     /// Value balance
-    pub balance: String,
+    pub balance: f64,
+
+    /// Value balance nanomina
+    pub balance_nanomina: u64,
 
     /// Value nonce
     pub nonce: u32,
@@ -154,9 +157,6 @@ pub struct StakesLedgerAccount {
     /// Value voting for
     #[graphql(name = "voting_for")]
     pub voting_for: String,
-
-    /// Value balance nanomina
-    pub balance_nanomina: u64,
 
     /// Value pk epoch num blocks
     #[graphql(name = "pk_epoch_num_blocks")]
@@ -206,7 +206,7 @@ pub struct StakesDelegationTotals {
     pub total_currency: u64,
 
     /// Value total delegated
-    pub total_delegated: String,
+    pub total_delegated: f64,
 
     /// Value total delegated in nanomina
     pub total_delegated_nanomina: u64,
@@ -494,7 +494,8 @@ impl
         let voting_for = account.voting_for.0;
 
         Self {
-            balance: balance.to_string(),
+            balance: balance.to_f64(),
+            balance_nanomina,
             nonce,
             delegate,
             pk,
@@ -503,7 +504,6 @@ impl
             token_address: token,
             receipt_chain_hash,
             voting_for,
-            balance_nanomina,
             pk_epoch_num_blocks: acc.1,
             pk_total_num_blocks: acc.2,
             pk_epoch_num_supercharged_blocks: acc.3,
@@ -525,18 +525,8 @@ impl StakesQueryInput {
         stakes_ledger_account: &StakesLedgerAccountWithMeta,
     ) -> bool {
         if let Some(query) = query {
-            if let Some(stake_lte) = query
-                .stake_lte
-                .as_ref()
-                .and_then(|s| s.parse::<Amount>().ok())
-            {
-                let total_delegated = stakes_ledger_account
-                    .delegation_totals
-                    .total_delegated
-                    .parse::<Amount>()
-                    .expect("total delegated");
-
-                if total_delegated > stake_lte {
+            if let Some(stake_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
+                if stakes_ledger_account.delegation_totals.total_delegated > stake_lte {
                     return false;
                 }
             }
@@ -626,7 +616,7 @@ impl StakesLedgerAccountWithMeta {
             .iter()
             .map(|pk| pk.0.clone())
             .collect();
-        let amount = Amount::new(total_delegated_nanomina);
+        let amount = Amount(total_delegated_nanomina);
 
         let timing = account.timing.as_ref().map(|timing| Timing {
             cliff_amount: Some(timing.cliff_amount.0),
@@ -699,7 +689,7 @@ impl StakesLedgerAccountWithMeta {
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
-                total_delegated: amount.to_string(),
+                total_delegated: amount.to_f64(),
                 total_delegated_nanomina,
                 total_currency,
                 delegates,
@@ -764,7 +754,7 @@ mod tests {
     fn test_matches_stake_lte_filter() {
         let stakes_ledger_account = StakesLedgerAccountWithMeta {
             delegation_totals: StakesDelegationTotals {
-                total_delegated: 500_000.0.to_string(),
+                total_delegated: 500_000.0,
                 ..Default::default()
             },
             ..Default::default()
@@ -811,7 +801,7 @@ mod tests {
     fn test_matches_no_filter() {
         let stakes_ledger_account = StakesLedgerAccountWithMeta {
             delegation_totals: StakesDelegationTotals {
-                total_delegated: 800_000.0.to_string(),
+                total_delegated: 800_000.0,
                 ..Default::default()
             },
             ..Default::default()
