@@ -1,10 +1,10 @@
 //! GraphQL `topStakers` endpoint
 
-use super::db;
+use super::{db, stakes::StakesDelegationTotals};
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
-    ledger::username::Username,
+    ledger::{store::staking::StakingLedgerStore, username::Username},
     store::username::UsernameStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };
@@ -35,6 +35,9 @@ pub struct TopStakerAccount {
 
     #[graphql(name = "public_key")]
     public_key: String,
+
+    #[graphql(name = "delegation_totals")]
+    delegation_totals: StakesDelegationTotals,
 
     #[graphql(name = "num_blocks_produced")]
     num_blocks_produced: u32,
@@ -77,6 +80,18 @@ impl TopStakersQueryRoot {
             Err(e) => return Err(async_graphql::Error::from(e)),
         };
 
+        let ledger_hash = db.get_staking_ledger_hash_by_epoch(epoch, &genesis_state_hash)?;
+        let ledger_hash = match ledger_hash {
+            Some(ledger_hash) => ledger_hash,
+            None => {
+                return Err(async_graphql::Error::new(format!(
+                    "ledger hash unknown for epoch {} genesis {}",
+                    epoch, genesis_state_hash
+                )))
+            }
+        };
+        let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
+
         let mut accounts = Vec::new();
         let direction = match sort_by.unwrap_or_default() {
             TopStakersSortByInput::NumCanonicalBlocksProducedAsc => Direction::Forward,
@@ -102,6 +117,10 @@ impl TopStakersQueryRoot {
             let num = from_be_bytes(key[StateHash::LEN..][U32_LEN..][..U32_LEN].to_vec());
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
 
+            let delegations = db
+                .get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
+                .expect("epoch delegations");
+
             let account = TopStakerAccount::new(
                 db.get_block_production_pk_epoch_count(
                     &pk,
@@ -117,6 +136,14 @@ impl TopStakersQueryRoot {
                 db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(&genesis_state_hash))?,
                 db.get_username(&pk)?,
                 pk,
+                StakesDelegationTotals {
+                    count_delegates: delegations.count_delegates.unwrap_or_default(),
+                    total_delegated: Amount(delegations.total_delegated.unwrap_or_default())
+                        .to_f64(),
+                    total_delegated_nanomina: delegations.total_delegated.unwrap_or_default(),
+                    total_currency,
+                    delegates: delegations.delegates.into_iter().map(|pk| pk.0).collect(),
+                },
             );
 
             accounts.push(account);
@@ -134,6 +161,7 @@ impl TopStakerAccount {
         num_slots_produced: u32,
         username: Option<Username>,
         pk: PublicKey,
+        delegation_totals: StakesDelegationTotals,
     ) -> Self {
         Self {
             public_key: pk.0,
@@ -142,6 +170,7 @@ impl TopStakerAccount {
             num_canonical_blocks_produced,
             num_supercharged_blocks_produced,
             num_slots_produced,
+            delegation_totals,
         }
     }
 }

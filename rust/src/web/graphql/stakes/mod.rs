@@ -339,7 +339,7 @@ impl StakesQueryRoot {
                             let account = StakesLedgerAccountWithMeta::new(
                                 db,
                                 account,
-                                &delegation,
+                                delegation,
                                 epoch,
                                 ledger_hash.to_owned(),
                                 total_currency,
@@ -414,7 +414,7 @@ impl StakesQueryRoot {
                 let account = StakesLedgerAccountWithMeta::new(
                     db,
                     account,
-                    &delegation,
+                    delegation,
                     epoch,
                     ledger_hash.to_owned(),
                     total_currency,
@@ -602,7 +602,7 @@ impl StakesLedgerAccountWithMeta {
     pub fn new(
         db: &Arc<IndexerStore>,
         account: StakingAccount,
-        delegations: &EpochStakeDelegation,
+        delegations: EpochStakeDelegation,
         epoch: u32,
         ledger_hash: LedgerHash,
         total_currency: u64,
@@ -613,10 +613,10 @@ impl StakesLedgerAccountWithMeta {
 
         let delegates: Vec<String> = delegations
             .delegates
-            .iter()
+            .into_iter()
             .map(|pk| pk.0.clone())
             .collect();
-        let amount = Amount(total_delegated_nanomina);
+        let total_delegated = Amount(total_delegated_nanomina).to_f64();
 
         let timing = account.timing.as_ref().map(|timing| Timing {
             cliff_amount: Some(timing.cliff_amount.0),
@@ -689,7 +689,7 @@ impl StakesLedgerAccountWithMeta {
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
-                total_delegated: amount.to_f64(),
+                total_delegated,
                 total_delegated_nanomina,
                 total_currency,
                 delegates,
@@ -865,7 +865,7 @@ mod tests {
                         let account = StakesLedgerAccountWithMeta::new(
                             &store,
                             account,
-                            &delegation,
+                            delegation,
                             epoch,
                             ledger_hash.to_owned(),
                             total_currency,
