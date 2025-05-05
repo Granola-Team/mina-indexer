@@ -14,7 +14,7 @@ use crate::{
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
     utility::store::common::U32_LEN,
-    web::graphql::Timing,
+    web::graphql::timing::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
 use rust_decimal::{prelude::ToPrimitive, Decimal};

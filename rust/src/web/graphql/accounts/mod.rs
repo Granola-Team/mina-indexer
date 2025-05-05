@@ -16,7 +16,7 @@ use crate::{
     snark_work::store::SnarkStore,
     store::{username::UsernameStore, IndexerStore},
     utility::store::common::U64_LEN,
-    web::graphql::Timing,
+    web::graphql::timing::Timing,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::IteratorMode;

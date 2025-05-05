@@ -1,6 +1,6 @@
 //! GraphQL `transaction` & `transactions` endpoint
 
-use super::{date_time_to_scalar, db, get_block_canonicity, PK};
+use super::{date_time_to_scalar, db, get_block_canonicity, pk::PK};
 use crate::{
     base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,

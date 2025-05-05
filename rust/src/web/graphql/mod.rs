@@ -2,6 +2,8 @@
 
 mod date_time;
 mod long;
+mod pk;
+mod timing;
 
 pub mod accounts;
 pub mod actions;
@@ -29,11 +31,9 @@ use actix_web::HttpResponse;
 use anyhow::Context as aContext;
 use async_graphql::{
     http::GraphiQLSource, Context, EmptyMutation, EmptySubscription, MergedObject, Schema,
-    SimpleObject,
 };
 use date_time::DateTime;
 use long::Long;
-use serde::Serialize;
 use std::sync::Arc;
 
 #[derive(MergedObject, Default)]
@@ -50,30 +50,6 @@ pub struct Root(
     top_snarkers::TopSnarkersQueryRoot,
     version::VersionQueryRoot,
 );
-
-#[derive(SimpleObject)]
-pub struct Timing {
-    #[graphql(name = "cliff_amount")]
-    pub cliff_amount: Option<u64>,
-
-    #[graphql(name = "cliff_time")]
-    pub cliff_time: Option<u32>,
-
-    #[graphql(name = "initial_minimum_balance")]
-    pub initial_minimum_balance: Option<u64>,
-
-    #[graphql(name = "vesting_period")]
-    pub vesting_period: Option<u32>,
-
-    #[graphql(name = "vesting_increment")]
-    pub vesting_increment: Option<u64>,
-}
-
-#[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
-#[graphql(name = "PublicKey")]
-pub struct PK {
-    pub public_key: String,
-}
 
 /// Build schema for all endpoints
 pub fn build_schema(store: Arc<IndexerStore>) -> Schema<Root, EmptyMutation, EmptySubscription> {
