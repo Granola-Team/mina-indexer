@@ -17,7 +17,7 @@ use crate::{
     web::graphql::timing::Timing,
 };
 use async_graphql::{ComplexObject, Context, Enum, InputObject, Object, Result, SimpleObject};
-use rust_decimal::{prelude::ToPrimitive, Decimal};
+use rust_decimal::Decimal;
 use speedb::Direction;
 use std::sync::Arc;
 
@@ -123,7 +123,7 @@ pub struct StakesLedgerAccountWithMeta {
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
     /// Value balance
-    pub balance: f64,
+    pub balance: String,
 
     /// Value nonce
     pub nonce: u32,
@@ -206,7 +206,7 @@ pub struct StakesDelegationTotals {
     pub total_currency: u64,
 
     /// Value total delegated
-    pub total_delegated: f64,
+    pub total_delegated: String,
 
     /// Value total delegated in nanomina
     pub total_delegated_nanomina: u64,
@@ -483,7 +483,6 @@ impl
 
         let balance_nanomina = account.balance;
         let balance = Amount(balance_nanomina);
-        let balance = balance.to_f64();
 
         let pk = account.pk.0;
         let public_key = pk.clone();
@@ -495,7 +494,7 @@ impl
         let voting_for = account.voting_for.0;
 
         Self {
-            balance,
+            balance: balance.to_string(),
             nonce,
             delegate,
             pk,
@@ -526,8 +525,18 @@ impl StakesQueryInput {
         stakes_ledger_account: &StakesLedgerAccountWithMeta,
     ) -> bool {
         if let Some(query) = query {
-            if let Some(stake_lte) = query.stake_lte.as_ref().and_then(|s| s.parse::<f64>().ok()) {
-                if stakes_ledger_account.delegation_totals.total_delegated > stake_lte {
+            if let Some(stake_lte) = query
+                .stake_lte
+                .as_ref()
+                .and_then(|s| s.parse::<Amount>().ok())
+            {
+                let total_delegated = stakes_ledger_account
+                    .delegation_totals
+                    .total_delegated
+                    .parse::<Amount>()
+                    .expect("total delegated");
+
+                if total_delegated > stake_lte {
                     return false;
                 }
             }
@@ -617,10 +626,8 @@ impl StakesLedgerAccountWithMeta {
             .iter()
             .map(|pk| pk.0.clone())
             .collect();
-        let mut decimal = Decimal::from(total_delegated_nanomina);
-        decimal.set_scale(9).ok();
+        let amount = Amount::new(total_delegated_nanomina);
 
-        let total_delegated = decimal.to_f64().unwrap_or_default();
         let timing = account.timing.as_ref().map(|timing| Timing {
             cliff_amount: Some(timing.cliff_amount.0),
             cliff_time: Some(timing.cliff_time.0),
@@ -692,7 +699,7 @@ impl StakesLedgerAccountWithMeta {
             )),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
-                total_delegated,
+                total_delegated: amount.to_string(),
                 total_delegated_nanomina,
                 total_currency,
                 delegates,
@@ -757,7 +764,7 @@ mod tests {
     fn test_matches_stake_lte_filter() {
         let stakes_ledger_account = StakesLedgerAccountWithMeta {
             delegation_totals: StakesDelegationTotals {
-                total_delegated: 500_000.0,
+                total_delegated: 500_000.0.to_string(),
                 ..Default::default()
             },
             ..Default::default()
@@ -804,7 +811,7 @@ mod tests {
     fn test_matches_no_filter() {
         let stakes_ledger_account = StakesLedgerAccountWithMeta {
             delegation_totals: StakesDelegationTotals {
-                total_delegated: 800_000.0,
+                total_delegated: 800_000.0.to_string(),
                 ..Default::default()
             },
             ..Default::default()

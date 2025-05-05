@@ -50,11 +50,14 @@ pub struct StagedLedgerAccount {
     #[graphql(name = "public_key")]
     pub public_key: String,
 
+    /// Value username
+    pub username: Option<String>,
+
     /// Value delegate
     pub delegate: String,
 
     /// Value balance
-    pub balance: f64,
+    pub balance: String,
 
     /// Value balance
     #[graphql(name = "balance_nanomina")]
@@ -62,9 +65,6 @@ pub struct StagedLedgerAccount {
 
     /// Value nonce
     pub nonce: u32,
-
-    /// Value username
-    pub username: Option<String>,
 }
 
 #[derive(Default)]
@@ -194,7 +194,7 @@ impl From<Account> for StagedLedgerAccount {
 
         Self {
             balance_nanomina: acct.balance.0,
-            balance: acct.balance.to_f64(),
+            balance: acct.balance.to_string(),
             nonce: acct.nonce.map_or(0, |n| n.0),
             delegate: acct.delegate.0,
             public_key: acct.public_key.0,
