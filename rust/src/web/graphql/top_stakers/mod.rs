@@ -4,11 +4,10 @@ use super::db;
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
-    ledger::{account, store::best::BestLedgerStore, token::TokenAddress, username::Username},
+    ledger::username::Username,
     store::username::UsernameStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };
-use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
 
@@ -102,14 +101,8 @@ impl TopStakersQueryRoot {
 
             let num = from_be_bytes(key[StateHash::LEN..][U32_LEN..][..U32_LEN].to_vec());
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
-            let account = db
-                .get_best_account(&pk, &TokenAddress::default())? // always MINA
-                .with_context(|| format!("Account missing {pk}"))
-                .unwrap()
-                .deduct_mina_account_creation_fee();
 
-            let account = TopStakerAccount::from((
-                account.clone(),
+            let account = TopStakerAccount::new(
                 db.get_block_production_pk_epoch_count(
                     &pk,
                     Some(epoch),
@@ -123,7 +116,8 @@ impl TopStakersQueryRoot {
                 )?,
                 db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(&genesis_state_hash))?,
                 db.get_username(&pk)?,
-            ));
+                pk,
+            );
 
             accounts.push(account);
         }
@@ -132,15 +126,22 @@ impl TopStakersQueryRoot {
     }
 }
 
-impl From<(account::Account, u32, u32, u32, u32, Option<Username>)> for TopStakerAccount {
-    fn from(value: (account::Account, u32, u32, u32, u32, Option<Username>)) -> Self {
+impl TopStakerAccount {
+    fn new(
+        num_blocks_produced: u32,
+        num_canonical_blocks_produced: u32,
+        num_supercharged_blocks_produced: u32,
+        num_slots_produced: u32,
+        username: Option<Username>,
+        pk: PublicKey,
+    ) -> Self {
         Self {
-            public_key: value.0.public_key.0,
-            username: value.5.unwrap_or_default().0,
-            num_blocks_produced: value.1,
-            num_canonical_blocks_produced: value.2,
-            num_supercharged_blocks_produced: value.3,
-            num_slots_produced: value.4,
+            public_key: pk.0,
+            username: username.unwrap_or_default().0,
+            num_blocks_produced,
+            num_canonical_blocks_produced,
+            num_supercharged_blocks_produced,
+            num_slots_produced,
         }
     }
 }
