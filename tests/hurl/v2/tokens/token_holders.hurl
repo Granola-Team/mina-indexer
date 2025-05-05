@@ -10,7 +10,9 @@ POST {{url}}
   ) {
     token
     supply
-    owner
+    owner {
+      publicKey
+    }
     symbol
     account {
       publicKey
@@ -31,7 +33,7 @@ jsonpath "$.data.tokenHolders" count == 1
 # token data
 jsonpath "$.data.tokenHolders[0].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokenHolders[0].supply" == 100000000000000
-jsonpath "$.data.tokenHolders[0].owner" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokenHolders[0].owner.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokenHolders[0].symbol" ==  "MINU"
 
 # account data
@@ -55,7 +57,9 @@ POST {{url}}
   ) {
     token
     supply
-    owner
+    owner {
+      publicKey
+    }
     symbol
     account {
       publicKey
@@ -89,7 +93,7 @@ jsonpath "$.data.tokenHolders[*].account.token" contains "wSHV2S4qX9jFsLjQo8r1Bs
 # MINU token data
 jsonpath "$.data.tokenHolders[*].token" contains "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokenHolders[*].supply" contains 100000000000000
-jsonpath "$.data.tokenHolders[*].owner" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokenHolders[*].owner.publicKey" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokenHolders[*].symbol" contains  "MINU"
 
 # MINU holder data
