@@ -61,6 +61,7 @@ pub struct TransactionWithoutBlock {
     zkapp: Option<TransactionZkapp>,
     fee: u64,
     from: String,
+    sender: PK,
     hash: String,
     kind: String,
     memo: String,
@@ -459,8 +460,9 @@ impl TransactionWithoutBlock {
             None
         };
 
+        let sender = cmd.command.source_pk();
         let receiver = cmd.command.receiver_pk();
-        let receiver = receiver.first().map(PublicKey::to_string);
+        let receiver = receiver.first();
 
         let failure_reason = match cmd.status {
             CommandStatusData::Applied { .. } => None,
@@ -479,13 +481,14 @@ impl TransactionWithoutBlock {
             block_height: cmd.blockchain_length,
             global_slot: cmd.global_slot_since_genesis,
             fee: cmd.command.fee(),
-            from: cmd.command.source_pk().0,
+            sender: PK::new(db, sender.clone()),
+            from: sender.0,
             hash: cmd.txn_hash.to_string(),
             kind: cmd.command.kind().to_string(),
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,
-            receiver: receiver.to_owned().map(|pk| PK { public_key: pk }),
-            to: receiver,
+            receiver: receiver.cloned().map(|pk| PK::new(db, pk)),
+            to: receiver.map(PublicKey::to_string),
             tokens: cmd.command.tokens().into_iter().map(|t| t.0).collect(),
             epoch_num_user_commands: num_commands[0],
             total_num_user_commands: num_commands[1],

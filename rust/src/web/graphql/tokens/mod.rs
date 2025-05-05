@@ -13,6 +13,7 @@ use crate::{
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
+use std::sync::Arc;
 
 #[derive(InputObject, Default)]
 pub struct TokensQueryInput {
@@ -75,7 +76,7 @@ pub struct TokenSimple {
     supply: u64,
 
     /// Value token owner
-    owner: Option<String>,
+    owner: Option<PK>,
 
     /// Value token symbol
     symbol: Option<String>,
@@ -99,7 +100,7 @@ pub struct TokenHolder {
     supply: u64,
 
     /// Value token owner
-    owner: Option<String>,
+    owner: Option<PK>,
 
     /// Value token symbol
     symbol: Option<String>,
@@ -157,9 +158,8 @@ impl TokensQueryRoot {
                 .and_then(|q| q.token.as_ref().and_then(TokenAddress::new))
             {
                 if let Some(token) = db.get_token(&token)? {
-                    let token = TokenWithMeta::new(db, token).expect("token with meta");
-
-                    return Ok(vec![token.into()]);
+                    let token = TokenWithMeta::new(db, token);
+                    return Ok(vec![Token::new(db, token)]);
                 }
             } else {
                 return Err(async_graphql::Error::new(format!(
@@ -173,12 +173,14 @@ impl TokensQueryRoot {
         let mut tokens = Vec::with_capacity(limit);
         for (_, value) in db.token_iterator().flatten() {
             if tokens.len() >= limit {
+                // gone beyond limit
                 break;
             }
 
             let token = serde_json::from_slice(&value)?;
             if TokensQueryInput::matches(query.as_ref(), &token) {
-                tokens.push(TokenWithMeta::new(db, token)?.into());
+                let token = TokenWithMeta::new(db, token);
+                tokens.push(Token::new(db, token));
             }
         }
 
@@ -242,7 +244,7 @@ impl TokensQueryRoot {
                             account: AccountWithMeta::new(db, account),
                         };
 
-                        holders.push(account.into());
+                        holders.push(TokenHolder::new(db, account));
                     }
                 }
             } else {
@@ -283,7 +285,7 @@ impl TokensQueryRoot {
                         account: AccountWithMeta::new(db, account),
                     };
 
-                    holders.push(account.into());
+                    holders.push(TokenHolder::new(db, account));
                 }
             }
         }
@@ -371,14 +373,20 @@ impl TokenHoldersQueryInput {
 }
 
 impl TokenWithMeta {
-    fn new(db: &std::sync::Arc<IndexerStore>, token: ledger::token::Token) -> Result<Self> {
-        Ok(Self {
-            num_holders: db.get_token_holders_num(&token.token)?.unwrap_or_default(),
-            total_num_txns: db.get_token_txns_num(&token.token)?.unwrap_or_default(),
-            total_num_tokens: db.get_num_tokens()?,
+    fn new(db: &Arc<IndexerStore>, token: ledger::token::Token) -> Self {
+        Self {
+            num_holders: db
+                .get_token_holders_num(&token.token)
+                .expect("num token holders")
+                .unwrap_or_default(),
+            total_num_txns: db
+                .get_token_txns_num(&token.token)
+                .expect("num token txns")
+                .unwrap_or_default(),
+            total_num_tokens: db.get_num_tokens().expect("num tokens"),
             total_num_locked: 0,
             token,
-        })
+        }
     }
 }
 
@@ -386,37 +394,37 @@ impl TokenWithMeta {
 // conversions //
 /////////////////
 
-impl From<TokenWithMeta> for Token {
-    fn from(value: TokenWithMeta) -> Self {
+impl Token {
+    fn new(db: &Arc<IndexerStore>, token: TokenWithMeta) -> Self {
         Self {
-            token: value.token.into(),
-            num_holders: value.num_holders,
-            total_num_txns: value.total_num_txns,
-            total_num_locked: value.total_num_locked,
-            total_num_tokens: value.total_num_tokens,
+            token: TokenSimple::new(db, token.token),
+            num_holders: token.num_holders,
+            total_num_txns: token.total_num_txns,
+            total_num_locked: token.total_num_locked,
+            total_num_tokens: token.total_num_tokens,
         }
     }
 }
 
-impl From<ledger::token::Token> for TokenSimple {
-    fn from(value: ledger::token::Token) -> Self {
+impl TokenSimple {
+    fn new(db: &Arc<IndexerStore>, token: ledger::token::Token) -> Self {
         Self {
-            token: value.token.to_string(),
-            supply: value.supply.0,
-            owner: value.owner.map(Into::into),
-            symbol: Some(value.symbol.to_string()),
+            token: token.token.to_string(),
+            supply: token.supply.0,
+            owner: token.owner.map(|pk| PK::new(db, pk)),
+            symbol: Some(token.symbol.to_string()),
         }
     }
 }
 
-impl From<TokenAccount> for TokenHolder {
-    fn from(value: TokenAccount) -> Self {
+impl TokenHolder {
+    fn new(db: &Arc<IndexerStore>, account: TokenAccount) -> Self {
         Self {
-            account: value.account.into(),
-            token: value.token.token.to_string(),
-            supply: value.token.supply.0,
-            owner: value.token.owner.map(Into::into),
-            symbol: Some(value.token.symbol.to_string()),
+            account: account.account.into(),
+            token: account.token.token.to_string(),
+            supply: account.token.supply.0,
+            owner: account.token.owner.map(|pk| PK::new(db, pk)),
+            symbol: Some(account.token.symbol.to_string()),
         }
     }
 }
