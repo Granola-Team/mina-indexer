@@ -101,7 +101,7 @@ impl SnarkStore for IndexerStore {
         // add: "pk -> linked list of SNARK work summaries with state hash"
         let completed_works_state_hash: Vec<_> = completed_works
             .into_iter()
-            .map(|snark| SnarkWorkSummaryWithStateHash::from((snark, state_hash.clone())))
+            .map(|snark| SnarkWorkSummaryWithStateHash::from(snark, state_hash.clone()))
             .collect();
 
         for pk in block.prover_keys() {

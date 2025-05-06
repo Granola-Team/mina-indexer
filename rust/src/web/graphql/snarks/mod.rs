@@ -1,11 +1,11 @@
 //! GraphQL `snarks` endpoint
 
-use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity};
+use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity, pk::PK};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     constants::*,
-    snark_work::{store::SnarkStore, SnarkWorkSummary, SnarkWorkSummaryWithStateHash},
+    snark_work::{store::SnarkStore, SnarkWorkSummaryWithStateHash},
     store::IndexerStore,
     utility::store::common::{from_be_bytes, state_hash_suffix, U32_LEN},
 };
@@ -14,13 +14,20 @@ use std::sync::Arc;
 
 #[derive(SimpleObject, Debug)]
 pub struct Snark {
+    /// Value SNARK fee (nanomina)
     pub fee: u64,
-    pub prover: String,
+
+    /// Value SNARK prover
+    pub prover: PK,
+
+    /// Value SNARK block
     pub block: SnarkBlock,
 
+    /// Value epoch SNARKs count
     #[graphql(name = "epoch_num_snarks")]
     epoch_num_snarks: u32,
 
+    /// Value total SNARKs count
     #[graphql(name = "total_num_snarks")]
     total_num_snarks: u32,
 }
@@ -98,6 +105,10 @@ pub enum SnarkSortByInput {
 
 #[derive(Default)]
 pub struct SnarkQueryRoot;
+
+///////////
+// impls //
+///////////
 
 #[Object]
 impl SnarkQueryRoot {
@@ -222,14 +233,13 @@ impl SnarkQueryRoot {
                         let sw = SnarkWithCanonicity {
                             canonical,
                             pcb,
-                            snark: (
-                                snark,
-                                state_hash,
+                            snark: Snark::new(
+                                db,
+                                SnarkWorkSummaryWithStateHash::from(snark, state_hash),
                                 db.get_snarks_epoch_count(None, None)
                                     .expect("epoch snarks count"),
                                 db.get_snarks_total_count().expect("total snarks count"),
-                            )
-                                .into(),
+                            ),
                         };
 
                         if query.as_ref().is_none_or(|q| q.matches(&sw)) {
@@ -256,15 +266,18 @@ impl SnarkQueryRoot {
             // validate prover pk
             if let Ok(prover) = PublicKey::new(prover.to_owned()) {
                 let mut start = prover.0.as_bytes().to_vec();
+
                 let mode = match sort_by {
                     SnarkSortByInput::BlockHeightAsc => {
                         speedb::IteratorMode::From(&start, speedb::Direction::Forward)
                     }
                     SnarkSortByInput::BlockHeightDesc => {
                         let mut pk_prefix = PublicKey::PREFIX.as_bytes().to_vec();
+
                         *pk_prefix.last_mut().unwrap_or(&mut 0) += 1;
                         start.append(&mut u32::MAX.to_be_bytes().to_vec());
                         start.append(&mut pk_prefix);
+
                         speedb::IteratorMode::From(&start, speedb::Direction::Reverse)
                     }
                 };
@@ -291,14 +304,13 @@ impl SnarkQueryRoot {
                         let sw = SnarkWithCanonicity {
                             canonical,
                             pcb,
-                            snark: (
-                                snark,
-                                state_hash,
+                            snark: Snark::new(
+                                db,
+                                SnarkWorkSummaryWithStateHash::from(snark, state_hash),
                                 db.get_snarks_epoch_count(None, None)
                                     .expect("epoch snarks count"),
                                 db.get_snarks_total_count().expect("total snarks count"),
-                            )
-                                .into(),
+                            ),
                         };
 
                         if query.as_ref().is_none_or(|q| q.matches(&sw)) {
@@ -374,14 +386,13 @@ impl SnarkQueryRoot {
                             .map(|snark| SnarkWithCanonicity {
                                 canonical,
                                 pcb: block.clone(),
-                                snark: (
-                                    snark,
-                                    state_hash.clone(),
+                                snark: Snark::new(
+                                    db,
+                                    SnarkWorkSummaryWithStateHash::from(snark, state_hash.clone()),
                                     db.get_snarks_epoch_count(None, None)
                                         .expect("epoch snarks count"),
                                     db.get_snarks_total_count().expect("total snarks count"),
-                                )
-                                    .into(),
+                                ),
                             })
                             .collect()
                     });
@@ -425,14 +436,13 @@ impl SnarkQueryRoot {
                     .map(|snark| SnarkWithCanonicity {
                         canonical,
                         pcb: get_block(db, &state_hash),
-                        snark: (
-                            snark,
-                            state_hash.clone(),
+                        snark: Snark::new(
+                            db,
+                            SnarkWorkSummaryWithStateHash::from(snark, state_hash.clone()),
                             db.get_snarks_epoch_count(None, None)
                                 .expect("epoch snarks count"),
                             db.get_snarks_total_count().expect("total snarks count"),
-                        )
-                            .into(),
+                        ),
                     })
                     .collect()
             });
@@ -461,13 +471,13 @@ fn snark_summary_matches_query(
     let snark_with_canonicity = SnarkWithCanonicity {
         pcb: get_block(db, &snark.state_hash),
         canonical,
-        snark: (
+        snark: Snark::new(
+            db,
             snark,
             db.get_snarks_epoch_count(None, None)
                 .expect("epoch snarks count"),
             db.get_snarks_total_count().expect("total snarks count"),
-        )
-            .into(),
+        ),
     };
 
     if query
@@ -480,30 +490,21 @@ fn snark_summary_matches_query(
     }
 }
 
-impl From<(SnarkWorkSummary, StateHash, u32, u32)> for Snark {
-    fn from(snark: (SnarkWorkSummary, StateHash, u32, u32)) -> Self {
+impl Snark {
+    fn new(
+        db: &Arc<IndexerStore>,
+        snark: SnarkWorkSummaryWithStateHash,
+        epoch_num_snarks: u32,
+        total_num_snarks: u32,
+    ) -> Self {
         Snark {
-            fee: snark.0.fee.0,
-            prover: snark.0.prover.0,
+            fee: snark.fee.0,
+            prover: PK::new(db, snark.prover),
             block: SnarkBlock {
-                state_hash: snark.1 .0,
+                state_hash: snark.state_hash.0,
             },
-            epoch_num_snarks: snark.2,
-            total_num_snarks: snark.3,
-        }
-    }
-}
-
-impl From<(SnarkWorkSummaryWithStateHash, u32, u32)> for Snark {
-    fn from(snark: (SnarkWorkSummaryWithStateHash, u32, u32)) -> Self {
-        Snark {
-            fee: snark.0.fee.0,
-            prover: snark.0.prover.0,
-            block: SnarkBlock {
-                state_hash: snark.0.state_hash.0,
-            },
-            epoch_num_snarks: snark.1,
-            total_num_snarks: snark.2,
+            epoch_num_snarks,
+            total_num_snarks,
         }
     }
 }
@@ -530,21 +531,25 @@ impl SnarkQueryInput {
                 return false;
             }
         }
+
         if let Some(height) = block_height_gt {
             if blockchain_length <= *height {
                 return false;
             }
         }
+
         if let Some(height) = block_height_gte {
             if blockchain_length < *height {
                 return false;
             }
         }
+
         if let Some(height) = block_height_lt {
             if blockchain_length >= *height {
                 return false;
             }
         }
+
         if let Some(height) = block_height_lte {
             if blockchain_length > *height {
                 return false;
@@ -584,11 +589,13 @@ impl SnarkQueryInput {
                 return false;
             }
         }
+
         if let Some(query) = or {
             if !query.is_empty() && !query.iter().any(|or| or.matches(snark)) {
                 return false;
             }
         }
+
         true
     }
 }

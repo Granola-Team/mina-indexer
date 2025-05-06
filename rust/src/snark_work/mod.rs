@@ -70,6 +70,14 @@ impl SnarkWorkSummaryWithStateHash {
     pub fn contains_pk(&self, pk: &PublicKey) -> bool {
         self.prover == *pk
     }
+
+    pub fn from(snark: SnarkWorkSummary, state_hash: StateHash) -> Self {
+        Self {
+            fee: snark.fee,
+            prover: snark.prover,
+            state_hash,
+        }
+    }
 }
 
 /////////////////
