@@ -2,7 +2,7 @@
 
 mod zkapp;
 
-use super::db;
+use super::{db, pk::PK};
 use crate::{
     base::public_key::PublicKey,
     block::store::BlockStore,
@@ -49,16 +49,37 @@ pub struct AccountQueryInput {
 
 #[derive(SimpleObject)]
 pub struct Account {
+    /// Value public key
     public_key: String,
-    delegate: String,
+
+    /// Value delegate
+    delegate: PK,
+
+    /// Value balance (nano)
     balance: u64,
+
+    /// Value nonce
     nonce: u32,
+
+    /// Value time locked
     time_locked: bool,
+
+    /// Value account timing
     timing: Option<Timing>,
+
+    /// Value account token address
     token: String,
+
+    /// Value zkapp
     zkapp: Option<ZkappAccount>,
+
+    /// Value receipt chain hash
     receipt_chain_hash: String,
+
+    /// Value voting for
     voting_for: String,
+
+    /// Value permissions
     permissions: Option<Permissions>,
 }
 
@@ -470,30 +491,32 @@ impl AccountWithMeta {
                 .unwrap()
                 .expect("best block height"),
             username: db.get_username(pk).expect("username").unwrap_or_default().0,
-            account: account.into(),
+            account: Account::new(db, account),
         }
     }
 }
 
-impl From<account::Account> for Account {
-    fn from(value: account::Account) -> Self {
-        let permissions = if value.is_zkapp_account() {
-            value.permissions.map(Into::into)
+impl Account {
+    fn new(db: &std::sync::Arc<IndexerStore>, account: account::Account) -> Self {
+        let permissions = if account.is_zkapp_account() {
+            account.permissions.map(Into::into)
         } else {
             None
         };
 
         Self {
-            public_key: value.public_key.0,
-            delegate: value.delegate.0,
-            nonce: value.nonce.map_or(0, |n| n.0),
-            balance: value.balance.0,
-            time_locked: value.timing.is_some(),
-            timing: value.timing.map(Into::into),
-            token: value.token.map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
-            zkapp: value.zkapp.map(Into::into),
-            receipt_chain_hash: value.receipt_chain_hash.unwrap_or_default().0,
-            voting_for: value.voting_for.unwrap_or_default().0,
+            public_key: account.public_key.0,
+            delegate: PK::new(db, account.delegate),
+            nonce: account.nonce.map_or(0, |n| n.0),
+            balance: account.balance.0,
+            time_locked: account.timing.is_some(),
+            timing: account.timing.map(Into::into),
+            token: account
+                .token
+                .map_or(MINA_TOKEN_ADDRESS.to_string(), |t| t.0),
+            zkapp: account.zkapp.map(Into::into),
+            receipt_chain_hash: account.receipt_chain_hash.unwrap_or_default().0,
+            voting_for: account.voting_for.unwrap_or_default().0,
             permissions,
         }
     }
