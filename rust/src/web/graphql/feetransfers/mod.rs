@@ -4,6 +4,7 @@ use super::{
     blocks::block::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,
     get_block, get_block_canonicity,
+    pk::PK,
 };
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
@@ -24,18 +25,30 @@ use std::sync::Arc;
 
 #[derive(SimpleObject, Debug)]
 pub struct Feetransfer {
+    /// Value state hash
     pub state_hash: String,
+
+    /// Value fee in nanomina
     pub fee: u64,
-    pub recipient: String,
+
+    /// Value recipient
+    pub recipient: PK,
+
+    /// Value block height
     pub block_height: u32,
+
+    /// Value date time
     pub date_time: String,
 
+    /// Value fee transfer kind
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
 
+    /// Value epoch internal commands count
     #[graphql(name = "epoch_num_internal_commands")]
     epoch_num_internal_commands: u32,
 
+    /// Value total internal commands count
     #[graphql(name = "total_num_internal_commands")]
     total_num_internal_commands: u32,
 }
@@ -91,17 +104,16 @@ impl FeetransferWithMeta {
         let epoch_num_slots_produced = db.get_epoch_slots_produced_count(None, None)?;
 
         if let Some(block) = self.block.as_ref() {
-            let block_num_snarks = db
-                .get_block_snarks_count(&block.state_hash())?
-                .unwrap_or_default();
+            let state_hash = block.state_hash();
+            let block_num_snarks = db.get_block_snarks_count(&state_hash)?.unwrap_or_default();
             let block_num_user_commands = db
-                .get_block_user_commands_count(&block.state_hash())?
+                .get_block_user_commands_count(&state_hash)?
                 .unwrap_or_default();
             let block_num_zkapp_commands = db
-                .get_block_zkapp_commands_count(&block.state_hash())?
+                .get_block_zkapp_commands_count(&state_hash)?
                 .unwrap_or_default();
             let block_num_internal_commands = db
-                .get_block_internal_commands_count(&block.state_hash())?
+                .get_block_internal_commands_count(&state_hash)?
                 .unwrap_or_default();
 
             return Ok(Some(Block {
@@ -308,7 +320,7 @@ impl FeetransferQueryInput {
         }
 
         if let Some(recipient) = recipient.as_ref() {
-            if ft.feetransfer.recipient != *recipient {
+            if ft.feetransfer.recipient.public_key != *recipient {
                 return false;
             }
         }
@@ -375,9 +387,14 @@ impl FeetransferQueryInput {
 // conversions //
 /////////////////
 
-impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
-    fn from(int_cmd: (DbInternalCommandWithData, u32, u32)) -> Self {
-        match int_cmd.0 {
+impl Feetransfer {
+    fn new(
+        db: &Arc<IndexerStore>,
+        int_cmd: DbInternalCommandWithData,
+        epoch_num_internal_commands: u32,
+        total_num_internal_commands: u32,
+    ) -> Self {
+        match int_cmd {
             DbInternalCommandWithData::FeeTransfer {
                 receiver,
                 amount,
@@ -389,12 +406,12 @@ impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
             } => Self {
                 state_hash: state_hash.0,
                 fee: amount,
-                recipient: receiver.0,
+                recipient: PK::new(db, receiver),
                 feetransfer_kind: kind.to_string(),
                 block_height,
                 date_time: millis_to_iso_date_string(date_time),
-                epoch_num_internal_commands: int_cmd.1,
-                total_num_internal_commands: int_cmd.2,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
             },
             DbInternalCommandWithData::Coinbase {
                 receiver,
@@ -406,12 +423,12 @@ impl From<(DbInternalCommandWithData, u32, u32)> for Feetransfer {
             } => Self {
                 state_hash: state_hash.0,
                 fee: amount,
-                recipient: receiver.0,
+                recipient: PK::new(db, receiver),
                 feetransfer_kind: kind.to_string(),
                 block_height,
                 date_time: millis_to_iso_date_string(date_time),
-                epoch_num_internal_commands: int_cmd.1,
-                total_num_internal_commands: int_cmd.2,
+                epoch_num_internal_commands,
+                total_num_internal_commands,
             },
         }
     }
@@ -457,11 +474,12 @@ fn default_query_handler(
         }
 
         let pcb = get_block(db, &state_hash);
-        let ft = Feetransfer::from((
+        let ft = Feetransfer::new(
+            db,
             serde_json::from_slice::<DbInternalCommandWithData>(&value)?,
             epoch_num_internal_commands,
             total_num_internal_commands,
-        ));
+        );
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
             feetransfer: ft,
@@ -506,11 +524,12 @@ fn get_fee_transfers_for_state_hash(
                 .into_iter()
                 .map(|ft| FeetransferWithMeta {
                     canonical,
-                    feetransfer: Feetransfer::from((
+                    feetransfer: Feetransfer::new(
+                        db,
                         ft,
                         epoch_num_internal_commands,
                         total_num_internal_commands,
-                    )),
+                    ),
                     block: Some(pcb.clone()),
                 })
                 .filter(|ft| query.as_ref().is_none_or(|q| q.matches(ft)))
@@ -612,11 +631,12 @@ fn block_height_bound_query_handler(
         let feetransfer_with_meta = FeetransferWithMeta {
             canonical,
             block: Some(get_block(db, &state_hash)),
-            feetransfer: Feetransfer::from((
+            feetransfer: Feetransfer::new(
+                db,
                 serde_json::from_slice(&value)?,
                 epoch_num_internal_commands,
                 total_num_internal_commands,
-            )),
+            ),
         };
 
         if query
@@ -679,11 +699,12 @@ fn recipient_query_handler(
         let ft = FeetransferWithMeta {
             canonical,
             block: Some(get_block(db, &state_hash)),
-            feetransfer: Feetransfer::from((
+            feetransfer: Feetransfer::new(
+                db,
                 serde_json::from_slice(&value)?,
                 epoch_num_internal_commands,
                 total_num_internal_commands,
-            )),
+            ),
         };
 
         if query.as_ref().is_none_or(|q| q.matches(&ft)) {
