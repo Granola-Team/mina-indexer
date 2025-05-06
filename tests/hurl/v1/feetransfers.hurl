@@ -11,7 +11,9 @@ POST {{url}}
     query: { canonical: true }
   ) {
     stateHash
-    recipient
+    recipient {
+      publicKey
+    }
     fee
     type
     blockHeight
@@ -28,7 +30,7 @@ jsonpath "$.data.feetransfers" count == 101
 
 # first datum
 jsonpath "$.data.feetransfers[0].stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
-jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
+jsonpath "$.data.feetransfers[0].recipient.publicKey" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
 jsonpath "$.data.feetransfers[0].fee" == 10000000
 jsonpath "$.data.feetransfers[0].type" == "Fee_transfer"
 jsonpath "$.data.feetransfers[0].blockHeight" == 120
@@ -37,7 +39,7 @@ jsonpath "$.data.feetransfers[0].dateTime" == "2021-03-17T08:39:00.000Z"
 
 # last datum
 jsonpath "$.data.feetransfers[100].stateHash" == "3NK6gZY6xoC98wTJdmfprmfWxeEU2o1mtFgKN9vh8z27LjnowLrz"
-jsonpath "$.data.feetransfers[100].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+jsonpath "$.data.feetransfers[100].recipient.publicKey" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
 jsonpath "$.data.feetransfers[100].fee" == 720000000000
 jsonpath "$.data.feetransfers[100].type" == "Coinbase"
 jsonpath "$.data.feetransfers[100].blockHeight" == 70
@@ -62,7 +64,9 @@ POST {{url}}
       canonical: true
     }
   ) {
-    recipient
+    recipient {
+      publicKey
+    }
     type
     blockStateHash {
       stateHash
@@ -78,7 +82,7 @@ HTTP 200
 jsonpath "$.data.feetransfers" count == 2
 
 # only datum
-jsonpath "$.data.feetransfers[0].recipient" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
+jsonpath "$.data.feetransfers[0].recipient.publicKey" == "B62qjWwDxk5nGMXN32ffuMpMSp3wPa7BLB3AXHH5EYiczcRxDTF9uP4"
 jsonpath "$.data.feetransfers[0].blockStateHash.stateHash" == "3NLNyQC4XgQX2Q9H7fC2UxFZKY4xwwUZop8jVR24SWYNNE93FsnS"
 jsonpath "$.data.feetransfers[0].blockStateHash.total_num_blocks" == 204
 jsonpath "$.data.feetransfers[0].type" == "Coinbase"
@@ -98,14 +102,6 @@ POST {{url}}
     query: { canonical: true, blockHeight_lte: 120 }
   ) {
     blockHeight
-    blockStateHash {
-      stateHash
-    }
-    fee
-    recipient
-    type
-    dateTime
-    canonical
   }
 }
 ```
@@ -169,14 +165,6 @@ POST {{url}}
     }
   ) {
     blockHeight
-    blockStateHash {
-      stateHash
-    }
-    fee
-    recipient
-    type
-    dateTime
-    canonical
   }
 }
 ```
@@ -201,7 +189,9 @@ POST {{url}}
       blockHeight_lte: 100
     }
   ) {
-    recipient
+    recipient {
+      publicKey
+    }
     blockHeight
   }
 }
@@ -212,9 +202,10 @@ HTTP 200
 # total data count
 jsonpath "$.data.feetransfers" count == 2
 
-jsonpath "$.data.feetransfers[0].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+jsonpath "$.data.feetransfers[0].recipient.publicKey" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
 jsonpath "$.data.feetransfers[0].blockHeight" == 70
-jsonpath "$.data.feetransfers[1].recipient" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
+
+jsonpath "$.data.feetransfers[1].recipient.publicKey" == "B62qkHM9NT3nDefqUvSMe8qnfEfeXipqkzZrvoBXpfaC9m2BdYjWVJA"
 jsonpath "$.data.feetransfers[1].blockHeight" == 70
 
 duration < 1000
@@ -235,7 +226,9 @@ POST {{url}}
       blockHeight_lte: 120
     }
   ) {
-    recipient
+    recipient {
+      publicKey
+    }
     blockHeight
   }
 }
@@ -246,13 +239,16 @@ HTTP 200
 # total data count
 jsonpath "$.data.feetransfers" count == 4
 
-jsonpath "$.data.feetransfers[0].recipient" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
+jsonpath "$.data.feetransfers[0].recipient.publicKey" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
 jsonpath "$.data.feetransfers[0].blockHeight" == 109
-jsonpath "$.data.feetransfers[1].recipient" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
+
+jsonpath "$.data.feetransfers[1].recipient.publicKey" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
 jsonpath "$.data.feetransfers[1].blockHeight" == 109
-jsonpath "$.data.feetransfers[2].recipient" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
+
+jsonpath "$.data.feetransfers[2].recipient.publicKey" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
 jsonpath "$.data.feetransfers[2].blockHeight" == 97
-jsonpath "$.data.feetransfers[3].recipient" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
+
+jsonpath "$.data.feetransfers[3].recipient.publicKey" == "B62qkiJuTwdJBARAPGAvStuEa37kZVZPyDrQoUCuM7WQUmZZydNBmTf"
 jsonpath "$.data.feetransfers[3].blockHeight" == 97
 
 duration < 500

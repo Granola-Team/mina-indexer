@@ -16,7 +16,9 @@ POST {{url}}
     symbol
     account {
       publicKey
-      delegate
+      delegate {
+        publicKey
+      }
       balance
       nonce
       token
@@ -38,7 +40,7 @@ jsonpath "$.data.tokenHolders[0].symbol" ==  "MINU"
 
 # account data
 jsonpath "$.data.tokenHolders[0].account.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.tokenHolders[0].account.delegate" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokenHolders[0].account.delegate.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokenHolders[0].account.balance" == 100000000000000
 jsonpath "$.data.tokenHolders[0].account.nonce" == 0
 jsonpath "$.data.tokenHolders[0].account.token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
@@ -63,7 +65,9 @@ POST {{url}}
     symbol
     account {
       publicKey
-      delegate
+      delegate {
+        publicKey
+      }
       balance
       nonce
       token
@@ -85,7 +89,7 @@ jsonpath "$.data.tokenHolders[*].symbol" contains  "MINA"
 
 # MINA holder data
 jsonpath "$.data.tokenHolders[*].account.publicKey" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.tokenHolders[*].account.delegate" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokenHolders[*].account.delegate.publicKey" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokenHolders[*].account.balance" contains 0
 jsonpath "$.data.tokenHolders[*].account.nonce" contains 1
 jsonpath "$.data.tokenHolders[*].account.token" contains "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
@@ -98,7 +102,7 @@ jsonpath "$.data.tokenHolders[*].symbol" contains  "MINU"
 
 # MINU holder data
 jsonpath "$.data.tokenHolders[*].account.publicKey" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
-jsonpath "$.data.tokenHolders[*].account.delegate" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokenHolders[*].account.delegate.publicKey" contains "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokenHolders[*].account.balance" contains 100000000000000
 jsonpath "$.data.tokenHolders[*].account.nonce" contains 0
 jsonpath "$.data.tokenHolders[*].account.token" contains "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"

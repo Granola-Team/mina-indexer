@@ -14,7 +14,9 @@ POST {{url}}
     balance
     username
     nonce
-    delegate
+    delegate {
+      publicKey
+    }
     timeLocked
     is_genesis_account
   }
@@ -30,7 +32,7 @@ jsonpath "$.data.accounts" count == 1
 jsonpath "$.data.accounts[0].publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].balance" == 720020000000
 jsonpath "$.data.accounts[0].nonce" == 0
-jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
+jsonpath "$.data.accounts[0].delegate.publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 jsonpath "$.data.accounts[0].timeLocked" == false
 jsonpath "$.data.accounts[0].is_genesis_account" == true
 
@@ -86,7 +88,9 @@ POST {{url}}
     balance
     username
     nonce
-    delegate
+    delegate {
+      publicKey
+    }
     timeLocked
     timing {
       initial_minimum_balance
@@ -109,7 +113,7 @@ jsonpath "$.data.accounts[0].publicKey" == "B62qoTaYnDYrtmver4jnkgJbFU6iohjtALTU
 jsonpath "$.data.accounts[0].balance" == 502777775000000
 jsonpath "$.data.accounts[0].username" == "Unknown"
 jsonpath "$.data.accounts[0].nonce" == 0
-jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
+jsonpath "$.data.accounts[0].delegate.publicKey" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 
 # timing info
 jsonpath "$.data.accounts[0].timeLocked" == true
@@ -274,7 +278,9 @@ POST {{url}}
     balance
     username
     nonce
-    delegate
+    delegate {
+      publicKey
+    }
     timeLocked
     timing {
       initial_minimum_balance
@@ -295,7 +301,7 @@ jsonpath "$.data.accounts" count == 100
 jsonpath "$.data.accounts[0].publicKey" == "B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3"
 jsonpath "$.data.accounts[0].balance" == 75000000000000000
 jsonpath "$.data.accounts[0].nonce" == 0
-jsonpath "$.data.accounts[0].delegate" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
+jsonpath "$.data.accounts[0].delegate.publicKey" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
 jsonpath "$.data.accounts[0].timeLocked" == false
 jsonpath "$.data.accounts[0].timing" == null
 
@@ -303,7 +309,7 @@ jsonpath "$.data.accounts[0].timing" == null
 jsonpath "$.data.accounts[99].publicKey" == "B62qmKJxgh6h4i56hTXmkDL2Xpesm94NNm2Ev4ySSA4rCE2Z3JbfZhc"
 jsonpath "$.data.accounts[99].balance" == 1693980637751650
 jsonpath "$.data.accounts[99].nonce" == 0
-jsonpath "$.data.accounts[99].delegate" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
+jsonpath "$.data.accounts[99].delegate.publicKey" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
 jsonpath "$.data.accounts[99].timeLocked" == true
 jsonpath "$.data.accounts[99].timing.initial_minimum_balance" == 1000000000
 jsonpath "$.data.accounts[99].timing.cliff_time" == 345600
@@ -326,7 +332,9 @@ POST {{url}}
     balance
     username
     nonce
-    delegate
+    delegate {
+      publicKey
+    }
     timeLocked
     timing {
       initial_minimum_balance
@@ -347,14 +355,14 @@ jsonpath "$.data.accounts" count == 100
 jsonpath "$.data.accounts[0].publicKey" == "B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3"
 jsonpath "$.data.accounts[0].balance" == 75000000000000000
 jsonpath "$.data.accounts[0].nonce" == 0
-jsonpath "$.data.accounts[0].delegate" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
+jsonpath "$.data.accounts[0].delegate.publicKey" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
 jsonpath "$.data.accounts[0].timeLocked" == false
 
 # last datum
 jsonpath "$.data.accounts[99].publicKey" == "B62qmKJxgh6h4i56hTXmkDL2Xpesm94NNm2Ev4ySSA4rCE2Z3JbfZhc"
 jsonpath "$.data.accounts[99].balance" == 1693980637751650
 jsonpath "$.data.accounts[99].nonce" == 0
-jsonpath "$.data.accounts[99].delegate" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
+jsonpath "$.data.accounts[99].delegate.publicKey" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
 jsonpath "$.data.accounts[99].timeLocked" == true
 jsonpath "$.data.accounts[99].timing.initial_minimum_balance" == 1000000000
 jsonpath "$.data.accounts[99].timing.cliff_time" == 345600
