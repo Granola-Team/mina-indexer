@@ -118,6 +118,10 @@ pub struct StakesLedgerAccountWithMeta {
     /// Value num accounts
     #[graphql(name = "num_accounts")]
     num_accounts: u32,
+
+    /// Value epoch total currency (nanomina)
+    #[graphql(name = "epoch_total_currency")]
+    epoch_total_currency: u64,
 }
 
 #[derive(SimpleObject, Default)]
@@ -728,6 +732,7 @@ impl StakesLedgerAccountWithMeta {
                 .expect("total internal command count"),
             epoch_num_accounts: num_accounts,
             num_accounts,
+            epoch_total_currency: total_currency,
         }
     }
 }
