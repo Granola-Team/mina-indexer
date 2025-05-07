@@ -113,6 +113,10 @@
 
             cargoLock = {
               lockFile = ./rust/Cargo.lock;
+              # Needed until a fix for https://github.com/async-graphql/async-graphql/issues/1703 is published
+              outputHashes = {
+                "async-graphql-7.0.16" = "sha256-O/r89nSwwDL7u06NgQhzjgKyrEuMS4euULPT5SmUA4E=";
+              };
             };
 
             nativeBuildInputs = buildDependencies;
