@@ -137,11 +137,10 @@ impl TopStakersQueryRoot {
                 db.get_username(&pk)?,
                 pk,
                 StakesDelegationTotals {
-                    count_delegates: delegations.count_delegates.unwrap_or_default(),
-                    total_delegated: Amount(delegations.total_delegated.unwrap_or_default())
-                        .to_f64(),
-                    total_delegated_nanomina: delegations.total_delegated.unwrap_or_default(),
                     total_currency,
+                    count_delegates: delegations.count_delegates,
+                    total_delegated: Amount(delegations.total_delegated).to_f64(),
+                    total_delegated_nanomina: delegations.total_delegated,
                     delegates: delegations.delegates.into_iter().map(|pk| pk.0).collect(),
                 },
             );

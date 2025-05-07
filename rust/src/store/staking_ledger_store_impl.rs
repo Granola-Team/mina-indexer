@@ -93,10 +93,7 @@ impl StakingLedgerStore for IndexerStore {
             staking_ledger_sort_key(
                 genesis_state_hash,
                 epoch,
-                staking_account_with_delegation
-                    .delegation
-                    .total_delegated
-                    .unwrap_or_default(),
+                staking_account_with_delegation.delegation.total_delegated,
                 pk,
             ),
             &account_serde_bytes,
@@ -188,7 +185,7 @@ impl StakingLedgerStore for IndexerStore {
                 .delegations
                 .get(&pk)
                 .cloned()
-                .expect("delegation exists");
+                .unwrap_or_default();
 
             self.set_staking_account(
                 &pk,
@@ -477,10 +474,9 @@ impl StakingLedgerStore for IndexerStore {
                     let account = self
                         .get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
                         .with_context(|| format!("epoch {epoch}, account {pk}"))?;
-                    if let Some(total_delegated) = account.total_delegated {
-                        assert_eq!(stake, total_delegated);
-                        total_delegations += total_delegated;
-                    }
+
+                    assert_eq!(stake, account.total_delegated);
+                    total_delegations += account.total_delegated;
 
                     delegations.insert(pk, account.clone());
                 }

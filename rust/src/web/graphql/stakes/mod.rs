@@ -612,8 +612,8 @@ impl StakesLedgerAccountWithMeta {
         total_currency: u64,
     ) -> Self {
         let pk = &account.pk;
-        let total_delegated_nanomina = delegations.total_delegated.unwrap_or_default();
-        let count_delegates = delegations.count_delegates.unwrap_or_default();
+        let total_delegated_nanomina = delegations.total_delegated;
+        let count_delegates = delegations.count_delegates;
 
         let delegates: Vec<String> = delegations
             .delegates
@@ -831,15 +831,17 @@ mod tests {
         let store = std::sync::Arc::new(create_indexer_store()?);
 
         let pk = PublicKey::arbitrary(g);
-        let account = StakingAccount {
-            pk: pk.clone(),
-            ..Default::default()
-        };
-
         let epoch = u32::arbitrary(g);
         let ledger_hash = LedgerHash::arbitrary(g);
         let genesis_state_hash = StateHash::arbitrary(g);
         let total_currency = u64::arbitrary(g);
+
+        let account = StakingAccount {
+            pk: pk.clone(),
+            delegate: pk.clone(),
+            balance: total_currency,
+            ..Default::default()
+        };
 
         let staking_ledger = StakingLedger {
             epoch,

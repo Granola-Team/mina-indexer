@@ -788,17 +788,20 @@ pub async fn handle_connection(
                     let count_delegates = aggregated_delegations
                         .delegations
                         .get(&pk)
-                        .and_then(|agg_del| agg_del.count_delegates);
+                        .map(|agg_del| agg_del.count_delegates)
+                        .unwrap_or_default();
                     let total_delegated = aggregated_delegations
                         .delegations
                         .get(&pk)
-                        .and_then(|agg_del| agg_del.total_delegated);
+                        .map(|agg_del| agg_del.total_delegated)
+                        .unwrap_or_default();
                     let delegates = aggregated_delegations
                         .delegations
                         .get(&pk)
                         .map_or(vec![], |agg_del| {
                             agg_del.delegates.iter().cloned().collect()
                         });
+
                     ServerCliResponse::Success(serde_json::to_string_pretty(
                         &AggregatedEpochStakeDelegation {
                             pk,
