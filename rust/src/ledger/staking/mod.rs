@@ -85,9 +85,11 @@ pub struct AggregatedEpochStakeDelegations {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EpochStakeDelegation {
     pub pk: PublicKey,
-    pub count_delegates: Option<u32>,
-    pub total_delegated: Option<u64>,
     pub delegates: HashSet<PublicKey>,
+    pub count_delegates: u32,
+
+    /// Total delegated nanomina
+    pub total_delegated: u64,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,9 +98,11 @@ pub struct AggregatedEpochStakeDelegation {
     pub epoch: u32,
     pub network: Network,
     pub total_stake: u64,
-    pub count_delegates: Option<u32>,
-    pub total_delegated: Option<u64>,
+    pub count_delegates: u32,
     pub delegates: Vec<PublicKey>,
+
+    /// Total delegated nanomina
+    pub total_delegated: u64,
 }
 
 impl From<StakingAccountJson> for StakingAccount {
@@ -251,6 +255,7 @@ impl StakingLedger {
         crate::utility::functions::is_valid_file_name(path, &LedgerHash::is_valid)
     }
 
+    /// Split a valid staking ledger path into constituent parts
     pub fn split_ledger_path(path: &Path) -> (Network, u32, LedgerHash) {
         let (height, hash) = extract_height_and_hash(path);
         let network = extract_network(path);
@@ -317,60 +322,46 @@ impl StakingLedger {
     /// If the public key has delegated, they cannot be delegated to
     pub fn aggregate_delegations(&self) -> anyhow::Result<AggregatedEpochStakeDelegations> {
         let mut delegations = HashMap::new();
+
         self.staking_ledger
             .iter()
             .for_each(|(pk, staking_account)| {
                 let balance = staking_account.balance;
                 let delegate = staking_account.delegate.clone();
 
-                if *pk != delegate {
-                    delegations.insert(pk.clone(), None);
-                }
-                match delegations.insert(
+                if let Some(EpochStakeDelegation {
+                    pk: delegate,
+                    total_delegated,
+                    count_delegates,
+                    mut delegates,
+                }) = delegations.insert(
                     delegate.clone(),
-                    Some(EpochStakeDelegation {
+                    EpochStakeDelegation {
                         pk: delegate.clone(),
-                        total_delegated: Some(balance),
-                        count_delegates: Some(1),
-                        delegates: HashSet::from([pk.clone(); 1]),
-                    }),
+                        total_delegated: balance,
+                        count_delegates: 1,
+                        delegates: HashSet::from([pk.clone()]),
+                    },
                 ) {
-                    None => (), // first delegation
-                    Some(None) => {
-                        // delegated to another account
-                        delegations.insert(delegate.clone(), None);
-                    }
-                    Some(Some(EpochStakeDelegation {
-                        pk: delegate,
-                        total_delegated,
-                        count_delegates,
-                        mut delegates,
-                    })) => {
-                        // accumulate delegation
-                        delegates.insert(pk.clone());
-                        delegations.insert(
-                            delegate.clone(),
-                            Some(EpochStakeDelegation {
-                                pk: delegate,
-                                total_delegated: total_delegated.map(|acc| acc + balance),
-                                count_delegates: count_delegates.map(|acc| acc + 1),
-                                delegates,
-                            }),
-                        );
-                    }
+                    // accumulate delegation
+                    delegates.insert(pk.clone());
+
+                    delegations.insert(
+                        delegate.clone(),
+                        EpochStakeDelegation {
+                            delegates,
+                            pk: delegate,
+                            total_delegated: total_delegated + balance,
+                            count_delegates: count_delegates + 1,
+                        },
+                    );
                 }
             });
 
-        let total_delegations = delegations.values().fold(0, |acc, x| {
-            acc + x
-                .as_ref()
-                .map(|x| x.total_delegated.unwrap_or_default())
-                .unwrap_or_default()
-        });
-        let delegations: HashMap<PublicKey, EpochStakeDelegation> = delegations
-            .into_iter()
-            .map(|(pk, del)| (pk, del.unwrap_or_default()))
-            .collect();
+        let total_delegations = delegations
+            .values()
+            .fold(0, |acc, x| acc + x.total_delegated);
+        assert_eq!(total_delegations, self.total_currency);
 
         Ok(AggregatedEpochStakeDelegations {
             delegations,
@@ -425,6 +416,7 @@ mod tests {
             staking_ledger.ledger_hash.0,
             "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
         );
+
         Ok(())
     }
 
@@ -434,6 +426,7 @@ mod tests {
 
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
         let staking_ledger = StakingLedger::parse_file(&path).await?;
+
         let AggregatedEpochStakeDelegations {
             epoch,
             network,
@@ -452,10 +445,11 @@ mod tests {
 
         let pk = PublicKey::from("B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4");
         let pk_delegations = delegations.get(&pk).cloned().unwrap();
+
         assert_eq!(pk_delegations.pk, pk);
-        assert_eq!(pk_delegations.count_delegates, Some(25));
-        assert_eq!(pk_delegations.total_delegated, Some(13277838425206999));
-        assert_eq!(total_delegations, 794268782956784283);
+        assert_eq!(pk_delegations.count_delegates, 25);
+        assert_eq!(pk_delegations.total_delegated, 13277838425206999);
+        assert_eq!(total_delegations, 805385692840039233);
         assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
 
         let expected_delegates: HashSet<PublicKey> = [
