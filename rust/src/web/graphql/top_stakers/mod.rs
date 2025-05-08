@@ -31,23 +31,30 @@ pub struct TopStakersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopStakerAccount {
+    /// Value staker username
     username: String,
 
+    /// Value staker public key
     #[graphql(name = "public_key")]
     public_key: String,
 
+    /// Value epoch delegation totals
     #[graphql(name = "delegation_totals")]
     delegation_totals: StakesDelegationTotals,
 
+    /// Value epoch blocks produced count
     #[graphql(name = "num_blocks_produced")]
     num_blocks_produced: u32,
 
+    /// Value epoch canonical blocks produced count
     #[graphql(name = "num_canonical_blocks_produced")]
     num_canonical_blocks_produced: u32,
 
+    /// Value epoch supercharged blocks count
     #[graphql(name = "num_supercharged_blocks_produced")]
     num_supercharged_blocks_produced: u32,
 
+    /// Value epoch slots produced count
     #[graphql(name = "num_slots_produced")]
     num_slots_produced: u32,
 }
