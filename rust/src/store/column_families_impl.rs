@@ -1501,7 +1501,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// CF for sorting staking ledger accounts by stake (i.e. total delegations)
     /// ```
     /// key: [staking_ledger_sort_key]
-    /// val: [EpochStakeDelegations] serde bytes
+    /// val: [StakingAccountWithEpochDelegation] serde bytes
     fn staking_ledger_stake_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-stake-sort")

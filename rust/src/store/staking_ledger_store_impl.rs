@@ -474,11 +474,11 @@ impl StakingLedgerStore for IndexerStore {
                     break;
                 }
 
-                let account: EpochStakeDelegation = serde_json::from_slice(&value)?;
-                assert_eq!(stake, account.total_delegated);
+                let account: StakingAccountWithEpochDelegation = serde_json::from_slice(&value)?;
+                assert_eq!(stake, account.delegation.total_delegated);
 
-                total_delegations += account.total_delegated;
-                delegations.insert(pk, account);
+                total_delegations += account.delegation.total_delegated;
+                delegations.insert(pk, account.delegation);
             }
 
             return Ok(Some(AggregatedEpochStakeDelegations {

@@ -773,7 +773,11 @@ pub async fn handle_connection(
                 genesis_state_hash,
                 public_key: pk,
             }) => {
-                debug!("Received staking ledger account command for pk {pk} epoch {epoch}");
+                debug!(
+                    "Received staking ledger account command for pk {} epoch {} genesis {}",
+                    pk, epoch, genesis_state_hash,
+                );
+
                 if !StateHash::is_valid(&genesis_state_hash) {
                     invalid_state_hash(&genesis_state_hash)
                 } else if !PublicKey::is_valid(&pk) {
@@ -784,7 +788,7 @@ pub async fn handle_connection(
                     let pk: PublicKey = pk.into();
                     let epoch = aggregated_delegations.epoch;
                     let network = aggregated_delegations.network;
-                    let total_delegations = aggregated_delegations.total_delegations;
+                    let total_stake = aggregated_delegations.total_delegations;
                     let count_delegates = aggregated_delegations
                         .delegations
                         .get(&pk)
@@ -809,7 +813,7 @@ pub async fn handle_connection(
                             network,
                             count_delegates,
                             total_delegated,
-                            total_stake: total_delegations,
+                            total_stake,
                             delegates,
                         },
                     )?)

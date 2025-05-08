@@ -1389,7 +1389,7 @@ test_staking_delegations() {
 	assert '0' $epoch
 	assert $pk $public_key
 	assert 'mainnet' $network
-	assert '794268782956784283' $total_stake
+	assert '805385692840039233' $total_stake
 	assert '2' $count_delegates
 	assert '57617370302858700' $total_delegated
 
