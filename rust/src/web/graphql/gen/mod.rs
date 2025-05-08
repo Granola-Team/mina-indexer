@@ -563,11 +563,10 @@ pub struct BlockQueryInput {
     pub coinbase_receiver: Option<BlockCoinbaseReceiverQueryInput>,
     pub protocol_state: Option<BlockProtocolStateQueryInput>,
     pub canonical: Option<bool>,
-    pub or: Option<Vec<BlockQueryInput>>,
-    pub and: Option<Vec<BlockQueryInput>>,
     pub state_hash: Option<String>,
     pub block_height: Option<u32>,
     pub genesis_state_hash: Option<String>,
+    pub block_stake_winner: Option<String>,
 
     #[graphql(name = "unique_block_producers_last_n_blocks")]
     pub unique_block_producers_last_n_blocks: Option<u32>,
@@ -586,6 +585,12 @@ pub struct BlockQueryInput {
 
     #[graphql(name = "blockHeight_lte")]
     pub block_height_lte: Option<u32>,
+
+    /// Boolean or
+    pub or: Option<Vec<BlockQueryInput>>,
+
+    /// Boolean and
+    pub and: Option<Vec<BlockQueryInput>>,
 }
 
 #[derive(InputObject)]

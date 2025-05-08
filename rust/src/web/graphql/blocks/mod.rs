@@ -526,6 +526,7 @@ impl BlockQueryInput {
             block_height: blockchain_length,
             global_slot_since_genesis,
             genesis_state_hash,
+            block_stake_winner,
             block_height_gt,
             block_height_gte,
             block_height_lt,
@@ -596,6 +597,13 @@ impl BlockQueryInput {
         // genesis state hash
         if let Some(genesis_state_hash) = genesis_state_hash {
             if block.block.genesis_state_hash != *genesis_state_hash {
+                return false;
+            }
+        }
+
+        // block stake winner
+        if let Some(block_stake_winner) = block_stake_winner {
+            if block.block.winner_account.public_key != *block_stake_winner {
                 return false;
             }
         }
