@@ -1420,8 +1420,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger accounts
     /// ```
-    /// - key: [staking_ledger_account_key]
-    /// - val: [Account] serde bytes
+    /// key: [staking_ledger_account_key]
+    /// val: [Account] serde bytes
     fn staking_ledger_accounts_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-accounts")
@@ -1430,8 +1430,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing aggregated staking delegations
     /// ```
-    /// - key: [staking_ledger_account_key]
-    /// - val: aggregated epoch delegations serde bytes
+    /// key: [staking_ledger_account_key]
+    /// val: [StakingAccountWithEpochDelegation] serde bytes
     fn staking_delegations_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-delegations")
@@ -1440,8 +1440,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing aggregated staking delegations
     /// ```
-    /// - key: [staking_ledger_epoch_key]
-    /// - val: b""
+    /// key: [staking_ledger_epoch_key]
+    /// val: b""
     fn staking_ledger_persisted_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-persisted")
@@ -1450,8 +1450,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger hashes
     /// ```
-    /// - key: [staking_ledger_epoch_key_prefix]
-    /// - val: [LedgerHash] bytes
+    /// key: [staking_ledger_epoch_key_prefix]
+    /// val: [LedgerHash] bytes
     fn staking_ledger_epoch_to_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-epoch-to-hash")
@@ -1460,8 +1460,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger epochs
     /// ```
-    /// - key: [LedgerHash] bytes
-    /// - val: [u32] BE bytes
+    /// key: [LedgerHash] bytes
+    /// val: [u32] BE bytes
     fn staking_ledger_hash_to_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-hash-to-epoch")
@@ -1470,8 +1470,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger genesis state hashes
     /// ```
-    /// - key: [LedgerHash] bytes
-    /// - val: [StateHash] bytes
+    /// key: [LedgerHash] bytes
+    /// val: [StateHash] bytes
     fn staking_ledger_genesis_hash_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-genesis-hash")
@@ -1480,8 +1480,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing staking ledger total currencies
     /// ```
-    /// - key: [LedgerHash] bytes
-    /// - val: [u64] BE bytes
+    /// key: [LedgerHash] bytes
+    /// val: [u64] BE bytes
     fn staking_ledger_total_currency_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-total-currency")
@@ -1490,8 +1490,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting staking ledger accounts by balance
     /// ```
-    /// - key: [staking_ledger_sort_key]
-    /// - val: b""
+    /// key: [staking_ledger_sort_key]
+    /// val: [StakingAccountWithEpochDelegation] serde bytes
     fn staking_ledger_balance_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-balance-sort")
@@ -1500,8 +1500,8 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting staking ledger accounts by stake (i.e. total delegations)
     /// ```
-    /// - key: [staking_ledger_sort_key]
-    /// - val: b""
+    /// key: [staking_ledger_sort_key]
+    /// val: [EpochStakeDelegations] serde bytes
     fn staking_ledger_stake_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-stake-sort")
@@ -1510,8 +1510,11 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for storing per epoch total number of staking ledger accounts
     /// ```
-    /// - key: epoch ([u32] BE bytes)
-    /// - value: number of staking ledger accounts in epoch ([u32] BE bytes)
+    /// key: {genesis}{epoch}
+    /// val: [u32] BE bytes
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
     fn staking_ledger_accounts_count_epoch_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staking-ledger-accounts-count-epoch")
