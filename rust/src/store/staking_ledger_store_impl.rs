@@ -93,7 +93,9 @@ impl StakingLedgerStore for IndexerStore {
             staking_ledger_sort_key(
                 genesis_state_hash,
                 epoch,
-                staking_account_with_delegation.delegation.total_delegated,
+                staking_account_with_delegation
+                    .delegation
+                    .map_or(0, |d| d.total_delegated),
                 pk,
             ),
             &account_serde_bytes,
@@ -181,14 +183,7 @@ impl StakingLedgerStore for IndexerStore {
         // add staking ledger accounts & per epoch balance-sorted data
         let aggregated_delegations = staking_ledger.aggregate_delegations()?;
         for (pk, account) in staking_ledger.staking_ledger {
-            let delegation = aggregated_delegations
-                .delegations
-                .get(&pk)
-                .cloned()
-                .unwrap_or_else(|| EpochStakeDelegation {
-                    pk: pk.clone(),
-                    ..Default::default()
-                });
+            let delegation = aggregated_delegations.delegations.get(&pk).cloned();
             self.set_staking_account(
                 &pk,
                 epoch,
@@ -475,10 +470,15 @@ impl StakingLedgerStore for IndexerStore {
                 }
 
                 let account: StakingAccountWithEpochDelegation = serde_json::from_slice(&value)?;
-                assert_eq!(stake, account.delegation.total_delegated);
+                assert_eq!(
+                    stake,
+                    account.delegation.as_ref().map_or(0, |d| d.total_delegated)
+                );
+                total_delegations += account.delegation.as_ref().map_or(0, |d| d.total_delegated);
 
-                total_delegations += account.delegation.total_delegated;
-                delegations.insert(pk, account.delegation);
+                if let Some(delegation) = account.delegation {
+                    delegations.insert(pk, delegation);
+                }
             }
 
             return Ok(Some(AggregatedEpochStakeDelegations {

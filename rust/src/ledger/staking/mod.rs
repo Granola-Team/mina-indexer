@@ -321,10 +321,6 @@ impl StakingLedger {
     /// Aggregate each public key's staking delegations and total delegations
     /// If the public key has delegated, they cannot be delegated to
     pub fn aggregate_delegations(&self) -> anyhow::Result<AggregatedEpochStakeDelegations> {
-        let total_staked_currency = self
-            .staking_ledger
-            .values()
-            .fold(0, |acc, account| acc + account.balance);
         let mut delegations = HashMap::new();
 
         self.staking_ledger
@@ -366,7 +362,7 @@ impl StakingLedger {
             (acc.0 + x.total_delegated, acc.1 + x.count_delegates)
         });
 
-        assert_eq!(total_delegations, total_staked_currency);
+        assert_eq!(total_delegations, self.total_currency);
         assert_eq!(total_delegators, self.staking_ledger.len() as u32);
 
         Ok(AggregatedEpochStakeDelegations {

@@ -327,37 +327,28 @@ impl StakesQueryRoot {
                 if let Some(mut account) =
                     db.get_staking_account(&pk, epoch, &genesis_state_hash)?
                 {
-                    if let Some(delegation) =
-                        db.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
-                    {
-                        // add username to account
-                        account.username = db.get_username(&pk)?.map(|u| u.0);
+                    // add username to account
+                    account.username = db.get_username(&pk)?.map(|u| u.0);
 
-                        if StakesQueryInput::matches_staking_account(
-                            query.as_ref(),
-                            &account,
-                            &ledger_hash,
-                            &genesis_state_hash,
+                    if StakesQueryInput::matches_staking_account(
+                        query.as_ref(),
+                        &account,
+                        &ledger_hash,
+                        &genesis_state_hash,
+                        epoch,
+                    ) {
+                        let account = StakesLedgerAccountWithMeta::new(
+                            db,
+                            account,
+                            db.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?,
                             epoch,
-                        ) {
-                            let account = StakesLedgerAccountWithMeta::new(
-                                db,
-                                account,
-                                delegation,
-                                epoch,
-                                ledger_hash.to_owned(),
-                                total_currency,
-                            );
+                            ledger_hash.to_owned(),
+                            total_currency,
+                        );
 
-                            if StakesQueryInput::matches(query.as_ref(), &account) {
-                                accounts.push(account);
-                            }
+                        if StakesQueryInput::matches(query.as_ref(), &account) {
+                            accounts.push(account);
                         }
-                    } else {
-                        return Err(async_graphql::Error::new(format!(
-                            "No staking delegations found for pk {} epoch {} genesis {}",
-                            pk, epoch, genesis_state_hash,
-                        )));
                     }
                 } else {
                     return Err(async_graphql::Error::new(format!(
@@ -606,20 +597,18 @@ impl StakesLedgerAccountWithMeta {
     pub fn new(
         db: &Arc<IndexerStore>,
         account: StakingAccount,
-        delegations: EpochStakeDelegation,
+        delegations: Option<EpochStakeDelegation>,
         epoch: u32,
         ledger_hash: LedgerHash,
         total_currency: u64,
     ) -> Self {
         let pk = &account.pk;
-        let total_delegated_nanomina = delegations.total_delegated;
-        let count_delegates = delegations.count_delegates;
+        let total_delegated_nanomina = delegations.as_ref().map_or(0, |d| d.total_delegated);
+        let count_delegates = delegations.as_ref().map_or(0, |d| d.count_delegates);
 
-        let delegates: Vec<String> = delegations
-            .delegates
-            .into_iter()
-            .map(|pk| pk.0.clone())
-            .collect();
+        let delegates: Vec<String> = delegations.as_ref().map_or(vec![], |d| {
+            d.delegates.iter().map(|pk| pk.0.clone()).collect()
+        });
         let total_delegated = Amount(total_delegated_nanomina).to_f64();
 
         let timing = account.timing.as_ref().map(|timing| Timing {
@@ -866,25 +855,16 @@ mod tests {
 
             for pk in username_pks {
                 if let Some(account) = store.get_staking_account(&pk, epoch, &genesis_state_hash)? {
-                    if let Some(delegation) =
-                        store.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
-                    {
-                        let account = StakesLedgerAccountWithMeta::new(
-                            &store,
-                            account,
-                            delegation,
-                            epoch,
-                            ledger_hash.to_owned(),
-                            total_currency,
-                        );
+                    let account = StakesLedgerAccountWithMeta::new(
+                        &store,
+                        account,
+                        store.get_epoch_delegations(&pk, epoch, &genesis_state_hash)?,
+                        epoch,
+                        ledger_hash.to_owned(),
+                        total_currency,
+                    );
 
-                        accounts.push(account);
-                    } else {
-                        return Err(async_graphql::Error::new(format!(
-                            "No staking delegations found for pk {} epoch {} genesis {}",
-                            pk, epoch, genesis_state_hash,
-                        )));
-                    }
+                    accounts.push(account);
                 } else {
                     return Err(async_graphql::Error::new(format!(
                         "No staking account found for pk {} epoch {} genesis {}",

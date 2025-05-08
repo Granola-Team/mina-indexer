@@ -123,7 +123,7 @@ pub trait StakingLedgerStore {
     /// Per epoch staking ledger account iterator via balance
     /// ```
     /// key: [staking_ledger_sort_key]
-    /// val: b""
+    /// val: [StakingAccountWithEpochDelegation] serde bytes
     fn staking_ledger_account_balance_iterator(
         &self,
         epoch: u32,
@@ -134,7 +134,7 @@ pub trait StakingLedgerStore {
     /// Per epoch staking ledger account iterator via stake (total delegations)
     /// ```
     /// key: [staking_ledger_sort_key]
-    /// val: b""
+    /// val: [StakingAccountWithEpochDelegation] serde bytes
     fn staking_ledger_account_stake_iterator(
         &self,
         epoch: u32,
@@ -152,5 +152,5 @@ pub trait StakingLedgerStore {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct StakingAccountWithEpochDelegation {
     pub account: StakingAccount,
-    pub delegation: EpochStakeDelegation,
+    pub delegation: Option<EpochStakeDelegation>,
 }
