@@ -1414,8 +1414,10 @@ impl IndexerState {
                     {
                         if let Some((block, _)) = indexer_store.get_block(state_hash)? {
                             assert_eq!(block.state_hash(), *state_hash);
+
                             return Ok(());
                         }
+
                         if state_hash.0 == MAINNET_GENESIS_PREV_STATE_HASH {
                             return Ok(());
                         } else {
@@ -1449,10 +1451,17 @@ impl IndexerState {
                             indexer_store.build_staking_ledger(*epoch, genesis_state_hash)?
                         {
                             // check delegation calculations
+                            let calculated_delegations = staking_ledger.aggregate_delegations()?;
                             assert_eq!(
                                 aggregated_delegations,
-                                staking_ledger.aggregate_delegations()?
+                                calculated_delegations,
+                                "aggregated delegations epoch {} genesis {} counts {} & {}",
+                                epoch,
+                                genesis_state_hash,
+                                aggregated_delegations.delegations.len(),
+                                calculated_delegations.delegations.len(),
                             );
+
                             return Ok(());
                         }
 

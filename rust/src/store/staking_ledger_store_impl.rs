@@ -185,8 +185,10 @@ impl StakingLedgerStore for IndexerStore {
                 .delegations
                 .get(&pk)
                 .cloned()
-                .unwrap_or_default();
-
+                .unwrap_or_else(|| EpochStakeDelegation {
+                    pk: pk.clone(),
+                    ..Default::default()
+                });
             self.set_staking_account(
                 &pk,
                 epoch,
@@ -213,7 +215,7 @@ impl StakingLedgerStore for IndexerStore {
             self.add_event(&IndexerEvent::Db(DbEvent::StakingLedger(
                 DbStakingLedgerEvent::AggregateDelegations {
                     epoch,
-                    genesis_state_hash: genesis_state_hash.clone(),
+                    genesis_state_hash,
                 },
             )))?;
         }
@@ -414,7 +416,7 @@ impl StakingLedgerStore for IndexerStore {
                         .get_staking_account(&pk, epoch, genesis_state_hash)?
                         .with_context(|| {
                             format!(
-                                "staking account: epoch {} pk {} genesis {:?}",
+                                "staking account epoch {} pk {} genesis {}",
                                 epoch, pk, genesis_state_hash
                             )
                         })
@@ -443,53 +445,50 @@ impl StakingLedgerStore for IndexerStore {
         epoch: u32,
         genesis_state_hash: &StateHash,
     ) -> Result<Option<AggregatedEpochStakeDelegations>> {
-        trace!("Building epoch {epoch} aggregated delegations");
+        trace!(
+            "Building epoch aggregated delegations epoch {} genesis {}",
+            epoch,
+            genesis_state_hash,
+        );
 
         if let Some(ledger_hash) =
             self.get_staking_ledger_hash_by_epoch(epoch, genesis_state_hash)?
         {
-            if let (network, Some(genesis_state_hash)) = (
-                self.get_current_network()?,
-                self.get_genesis_state_hash(&ledger_hash)?,
-            ) {
-                trace!("Staking ledger {network} (epoch {epoch}): {ledger_hash}");
+            let network = self.get_current_network()?;
+            trace!("Staking ledger {network} (epoch {epoch}): {ledger_hash}");
 
-                let mut delegations = HashMap::new();
-                let mut total_delegations = 0;
+            let mut delegations = HashMap::new();
+            let mut total_delegations = 0;
 
-                for (key, _value) in self
-                    .staking_ledger_account_stake_iterator(
-                        epoch,
-                        &genesis_state_hash,
-                        Direction::Reverse,
-                    )
-                    .flatten()
-                {
-                    let (key_genesis, key_epoch, stake, pk) = split_staking_ledger_sort_key(&key)?;
-                    if key_genesis != genesis_state_hash || key_epoch != epoch {
-                        // no longer the staking ledger of interest
-                        break;
-                    }
-
-                    let account = self
-                        .get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
-                        .with_context(|| format!("epoch {epoch}, account {pk}"))?;
-
-                    assert_eq!(stake, account.total_delegated);
-                    total_delegations += account.total_delegated;
-
-                    delegations.insert(pk, account.clone());
+            for (key, value) in self
+                .staking_ledger_account_stake_iterator(
+                    epoch,
+                    genesis_state_hash,
+                    Direction::Reverse,
+                )
+                .flatten()
+            {
+                let (key_genesis, key_epoch, stake, pk) = split_staking_ledger_sort_key(&key)?;
+                if key_genesis != *genesis_state_hash || key_epoch != epoch {
+                    // no longer the staking ledger of interest
+                    break;
                 }
 
-                return Ok(Some(AggregatedEpochStakeDelegations {
-                    epoch,
-                    network,
-                    ledger_hash,
-                    delegations,
-                    total_delegations,
-                    genesis_state_hash: genesis_state_hash.clone(),
-                }));
+                let account: EpochStakeDelegation = serde_json::from_slice(&value)?;
+                assert_eq!(stake, account.total_delegated);
+
+                total_delegations += account.total_delegated;
+                delegations.insert(pk, account);
             }
+
+            return Ok(Some(AggregatedEpochStakeDelegations {
+                epoch,
+                network,
+                ledger_hash,
+                delegations,
+                total_delegations,
+                genesis_state_hash: genesis_state_hash.clone(),
+            }));
         }
 
         Ok(None)
