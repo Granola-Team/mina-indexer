@@ -25,6 +25,7 @@ pub mod version_store_impl;
 pub mod zkapp_store_impl;
 
 use self::fixed_keys::FixedKeys;
+use crate::base::username::off_chain::OffChainUsernames;
 use anyhow::{anyhow, bail, Context};
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -318,6 +319,12 @@ impl IndexerStore {
 
         let version = primary.get_db_version().expect("db version exists");
         persist_indexer_version(&version, path)?;
+
+        let off_chain_usernames = OffChainUsernames::new()?;
+        for (pk, username) in off_chain_usernames.usernames {
+            use username::UsernameStore;
+            primary.add_username(pk, &username)?;
+        }
 
         Ok(primary)
     }
