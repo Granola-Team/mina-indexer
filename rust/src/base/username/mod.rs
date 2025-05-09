@@ -16,7 +16,7 @@ pub struct Username(pub String);
 impl Username {
     pub const MAX_LEN: usize = MEMO_LEN - NAME_SERVICE_MEMO_PREFIX.len();
 
-    pub fn is_valid(username: &str) -> bool {
+    fn is_valid(username: &str) -> bool {
         username.len() <= Self::MAX_LEN
     }
 
