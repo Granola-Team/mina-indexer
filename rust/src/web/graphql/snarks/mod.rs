@@ -1,6 +1,6 @@
 //! GraphQL `snarks` endpoint
 
-use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity, pk::PK};
+use super::{db, gen::BlockQueryInput, get_block, get_block_canonicity, pk::ProverPK};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},
@@ -18,7 +18,8 @@ pub struct Snark {
     pub fee: u64,
 
     /// Value SNARK prover
-    pub prover: PK,
+    #[graphql(flatten)]
+    pub prover: ProverPK,
 
     /// Value SNARK block
     pub block: SnarkBlock,
@@ -499,7 +500,7 @@ impl Snark {
     ) -> Self {
         Snark {
             fee: snark.fee.0,
-            prover: PK::new(db, snark.prover),
+            prover: ProverPK::new(db, snark.prover),
             block: SnarkBlock {
                 state_hash: snark.state_hash.0,
             },
