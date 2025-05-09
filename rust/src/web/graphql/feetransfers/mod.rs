@@ -4,7 +4,7 @@ use super::{
     blocks::block::{Block, BlockWithoutCanonicity},
     gen::BlockQueryInput,
     get_block, get_block_canonicity,
-    pk::PK,
+    pk::RecipientPK,
 };
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
@@ -25,19 +25,20 @@ use std::sync::Arc;
 
 #[derive(SimpleObject, Debug)]
 pub struct Feetransfer {
-    /// Value state hash
+    /// Value block state hash
     pub state_hash: String,
 
-    /// Value fee in nanomina
+    /// Value fee (nanomina)
     pub fee: u64,
 
-    /// Value recipient
-    pub recipient: PK,
+    /// Value fee transfer recipient
+    #[graphql(flatten)]
+    pub recipient: RecipientPK,
 
     /// Value block height
     pub block_height: u32,
 
-    /// Value date time
+    /// Value block date time
     pub date_time: String,
 
     /// Value fee transfer kind
@@ -320,7 +321,7 @@ impl FeetransferQueryInput {
         }
 
         if let Some(recipient) = recipient.as_ref() {
-            if ft.feetransfer.recipient.public_key != *recipient {
+            if ft.feetransfer.recipient.recipient != *recipient {
                 return false;
             }
         }
@@ -403,17 +404,8 @@ impl Feetransfer {
                 date_time,
                 block_height,
                 ..
-            } => Self {
-                state_hash: state_hash.0,
-                fee: amount,
-                recipient: PK::new(db, receiver),
-                feetransfer_kind: kind.to_string(),
-                block_height,
-                date_time: millis_to_iso_date_string(date_time),
-                epoch_num_internal_commands,
-                total_num_internal_commands,
-            },
-            DbInternalCommandWithData::Coinbase {
+            }
+            | DbInternalCommandWithData::Coinbase {
                 receiver,
                 amount,
                 state_hash,
@@ -423,7 +415,7 @@ impl Feetransfer {
             } => Self {
                 state_hash: state_hash.0,
                 fee: amount,
-                recipient: PK::new(db, receiver),
+                recipient: RecipientPK::new(db, receiver),
                 feetransfer_kind: kind.to_string(),
                 block_height,
                 date_time: millis_to_iso_date_string(date_time),
