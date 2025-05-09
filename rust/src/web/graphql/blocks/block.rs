@@ -11,7 +11,11 @@ use crate::{
     ledger::coinbase::Coinbase,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
-    web::graphql::{get_block_canonicity, transactions::TransactionWithoutBlock},
+    web::graphql::{
+        get_block_canonicity,
+        pk::{CoinbaseReceiverPK, CreatorPK, ProverPK, RecipientPK},
+        transactions::TransactionWithoutBlock,
+    },
 };
 use async_graphql::{self, Enum, SimpleObject};
 use serde::Serialize;
@@ -108,13 +112,15 @@ pub struct BlockWithoutCanonicity {
     pub received_time: String,
 
     /// The public_key for the creator account
+    #[graphql(deprecation = "Use creator instead")]
     pub creator_account: PK,
+
+    /// Value creator public key
+    #[graphql(flatten)]
+    pub creator: CreatorPK,
 
     /// The public_key for the coinbase_receiver
     pub coinbase_receiver: PK,
-
-    /// Value creator public key
-    pub creator: String,
 
     /// Value protocol state
     pub protocol_state: ProtocolState,
@@ -122,7 +128,7 @@ pub struct BlockWithoutCanonicity {
     /// Value transaction fees
     pub tx_fees: String,
 
-    /// Value SNARK fees
+    /// Value SNARK fees (MINA)
     pub snark_fees: String,
 
     /// Value transactions
@@ -143,32 +149,42 @@ pub struct SnarkJob {
     /// Value date time
     pub date_time: String,
 
-    /// Value fee
+    /// Value fee (nanomina)
     pub fee: u64,
 
-    /// Value prover
-    pub prover: String,
+    /// Value SNARK prover public key
+    #[graphql(flatten)]
+    pub prover: ProverPK,
 }
 
 #[derive(Default, SimpleObject, Serialize)]
 pub struct Transactions {
-    /// Value coinbase
+    /// Value coinbase amount
     pub coinbase: String,
 
-    /// The public key for the coinbase receiver account
+    /// Value coinbase receiver account
+    #[graphql(deprecation = "Use coinbase_receiver instead")]
     pub coinbase_receiver_account: PK,
 
-    /// Value fee transfer
+    /// Value coinbase receiver public key
+    #[graphql(flatten)]
+    pub coinbase_receiver: CoinbaseReceiverPK,
+
+    /// Value block fee transfers
     pub fee_transfer: Vec<BlockFeeTransfer>,
 
-    /// Value user commands
+    /// Value block user commands
     pub user_commands: Vec<TransactionWithoutBlock>,
 }
 
 #[derive(Default, SimpleObject, Serialize)]
 pub struct BlockFeeTransfer {
+    /// Value fee (MINA)
     pub fee: String,
-    pub recipient: String,
+
+    /// Value fee transfer recipient public key
+    #[graphql(flatten)]
+    pub recipient: RecipientPK,
 
     #[graphql(name = "type")]
     pub feetransfer_kind: String,
@@ -211,57 +227,57 @@ pub struct ConsensusState {
 }
 
 #[derive(Default, SimpleObject, Serialize)]
+pub struct StakingEpochDataLedger {
+    /// Value staking epoch hash
+    pub hash: String,
+
+    /// Value staking epoch total currency (nanomina)
+    pub total_currency: u64,
+}
+
+#[derive(Default, SimpleObject, Serialize)]
 pub struct StakingEpochData {
-    /// Value seed
+    /// Value staking epoch seed
     pub seed: String,
 
-    /// Value epoch length
+    /// Value staking epoch length
     pub epoch_length: u32,
 
-    /// Value start checkpoint
+    /// Value staking epoch start checkpoint
     pub start_checkpoint: String,
 
-    /// Value lock checkpoint
+    /// Value staking epoch lock checkpoint
     pub lock_checkpoint: String,
 
-    /// Value staking ledger
+    /// Value epoch staking ledger
     pub ledger: StakingEpochDataLedger,
 }
 
 #[derive(Default, SimpleObject, Serialize)]
+pub struct NextEpochDataLedger {
+    /// Value next epoch hash
+    pub hash: String,
+
+    /// Value next epoch total currency (nanomina)
+    pub total_currency: u64,
+}
+
+#[derive(Default, SimpleObject, Serialize)]
 pub struct NextEpochData {
-    /// Value seed
+    /// Value next epoch seed
     pub seed: String,
 
-    /// Value epoch length
+    /// Value next epoch length
     pub epoch_length: u32,
 
-    /// Value start checkpoint
+    /// Value next epoch start checkpoint
     pub start_checkpoint: String,
 
-    /// Value lock checkpoint
+    /// Value next epoch lock checkpoint
     pub lock_checkpoint: String,
 
-    /// Value next ledger
+    /// Value next epoch staking ledger
     pub ledger: NextEpochDataLedger,
-}
-
-#[derive(Default, SimpleObject, Serialize)]
-pub struct NextEpochDataLedger {
-    /// Value hash
-    pub hash: String,
-
-    /// Value total currency
-    pub total_currency: u64,
-}
-
-#[derive(Default, SimpleObject, Serialize)]
-pub struct StakingEpochDataLedger {
-    /// Value hash
-    pub hash: String,
-
-    /// Value total currency
-    pub total_currency: u64,
 }
 
 #[derive(Default, SimpleObject, Serialize)]
@@ -377,6 +393,8 @@ impl BlockWithoutCanonicity {
         let date_time = millis_to_iso_date_string(block.timestamp() as i64);
         let utc_date = block.timestamp().to_string();
         let received_time = millis_to_iso_date_string(scheduled_time.parse::<i64>().unwrap());
+
+        let state_hash = block.state_hash().0;
         let previous_state_hash = block.previous_state_hash().0;
 
         let tx_fees = block.tx_fees();
@@ -417,37 +435,43 @@ impl BlockWithoutCanonicity {
 
         // internal commands
         let coinbase = Coinbase::from_precomputed(block);
-        let fee_transfers: Vec<BlockFeeTransfer> =
-            DbInternalCommandWithData::from_precomputed(block)
-                .into_iter()
-                .filter(|x| matches!(x, DbInternalCommandWithData::FeeTransfer { .. }))
-                .map(|ft| ft.into())
-                .collect();
+        let fee_transfers: Vec<_> = DbInternalCommandWithData::from_precomputed(block)
+            .into_iter()
+            .filter(|x| matches!(x, DbInternalCommandWithData::FeeTransfer { .. }))
+            .map(|ft| BlockFeeTransfer::new(db, ft))
+            .collect();
 
         // user commands
-        let user_commands: Vec<TransactionWithoutBlock> =
-            SignedCommandWithData::from_precomputed(block)
-                .into_iter()
-                .map(|cmd| TransactionWithoutBlock::new(db, cmd, canonical, num_commands))
-                .collect();
+        let user_commands: Vec<_> = SignedCommandWithData::from_precomputed(block)
+            .into_iter()
+            .map(|cmd| TransactionWithoutBlock::new(db, cmd, canonical, num_commands))
+            .collect();
 
         // SNARKs
-        let snark_jobs: Vec<SnarkJob> = SnarkWorkSummary::from_precomputed(block)
+        let snark_jobs: Vec<_> = SnarkWorkSummary::from_precomputed(block)
             .into_iter()
-            .map(|snark| (snark, block.state_hash().0, block_height, date_time.clone()).into())
+            .map(|snark| {
+                SnarkJob::new(
+                    db,
+                    snark,
+                    state_hash.clone(),
+                    block_height,
+                    date_time.clone(),
+                )
+            })
             .collect();
 
         Self {
             date_time,
             snark_jobs,
-            state_hash: block.state_hash().0,
+            state_hash,
             block_height: block.blockchain_length(),
             global_slot_since_genesis: block.global_slot_since_genesis(),
             genesis_state_hash: block.genesis_state_hash().0,
             coinbase_receiver: PK::new(db, block.coinbase_receiver()),
             winner_account: PK::new(db, block.block_stake_winner()),
-            creator_account: PK::new(db, creator.clone()),
-            creator: creator.0,
+            creator: CreatorPK::new(db, creator.clone()),
+            creator_account: PK::new(db, creator),
             received_time,
             protocol_state: ProtocolState {
                 previous_state_hash,
@@ -493,7 +517,8 @@ impl BlockWithoutCanonicity {
             snark_fees: snark_fees.to_string(),
             transactions: Transactions {
                 coinbase: coinbase.amount().to_string(),
-                coinbase_receiver_account: PK::new(db, coinbase.receiver),
+                coinbase_receiver_account: PK::new(db, coinbase.receiver.clone()),
+                coinbase_receiver: CoinbaseReceiverPK::new(db, coinbase.receiver),
                 fee_transfer: fee_transfers,
                 user_commands,
             },
@@ -505,41 +530,43 @@ impl BlockWithoutCanonicity {
 // conversions //
 /////////////////
 
-impl From<DbInternalCommandWithData> for BlockFeeTransfer {
-    fn from(int_cmd: DbInternalCommandWithData) -> Self {
+impl BlockFeeTransfer {
+    fn new(db: &Arc<IndexerStore>, int_cmd: DbInternalCommandWithData) -> Self {
         match int_cmd {
             DbInternalCommandWithData::FeeTransfer {
                 receiver,
                 amount,
                 kind,
                 ..
-            } => Self {
-                fee: amount.to_string(),
-                recipient: receiver.0,
-                feetransfer_kind: kind.to_string(),
-            },
-            DbInternalCommandWithData::Coinbase {
+            }
+            | DbInternalCommandWithData::Coinbase {
                 receiver,
                 amount,
                 kind,
                 ..
             } => Self {
                 fee: amount.to_string(),
-                recipient: receiver.0,
+                recipient: RecipientPK::new(db, receiver),
                 feetransfer_kind: kind.to_string(),
             },
         }
     }
 }
 
-impl From<(SnarkWorkSummary, String, u32, String)> for SnarkJob {
-    fn from(value: (SnarkWorkSummary, String, u32, String)) -> Self {
+impl SnarkJob {
+    fn new(
+        db: &Arc<IndexerStore>,
+        snark: SnarkWorkSummary,
+        block_state_hash: String,
+        block_height: u32,
+        date_time: String,
+    ) -> Self {
         Self {
-            block_state_hash: value.1,
-            block_height: value.2,
-            date_time: value.3,
-            fee: value.0.fee.0,
-            prover: value.0.prover.to_string(),
+            block_state_hash,
+            block_height,
+            date_time,
+            fee: snark.fee.0,
+            prover: ProverPK::new(db, snark.prover),
         }
     }
 }
