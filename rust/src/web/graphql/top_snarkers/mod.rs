@@ -1,11 +1,10 @@
 //! GraphQL `topSnarkers` endpoint
 
-use super::db;
+use super::{db, pk::PK_};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
     snark_work::store::SnarkStore,
-    store::username::UsernameStore,
     utility::store::common::{U32_LEN, U64_LEN},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -13,8 +12,10 @@ use speedb::Direction;
 
 #[derive(InputObject)]
 pub struct TopSnarkersQueryInput {
+    /// Input epoch
     epoch: u32,
 
+    /// Input genesis state hash
     #[graphql(name = "genesis_state_hash")]
     genesis_state_hash: Option<String>,
 }
@@ -34,22 +35,41 @@ pub struct TopSnarkersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopSnarker {
-    username: String,
+    /// Value SNARKer public key
+    #[graphql(name = "public_key", flatten)]
+    public_key: PK_,
 
-    #[graphql(name = "public_key")]
-    public_key: String,
-
+    /// Value total fees
     #[graphql(name = "total_fees")]
     total_fees: u64,
 
+    /// Value epoch total fees
+    #[graphql(name = "epoch_fees")]
+    epoch_fees: u64,
+
+    /// Value min fee
     #[graphql(name = "min_fee")]
     min_fee: u64,
 
+    /// Value min fee
+    #[graphql(name = "epoch_min_fee")]
+    epoch_min_fee: u64,
+
+    /// Value max fee
     #[graphql(name = "max_fee")]
     max_fee: u64,
 
+    /// Value epoch max fee
+    #[graphql(name = "epoch_max_fee")]
+    epoch_max_fee: u64,
+
+    /// Value SNARKs sold count
     #[graphql(name = "snarks_sold")]
     snarks_sold: u32,
+
+    /// Value epoch SNARKs sold count
+    #[graphql(name = "epoch_snarks_sold")]
+    epoch_snarks_sold: u32,
 }
 
 #[Object]
@@ -115,27 +135,38 @@ impl TopSnarkersQueryRoot {
             }
 
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U64_LEN..])?;
-            let username = db.get_username(&pk)?.unwrap_or_default().0;
-
-            let total_fees = db
-                .get_snark_prover_epoch_fees(&pk, Some(epoch), Some(&genesis_state_hash), None)?
-                .expect("total fees");
-            let min_fee = db
-                .get_snark_prover_epoch_min_fee(&pk, Some(epoch), Some(&genesis_state_hash), None)?
-                .expect("min fee");
-            let max_fee = db
-                .get_snark_prover_epoch_max_fee(&pk, Some(epoch), Some(&genesis_state_hash), None)?
-                .expect("max fee");
-            let snarks_sold =
-                db.get_snarks_pk_epoch_count(&pk, Some(epoch), Some(&genesis_state_hash))?;
-
             snarkers.push(TopSnarker {
-                username,
-                public_key: pk.0,
-                total_fees,
-                min_fee,
-                max_fee,
-                snarks_sold,
+                total_fees: db
+                    .get_snark_prover_total_fees(&pk, None)?
+                    .expect("total fees"),
+                epoch_fees: db
+                    .get_snark_prover_epoch_fees(&pk, Some(epoch), Some(&genesis_state_hash), None)?
+                    .expect("epoch fees"),
+                min_fee: db.get_snark_prover_min_fee(&pk, None)?.expect("min fee"),
+                epoch_min_fee: db
+                    .get_snark_prover_epoch_min_fee(
+                        &pk,
+                        Some(epoch),
+                        Some(&genesis_state_hash),
+                        None,
+                    )?
+                    .expect("epoch min fee"),
+                max_fee: db.get_snark_prover_max_fee(&pk, None)?.expect("max fee"),
+                epoch_max_fee: db
+                    .get_snark_prover_epoch_max_fee(
+                        &pk,
+                        Some(epoch),
+                        Some(&genesis_state_hash),
+                        None,
+                    )?
+                    .expect("epoch max fee"),
+                snarks_sold: db.get_snarks_pk_total_count(&pk)?,
+                epoch_snarks_sold: db.get_snarks_pk_epoch_count(
+                    &pk,
+                    Some(epoch),
+                    Some(&genesis_state_hash),
+                )?,
+                public_key: PK_::new(db, pk),
             });
         }
 
