@@ -8,9 +8,7 @@ POST {{url}}
   tokens {
     token
     supply
-    owner {
-      publicKey
-    }
+    owner
     symbol
     num_holders
     total_num_txns
@@ -38,7 +36,7 @@ jsonpath "$.data.tokens[0].total_num_tokens" == 2
 # last datum
 jsonpath "$.data.tokens[1].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokens[1].supply" == 100000000000000
-jsonpath "$.data.tokens[1].owner.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokens[1].owner" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokens[1].symbol" == "MINU"
 jsonpath "$.data.tokens[1].num_holders" == 1
 jsonpath "$.data.tokens[1].total_num_txns" == 1
@@ -57,9 +55,7 @@ POST {{url}}
   tokens(query: { symbol: "MINU" }) {
     token
     supply
-    owner {
-      publicKey
-    }
+    owner
     symbol
     num_holders
     total_num_txns
@@ -77,7 +73,7 @@ jsonpath "$.data.tokens" count == 1
 # first datum
 jsonpath "$.data.tokens[0].token" == "wfG3GivPMttpt6nQnPuX9eDPnoyA5RJZY23LTc4kkNkCRH2gUd"
 jsonpath "$.data.tokens[0].supply" == 100000000000000
-jsonpath "$.data.tokens[0].owner.publicKey" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
+jsonpath "$.data.tokens[0].owner" == "B62qkPg6P2We1SZhCq84ZvDKknrWy8P3Moi99Baz8KFpYsMoFJKHHqF"
 jsonpath "$.data.tokens[0].symbol" == "MINU"
 jsonpath "$.data.tokens[0].num_holders" == 1
 jsonpath "$.data.tokens[0].total_num_txns" == 1
@@ -96,9 +92,7 @@ POST {{url}}
   tokens(query: { symbol: "MINA" }) {
     token
     supply
-    owner {
-      publicKey
-    }
+    owner
     symbol
     num_holders
     total_num_txns

@@ -17,14 +17,22 @@ use std::sync::Arc;
 
 #[derive(InputObject, Default)]
 pub struct TokensQueryInput {
+    /// Input token address
     token: Option<String>,
+
+    /// Input token owner
     owner: Option<String>,
+
+    /// Input token symbol
     symbol: Option<String>,
+
+    /// Input token supply
     supply: Option<u64>,
 }
 
 #[derive(SimpleObject)]
 pub struct Token {
+    /// Value token
     #[graphql(flatten)]
     token: TokenSimple,
 
@@ -72,11 +80,16 @@ pub struct TokenSimple {
     /// Value token address
     token: String,
 
-    /// Value token supply
+    /// Value token supply (nano)
     supply: u64,
 
     /// Value token owner
-    owner: Option<PK>,
+    #[graphql(deprecation = "Use owner_account instead")]
+    owner: Option<String>,
+
+    /// Value token owner account
+    #[graphql(name = "owner_account")]
+    owner_account: Option<PK>,
 
     /// Value token symbol
     symbol: Option<String>,
@@ -84,10 +97,10 @@ pub struct TokenSimple {
 
 #[derive(InputObject)]
 pub struct TokenHoldersQueryInput {
-    /// Value token address of holder account
+    /// Input token address of holder account
     token: Option<String>,
 
-    /// Value public key of holder account
+    /// Input public key of holder account
     holder: Option<String>,
 }
 
@@ -96,16 +109,21 @@ pub struct TokenHolder {
     /// Value token address
     token: String,
 
-    /// Value token supply
+    /// Value token supply (nano)
     supply: u64,
 
-    /// Value token owner
-    owner: Option<PK>,
+    /// Value token owner public key
+    #[graphql(deprecation = "Use owner_account instead")]
+    owner: Option<String>,
+
+    /// Value token owner account
+    #[graphql(name = "owner_account")]
+    owner_account: Option<PK>,
 
     /// Value token symbol
     symbol: Option<String>,
 
-    /// Value token account
+    /// Value token holder account
     account: accounts::Account,
 }
 
@@ -409,10 +427,11 @@ impl Token {
 impl TokenSimple {
     fn new(db: &Arc<IndexerStore>, token: ledger::token::Token) -> Self {
         Self {
-            token: token.token.to_string(),
+            token: token.token.0,
             supply: token.supply.0,
-            owner: token.owner.map(|pk| PK::new(db, pk)),
-            symbol: Some(token.symbol.to_string()),
+            owner: token.owner.as_ref().map(ToString::to_string),
+            owner_account: token.owner.map(|pk| PK::new(db, pk)),
+            symbol: Some(token.symbol.0),
         }
     }
 }
@@ -420,11 +439,12 @@ impl TokenSimple {
 impl TokenHolder {
     fn new(db: &Arc<IndexerStore>, account: TokenAccount) -> Self {
         Self {
-            account: account.account.into(),
-            token: account.token.token.to_string(),
+            account: account.account.account,
+            token: account.token.token.0,
             supply: account.token.supply.0,
-            owner: account.token.owner.map(|pk| PK::new(db, pk)),
-            symbol: Some(account.token.symbol.to_string()),
+            owner: account.token.owner.as_ref().map(ToString::to_string),
+            owner_account: account.token.owner.map(|pk| PK::new(db, pk)),
+            symbol: Some(account.token.symbol.0),
         }
     }
 }
