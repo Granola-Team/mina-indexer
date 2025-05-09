@@ -11,16 +11,11 @@ POST {{url}}
     amount
     fee
     kind
-    to
-    from
     nonce
     memo
     hash
-    block {
-      dateTime
-      stateHash
-    }
-    receiver {
+    sender
+    receiver_account {
       publicKey
     }
   }
@@ -37,12 +32,16 @@ jsonpath "$.data.transactions[0].blockHeight" == 3
 jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].memo" == ""
 jsonpath "$.data.transactions[0].hash" == "CkpYeG32dVJUjs6iq3oroXWitXar1eBtV3GVFyH5agw7HPp9bG4yQ"
+jsonpath "$.data.transactions[0].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 
 # last datum
 jsonpath "$.data.transactions[49].blockHeight" == 37
 jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].memo" == ""
 jsonpath "$.data.transactions[49].hash" == "CkpYsbai6qHEoF53e8pFHdiWqhT34sPhSgbUVdxLmfzAZ8oMpKDuK"
+jsonpath "$.data.transactions[49].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[49].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 
 duration < 100
 
@@ -100,18 +99,11 @@ POST {{url}}
     blockHeight
     canonical
     amount
-    fee
     kind
-    to
-    from
-    nonce
-    memo
     hash
-    block {
-      dateTime
-      stateHash
-    }
-    receiver {
+    fee
+    sender
+    receiver_account {
       publicKey
     }
   }
@@ -126,16 +118,16 @@ jsonpath "$.data.transactions" count == 2
 # first datum
 jsonpath "$.data.transactions[0].blockHeight" == 11
 jsonpath "$.data.transactions[0].hash" == "CkpZwTdKUDFM8Nsq6noJ4pP6esqP7FeJaHiisGrXSqHYvidfvukDA"
-jsonpath "$.data.transactions[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[0].to" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].receiver_account.publicKey" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
 jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
 # last datum
 jsonpath "$.data.transactions[1].blockHeight" == 11
 jsonpath "$.data.transactions[1].hash" == "CkpZE6rHwLM8iJwBU1ssm1tdMzx9rdyDEhpGU8aCAionzF1k82d5N"
-jsonpath "$.data.transactions[1].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[1].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[1].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[1].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[1].amount" == 1000000000
 jsonpath "$.data.transactions[1].fee" == 10000000
 
@@ -158,8 +150,10 @@ POST {{url}}
   ) {
     blockHeight
     canonical
-    from
-    to
+    sender
+    receiver_account {
+      publicKey
+    }
     hash
     amount
     fee
@@ -176,8 +170,8 @@ jsonpath "$.data.transactions" count == 50
 jsonpath "$.data.transactions[0].blockHeight" == 120
 jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
-jsonpath "$.data.transactions[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[0].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
@@ -185,8 +179,8 @@ jsonpath "$.data.transactions[0].fee" == 10000000
 jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
-jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[49].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[49].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
@@ -209,8 +203,10 @@ POST {{url}}
   ) {
     blockHeight
     canonical
-    from
-    to
+    sender
+    receiver_account {
+      publicKey
+    }
     hash
     amount
     fee
@@ -227,8 +223,8 @@ jsonpath "$.data.transactions" count == 50
 jsonpath "$.data.transactions[0].blockHeight" == 120
 jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"
-jsonpath "$.data.transactions[0].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[0].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[0].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[0].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[0].amount" == 1000
 jsonpath "$.data.transactions[0].fee" == 10000000
 
@@ -236,8 +232,8 @@ jsonpath "$.data.transactions[0].fee" == 10000000
 jsonpath "$.data.transactions[49].blockHeight" == 89
 jsonpath "$.data.transactions[49].canonical" == true
 jsonpath "$.data.transactions[49].hash" == "CkpaJb8GcyrbGYjGeC7aUtwDq3m6yxXSBFhuUVy4Jm8FVvaimbioM"
-jsonpath "$.data.transactions[49].from" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
-jsonpath "$.data.transactions[49].to" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
+jsonpath "$.data.transactions[49].sender" == "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy"
+jsonpath "$.data.transactions[49].receiver_account.publicKey" == "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM"
 jsonpath "$.data.transactions[49].amount" == 1000
 jsonpath "$.data.transactions[49].fee" == 10000000
 
@@ -293,13 +289,6 @@ POST {{url}}
   ) {
     blockHeight
     canonical
-    amount
-    fee
-    kind
-    to
-    from
-    nonce
-    memo
   }
 }
 ```
@@ -354,6 +343,7 @@ HTTP 200
 # total data count
 jsonpath "$.data.transactions" count == 1
 
+# only datum
 jsonpath "$.data.transactions[0].blockHeight" == 120
 jsonpath "$.data.transactions[0].canonical" == true
 jsonpath "$.data.transactions[0].hash" == "CkpZreaWRNr1eANhVYLmi8vzRrwkoEwdNyk2FyUa7M4ZQVnA752wL"

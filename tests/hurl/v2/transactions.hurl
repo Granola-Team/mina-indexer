@@ -12,12 +12,6 @@ POST {{url}}
   ) {
     blockHeight
     canonical
-    amount
-    fee
-    kind
-    to
-    from
-    nonce
     memo
     hash
   }
@@ -163,7 +157,7 @@ POST {{url}}
   transactions(limit: 1, query: { canonical: true, zkapp: true }) {
     zkapp {
       accounts_updated {
-        pk
+        public_key
         token
         balance_change
         balance_change_str
@@ -187,13 +181,13 @@ jsonpath "$.data.transactions[0].zkapp.events" count == 0
 jsonpath "$.data.transactions[0].zkapp.accounts_updated" count == 2
 
 # account updates
-jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].public_key" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change" == -2000000000
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].balance_change_str" == "-2"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[0].increment_nonce" == false
 
-jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].pk" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
+jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].public_key" == "B62qn4SxXSBZuCUCKH3ZqgP32eab9bKNrEXkjoczEnerihQrSNnxoc5"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change" == 2000000000
 jsonpath "$.data.transactions[0].zkapp.accounts_updated[1].balance_change_str" == "2"

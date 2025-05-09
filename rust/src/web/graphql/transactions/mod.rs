@@ -1,6 +1,9 @@
 //! GraphQL `transaction` & `transactions` endpoint
 
-use super::{date_time_to_scalar, db, get_block_canonicity, pk::PK};
+use super::{
+    date_time_to_scalar, db, get_block_canonicity,
+    pk::{SenderPK, PK, PK_},
+};
 use crate::{
     base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
@@ -26,8 +29,10 @@ use std::sync::Arc;
 
 #[derive(Clone, Debug, SimpleObject)]
 pub struct Transaction {
+    /// Value block
     block: TransactionBlock,
 
+    /// Value transaction
     #[graphql(flatten)]
     transaction: TransactionWithoutBlock,
 }
@@ -52,22 +57,42 @@ pub enum TransactionSortByInput {
 
 #[derive(Clone, Debug, SimpleObject, Serialize)]
 pub struct TransactionWithoutBlock {
+    /// Value amount (nano)
     amount: u64,
+
+    /// Value txn fee (nanomina)
+    fee: u64,
+
+    /// Value txn sender public key
+    #[graphql(deprecation = "Use sender instead")]
+    from: String,
+
+    /// Value txn sender account
+    #[graphql(flatten)]
+    sender: SenderPK,
+
+    /// Value txn receiver public key
+    #[graphql(deprecation = "Use receiver_account instead")]
+    receiver: Option<String>,
+
+    /// Value txn receiver public key
+    #[graphql(deprecation = "Use receiver_account instead")]
+    to: Option<String>,
+
+    /// Value txn receiver account
+    #[graphql(name = "receiver_account")]
+    receiver_account: Option<PK>,
+
     block_height: u32,
     global_slot: u32,
+    nonce: u32,
     canonical: bool,
-    failure_reason: Option<String>,
-    is_applied: bool,
-    zkapp: Option<TransactionZkapp>,
-    fee: u64,
-    from: String,
-    sender: PK,
     hash: String,
     kind: String,
     memo: String,
-    nonce: u32,
-    receiver: Option<PK>,
-    to: Option<String>,
+    failure_reason: Option<String>,
+    is_applied: bool,
+    zkapp: Option<TransactionZkapp>,
     tokens: Vec<String>,
 
     /// Total number of user commands in the given epoch
@@ -98,7 +123,12 @@ struct TransactionBlock {
 #[derive(Clone, Debug, PartialEq, SimpleObject, Serialize)]
 struct TokenAccount {
     /// Public key
+    #[graphql(deprecation = "Use public_key instead")]
     pk: String,
+
+    /// Public key
+    #[graphql(flatten)]
+    public_key: PK_,
 
     /// Token address
     token: String,
@@ -106,7 +136,7 @@ struct TokenAccount {
     /// Token symbol
     symbol: String,
 
-    /// Balance change (nano units)
+    /// Balance change (nano)
     #[graphql(name = "balance_change")]
     balance_change: i64,
 
@@ -481,14 +511,15 @@ impl TransactionWithoutBlock {
             block_height: cmd.blockchain_length,
             global_slot: cmd.global_slot_since_genesis,
             fee: cmd.command.fee(),
-            sender: PK::new(db, sender.clone()),
+            sender: SenderPK::new(db, sender.clone()),
             from: sender.0,
+            receiver_account: receiver.cloned().map(|pk| PK::new(db, pk)),
+            to: receiver.map(PublicKey::to_string),
+            receiver: receiver.map(PublicKey::to_string),
             hash: cmd.txn_hash.to_string(),
             kind: cmd.command.kind().to_string(),
             memo: cmd.command.memo(),
             nonce: cmd.command.nonce().0,
-            receiver: receiver.cloned().map(|pk| PK::new(db, pk)),
-            to: receiver.map(PublicKey::to_string),
             tokens: cmd.command.tokens().into_iter().map(|t| t.0).collect(),
             epoch_num_user_commands: num_commands[0],
             total_num_user_commands: num_commands[1],
@@ -1434,6 +1465,7 @@ impl TokenAccount {
             balance_change,
             increment_nonce,
             pk: pk.to_string(),
+            public_key: PK_::new(db, pk),
             token: token.to_string(),
             symbol: token_symbol.to_string(),
             balance_change_str: balance_change_str(balance_change),
