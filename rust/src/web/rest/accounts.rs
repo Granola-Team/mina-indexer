@@ -4,7 +4,7 @@ use crate::{
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
     ledger::{account, store::best::BestLedgerStore, token::TokenAddress},
     snark_work::store::SnarkStore,
-    store::IndexerStore,
+    store::{username::UsernameStore, IndexerStore},
 };
 use actix_web::{
     get,
@@ -58,7 +58,10 @@ pub async fn get_account(
         debug!("Found account in ledger: {account}");
 
         let account = Account {
-            account,
+            account: account::Account {
+                username: db.get_username(&pk).unwrap_or_default(),
+                ..account
+            },
 
             // accounts
             total_num_accounts: db
