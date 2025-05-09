@@ -1,6 +1,9 @@
 //! GraphQL `stakes` endpoint
 
-use super::db;
+use super::{
+    db,
+    pk::{DelegatePK, PK, PK_},
+};
 use crate::{
     base::{amount::Amount, state_hash::StateHash},
     block::store::BlockStore,
@@ -23,16 +26,26 @@ use std::sync::Arc;
 
 #[derive(InputObject, Default)]
 pub struct StakesQueryInput {
+    /// Input staking epoch
     epoch: Option<u32>,
+
+    /// Input delegate
     delegate: Option<String>,
+
+    /// Input staking ledger hash
     ledger_hash: Option<String>,
+
+    /// Input genesis state hash
     genesis_state_hash: Option<String>,
 
     #[graphql(validator(regex = "^\\d+(\\.\\d{1,9})?$"), name = "stake_lte")]
     stake_lte: Option<String>,
 
+    /// Input staking account public key
     #[graphql(name = "public_key")]
     public_key: Option<String>,
+
+    /// Input staking account username
     username: Option<String>,
 }
 
@@ -52,10 +65,10 @@ pub enum StakesSortByInput {
 
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccountWithMeta {
-    /// Value current epoch
+    /// Value staking epoch
     epoch: u32,
 
-    /// Value current ledger hash
+    /// Value staking ledger hash
     ledger_hash: String,
 
     /// Value genesis state hash
@@ -64,7 +77,7 @@ pub struct StakesLedgerAccountWithMeta {
     /// Value delegation totals
     delegation_totals: StakesDelegationTotals,
 
-    /// Value accounts
+    /// Value staking account
     #[graphql(flatten)]
     account: StakesLedgerAccount,
 
@@ -126,7 +139,7 @@ pub struct StakesLedgerAccountWithMeta {
 
 #[derive(SimpleObject, Default)]
 pub struct StakesLedgerAccount {
-    /// Value balance
+    /// Value balance (MINA)
     pub balance: f64,
 
     /// Value balance nanomina
@@ -136,17 +149,16 @@ pub struct StakesLedgerAccount {
     pub nonce: u32,
 
     /// Value delegate
-    pub delegate: String,
+    #[graphql(flatten)]
+    pub delegate: DelegatePK,
 
     /// Value public key
+    #[graphql(flatten)]
+    pub public_key: PK_,
+
+    /// Value public key
+    #[graphql(deprecation = "Use public_key instead")]
     pub pk: String,
-
-    /// Value username
-    pub username: String,
-
-    /// Value public key
-    #[graphql(name = "public_key")]
-    pub public_key: String,
 
     /// Value token id
     pub token: u64,
@@ -206,20 +218,25 @@ pub struct StakesLedgerAccount {
 #[derive(SimpleObject, Default)]
 #[graphql(complex)]
 pub struct StakesDelegationTotals {
-    /// Value total currency
+    /// Value total currency (nanomina)
     pub total_currency: u64,
 
-    /// Value total delegated
+    /// Value total delegated (MINA)
     pub total_delegated: f64,
 
-    /// Value total delegated in nanomina
+    /// Value total delegated (nanomina)
     pub total_delegated_nanomina: u64,
 
     /// Value count delegates
     pub count_delegates: u32,
 
-    /// Value delegates
+    /// Value delegate public keys
+    #[graphql(deprecation = "Use delegate_pks instead")]
     pub delegates: Vec<String>,
+
+    /// Value delegate public keys
+    #[graphql(name = "delegate_pks")]
+    pub delegate_pks: Vec<PK>,
 }
 
 #[derive(Default)]
@@ -442,23 +459,9 @@ impl StakesDelegationTotals {
     }
 }
 
-impl
-    From<(
-        StakingAccount, //  0 - staking account
-        u32,            //  1 - pk epoch num blocks
-        u32,            //  2 - pk total num blocks
-        u32,            //  3 - pk epoch num supercharged blocks
-        u32,            //  4 - pk total num supercharged blocks
-        u32,            //  5 - pk epoch num SNARKs
-        u32,            //  6 - pk total num SNARKs
-        u32,            //  7 - pk epoch num user commands
-        u32,            //  8 - pk total num user commands
-        u32,            //  9 - pk epoch num internal commands
-        u32,            // 10 - pk total num internal commands
-        String,         // 11 - username
-    )> for StakesLedgerAccount
-{
-    fn from(
+impl StakesLedgerAccount {
+    fn new(
+        db: &Arc<IndexerStore>,
         acc: (
             StakingAccount, //  0 - staking account
             u32,            //  1 - pk epoch num blocks
@@ -471,17 +474,13 @@ impl
             u32,            //  8 - pk total num user commands
             u32,            //  9 - pk epoch num internal commands
             u32,            // 10 - pk total num internal commands
-            String,         // 11 - username
         ),
     ) -> Self {
         let account = acc.0;
+        let pk = account.pk;
 
         let balance_nanomina = account.balance;
         let balance = Amount(balance_nanomina);
-
-        let pk = account.pk.0;
-        let public_key = pk.clone();
-        let delegate = account.delegate.0;
 
         let nonce = account.nonce.unwrap_or_default().0;
         let token = account.token.unwrap_or_default().0;
@@ -492,9 +491,9 @@ impl
             balance: balance.to_f64(),
             balance_nanomina,
             nonce,
-            delegate,
-            pk,
-            public_key,
+            delegate: DelegatePK::new(db, account.delegate),
+            pk: pk.to_string(),
+            public_key: PK_::new(db, pk),
             token: MINA_TOKEN_ID,
             token_address: token,
             receipt_chain_hash,
@@ -509,7 +508,6 @@ impl
             pk_total_num_user_commands: acc.8,
             pk_epoch_num_internal_commands: acc.9,
             pk_total_num_internal_commands: acc.10,
-            username: acc.11,
         }
     }
 }
@@ -606,9 +604,7 @@ impl StakesLedgerAccountWithMeta {
         let total_delegated_nanomina = delegations.as_ref().map_or(0, |d| d.total_delegated);
         let count_delegates = delegations.as_ref().map_or(0, |d| d.count_delegates);
 
-        let delegates: Vec<String> = delegations.as_ref().map_or(vec![], |d| {
-            d.delegates.iter().map(|pk| pk.0.clone()).collect()
-        });
+        let delegates: Vec<_> = delegations.map_or(vec![], |d| d.delegates.into_iter().collect());
         let total_delegated = Amount(total_delegated_nanomina).to_f64();
 
         let timing = account.timing.as_ref().map(|timing| Timing {
@@ -655,7 +651,6 @@ impl StakesLedgerAccountWithMeta {
         let pk_total_num_internal_commands = db
             .get_internal_commands_pk_total_count(pk)
             .expect("pk total num internal commands");
-        let username = db.get_username(pk).expect("username").unwrap_or_default().0;
 
         let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash);
         let num_accounts = db
@@ -666,26 +661,29 @@ impl StakesLedgerAccountWithMeta {
             epoch,
             ledger_hash: ledger_hash.0,
             genesis_state_hash: genesis_state_hash.to_string(),
-            account: StakesLedgerAccount::from((
-                account,
-                pk_epoch_num_blocks,
-                pk_total_num_blocks,
-                pk_epoch_num_supercharged_blocks,
-                pk_total_num_supercharged_blocks,
-                pk_epoch_num_snarks,
-                pk_total_num_snarks,
-                pk_epoch_num_user_commands,
-                pk_total_num_user_commands,
-                pk_epoch_num_internal_commands,
-                pk_total_num_internal_commands,
-                username,
-            )),
+            account: StakesLedgerAccount::new(
+                db,
+                (
+                    account,
+                    pk_epoch_num_blocks,
+                    pk_total_num_blocks,
+                    pk_epoch_num_supercharged_blocks,
+                    pk_total_num_supercharged_blocks,
+                    pk_epoch_num_snarks,
+                    pk_total_num_snarks,
+                    pk_epoch_num_user_commands,
+                    pk_total_num_user_commands,
+                    pk_epoch_num_internal_commands,
+                    pk_total_num_internal_commands,
+                ),
+            ),
             delegation_totals: StakesDelegationTotals {
                 count_delegates,
                 total_delegated,
                 total_delegated_nanomina,
                 total_currency,
-                delegates,
+                delegates: delegates.iter().map(|pk| pk.to_string()).collect(),
+                delegate_pks: delegates.into_iter().map(|pk| PK::new(db, pk)).collect(),
             },
             timing,
             epoch_num_blocks: db
@@ -878,11 +876,11 @@ mod tests {
 
         let res = query()
             .unwrap()
-            .iter()
+            .into_iter()
             .map(|account| {
                 (
-                    account.account.public_key.clone(),
-                    account.account.username.clone(),
+                    account.account.public_key.public_key,
+                    account.account.public_key.username,
                 )
             })
             .collect::<Vec<_>>();

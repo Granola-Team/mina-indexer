@@ -19,7 +19,6 @@ POST {{url}}
     epoch
     ledgerHash
     nonce
-    pk
     public_key
     token
     tokenAddress
@@ -45,7 +44,6 @@ jsonpath "$.data.stakes[0].delegate" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz
 jsonpath "$.data.stakes[0].epoch" == 42
 jsonpath "$.data.stakes[0].ledgerHash" == "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH"
 jsonpath "$.data.stakes[0].nonce" == 0
-jsonpath "$.data.stakes[0].pk" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].public_key" == "B62qiburnzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzmp7r7UN6X"
 jsonpath "$.data.stakes[0].token" == 1
 jsonpath "$.data.stakes[0].tokenAddress" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozGPieEC4Jf"
@@ -235,7 +233,7 @@ POST {{url}}
     limit: 10
     query: { ledgerHash: "jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH" }
   ) {
-    pk
+    public_key
     balance
     balanceNanomina
     username
@@ -249,13 +247,13 @@ HTTP 200
 jsonpath "$.data.stakes" count == 10
 
 # first datum
-jsonpath "$.data.stakes[0].pk" == "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"
+jsonpath "$.data.stakes[0].public_key" == "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"
 jsonpath "$.data.stakes[0].balance" == 83482371.13484836
 jsonpath "$.data.stakes[0].balanceNanomina" == 83482371134848360
 jsonpath "$.data.stakes[0].username" == "Unknown"
 
 # last datum
-jsonpath "$.data.stakes[9].pk" == "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
+jsonpath "$.data.stakes[9].public_key" == "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
 jsonpath "$.data.stakes[9].balance" == 1104.686899999
 jsonpath "$.data.stakes[9].balanceNanomina" == 1104686899999
 jsonpath "$.data.stakes[9].username" == "Unknown"
@@ -310,7 +308,10 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
+# total data count
 jsonpath "$.data.stakes" count == 1
+
+# only datum
 jsonpath "$.data.stakes[0].public_key" == "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"
 jsonpath "$.data.stakes[0].balance" == 92.929966438
 jsonpath "$.data.stakes[0].nonce" == 4
@@ -338,7 +339,10 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
+# total data count
 jsonpath "$.data.stakes" count == 1
+
+# only datum
 jsonpath "$.data.stakes[0].epoch" == 0
 
 duration < 100
