@@ -91,11 +91,12 @@ POST {{url}}
       }
     }
   ) {
-    stateHash
     blockHeight
-    winnerAccount {
-      publicKey
-    }
+    stateHash
+    creator
+    creatorUsername
+    winner
+    winnerUsername
   }
 }
 ```
@@ -106,14 +107,26 @@ HTTP 200
 jsonpath "$.data.blocks" count == 3
 
 # Block data
-jsonpath "$.data.blocks[0].stateHash" == "3NKGUXQYm1nF1hdEDEzwuLRWZjBTdSeKqHfqS3JPCzJ2i31mrovV"
 jsonpath "$.data.blocks[0].blockHeight" == 109
+jsonpath "$.data.blocks[0].stateHash" == "3NKGUXQYm1nF1hdEDEzwuLRWZjBTdSeKqHfqS3JPCzJ2i31mrovV"
+jsonpath "$.data.blocks[0].creator" == "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"
+jsonpath "$.data.blocks[0].winner" == "B62qo5aeu9qezh2Z1qsKV47jHwgt8MvYLbKVWUSoi6iNaX165bAtmT9"
+jsonpath "$.data.blocks[0].creatorUsername" == "Unknown"
+jsonpath "$.data.blocks[0].winnerUsername" == "Unknown"
 
-jsonpath "$.data.blocks[1].stateHash" == "3NLgPYVDSV6y7ZKSQrjowedjZn9RuLwdx311vheWZEy3mBjKDbmj"
 jsonpath "$.data.blocks[1].blockHeight" == 97
+jsonpath "$.data.blocks[1].stateHash" == "3NLgPYVDSV6y7ZKSQrjowedjZn9RuLwdx311vheWZEy3mBjKDbmj"
+jsonpath "$.data.blocks[1].creator" == "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"
+jsonpath "$.data.blocks[1].winner" == "B62qo5aeu9qezh2Z1qsKV47jHwgt8MvYLbKVWUSoi6iNaX165bAtmT9"
+jsonpath "$.data.blocks[1].creatorUsername" == "Unknown"
+jsonpath "$.data.blocks[1].winnerUsername" == "Unknown"
 
-jsonpath "$.data.blocks[2].stateHash" == "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
 jsonpath "$.data.blocks[2].blockHeight" == 5
+jsonpath "$.data.blocks[2].stateHash" == "3NKQUoBfi9vkbuqtDJmSEYBQrcSo4GjwG8bPCiii4yqM8AxEQvtY"
+jsonpath "$.data.blocks[2].creator" == "B62qnYBehkVZzgJBCC5yhFyF2L7mMRPsVnKW2xpcWFVuQYRVgoqwDCS"
+jsonpath "$.data.blocks[2].winner" == "B62qnhrUFMCj5n5yiPuXcQYqKh9d22ZWMW9LNxGdF1FkhqAT3B8KmgQ"
+jsonpath "$.data.blocks[2].creatorUsername" == "Unknown"
+jsonpath "$.data.blocks[2].winnerUsername" == "Unknown"
 
 duration < 2000
 
