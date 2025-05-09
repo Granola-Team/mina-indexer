@@ -1,20 +1,32 @@
 //! GraphQL `stagedLedgerAccounts` endpoint
 
-use super::db;
+use super::{
+    db,
+    pk::{DelegatePK, PK},
+};
 use crate::{
     base::state_hash::StateHash,
     canonicity::store::CanonicityStore,
     ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress, LedgerHash},
+    store::IndexerStore,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
 #[derive(InputObject)]
 pub struct StagedLedgerQueryInput {
+    /// Input staged ledger hash
     ledger_hash: Option<String>,
+
+    /// Input block state hash
     state_hash: Option<String>,
+
+    /// Input account public key
     public_key: Option<String>,
+
+    /// Input account token
     token: Option<String>,
 
+    /// Input blockchain length (aka block height)
     #[graphql(name = "blockchain_length")]
     blockchain_length: Option<u32>,
 }
@@ -30,14 +42,14 @@ pub enum StagedLedgerSortByInput {
 
 #[derive(SimpleObject)]
 pub struct StagedLedgerWithMeta {
-    /// Value blockchain length
+    /// Value blockchain length (aka block height)
     #[graphql(name = "blockchain_length")]
     blockchain_length: u32,
 
-    /// Value state hash
+    /// Value block state hash
     state_hash: String,
 
-    /// Value ledger hash
+    /// Value staged ledger hash
     ledger_hash: String,
 
     /// Value staged ledger accounts
@@ -46,17 +58,16 @@ pub struct StagedLedgerWithMeta {
 
 #[derive(SimpleObject)]
 pub struct StagedLedgerAccount {
-    /// Value public key
+    /// Value account public key
     #[graphql(name = "public_key")]
-    pub public_key: String,
-
-    /// Value username
-    pub username: Option<String>,
+    #[graphql(flatten)]
+    pub public_key: PK,
 
     /// Value delegate
-    pub delegate: String,
+    #[graphql(flatten)]
+    pub delegate: DelegatePK,
 
-    /// Value balance
+    /// Value balance (MINA)
     pub balance: f64,
 
     /// Value balance
@@ -94,20 +105,20 @@ impl StagedLedgerQueryRoot {
             if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
                 return Ok(db
                     .get_staged_account(&pk.into(), &token, &state_hash.into())?
-                    .map(|acct| vec![StagedLedgerAccount::from(acct)]));
+                    .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
             } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
                 if let Some(state_hash) =
                     db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
                 {
                     return Ok(db
                         .get_staged_account(&pk.into(), &token, &state_hash)?
-                        .map(|acct| vec![StagedLedgerAccount::from(acct)]));
+                        .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
                 }
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
                 if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
                     return Ok(db
                         .get_staged_account(&pk.into(), &token, &state_hash)?
-                        .map(|acct| vec![StagedLedgerAccount::from(acct)]));
+                        .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
                 }
             }
 
@@ -160,7 +171,7 @@ impl StagedLedgerQueryRoot {
                         .accounts
                         .to_owned()
                         .into_values()
-                        .map(StagedLedgerAccount::from)
+                        .map(|account| StagedLedgerAccount::new(db, account))
                         .collect()
                 })
                 .expect("MINA token ledger")
@@ -176,9 +187,9 @@ impl StagedLedgerQueryRoot {
 fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
     if let Some(sort_by) = sort_by {
         match sort_by {
-            StagedLedgerSortByInput::BalanceAsc => {
-                accts.sort_by_cached_key(|x| (x.balance_nanomina, x.nonce, x.public_key.clone()))
-            }
+            StagedLedgerSortByInput::BalanceAsc => accts.sort_by_cached_key(|x| {
+                (x.balance_nanomina, x.nonce, x.public_key.public_key.clone())
+            }),
             StagedLedgerSortByInput::BalanceDesc => {
                 reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
                 accts.reverse();
@@ -187,18 +198,17 @@ fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortBy
     }
 }
 
-impl From<Account> for StagedLedgerAccount {
+impl StagedLedgerAccount {
     /// Account creation fee deducted here
-    fn from(acct: Account) -> Self {
-        let acct = acct.deduct_mina_account_creation_fee();
+    fn new(db: &std::sync::Arc<IndexerStore>, account: Account) -> Self {
+        let account = account.deduct_mina_account_creation_fee();
 
         Self {
-            balance_nanomina: acct.balance.0,
-            balance: acct.balance.to_f64(),
-            nonce: acct.nonce.map_or(0, |n| n.0),
-            delegate: acct.delegate.0,
-            public_key: acct.public_key.0,
-            username: acct.username.map(|u| u.0),
+            balance_nanomina: account.balance.0,
+            balance: account.balance.to_f64(),
+            nonce: account.nonce.map_or(0, |n| n.0),
+            delegate: DelegatePK::new(db, account.delegate),
+            public_key: PK::new(db, account.public_key),
         }
     }
 }
