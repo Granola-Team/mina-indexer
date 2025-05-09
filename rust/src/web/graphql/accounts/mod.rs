@@ -2,7 +2,10 @@
 
 mod zkapp;
 
-use super::{db, pk::PK};
+use super::{
+    db,
+    pk::{DelegatePK, PK},
+};
 use crate::{
     base::public_key::PublicKey,
     block::store::BlockStore,
@@ -50,10 +53,12 @@ pub struct AccountQueryInput {
 #[derive(SimpleObject)]
 pub struct Account {
     /// Value public key
-    public_key: String,
+    #[graphql(flatten)]
+    public_key: PK,
 
-    /// Value delegate
-    delegate: PK,
+    /// Value delegate public key
+    #[graphql(flatten)]
+    delegate: DelegatePK,
 
     /// Value balance (nano)
     balance: u64,
@@ -183,6 +188,7 @@ pub struct AccountWithMeta {
     #[graphql(name = "block_height")]
     block_height: u32,
 
+    // TODO deprecate
     username: String,
 }
 
@@ -497,6 +503,7 @@ impl AccountWithMeta {
 }
 
 impl Account {
+    /// Creates a GQL account from a ledger account
     fn new(db: &std::sync::Arc<IndexerStore>, account: account::Account) -> Self {
         let permissions = if account.is_zkapp_account() {
             account.permissions.map(Into::into)
@@ -505,8 +512,8 @@ impl Account {
         };
 
         Self {
-            public_key: account.public_key.0,
-            delegate: PK::new(db, account.delegate),
+            public_key: PK::new(db, account.public_key),
+            delegate: DelegatePK::new(db, account.delegate),
             nonce: account.nonce.map_or(0, |n| n.0),
             balance: account.balance.0,
             time_locked: account.timing.is_some(),
@@ -522,23 +529,9 @@ impl Account {
     }
 }
 
-impl From<AccountWithMeta> for Account {
-    fn from(value: AccountWithMeta) -> Self {
-        Self {
-            public_key: value.account.public_key,
-            delegate: value.account.delegate,
-            nonce: value.account.nonce,
-            balance: value.account.balance,
-            time_locked: value.account.timing.is_some(),
-            timing: value.account.timing,
-            token: value.account.token,
-            zkapp: value.account.zkapp,
-            receipt_chain_hash: value.account.receipt_chain_hash,
-            voting_for: value.account.voting_for,
-            permissions: value.account.permissions,
-        }
-    }
-}
+/////////////////
+// conversions //
+/////////////////
 
 impl From<account::Timing> for Timing {
     fn from(timing: account::Timing) -> Self {
