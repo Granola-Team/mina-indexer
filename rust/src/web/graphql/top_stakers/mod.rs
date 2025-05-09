@@ -1,11 +1,14 @@
 //! GraphQL `topStakers` endpoint
 
-use super::{db, stakes::StakesDelegationTotals};
+use super::{
+    db,
+    pk::{PK, PK_},
+    stakes::StakesDelegationTotals,
+};
 use crate::{
     base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
     block::store::BlockStore,
-    ledger::{store::staking::StakingLedgerStore, username::Username},
-    store::username::UsernameStore,
+    ledger::store::staking::StakingLedgerStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
@@ -13,8 +16,10 @@ use speedb::Direction;
 
 #[derive(InputObject)]
 pub struct TopStakersQueryInput {
+    /// Input spoch
     epoch: u32,
 
+    /// Input genesis state hash
     #[graphql(name = "genesis_state_hash")]
     genesis_state_hash: Option<String>,
 }
@@ -31,12 +36,9 @@ pub struct TopStakersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopStakerAccount {
-    /// Value staker username
-    username: String,
-
     /// Value staker public key
-    #[graphql(name = "public_key")]
-    public_key: String,
+    #[graphql(name = "public_key", flatten)]
+    public_key: PK_,
 
     /// Value epoch delegation totals
     #[graphql(name = "delegation_totals")]
@@ -129,6 +131,7 @@ impl TopStakersQueryRoot {
                 .expect("epoch delegations");
 
             let account = TopStakerAccount::new(
+                db,
                 db.get_block_production_pk_epoch_count(
                     &pk,
                     Some(epoch),
@@ -141,14 +144,22 @@ impl TopStakersQueryRoot {
                     Some(&genesis_state_hash),
                 )?,
                 db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(&genesis_state_hash))?,
-                db.get_username(&pk)?,
                 pk,
                 StakesDelegationTotals {
                     total_currency,
                     count_delegates: delegations.count_delegates,
                     total_delegated: Amount(delegations.total_delegated).to_f64(),
                     total_delegated_nanomina: delegations.total_delegated,
-                    delegates: delegations.delegates.into_iter().map(|pk| pk.0).collect(),
+                    delegates: delegations
+                        .delegates
+                        .iter()
+                        .map(|pk| pk.to_string())
+                        .collect(),
+                    delegate_pks: delegations
+                        .delegates
+                        .into_iter()
+                        .map(|pk| PK::new(db, pk))
+                        .collect(),
                 },
             );
 
@@ -161,17 +172,16 @@ impl TopStakersQueryRoot {
 
 impl TopStakerAccount {
     fn new(
+        db: &std::sync::Arc<crate::store::IndexerStore>,
         num_blocks_produced: u32,
         num_canonical_blocks_produced: u32,
         num_supercharged_blocks_produced: u32,
         num_slots_produced: u32,
-        username: Option<Username>,
         pk: PublicKey,
         delegation_totals: StakesDelegationTotals,
     ) -> Self {
         Self {
-            public_key: pk.0,
-            username: username.unwrap_or_default().0,
+            public_key: PK_::new(db, pk),
             num_blocks_produced,
             num_canonical_blocks_produced,
             num_supercharged_blocks_produced,
