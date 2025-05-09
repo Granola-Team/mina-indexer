@@ -269,4 +269,17 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn off_chain_usernames() -> anyhow::Result<()> {
+        let store = create_indexer_store()?;
+
+        let pk = PublicKey::new("B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN")?;
+        assert_eq!(
+            store.get_username(&pk)?.unwrap(),
+            Username::new("MinaExplorer")?
+        );
+
+        Ok(())
+    }
 }

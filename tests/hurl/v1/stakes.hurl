@@ -300,6 +300,7 @@ POST {{url}}
     }
   ) {
     public_key
+    username
     balance
     nonce
   }
@@ -313,6 +314,7 @@ jsonpath "$.data.stakes" count == 1
 
 # only datum
 jsonpath "$.data.stakes[0].public_key" == "B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN"
+jsonpath "$.data.stakes[0].username" == "MinaExplorer"
 jsonpath "$.data.stakes[0].balance" == 92.929966438
 jsonpath "$.data.stakes[0].nonce" == 4
 
