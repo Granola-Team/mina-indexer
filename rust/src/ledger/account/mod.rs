@@ -18,10 +18,12 @@ use super::{
         LedgerDiff,
     },
     token::{account::TokenAccount, TokenAddress, TokenSymbol},
-    username::Username,
 };
 use crate::{
-    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    base::{
+        amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash,
+        username::Username,
+    },
     block::genesis::GenesisBlock,
     constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
     ledger::diff::account::PaymentDiff,

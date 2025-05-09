@@ -1,5 +1,9 @@
+//! Username representation
+
+pub mod off_chain;
+
 use crate::{command::MEMO_LEN, constants::NAME_SERVICE_MEMO_PREFIX};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -11,6 +15,20 @@ pub struct Username(pub String);
 
 impl Username {
     pub const MAX_LEN: usize = MEMO_LEN - NAME_SERVICE_MEMO_PREFIX.len();
+
+    fn is_valid(username: &str) -> bool {
+        username.len() <= Self::MAX_LEN
+    }
+
+    pub fn new(username: impl Into<String>) -> anyhow::Result<Self> {
+        let username: String = username.into();
+
+        if Self::is_valid(&username) {
+            Ok(Self(username))
+        } else {
+            bail!("Invalid username: {}", username)
+        }
+    }
 
     pub fn from_bytes(bytes: Vec<u8>) -> anyhow::Result<Self> {
         String::from_utf8(bytes)

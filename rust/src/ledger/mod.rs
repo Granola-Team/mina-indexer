@@ -8,7 +8,6 @@ pub mod hash;
 pub mod staking;
 pub mod store;
 pub mod token;
-pub mod username;
 
 use crate::{
     base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},

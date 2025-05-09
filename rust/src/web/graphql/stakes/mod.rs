@@ -728,13 +728,12 @@ impl StakesLedgerAccountWithMeta {
 mod tests {
     use super::{StakesDelegationTotals, StakesLedgerAccountWithMeta, StakesQueryInput};
     use crate::{
-        base::{public_key::PublicKey, state_hash::StateHash},
+        base::{public_key::PublicKey, state_hash::StateHash, username::Username},
         chain::Network,
         ledger::{
             hash::LedgerHash,
             staking::{StakingAccount, StakingLedger},
             store::staking::StakingLedgerStore,
-            username::Username,
         },
         store::{username::UsernameStore, IndexerStore},
     };

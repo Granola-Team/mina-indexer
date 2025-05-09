@@ -2,9 +2,8 @@
 
 use super::DbUpdate;
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{public_key::PublicKey, state_hash::StateHash, username::Username},
     block::store::DbBlockUpdate,
-    ledger::username::Username,
     store::Result,
 };
 use serde::{Deserialize, Serialize};

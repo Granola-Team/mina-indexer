@@ -2,7 +2,7 @@ pub mod branch;
 pub mod summary;
 
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{public_key::PublicKey, state_hash::StateHash, username::Username},
     block::{
         genesis::GenesisBlock,
         genesis_state_hash::GenesisStateHash,
@@ -21,7 +21,6 @@ use crate::{
         staking::{parser::StakingLedgerParser, StakingLedger},
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
-        username::Username,
         Ledger, LedgerHash,
     },
     server::IndexerVersion,

@@ -6,9 +6,8 @@ use super::{
     DbUpdate, IndexerStore,
 };
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{public_key::PublicKey, state_hash::StateHash, username::Username},
     block::store::{BlockUpdate, DbBlockUpdate},
-    ledger::username::Username,
     store::Result,
     utility::store::{common::from_be_bytes, username::username_key},
 };
@@ -194,8 +193,7 @@ impl UsernameStore for IndexerStore {
 #[cfg(all(test, feature = "tier2"))]
 mod tests {
     use crate::{
-        base::public_key::PublicKey,
-        ledger::username::Username,
+        base::{public_key::PublicKey, username::Username},
         store::{username::UsernameStore, IndexerStore},
     };
     use quickcheck::{Arbitrary, Gen};
