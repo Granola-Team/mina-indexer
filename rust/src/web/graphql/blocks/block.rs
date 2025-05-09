@@ -13,7 +13,7 @@ use crate::{
     store::IndexerStore,
     web::graphql::{
         get_block_canonicity,
-        pk::{CoinbaseReceiverPK, CreatorPK, ProverPK, RecipientPK},
+        pk::{CoinbaseReceiverPK, CreatorPK, ProverPK, RecipientPK, WinnerPK},
         transactions::TransactionWithoutBlock,
     },
 };
@@ -102,25 +102,31 @@ pub struct BlockWithoutCanonicity {
     /// Value genesis state hash
     pub genesis_state_hash: String,
 
-    /// The public_key for the winner account
+    /// Value winner public key/username
+    #[graphql(deprecation = "Use winner instead")]
     pub winner_account: PK,
 
-    /// Value date_time as ISO 8601 string
+    /// Value winner public key/username
+    #[graphql(flatten)]
+    pub winner: WinnerPK,
+
+    /// Value date time as ISO 8601 string
     pub date_time: String,
 
-    /// Value received_time as ISO 8601 string
+    /// Value received time as ISO 8601 string
     pub received_time: String,
 
-    /// The public_key for the creator account
+    /// Value creator public key/username
     #[graphql(deprecation = "Use creator instead")]
     pub creator_account: PK,
 
-    /// Value creator public key
+    /// Value creator public key/username
     #[graphql(flatten)]
     pub creator: CreatorPK,
 
-    /// The public_key for the coinbase_receiver
-    pub coinbase_receiver: PK,
+    /// Value coinbase receiver public key/username
+    #[graphql(flatten)]
+    pub coinbase_receiver: CoinbaseReceiverPK,
 
     /// Value protocol state
     pub protocol_state: ProtocolState,
@@ -401,6 +407,7 @@ impl BlockWithoutCanonicity {
         let snark_fees = block.snark_fees();
 
         let creator = block.block_creator();
+        let winner = block.block_stake_winner();
 
         // blockchain state
         let snarked_ledger_hash = block.snarked_ledger_hash().0;
@@ -468,8 +475,9 @@ impl BlockWithoutCanonicity {
             block_height: block.blockchain_length(),
             global_slot_since_genesis: block.global_slot_since_genesis(),
             genesis_state_hash: block.genesis_state_hash().0,
-            coinbase_receiver: PK::new(db, block.coinbase_receiver()),
-            winner_account: PK::new(db, block.block_stake_winner()),
+            coinbase_receiver: CoinbaseReceiverPK::new(db, block.coinbase_receiver()),
+            winner_account: PK::new(db, winner.clone()),
+            winner: WinnerPK::new(db, winner),
             creator: CreatorPK::new(db, creator.clone()),
             creator_account: PK::new(db, creator),
             received_time,

@@ -57,6 +57,12 @@ pub struct SenderPK {
     pub sender_username: String,
 }
 
+#[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
+pub struct WinnerPK {
+    pub winner: String,
+    pub winner_username: String,
+}
+
 ///////////
 // impls //
 ///////////
@@ -111,6 +117,12 @@ impl RecipientPK {
 }
 
 impl SenderPK {
+    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+        PK::new(db, pk).into()
+    }
+}
+
+impl WinnerPK {
     pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
@@ -179,6 +191,15 @@ impl From<PK> for SenderPK {
         Self {
             sender: value.public_key,
             sender_username: value.username,
+        }
+    }
+}
+
+impl From<PK> for WinnerPK {
+    fn from(value: PK) -> Self {
+        Self {
+            winner: value.public_key,
+            winner_username: value.username,
         }
     }
 }

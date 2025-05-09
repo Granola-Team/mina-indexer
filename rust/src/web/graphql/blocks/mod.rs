@@ -115,7 +115,7 @@ impl BlocksQueryRoot {
     #[graphql(cache_control(max_age = 3600))]
     async fn blocks(
         &self,
-        ctx: &async_graphql::Context<'_>,
+        ctx: &Context<'_>,
         query: Option<BlockQueryInput>,
         #[graphql(default = 100)] limit: usize,
         sort_by: Option<BlockSortByInput>,
@@ -677,7 +677,7 @@ impl BlockQueryInput {
         // creator account
         if let Some(creator_account) = creator_account {
             if let Some(public_key) = creator_account.public_key.as_ref() {
-                if block.block.creator_account.public_key != *public_key {
+                if block.block.creator.creator != *public_key {
                     return false;
                 }
             }
@@ -686,7 +686,7 @@ impl BlockQueryInput {
         // coinbase receiver
         if let Some(coinbase_receiver) = coinbase_receiver {
             if let Some(public_key) = coinbase_receiver.public_key.as_ref() {
-                if block.block.coinbase_receiver.public_key != *public_key {
+                if block.block.coinbase_receiver.coinbase_receiver != *public_key {
                     return false;
                 }
             }
