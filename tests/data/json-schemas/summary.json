@@ -53,7 +53,13 @@
     "totalNumAccounts": {
       "type": "integer"
     },
+    "totalNumMinaAccounts": {
+      "type": "integer"
+    },
     "totalNumZkappAccounts": {
+      "type": "integer"
+    },
+    "totalNumMinaZkappAccounts": {
       "type": "integer"
     },
     "epochNumBlocks": {
@@ -150,7 +156,9 @@
     "lockedSupply",
     "circulatingSupply",
     "totalNumAccounts",
+    "totalNumMinaAccounts",
     "totalNumZkappAccounts",
+    "totalNumMinaZkappAccounts",
     "epochNumBlocks",
     "totalNumBlocks",
     "epochNumCanonicalBlocks",

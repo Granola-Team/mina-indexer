@@ -51,7 +51,9 @@ pub struct BlockchainSummary {
 
     // accounts
     total_num_accounts: u32,
+    total_num_mina_accounts: u32,
     total_num_zkapp_accounts: u32,
+    total_num_mina_zkapp_accounts: u32,
 
     // blocks
     epoch_num_blocks: u32,
@@ -141,7 +143,9 @@ struct SummaryInput {
 
     // accounts
     total_num_accounts: u32,
+    total_num_mina_accounts: u32,
     total_num_zkapp_accounts: u32,
+    total_num_mina_zkapp_accounts: u32,
 
     // blocks
     epoch_num_blocks: u32,
@@ -207,7 +211,9 @@ impl BlockchainSummary {
             locked_balance,
 
             total_num_accounts,
+            total_num_mina_accounts,
             total_num_zkapp_accounts,
+            total_num_mina_zkapp_accounts,
 
             epoch_num_blocks,
             total_num_blocks,
@@ -289,7 +295,9 @@ impl BlockchainSummary {
             circulating_supply,
 
             total_num_accounts,
+            total_num_mina_accounts,
             total_num_zkapp_accounts,
+            total_num_mina_zkapp_accounts,
 
             epoch_num_blocks,
             total_num_blocks,
@@ -342,9 +350,17 @@ pub async fn get_blockchain_summary(
             .get_num_accounts()
             .expect("num accounts")
             .unwrap_or_default();
+        let total_num_mina_accounts = store
+            .get_num_mina_accounts()
+            .expect("num mina accounts")
+            .unwrap_or_default();
         let total_num_zkapp_accounts = store
             .get_num_zkapp_accounts()
             .expect("num zkapp accounts")
+            .unwrap_or_default();
+        let total_num_mina_zkapp_accounts = store
+            .get_num_mina_zkapp_accounts()
+            .expect("num mina zkapp accounts")
             .unwrap_or_default();
 
         // aggregated on-chain & off-chain time-locked tokens
@@ -469,7 +485,9 @@ pub async fn get_blockchain_summary(
             indexer_version,
 
             total_num_accounts,
+            total_num_mina_accounts,
             total_num_zkapp_accounts,
+            total_num_mina_zkapp_accounts,
 
             epoch_num_blocks,
             total_num_blocks,
