@@ -17,6 +17,8 @@ pub trait FixedKeys {
     const TOTAL_NUM_ACCOUNTS_KEY: &'static [u8] = "total_num_accounts".as_bytes();
     const TOTAL_NUM_MINA_ACCOUNTS_KEY: &'static [u8] = "total_num_mina_accounts".as_bytes();
     const TOTAL_NUM_ZKAPP_ACCOUNTS_KEY: &'static [u8] = "total_num_zkapp_accounts".as_bytes();
+    const TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY: &'static [u8] =
+        "total_num_mina_zkapp_accounts".as_bytes();
 
     const TOTAL_NUM_BLOCKS_KEY: &'static [u8] = "total_num_blocks".as_bytes();
     const TOTAL_NUM_BLOCKS_SUPERCHARGED_KEY: &'static [u8] =

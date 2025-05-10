@@ -264,6 +264,27 @@ impl BestLedgerStore for IndexerStore {
             self.update_num_mina_accounts(mina_adjust)?;
         }
 
+        // count mina zkapp accounts
+        let mina_zkapp_accounts = |update: &AccountUpdate| -> i32 {
+            update
+                .new_zkapp_accounts
+                .iter()
+                .filter(|(_, token)| token.0 == MINA_TOKEN_ADDRESS)
+                .count() as i32
+        };
+        let apply_acc = updates
+            .apply
+            .iter()
+            .fold(0, |acc, update| acc + mina_zkapp_accounts(update));
+        let mina_zkapp_adjust = updates
+            .unapply
+            .iter()
+            .fold(apply_acc, |acc, update| acc - mina_zkapp_accounts(update));
+
+        if mina_zkapp_adjust != 0 {
+            self.update_num_mina_zkapp_accounts(mina_zkapp_adjust)?;
+        }
+
         // count zkapp accounts
         let apply_acc = updates.apply.iter().fold(0, |acc, update| {
             acc + update.new_zkapp_accounts.len() as i32
@@ -467,6 +488,65 @@ impl BestLedgerStore for IndexerStore {
 
         let old = self.get_num_mina_accounts()?.unwrap_or_default();
         self.set_num_mina_accounts(old + 1)
+    }
+
+    fn update_num_mina_zkapp_accounts(&self, adjust: i32) -> Result<()> {
+        use std::cmp::Ordering::*;
+
+        match adjust.cmp(&0) {
+            Equal => (),
+            Greater => {
+                // add to num mina zkapp accounts
+                let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+            Less => {
+                // sub from num mina zkapp accounts
+                let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
+                self.database.put(
+                    Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY,
+                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_num_mina_zkapp_accounts(&self) -> Result<Option<u32>> {
+        trace!("Getting count of mina zkapp accounts");
+
+        Ok(self
+            .database
+            .get(Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY)?
+            .map(from_be_bytes))
+    }
+
+    fn set_num_mina_zkapp_accounts(&self, num: u32) -> Result<()> {
+        trace!("Setting count of mina zkapp accounts to {}", num);
+
+        Ok(self
+            .database
+            .put(Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY, num.to_be_bytes())?)
+    }
+
+    fn decrement_num_mina_zkapp_accounts(&self) -> Result<()> {
+        trace!("Decrementing count of mina zkapp accounts");
+
+        let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
+        assert!(old >= 1);
+
+        self.set_num_mina_zkapp_accounts(old - 1)
+    }
+
+    fn increment_num_mina_zkapp_accounts(&self) -> Result<()> {
+        trace!("Incrementing count of mina zkapp accounts");
+
+        let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
+        self.set_num_mina_zkapp_accounts(old + 1)
     }
 
     ////////////////////

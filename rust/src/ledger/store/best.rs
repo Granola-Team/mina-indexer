@@ -109,6 +109,21 @@ pub trait BestLedgerStore {
     /// Decrement the count of best ledger MINA accounts
     fn decrement_num_mina_accounts(&self) -> Result<()>;
 
+    /// Update the count of best ledger MINA zkapp accounts
+    fn update_num_mina_zkapp_accounts(&self, adjust: i32) -> Result<()>;
+
+    /// Get the count of best ledger MINA zkapp accounts
+    fn get_num_mina_zkapp_accounts(&self) -> Result<Option<u32>>;
+
+    /// Set the count of best ledger MINA zkapp accounts
+    fn set_num_mina_zkapp_accounts(&self, num: u32) -> Result<()>;
+
+    /// Increment the count of best ledger MINA zkapp accounts
+    fn increment_num_mina_zkapp_accounts(&self) -> Result<()>;
+
+    /// Decrement the count of best ledger MINA zkapp accounts
+    fn decrement_num_mina_zkapp_accounts(&self) -> Result<()>;
+
     ////////////////////
     // zkApp accounts //
     ////////////////////
