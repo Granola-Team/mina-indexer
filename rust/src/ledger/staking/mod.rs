@@ -3,10 +3,10 @@ pub mod permissions;
 
 use super::token::TokenAddress;
 use crate::{
-    base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+    base::{amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
     block::extract_network,
     chain::Network,
-    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH, MINA_SCALE_DEC},
+    constants::{HARDFORK_GENESIS_HASH, MAINNET_GENESIS_HASH, MINA_TOKEN_ADDRESS},
     ledger::{
         account::{ReceiptChainHash, Timing},
         LedgerHash,
@@ -17,7 +17,6 @@ use crate::{
 use anyhow::Context;
 use log::trace;
 use permissions::StakingPermissions;
-use rust_decimal::{prelude::ToPrimitive, Decimal};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -55,7 +54,7 @@ pub struct StakingAccountJson {
     pub balance: String,
     pub delegate: Option<PublicKey>,
     pub username: Option<String>,
-    pub token: String,
+    pub token: Option<String>,
     pub permissions: StakingPermissions,
     pub receipt_chain_hash: ReceiptChainHash,
     pub voting_for: StateHash,
@@ -107,14 +106,14 @@ pub struct AggregatedEpochStakeDelegation {
 
 impl From<StakingAccountJson> for StakingAccount {
     fn from(value: StakingAccountJson) -> Self {
-        let token = if let Ok(token_id) = value.token.parse::<u64>() {
+        let token = if let Some(Ok(token_id)) = value.token.as_ref().map(|s| s.parse::<u64>()) {
             assert_eq!(token_id, 1);
 
             Some(TokenAddress::default())
-        } else if let Ok(token) = value
+        } else if let Some(Ok(token)) = value
             .token
-            .parse::<TokenAddress>()
-            .with_context(|| value.token)
+            .as_ref()
+            .map(|s| s.parse::<TokenAddress>().with_context(|| s.to_string()))
         {
             Some(token)
         } else {
@@ -122,11 +121,9 @@ impl From<StakingAccountJson> for StakingAccount {
         };
 
         let nonce = value.nonce.map(Into::into);
-        let balance = match value.balance.parse::<Decimal>() {
-            Ok(amt) => (amt * MINA_SCALE_DEC)
-                .to_u64()
-                .expect("staking account balance"),
-            Err(e) => panic!("Unable to parse staking account balance: {e}"),
+        let balance = match value.balance.parse::<Amount>() {
+            Ok(amt) => amt.0,
+            Err(e) => panic!("Unable to parse staking account balance: {}", e),
         };
         let timing = value.timing.map(|timing| Timing {
             cliff_time: timing.cliff_time.parse().expect("cliff_time is u64"),
@@ -134,16 +131,16 @@ impl From<StakingAccountJson> for StakingAccount {
                 .vesting_period
                 .parse()
                 .expect("vesting_period is u64"),
-            initial_minimum_balance: match timing.initial_minimum_balance.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
-                Err(e) => panic!("Unable to parse initial_minimum_balance: {e}"),
+            initial_minimum_balance: match timing.initial_minimum_balance.parse::<Amount>() {
+                Ok(amt) => amt.0.into(),
+                Err(e) => panic!("Unable to parse initial_minimum_balance: {}", e),
             },
-            cliff_amount: match timing.cliff_amount.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
-                Err(e) => panic!("Unable to parse cliff_amount: {e}"),
+            cliff_amount: match timing.cliff_amount.parse::<Amount>() {
+                Ok(amt) => amt.0.into(),
+                Err(e) => panic!("Unable to parse cliff_amount: {}", e),
             },
-            vesting_increment: match timing.vesting_increment.parse::<Decimal>() {
-                Ok(amt) => (amt * MINA_SCALE_DEC).to_u64().unwrap().into(),
+            vesting_increment: match timing.vesting_increment.parse::<Amount>() {
+                Ok(amt) => amt.0.into(),
                 Err(e) => panic!("Unable to parse vesting_increment: {e}"),
             },
         });
@@ -288,15 +285,23 @@ impl StakingLedger {
         });
         trace!("Parsing staking ledger {:?}", file_name);
 
+        let (network, epoch, ledger_hash) = Self::split_ledger_path(path);
+        let is_pre_hardfork = Self::V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str));
+
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)
             .with_context(|| format!("Failed reading staking ledger {}", path.display()))?;
 
         let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
-            .map(|acct| (acct.pk.clone(), acct.into()))
+            .filter_map(|acct| {
+                if is_pre_hardfork || acct.token.as_ref().is_some_and(|t| t == MINA_TOKEN_ADDRESS) {
+                    Some((acct.pk.clone(), acct.into()))
+                } else {
+                    None
+                }
+            })
             .collect();
 
-        let (network, epoch, ledger_hash) = Self::split_ledger_path(path);
         let total_currency: u64 = staking_ledger.values().map(|account| account.balance).sum();
         let genesis_state_hash = Self::genesis_state_hash(&ledger_hash);
 
@@ -442,7 +447,7 @@ mod tests {
         assert_eq!(network, Network::Mainnet);
         assert_eq!(
             ledger_hash.0,
-            "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee".to_string()
+            "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"
         );
 
         let pk = PublicKey::from("B62qrecVjpoZ4Re3a5arN6gXZ6orhmj1enUtA887XdG5mtZfdUbBUh4");
@@ -452,7 +457,7 @@ mod tests {
         assert_eq!(pk_delegations.count_delegates, 25);
         assert_eq!(pk_delegations.total_delegated, 13277838425206999);
         assert_eq!(total_delegations, 805385692840039233);
-        assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH.to_string());
+        assert_eq!(genesis_state_hash.0, MAINNET_GENESIS_HASH);
 
         let expected_delegates: HashSet<PublicKey> = [
             "B62qmCwouxG2UzH6zEYGFWFFzUuSv9sbLnr96VJWDX3paSSucX7jAJN",
