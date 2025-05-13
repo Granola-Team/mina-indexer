@@ -19,6 +19,7 @@ pub struct SnarkProverFees {
 
 pub struct SnarkUpdate {
     pub state_hash: StateHash,
+    pub epoch: u32,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
     pub works: Vec<SnarkWorkSummary>,
@@ -53,8 +54,8 @@ pub trait SnarkStore {
     /// Update snark work prover fees
     fn update_snark_prover_fees(
         &self,
+        epoch: u32,
         block_height: u32,
-        global_slot: u32,
         genesis_state_hash: &StateHash,
         snarks: &[SnarkWorkSummary],
         apply: SnarkApplication,

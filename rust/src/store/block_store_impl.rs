@@ -320,6 +320,7 @@ impl BlockStore for IndexerStore {
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
+                epoch: block_epoch(self, &b)?,
                 global_slot_since_genesis: block_slot(self, &b)?,
             });
 
@@ -338,11 +339,13 @@ impl BlockStore for IndexerStore {
             apply.push(BlockUpdate {
                 state_hash: b.clone(),
                 blockchain_length: b_length,
+                epoch: block_epoch(self, &b)?,
                 global_slot_since_genesis: block_slot(self, &b)?,
             });
             unapply.push(BlockUpdate {
                 state_hash: a.clone(),
                 blockchain_length: a_length,
+                epoch: block_epoch(self, &a)?,
                 global_slot_since_genesis: block_slot(self, &a)?,
             });
 
@@ -367,7 +370,7 @@ impl BlockStore for IndexerStore {
     fn get_current_epoch(&self) -> Result<u32> {
         Ok(self
             .get_best_block_hash()?
-            .and_then(|state_hash| self.get_block_epoch(&state_hash).ok().flatten())
+            .and_then(|state_hash| self.get_block_epoch(&state_hash).expect("current epoch"))
             .unwrap_or_default())
     }
 
@@ -1882,6 +1885,13 @@ fn block_height(db: &IndexerStore, state_hash: &StateHash) -> Result<u32> {
         .get_block_height(state_hash)?
         .with_context(|| format!("{state_hash}"))
         .expect("block height"))
+}
+
+fn block_epoch(db: &IndexerStore, state_hash: &StateHash) -> Result<u32> {
+    Ok(db
+        .get_block_epoch(state_hash)?
+        .with_context(|| format!("{state_hash}"))
+        .expect("block epoch"))
 }
 
 fn block_slot(db: &IndexerStore, state_hash: &StateHash) -> Result<u32> {

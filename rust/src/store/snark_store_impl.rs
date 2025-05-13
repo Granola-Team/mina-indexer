@@ -8,7 +8,6 @@ use crate::{
         store::{BlockStore, BlockUpdate, DbBlockUpdate},
     },
     canonicity::store::CanonicityStore,
-    constants::MAINNET_EPOCH_SLOT_COUNT,
     snark_work::{
         store::{DbSnarkUpdate, SnarkApplication, SnarkProverFees, SnarkStore, SnarkUpdate},
         SnarkWorkSummary, SnarkWorkSummaryWithStateHash, SnarkWorkTotal,
@@ -22,7 +21,7 @@ use crate::{
         snarks::*,
     },
 };
-use log::trace;
+use log::{debug, trace};
 use serde::{Deserialize, Serialize};
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
@@ -166,6 +165,7 @@ impl SnarkStore for IndexerStore {
         state_hash: &StateHash,
     ) -> Result<Option<Vec<SnarkWorkSummary>>> {
         trace!("Getting SNARK work in block {state_hash}");
+
         let mut snarks: Vec<SnarkWorkSummary> = vec![];
         if let Some(num) = self.get_block_snarks_count(state_hash)? {
             for index in 0..num {
@@ -217,15 +217,14 @@ impl SnarkStore for IndexerStore {
 
     fn update_snark_prover_fees(
         &self,
+        epoch: u32,
         block_height: u32,
-        global_slot: u32,
         genesis_state_hash: &StateHash,
         snarks: &[SnarkWorkSummary],
         apply: SnarkApplication,
     ) -> Result<()> {
         trace!("Updating SNARK prover fees");
 
-        let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
         let block_height_opt = match apply {
             SnarkApplication::Apply => None,
             SnarkApplication::Unapply => Some(block_height),
@@ -518,6 +517,10 @@ impl SnarkStore for IndexerStore {
         epoch_max_fee: u64,
         epoch_min_fee: u64,
     ) -> Result<()> {
+        debug!(
+            "EPOCH SNARK genesis {} epoch {} fees {} prover {}",
+            genesis_state_hash, epoch, epoch_total_fees, prover
+        );
         self.database.put_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
             snark_fee_epoch_sort_key(genesis_state_hash, epoch, epoch_total_fees, prover),
@@ -826,12 +829,14 @@ impl SnarkStore for IndexerStore {
                 .iter()
                 .map(
                     |BlockUpdate {
+                         epoch,
                          state_hash: a,
                          global_slot_since_genesis,
                          blockchain_length,
                      }| {
                         let block_snarks = self.get_block_snark_work(a).ok().flatten().unwrap();
                         SnarkUpdate {
+                            epoch: *epoch,
                             state_hash: a.clone(),
                             blockchain_length: *blockchain_length,
                             global_slot_since_genesis: *global_slot_since_genesis,
@@ -845,12 +850,14 @@ impl SnarkStore for IndexerStore {
                 .iter()
                 .map(
                     |BlockUpdate {
+                         epoch,
                          state_hash: u,
-                         global_slot_since_genesis,
                          blockchain_length,
+                         global_slot_since_genesis,
                      }| {
                         let block_snarks = self.get_block_snark_work(u).ok().flatten().unwrap();
                         SnarkUpdate {
+                            epoch: *epoch,
                             state_hash: u.clone(),
                             blockchain_length: *blockchain_length,
                             global_slot_since_genesis: *global_slot_since_genesis,
@@ -875,8 +882,8 @@ impl SnarkStore for IndexerStore {
 
             self.decrement_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
+                snark_update.epoch,
                 snark_update.blockchain_length,
-                snark_update.global_slot_since_genesis,
                 &genesis_state_hash,
                 &snark_update.works,
                 SnarkApplication::Unapply,
@@ -891,8 +898,8 @@ impl SnarkStore for IndexerStore {
 
             self.increment_snarks_total_canonical_count(snark_update.works.len() as u32)?;
             self.update_snark_prover_fees(
+                snark_update.epoch,
                 snark_update.blockchain_length,
-                snark_update.global_slot_since_genesis,
                 &genesis_state_hash,
                 &snark_update.works,
                 SnarkApplication::Apply,

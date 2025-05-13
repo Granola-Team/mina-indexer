@@ -11,6 +11,7 @@ use speedb::{DBIterator, Direction, IteratorMode, WriteBatch};
 #[derive(Debug)]
 pub struct BlockUpdate {
     pub state_hash: StateHash,
+    pub epoch: u32,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
 }

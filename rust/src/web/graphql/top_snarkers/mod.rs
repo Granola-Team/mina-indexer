@@ -36,7 +36,7 @@ pub struct TopSnarkersQueryRoot;
 #[derive(SimpleObject)]
 pub struct TopSnarker {
     /// Value SNARKer public key
-    #[graphql(name = "public_key", flatten)]
+    #[graphql(flatten)]
     public_key: PK_,
 
     /// Value total fees
@@ -101,7 +101,7 @@ impl TopSnarkersQueryRoot {
             Err(e) => return Err(async_graphql::Error::from(e)),
         };
 
-        let mut snarkers = vec![];
+        // make iterator
         let iter = match sort_by.unwrap_or_default() {
             MaxFeeAsc => db.snark_prover_max_fee_epoch_iterator(
                 epoch,
@@ -125,6 +125,7 @@ impl TopSnarkersQueryRoot {
             ),
         };
 
+        let mut snarkers = vec![];
         for (key, _) in iter.flatten() {
             if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
                 || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()

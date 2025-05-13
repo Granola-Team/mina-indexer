@@ -153,6 +153,7 @@ impl CanonicityStore for IndexerStore {
                          state_hash: a,
                          blockchain_length: h,
                          global_slot_since_genesis: g,
+                         epoch: _,
                      }| CanonicityDiff {
                         state_hash: a.clone(),
                         blockchain_length: *h,
@@ -168,6 +169,7 @@ impl CanonicityStore for IndexerStore {
                          state_hash: u,
                          blockchain_length: h,
                          global_slot_since_genesis: g,
+                         epoch: _,
                      }| CanonicityDiff {
                         state_hash: u.clone(),
                         blockchain_length: *h,
