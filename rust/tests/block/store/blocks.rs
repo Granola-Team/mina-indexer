@@ -15,7 +15,8 @@ use std::{collections::HashMap, path::PathBuf, time::Instant};
 async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("block-store-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
-    let db = IndexerStore::new(store_dir.path())?;
+
+    let db = IndexerStore::new(store_dir.path(), true)?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,
@@ -58,7 +59,8 @@ async fn add_and_get() -> anyhow::Result<()> {
 async fn get_invalid() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("block-store-db")?;
     let blocks_dir = &PathBuf::from("./tests/data/sequential_blocks");
-    let db = IndexerStore::new(store_dir.path())?;
+
+    let db = IndexerStore::new(store_dir.path(), true)?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         blocks_dir,
         PcbVersion::V1,

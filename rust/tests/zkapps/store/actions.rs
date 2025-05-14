@@ -10,7 +10,7 @@ use quickcheck::Arbitrary;
 #[test]
 fn action_store_test() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("zkapp-action-store")?;
-    let indexer_store = IndexerStore::new(store_dir.path())?;
+    let indexer_store = IndexerStore::new(store_dir.path(), true)?;
 
     // generate arbitrary actions
     let g = &mut gen();

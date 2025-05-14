@@ -1351,7 +1351,7 @@ mod tests {
 
     fn create_indexer_store() -> anyhow::Result<IndexerStore> {
         let temp_dir = TempDir::with_prefix(env::current_dir()?)?;
-        IndexerStore::new(temp_dir.path())
+        IndexerStore::new(temp_dir.path(), true)
     }
 
     #[test]

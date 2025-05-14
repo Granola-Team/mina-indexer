@@ -23,7 +23,8 @@ use std::{path::PathBuf, sync::Arc};
 async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("command-store")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
+
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path(), true)?);
     let genesis_ledger = GenesisLedger::new_v1()?;
 
     let mut indexer = IndexerState::new(

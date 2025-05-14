@@ -40,14 +40,14 @@ pub mod helpers {
             state::IndexerState,
             store::IndexerStore,
         };
-        use std::path::Path;
+        use std::{path::Path, sync::Arc};
 
         /// Creates an indexer from the original mainnet genesis ledger & block
         pub fn mainnet_genesis_state<P>(path: P) -> anyhow::Result<IndexerState>
         where
             P: AsRef<Path>,
         {
-            let indexer_store = std::sync::Arc::new(IndexerStore::new(path.as_ref())?);
+            let indexer_store = Arc::new(IndexerStore::new(path.as_ref(), true)?);
             IndexerState::new_v1(
                 indexer_store,
                 MAINNET_CANONICAL_THRESHOLD,
@@ -61,7 +61,7 @@ pub mod helpers {
         where
             P: AsRef<Path>,
         {
-            let indexer_store = std::sync::Arc::new(IndexerStore::new(path.as_ref())?);
+            let indexer_store = Arc::new(IndexerStore::new(path.as_ref(), true)?);
             IndexerState::new_v2(
                 indexer_store,
                 MAINNET_CANONICAL_THRESHOLD,

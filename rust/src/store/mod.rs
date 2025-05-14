@@ -284,7 +284,7 @@ impl IndexerStore {
     ];
 
     /// Creates a new _primary_ indexer store
-    pub fn new(path: &Path) -> Result<Self> {
+    pub fn new(path: &Path, creation: bool) -> Result<Self> {
         let mut cf_opts = speedb::Options::default();
         cf_opts.set_write_buffer_size(256 * 1024 * 1024); // 256MB
         cf_opts.set_max_write_buffer_number(16); // 256Mb * 16 ~= 4GB
@@ -320,10 +320,12 @@ impl IndexerStore {
         let version = primary.get_db_version().expect("db version exists");
         persist_indexer_version(&version, path)?;
 
-        let off_chain_usernames = OffChainUsernames::new()?;
-        for (pk, username) in off_chain_usernames.usernames {
-            use username::UsernameStore;
-            primary.add_username(pk, &username)?;
+        if creation {
+            let off_chain_usernames = OffChainUsernames::new()?;
+            for (pk, username) in off_chain_usernames.usernames {
+                use username::UsernameStore;
+                primary.add_username(pk, &username)?;
+            }
         }
 
         Ok(primary)

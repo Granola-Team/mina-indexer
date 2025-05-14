@@ -10,20 +10,24 @@ use mina_indexer::{
 #[test]
 fn add_and_get_events() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("event-store")?;
-    let db = IndexerStore::new(store_dir.path())?;
+    let db = IndexerStore::new(store_dir.path(), true)?;
+
     let event0 = IndexerEvent::Db(DbEvent::Block(DbBlockEvent::NewBlock {
         blockchain_length: 23,
         state_hash: StateHash::default(),
     }));
+
     let event1 = IndexerEvent::Db(DbEvent::Ledger(DbLedgerEvent::NewLedger {
         ledger_hash: LedgerHash::default(),
         state_hash: StateHash::default(),
         blockchain_length: 42,
     }));
+
     let event2 = IndexerEvent::Db(DbEvent::Canonicity(DbCanonicityEvent::NewCanonicalBlock {
         blockchain_length: 0,
         state_hash: StateHash::default(),
     }));
+
     let block = Block {
         parent_hash: "parent_hash".into(),
         state_hash: "state_hash".into(),
@@ -33,6 +37,7 @@ fn add_and_get_events() -> anyhow::Result<()> {
         global_slot_since_genesis: 0,
         hash_last_vrf_output: VrfOutput::new("last_vrf_output".as_bytes().to_vec()),
     };
+
     let event3 = IndexerEvent::WitnessTree(WitnessTreeEvent::UpdateBestTip {
         best_tip: block.clone(),
         canonical_blocks: vec![block],
@@ -49,7 +54,9 @@ fn add_and_get_events() -> anyhow::Result<()> {
     // expected event log
     let next_seq_num = db.get_next_seq_num()?;
     let event_log = db.get_event_log()?;
+
     assert_eq!(next_seq_num, event_log.len() as u32);
     assert_eq!(event_log, vec![event0, event1, event2]);
+
     Ok(())
 }

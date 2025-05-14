@@ -10,7 +10,7 @@ use quickcheck::Arbitrary;
 #[test]
 fn event_store_test() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("zkapp-event-store")?;
-    let indexer_store = IndexerStore::new(store_dir.path())?;
+    let indexer_store = IndexerStore::new(store_dir.path(), true)?;
 
     // generate arbitrary events
     let g = &mut gen();

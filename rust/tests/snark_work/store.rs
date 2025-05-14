@@ -14,7 +14,8 @@ use std::{path::PathBuf, sync::Arc};
 async fn store() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("snark-store")?;
     let blocks_dir = &PathBuf::from("./tests/data/non_sequential_blocks");
-    let indexer_store = Arc::new(IndexerStore::new(store_dir.path())?);
+
+    let indexer_store = Arc::new(IndexerStore::new(store_dir.path(), true)?);
     let genesis_ledger = GenesisLedger::new_v1()?;
 
     let mut indexer = IndexerState::new(
@@ -61,5 +62,6 @@ async fn store() -> anyhow::Result<()> {
             indexer_store.as_ref().get_snark_work_by_public_key(&pk)?;
         assert_eq!(result_pk_snarks, pk_snarks);
     }
+
     Ok(())
 }

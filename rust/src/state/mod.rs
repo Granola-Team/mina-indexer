@@ -408,7 +408,7 @@ impl IndexerState {
     ) -> Result<Self> {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = speedb_path.map(|path| {
-            let store = IndexerStore::new(path).unwrap();
+            let store = IndexerStore::new(path, true).unwrap();
 
             if let Some(ledger) = root_ledger {
                 store

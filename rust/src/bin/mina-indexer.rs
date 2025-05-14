@@ -201,7 +201,7 @@ impl ServerCommand {
         let config = process_indexer_configuration(args, mode, domain_socket_path.clone())?;
 
         info!("Starting the mina indexer filesystem watchers & UDS server");
-        let db = Arc::new(IndexerStore::new(&database_dir)?);
+        let db = Arc::new(IndexerStore::new(&database_dir, false)?);
         let store = db.clone();
 
         subsys.start(SubsystemBuilder::new("Indexer", move |s| {
@@ -305,7 +305,7 @@ impl DatabaseCommand {
                 } else {
                     process_indexer_configuration((*args).into(), mode, domain_socket_path)?
                 };
-                let db = Arc::new(IndexerStore::new(&database_dir)?);
+                let db = Arc::new(IndexerStore::new(&database_dir, true)?);
                 let store = db.clone();
 
                 tokio::select! {

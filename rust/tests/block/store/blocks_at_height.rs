@@ -15,7 +15,7 @@ async fn add_and_get() -> anyhow::Result<()> {
     let store_dir = setup_new_db_dir("blocks-at-height")?;
     let block_dir = &PathBuf::from("./tests/data/sequential_blocks");
 
-    let db = IndexerStore::new(store_dir.path())?;
+    let db = IndexerStore::new(store_dir.path(), true)?;
     let mut bp = BlockParser::new_with_canonical_chain_discovery(
         block_dir,
         PcbVersion::V1,
