@@ -21,7 +21,7 @@ use crate::{
         snarks::*,
     },
 };
-use log::{debug, trace};
+use log::trace;
 use serde::{Deserialize, Serialize};
 use speedb::{DBIterator, Direction, IteratorMode};
 use std::collections::HashMap;
@@ -517,9 +517,12 @@ impl SnarkStore for IndexerStore {
         epoch_max_fee: u64,
         epoch_min_fee: u64,
     ) -> Result<()> {
-        debug!(
-            "EPOCH SNARK genesis {} epoch {} fees {} prover {}",
-            genesis_state_hash, epoch, epoch_total_fees, prover
+        trace!(
+            "Sort SNARK fees epoch {} genesis {} fees {} prover {}",
+            epoch,
+            genesis_state_hash,
+            epoch_total_fees,
+            prover
         );
         self.database.put_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
