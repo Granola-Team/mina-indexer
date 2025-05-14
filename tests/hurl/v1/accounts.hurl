@@ -107,7 +107,7 @@ jsonpath "$.data.accounts" count == 1
 # account info
 jsonpath "$.data.accounts[0].publicKey" == "B62qoTaYnDYrtmver4jnkgJbFU6iohjtALTU4ebf4yCKrxFFHd9Dimh"
 jsonpath "$.data.accounts[0].balance" == 502777775000000
-jsonpath "$.data.accounts[0].username" == "Unknown"
+jsonpath "$.data.accounts[0].username" == "Mina Foundation"
 jsonpath "$.data.accounts[0].nonce" == 0
 jsonpath "$.data.accounts[0].delegate" == "B62qj8KB2fk59NkV4VuoTkVXHjw8VJzC3ybKrWo7zuDC9xTiWXPygEe"
 

@@ -39,7 +39,7 @@ jsonpath "$.data.stagedLedgerAccounts[99].balance_nanomina" == 1693980637751650
 jsonpath "$.data.stagedLedgerAccounts[99].delegate" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
 jsonpath "$.data.stagedLedgerAccounts[99].nonce" == 0
 jsonpath "$.data.stagedLedgerAccounts[99].publicKey" == "B62qmKJxgh6h4i56hTXmkDL2Xpesm94NNm2Ev4ySSA4rCE2Z3JbfZhc"
-jsonpath "$.data.stagedLedgerAccounts[99].username" == "Unknown"
+jsonpath "$.data.stagedLedgerAccounts[99].username" == "O(1) Labs"
 
 duration < 1000
 
@@ -82,7 +82,7 @@ jsonpath "$.data.stagedLedgerAccounts[99].balance_nanomina" == 1693980637751650
 jsonpath "$.data.stagedLedgerAccounts[99].delegate" == "B62qnvzUAvwnAiK3eMVQooshDA5AmEF9jKRrUTt5cwbCvVFiF47vdqp"
 jsonpath "$.data.stagedLedgerAccounts[99].nonce" == 0
 jsonpath "$.data.stagedLedgerAccounts[99].publicKey" == "B62qmKJxgh6h4i56hTXmkDL2Xpesm94NNm2Ev4ySSA4rCE2Z3JbfZhc"
-jsonpath "$.data.stagedLedgerAccounts[99].username" == "Unknown"
+jsonpath "$.data.stagedLedgerAccounts[99].username" == "O(1) Labs"
 
 duration < 1000
 
