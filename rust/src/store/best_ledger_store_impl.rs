@@ -33,6 +33,7 @@ use std::collections::{HashMap, HashSet};
 impl BestLedgerStore for IndexerStore {
     fn get_best_account(&self, pk: &PublicKey, token: &TokenAddress) -> Result<Option<Account>> {
         trace!("Getting best ledger account {pk}");
+
         Ok(self
             .database
             .get_cf(self.best_ledger_accounts_cf(), best_account_key(token, pk))?
@@ -48,9 +49,11 @@ impl BestLedgerStore for IndexerStore {
         token: &TokenAddress,
     ) -> Result<Option<Account>> {
         trace!("Display best ledger account {pk}");
+
         if let Some(best_acct) = self.get_best_account(pk, token)? {
             return Ok(Some(best_acct.deduct_mina_account_creation_fee()));
         }
+
         Ok(None)
     }
 
@@ -83,6 +86,10 @@ impl BestLedgerStore for IndexerStore {
                         .delete_cf(self.zkapp_best_ledger_accounts_cf(), account_key)?;
                     self.database
                         .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
+
+                    if token.0 == MINA_TOKEN_ADDRESS {
+                        self.decrement_num_mina_zkapp_accounts()?;
+                    }
                 }
             }
 
@@ -126,6 +133,10 @@ impl BestLedgerStore for IndexerStore {
         // zkapp account
         if after.is_zkapp_account() {
             self.increment_num_zkapp_accounts()?;
+
+            if token.0 == MINA_TOKEN_ADDRESS {
+                self.increment_num_mina_zkapp_accounts()?;
+            }
 
             // store new zkapp account
             self.database
