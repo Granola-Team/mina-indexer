@@ -34,11 +34,10 @@ impl UsernameStore for IndexerStore {
         trace!("Adding username: {} -> {}", pk, username);
 
         let index = self.get_pk_num_username_updates(&pk)?.unwrap_or_default();
-        self.database.put_cf(
-            self.username_num_cf(),
-            pk.0.as_bytes(),
-            (index + 1).to_be_bytes(),
-        )?;
+        let count = index + 1;
+
+        self.database
+            .put_cf(self.username_num_cf(), pk.0.as_bytes(), count.to_be_bytes())?;
 
         self.database.put_cf(
             self.username_cf(),
@@ -181,7 +180,7 @@ impl UsernameStore for IndexerStore {
     }
 
     fn get_username_pks(&self, username: &str) -> Result<Option<BTreeSet<PublicKey>>> {
-        trace!("Getting username {} accounts", username);
+        trace!("Getting username '{}' accounts", username);
 
         Ok(self
             .database
@@ -275,9 +274,13 @@ mod tests {
         let store = create_indexer_store()?;
 
         let pk = PublicKey::new("B62qpge4uMq4Vv5Rvc8Gw9qSquUYd6xoW1pz7HQkMSHm6h1o7pvLPAN")?;
+        let username = Username::new("MinaExplorer")?;
+
+        assert_eq!(store.get_username(&pk)?.unwrap(), username);
+        assert_eq!(store.get_pk_num_username_updates(&pk)?.unwrap(), 1);
         assert_eq!(
-            store.get_username(&pk)?.unwrap(),
-            Username::new("MinaExplorer")?
+            store.get_username_pks(&username.0)?.unwrap(),
+            BTreeSet::from([pk])
         );
 
         Ok(())
