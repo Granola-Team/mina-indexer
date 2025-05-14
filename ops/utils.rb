@@ -16,7 +16,7 @@ if ARGV.first == "kill"
   end
 
   puts pids
-  pids = pids.split('\n')
+  pids = pids.split("\n")
   pids.map { |pid| system("kill", "-9", pid) }
 end
 
