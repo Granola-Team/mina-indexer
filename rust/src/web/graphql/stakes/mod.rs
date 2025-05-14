@@ -51,15 +51,11 @@ pub struct StakesQueryInput {
 
 #[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StakesSortByInput {
-    #[graphql(name = "BALANCE_DESC")]
     BalanceDesc,
-    #[graphql(name = "BALANCE_ASC")]
     BalanceAsc,
 
     #[default]
-    #[graphql(name = "STAKE_DESC")]
     StakeDesc,
-    #[graphql(name = "STAKE_ASC")]
     StakeAsc,
 }
 
@@ -307,24 +303,25 @@ impl StakesQueryRoot {
                     }
                 };
 
-                let epoch = if let Some(epoch) = query_epoch {
-                    epoch
-                } else {
-                    db.get_epoch(&ledger_hash)?.unwrap_or_default()
-                };
+                let epoch = query_epoch.unwrap_or_else(|| {
+                    db.get_epoch(&ledger_hash)
+                        .expect("epoch from ledger hash")
+                        .unwrap_or_default()
+                });
 
                 (ledger_hash, epoch)
             }
-            _ => (
-                if let Some(ledger_hash) =
+            _ => {
+                let ledger_hash = if let Some(ledger_hash) =
                     db.get_staking_ledger_hash_by_epoch(epoch, &genesis_state_hash)?
                 {
                     ledger_hash
                 } else {
                     return Ok(vec![]);
-                },
-                epoch,
-            ),
+                };
+
+                (ledger_hash, epoch)
+            }
         };
         let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
 
@@ -554,12 +551,12 @@ impl StakesQueryInput {
 
             if let Some(username) = username {
                 if let Some(acct_username) = account.username.as_ref() {
-                    if *username != *acct_username {
+                    if username != acct_username {
                         return false;
                     }
+                } else {
+                    return false;
                 }
-
-                return false;
             }
 
             if let Some(delegate) = delegate {
