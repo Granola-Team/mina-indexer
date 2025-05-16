@@ -15,11 +15,18 @@ use std::sync::Arc;
 #[derive(InputObject)]
 pub struct TopSnarkersQueryInput {
     /// Input epoch
-    epoch: u32,
+    epoch: Option<u32>,
 
     /// Input genesis state hash
     #[graphql(name = "genesis_state_hash")]
     genesis_state_hash: Option<String>,
+
+    /// Input SNARK prover public key
+    #[graphql(name = "public_key")]
+    public_key: Option<String>,
+
+    /// Input SNARK prover username
+    username: Option<String>,
 }
 
 #[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
@@ -88,6 +95,10 @@ pub struct TopSnarker {
     epoch_snarks_sold: u32,
 }
 
+///////////
+// impls //
+///////////
+
 #[Object]
 impl TopSnarkersQueryRoot {
     async fn top_snarkers(
@@ -97,12 +108,11 @@ impl TopSnarkersQueryRoot {
         sort_by: Option<TopSnarkersSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Vec<TopSnarker>> {
-        use TopSnarkersSortByInput::*;
-
         let db = db(ctx);
         let epoch = query
             .as_ref()
-            .map_or(db.get_current_epoch().expect("current epoch"), |q| q.epoch);
+            .and_then(|q| q.epoch)
+            .unwrap_or_else(|| db.get_current_epoch().expect("current epoch"));
 
         let genesis_state_hash = query
             .as_ref()
@@ -118,100 +128,160 @@ impl TopSnarkersQueryRoot {
         };
 
         let sort_by = sort_by.unwrap_or_default();
-        let iter = match sort_by {
-            TotalFeesAsc => db.snark_prover_total_fees_epoch_iterator(
-                epoch,
-                &genesis_state_hash,
-                Direction::Forward,
-            ),
-            TotalFeesDesc => db.snark_prover_total_fees_epoch_iterator(
-                epoch,
-                &genesis_state_hash,
-                Direction::Reverse,
-            ),
-            MaxFeeAsc => db.snark_prover_max_fee_epoch_iterator(
-                epoch,
-                &genesis_state_hash,
-                Direction::Forward,
-            ),
-            MaxFeeDesc => db.snark_prover_max_fee_epoch_iterator(
-                epoch,
-                &genesis_state_hash,
-                Direction::Reverse,
-            ),
-            AllTimeTotalFeesAsc => db.snark_prover_total_fees_iterator(IteratorMode::Start),
-            AllTimeTotalFeesDesc => db.snark_prover_total_fees_iterator(IteratorMode::End),
-            AllTimeMaxFeeAsc => db.snark_prover_max_fee_iterator(IteratorMode::Start),
-            AllTimeMaxFeeDesc => db.snark_prover_max_fee_iterator(IteratorMode::End),
-        };
-
-        query_handler(db, iter, epoch, &genesis_state_hash, sort_by, limit)
+        TopSnarkersQueryInput::handler(
+            db,
+            query.as_ref(),
+            epoch,
+            &genesis_state_hash,
+            sort_by,
+            limit,
+        )
     }
 }
 
-fn query_handler(
-    db: &Arc<IndexerStore>,
-    iter: DBIterator<'_>,
+impl TopSnarkersQueryInput {
+    fn handler(
+        db: &Arc<IndexerStore>,
+        query: Option<&Self>,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+        sort_by: TopSnarkersSortByInput,
+        limit: usize,
+    ) -> Result<Vec<TopSnarker>> {
+        use TopSnarkersSortByInput::*;
+
+        let mut snarkers = vec![];
+        let iter = make_iterator(db, epoch, genesis_state_hash, sort_by);
+
+        for (key, _) in iter.flatten() {
+            if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
+                || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
+                || snarkers.len() >= limit
+            {
+                // gone beyond the desired epoch or limit
+                break;
+            }
+
+            let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U64_LEN..])?;
+            let fee = u64_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U64_LEN])?;
+            let epoch_fees = match sort_by {
+                TotalFeesAsc | TotalFeesDesc => fee,
+                _ => db
+                    .get_snark_prover_epoch_fees(&pk, Some(epoch), Some(genesis_state_hash), None)?
+                    .expect("epoch fees"),
+            };
+            let epoch_max_fee = match sort_by {
+                MaxFeeAsc | MaxFeeDesc => fee,
+                _ => db
+                    .get_snark_prover_epoch_max_fee(
+                        &pk,
+                        Some(epoch),
+                        Some(genesis_state_hash),
+                        None,
+                    )?
+                    .expect("epoch max fee"),
+            };
+            let total_fees = match sort_by {
+                AllTimeTotalFeesAsc | AllTimeTotalFeesDesc => fee,
+                _ => db
+                    .get_snark_prover_total_fees(&pk, None)?
+                    .expect("total fees"),
+            };
+            let max_fee = match sort_by {
+                AllTimeMaxFeeAsc | AllTimeMaxFeeDesc => fee,
+                _ => db.get_snark_prover_max_fee(&pk, None)?.expect("max fee"),
+            };
+
+            let top_snarker = TopSnarker {
+                epoch_fees,
+                epoch_max_fee,
+                epoch_min_fee: db
+                    .get_snark_prover_epoch_min_fee(
+                        &pk,
+                        Some(epoch),
+                        Some(genesis_state_hash),
+                        None,
+                    )?
+                    .expect("epoch min fee"),
+                epoch_snarks_sold: db.get_snarks_pk_epoch_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash),
+                )?,
+                total_fees,
+                max_fee,
+                min_fee: db.get_snark_prover_min_fee(&pk, None)?.expect("min fee"),
+                snarks_sold: db.get_snarks_pk_total_count(&pk)?,
+                public_key: PK_::new(db, pk),
+            };
+
+            if TopSnarkersQueryInput::matches(query, &top_snarker) {
+                snarkers.push(top_snarker);
+            }
+        }
+
+        Ok(snarkers)
+    }
+
+    fn matches(query: Option<&Self>, top_snarker: &TopSnarker) -> bool {
+        if let Some(Self {
+            epoch: _,
+            genesis_state_hash: _,
+            public_key,
+            username,
+        }) = query
+        {
+            if let Some(public_key) = public_key {
+                if top_snarker.public_key.public_key != *public_key {
+                    return false;
+                }
+            }
+
+            if let Some(username) = username {
+                if top_snarker.public_key.username != *username {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+}
+
+/////////////
+// helpers //
+/////////////
+
+fn make_iterator<'a>(
+    db: &'a Arc<IndexerStore>,
     epoch: u32,
     genesis_state_hash: &StateHash,
     sort_by: TopSnarkersSortByInput,
-    limit: usize,
-) -> Result<Vec<TopSnarker>> {
-    use TopSnarkersSortByInput::*;
-    let mut snarkers = vec![];
-
-    for (key, _) in iter.flatten() {
-        if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
-            || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
-            || snarkers.len() >= limit
-        {
-            // gone beyond the desired epoch or limit
-            break;
+) -> DBIterator<'a> {
+    match sort_by {
+        TopSnarkersSortByInput::TotalFeesAsc => {
+            db.snark_prover_total_fees_epoch_iterator(epoch, genesis_state_hash, Direction::Forward)
         }
-
-        let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U64_LEN..])?;
-        let fee = u64_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U64_LEN])?;
-        let epoch_fees = match sort_by {
-            TotalFeesAsc | TotalFeesDesc => fee,
-            _ => db
-                .get_snark_prover_epoch_fees(&pk, Some(epoch), Some(genesis_state_hash), None)?
-                .expect("epoch fees"),
-        };
-        let epoch_max_fee = match sort_by {
-            MaxFeeAsc | MaxFeeDesc => fee,
-            _ => db
-                .get_snark_prover_epoch_max_fee(&pk, Some(epoch), Some(genesis_state_hash), None)?
-                .expect("epoch max fee"),
-        };
-        let total_fees = match sort_by {
-            AllTimeTotalFeesAsc | AllTimeTotalFeesDesc => fee,
-            _ => db
-                .get_snark_prover_total_fees(&pk, None)?
-                .expect("total fees"),
-        };
-        let max_fee = match sort_by {
-            AllTimeMaxFeeAsc | AllTimeMaxFeeDesc => fee,
-            _ => db.get_snark_prover_max_fee(&pk, None)?.expect("max fee"),
-        };
-
-        snarkers.push(TopSnarker {
-            epoch_fees,
-            epoch_max_fee,
-            epoch_min_fee: db
-                .get_snark_prover_epoch_min_fee(&pk, Some(epoch), Some(genesis_state_hash), None)?
-                .expect("epoch min fee"),
-            epoch_snarks_sold: db.get_snarks_pk_epoch_count(
-                &pk,
-                Some(epoch),
-                Some(genesis_state_hash),
-            )?,
-            total_fees,
-            max_fee,
-            min_fee: db.get_snark_prover_min_fee(&pk, None)?.expect("min fee"),
-            snarks_sold: db.get_snarks_pk_total_count(&pk)?,
-            public_key: PK_::new(db, pk),
-        });
+        TopSnarkersSortByInput::TotalFeesDesc => {
+            db.snark_prover_total_fees_epoch_iterator(epoch, genesis_state_hash, Direction::Reverse)
+        }
+        TopSnarkersSortByInput::MaxFeeAsc => {
+            db.snark_prover_max_fee_epoch_iterator(epoch, genesis_state_hash, Direction::Forward)
+        }
+        TopSnarkersSortByInput::MaxFeeDesc => {
+            db.snark_prover_max_fee_epoch_iterator(epoch, genesis_state_hash, Direction::Reverse)
+        }
+        TopSnarkersSortByInput::AllTimeTotalFeesAsc => {
+            db.snark_prover_total_fees_iterator(IteratorMode::Start)
+        }
+        TopSnarkersSortByInput::AllTimeTotalFeesDesc => {
+            db.snark_prover_total_fees_iterator(IteratorMode::End)
+        }
+        TopSnarkersSortByInput::AllTimeMaxFeeAsc => {
+            db.snark_prover_max_fee_iterator(IteratorMode::Start)
+        }
+        TopSnarkersSortByInput::AllTimeMaxFeeDesc => {
+            db.snark_prover_max_fee_iterator(IteratorMode::End)
+        }
     }
-
-    Ok(snarkers)
 }
