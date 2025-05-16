@@ -221,15 +221,47 @@ pub trait SnarkStore {
     ///////////////
 
     /// Iterator over SNARKs sorted by fee & block height
+    /// ```
+    /// key: {fee}{height}{pk}{hash}{index}
+    /// val: b""
+    /// where
+    /// - fee:    [u64] BE bytes
+    /// - height: [u32] BE bytes
+    /// - pk:     [PublicKey] bytes
+    /// - hash:   [StateHash] bytes
+    /// - index:  [u32] BE bytes
     fn snark_fees_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator over SNARKs sorted by fee & block height
+    /// Iterator over SNARKs sorted by fee & global slot
+    /// ```
+    /// key: {fee}{slot}{pk}{hash}{index}
+    /// val: b""
+    /// where
+    /// - fee:   [u64] BE bytes
+    /// - slot:  [u32] BE bytes
+    /// - pk:    [PublicKey] bytes
+    /// - hash:  [StateHash] bytes
+    /// - index: [u32] BE bytes
     fn snark_fees_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator over SNARK provers by max fee
+    /// Iterator over SNARK provers by all-time max fee
+    /// ```
+    /// key: {fee}{prover}
+    /// val: b""
+    /// where
+    /// - fee:    [u64] BE bytes
+    /// - prover: [PublicKey] bytes
     fn snark_prover_max_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator over SNARK provers per epoch by max fee
+    /// ```
+    /// key: {genesis}{epoch}{fee}{prover}
+    /// val: b""
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fee:     [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
     fn snark_prover_max_fee_epoch_iterator(
         &self,
         epoch: u32,
@@ -237,10 +269,24 @@ pub trait SnarkStore {
         direction: Direction,
     ) -> DBIterator<'_>;
 
-    /// Iterator over SNARK provers by min fee
+    /// Iterator over SNARK provers by all-time min fee
+    /// ```
+    /// key: {fee}{prover}
+    /// val: b""
+    /// where
+    /// - fee:    [u64] BE bytes
+    /// - prover: [PublicKey] bytes
     fn snark_prover_min_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator over SNARK provers per epoch by min fee
+    /// ```
+    /// key: {genesis}{epoch}{fee}{prover}
+    /// val: b""
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fee:     [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
     fn snark_prover_min_fee_epoch_iterator(
         &self,
         epoch: u32,
@@ -248,10 +294,24 @@ pub trait SnarkStore {
         direction: Direction,
     ) -> DBIterator<'_>;
 
-    /// Iterator over SNARK provers by accumulated fees
+    /// Iterator over SNARK provers by all-time fees
+    /// ```
+    /// key: {fees}{prover}
+    /// val: b""
+    /// where
+    /// - fees:   [u64] BE bytes
+    /// - prover: [PublicKey] bytes
     fn snark_prover_total_fees_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator over SNARK provers per epoch by accumulated fees
+    /// ```
+    /// key: {genesis}{epoch}{fees}{prover}
+    /// val: b""
+    /// where
+    /// - genesis: [StateHash] bytes
+    /// - epoch:   [u32] BE bytes
+    /// - fees:    [u64] BE bytes
+    /// - prover:  [PublicKey] bytes
     fn snark_prover_total_fees_epoch_iterator(
         &self,
         epoch: u32,
@@ -260,9 +320,25 @@ pub trait SnarkStore {
     ) -> DBIterator<'_>;
 
     /// Iterator over SNARKs by prover, sorted by block height & index
+    /// ```
+    /// key: {prover}{height}{index}{state_hash}
+    /// val: snark
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - height: [u32] BE bytes
+    /// - index:  [u32] BE bytes
+    /// - snark:  [SnarkWorkSummary] serde bytes
     fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator over SNARKs by prover, sorted by global slot & index
+    /// ```
+    /// key: {prover}{slot}{index}
+    /// val: snark
+    /// where
+    /// - prover: [PublicKey] bytes
+    /// - slot:   [u32] BE bytes
+    /// - index:  [u32] BE bytes
+    /// - snark:  [SnarkWorkSummary] serde bytes
     fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     //////////////////

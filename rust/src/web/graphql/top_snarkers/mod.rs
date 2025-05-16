@@ -22,12 +22,16 @@ pub struct TopSnarkersQueryInput {
 
 #[derive(Enum, Copy, Clone, Default, Eq, PartialEq)]
 pub enum TopSnarkersSortByInput {
-    MaxFeeAsc,
-    MaxFeeDesc,
-
     #[default]
+    /// Sort by epoch total fees descending
     TotalFeesDesc,
+    /// Sort by epoch total fees ascending
     TotalFeesAsc,
+
+    /// Sort by epoch max fee descending
+    MaxFeeDesc,
+    /// Sort by epoch max fee ascending
+    MaxFeeAsc,
 }
 
 #[derive(Default)]
@@ -35,39 +39,39 @@ pub struct TopSnarkersQueryRoot;
 
 #[derive(SimpleObject)]
 pub struct TopSnarker {
-    /// Value SNARKer public key
+    /// Value SNARK prover public key
     #[graphql(flatten)]
     public_key: PK_,
 
-    /// Value total fees
+    /// Value all-time total SNARK fees
     #[graphql(name = "total_fees")]
     total_fees: u64,
 
-    /// Value epoch total fees
+    /// Value epoch total SNARK fees
     #[graphql(name = "epoch_fees")]
     epoch_fees: u64,
 
-    /// Value min fee
+    /// Value all-time min SNARK fee
     #[graphql(name = "min_fee")]
     min_fee: u64,
 
-    /// Value min fee
+    /// Value epoch min SNARK fee
     #[graphql(name = "epoch_min_fee")]
     epoch_min_fee: u64,
 
-    /// Value max fee
+    /// Value all-time max SNARK fee
     #[graphql(name = "max_fee")]
     max_fee: u64,
 
-    /// Value epoch max fee
+    /// Value epoch max SNARK fee
     #[graphql(name = "epoch_max_fee")]
     epoch_max_fee: u64,
 
-    /// Value SNARKs sold count
+    /// Value all-time SNARKs sold
     #[graphql(name = "snarks_sold")]
     snarks_sold: u32,
 
-    /// Value epoch SNARKs sold count
+    /// Value epoch SNARKs sold
     #[graphql(name = "epoch_snarks_sold")]
     epoch_snarks_sold: u32,
 }
@@ -101,7 +105,7 @@ impl TopSnarkersQueryRoot {
             Err(e) => return Err(async_graphql::Error::from(e)),
         };
 
-        // make iterator
+        let sort_by = sort_by.unwrap_or_default();
         let iter = match sort_by.unwrap_or_default() {
             MaxFeeAsc => db.snark_prover_max_fee_epoch_iterator(
                 epoch,

@@ -1799,14 +1799,14 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting snark fees by block height
     /// ```
-    /// key: {fee}{sort}{pk}{hash}{index}
+    /// key: {fee}{height}{pk}{hash}{index}
     /// val: b""
     /// where
-    /// - fee:   [u64] BE bytes
-    /// - sort:  [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
-    /// - hash:  [StateHash] bytes
-    /// - index: [u32] BE bytes
+    /// - fee:    [u64] BE bytes
+    /// - height: [u32] BE bytes
+    /// - pk:     [PublicKey] bytes
+    /// - hash:   [StateHash] bytes
+    /// - index:  [u32] BE bytes
     /// ```
     /// Use [snark_fee_sort_key]
     fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily {
@@ -1817,11 +1817,11 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// CF for sorting snark fees by global slot
     /// ```
-    /// key: {fee}{sort}{pk}{hash}{index}
+    /// key: {fee}{slot}{pk}{hash}{index}
     /// val: b""
     /// where
     /// - fee:   [u64] BE bytes
-    /// - sort:  [u32] BE bytes
+    /// - slot:  [u32] BE bytes
     /// - pk:    [PublicKey] bytes
     /// - hash:  [StateHash] bytes
     /// - index: [u32] BE bytes
