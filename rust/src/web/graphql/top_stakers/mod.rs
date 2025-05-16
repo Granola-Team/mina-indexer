@@ -6,28 +6,39 @@ use super::{
     stakes::StakesDelegationTotals,
 };
 use crate::{
-    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash},
+    base::{amount::Amount, public_key::PublicKey, state_hash::StateHash, username::Username},
     block::store::BlockStore,
     ledger::store::staking::StakingLedgerStore,
+    store::IndexerStore,
     utility::store::common::{from_be_bytes, U32_LEN},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
+use std::sync::Arc;
 
 #[derive(InputObject)]
 pub struct TopStakersQueryInput {
-    /// Input spoch
+    /// Input epoch
     epoch: u32,
 
     /// Input genesis state hash
     #[graphql(name = "genesis_state_hash")]
     genesis_state_hash: Option<String>,
+
+    /// Input staker public key
+    #[graphql(name = "public_key")]
+    public_key: Option<String>,
+
+    /// Input staker username
+    username: Option<String>,
 }
 
 #[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum TopStakersSortByInput {
     #[default]
+    /// Sort by number of canonical blocks produced descending
     NumCanonicalBlocksProducedDesc,
+    /// Sort by number of canonical blocks produced ascending
     NumCanonicalBlocksProducedAsc,
 }
 
@@ -101,15 +112,38 @@ impl TopStakersQueryRoot {
         };
         let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
 
+        TopStakersQueryInput::verify_inputs(query.as_ref())?;
+        TopStakersQueryInput::handler(
+            db,
+            query.as_ref(),
+            epoch,
+            &genesis_state_hash,
+            sort_by.unwrap_or_default(),
+            total_currency,
+            limit,
+        )
+    }
+}
+
+impl TopStakersQueryInput {
+    fn handler(
+        db: &Arc<IndexerStore>,
+        query: Option<&Self>,
+        epoch: u32,
+        genesis_state_hash: &StateHash,
+        sort_by: TopStakersSortByInput,
+        total_currency: u64,
+        limit: usize,
+    ) -> Result<Vec<TopStakerAccount>> {
         let mut accounts = Vec::new();
-        let direction = match sort_by.unwrap_or_default() {
+        let direction = match sort_by {
             TopStakersSortByInput::NumCanonicalBlocksProducedAsc => Direction::Forward,
             TopStakersSortByInput::NumCanonicalBlocksProducedDesc => Direction::Reverse,
         };
 
         for (key, _) in db
             .canonical_epoch_blocks_produced_iterator(
-                Some(&genesis_state_hash),
+                Some(genesis_state_hash),
                 Some(epoch),
                 direction,
             )
@@ -127,23 +161,19 @@ impl TopStakersQueryRoot {
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
 
             let delegations = db
-                .get_epoch_delegations(&pk, epoch, &genesis_state_hash)?
+                .get_epoch_delegations(&pk, epoch, genesis_state_hash)?
                 .expect("epoch delegations");
 
-            let account = TopStakerAccount::new(
+            let top_staker = TopStakerAccount::new(
                 db,
-                db.get_block_production_pk_epoch_count(
-                    &pk,
-                    Some(epoch),
-                    Some(&genesis_state_hash),
-                )?,
+                db.get_block_production_pk_epoch_count(&pk, Some(epoch), Some(genesis_state_hash))?,
                 num,
                 db.get_block_production_pk_supercharged_epoch_count(
                     &pk,
                     Some(epoch),
-                    Some(&genesis_state_hash),
+                    Some(genesis_state_hash),
                 )?,
-                db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(&genesis_state_hash))?,
+                db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(genesis_state_hash))?,
                 pk,
                 StakesDelegationTotals {
                     total_currency,
@@ -163,10 +193,58 @@ impl TopStakersQueryRoot {
                 },
             );
 
-            accounts.push(account);
+            if TopStakersQueryInput::matches(query, &top_staker) {
+                accounts.push(top_staker);
+            }
         }
 
         Ok(accounts)
+    }
+
+    fn verify_inputs(query: Option<&Self>) -> Result<()> {
+        if let Some(public_key) = query.and_then(|q| q.public_key.as_ref()) {
+            if !PublicKey::is_valid(public_key as &str) {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid public key: {}",
+                    public_key
+                )));
+            }
+        }
+
+        if let Some(username) = query.and_then(|q| q.username.as_ref()) {
+            if !Username::is_valid(username as &str) {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid username: {}",
+                    username
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn matches(query: Option<&Self>, top_staker: &TopStakerAccount) -> bool {
+        if let Some(Self {
+            epoch: _,
+            genesis_state_hash: _,
+            public_key,
+            username,
+        }) = query
+        {
+            if let Some(public_key) = public_key {
+                if top_staker.public_key.public_key != *public_key {
+                    return false;
+                }
+            }
+
+            if let Some(username) = username {
+                if top_staker.public_key.username != *username {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 }
 
