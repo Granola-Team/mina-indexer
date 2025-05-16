@@ -65,7 +65,10 @@ impl SnarkStore for IndexerStore {
             )?;
 
             // add fee data
-            let prover_index = num_prover_works.get(&snark.prover).copied().unwrap_or(0);
+            let prover_index = num_prover_works
+                .get(&snark.prover)
+                .copied()
+                .unwrap_or_default();
             self.database.put_cf(
                 self.snark_work_fees_block_height_sort_cf(),
                 snark_fee_sort_key(
@@ -487,6 +490,18 @@ impl SnarkStore for IndexerStore {
         old_max: u64,
         old_min: u64,
     ) -> Result<()> {
+        trace!("Deleting all-time SNARK fees pk {}", prover);
+
+        // stored values
+        let prover_bytes = prover.0.as_bytes();
+        self.database
+            .delete_cf(self.snark_prover_fees_cf(), prover_bytes)?;
+        self.database
+            .delete_cf(self.snark_prover_max_fee_cf(), prover_bytes)?;
+        self.database
+            .delete_cf(self.snark_prover_min_fee_cf(), prover_bytes)?;
+
+        // sort values
         self.database.delete_cf(
             self.snark_prover_total_fees_sort_cf(),
             u64_prefix_key(old_total, prover),
@@ -585,6 +600,28 @@ impl SnarkStore for IndexerStore {
         old_epoch_max: u64,
         old_epoch_min: u64,
     ) -> Result<()> {
+        trace!(
+            "Deleting old epoch SNARK fees pk {} epoch {} genesis {}",
+            prover,
+            epoch,
+            genesis_state_hash,
+        );
+
+        // stored values
+        self.database.delete_cf(
+            self.snark_prover_fees_epoch_cf(),
+            snarks_pk_epoch_key(genesis_state_hash, epoch, prover),
+        )?;
+        self.database.delete_cf(
+            self.snark_prover_max_fee_epoch_cf(),
+            snarks_pk_epoch_key(genesis_state_hash, epoch, prover),
+        )?;
+        self.database.delete_cf(
+            self.snark_prover_min_fee_epoch_cf(),
+            snarks_pk_epoch_key(genesis_state_hash, epoch, prover),
+        )?;
+
+        // sort values
         self.database.delete_cf(
             self.snark_prover_total_fees_epoch_sort_cf(),
             snark_fee_epoch_sort_key(genesis_state_hash, epoch, old_epoch_total, prover),
