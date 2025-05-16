@@ -1946,7 +1946,7 @@ impl ColumnFamilyHelpers for IndexerStore {
     /// - count:   [u32] BE bytes
     /// - pk:      [PublicKey] bytes
     /// ```
-    /// Use [epoch_block_num_key]
+    /// Use [epoch_pk_num_key]
     fn block_production_pk_canonical_epoch_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-production-pk-canonical-epoch-sort")

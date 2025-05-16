@@ -971,14 +971,23 @@ impl BlockStore for IndexerStore {
                 .put_cf(self.block_pk_epoch_slots_produced_cf(), key, b"")?;
 
             // increment epoch slots produced count
-            let key = epoch_pk_key(genesis_state_hash, epoch, pk);
-            let acc =
+            let epoch_pk_key = epoch_pk_key(genesis_state_hash, epoch, pk);
+            let epoch_slots_produced =
                 self.get_pk_epoch_slots_produced_count(pk, Some(epoch), Some(genesis_state_hash))?;
 
             self.database.put_cf(
                 self.block_pk_epoch_slots_produced_count_cf(),
-                key,
-                (acc + 1).to_be_bytes(),
+                epoch_pk_key,
+                (epoch_slots_produced + 1).to_be_bytes(),
+            )?;
+
+            let sort_key = epoch_num_pk_key(genesis_state_hash, epoch, epoch_slots_produced, pk);
+            self.database
+                .delete_cf(self.block_pk_epoch_slots_produced_count_sort_cf(), sort_key)?;
+            self.database.put_cf(
+                self.block_pk_epoch_slots_produced_count_sort_cf(),
+                epoch_num_pk_key(genesis_state_hash, epoch, epoch_slots_produced + 1, pk),
+                b"",
             )?;
         }
 
@@ -1120,6 +1129,37 @@ impl BlockStore for IndexerStore {
 
         self.database.iterator_cf(
             self.block_production_pk_canonical_epoch_sort_cf(),
+            IteratorMode::From(start.as_slice(), direction),
+        )
+    }
+
+    fn epoch_slots_produced_iterator(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+        direction: Direction,
+    ) -> DBIterator<'_> {
+        let epoch = epoch.unwrap_or(self.get_current_epoch().expect("current epoch"));
+        let best_block_genesis_hash = self.get_best_block_genesis_hash().unwrap();
+        let genesis_state_hash = genesis_state_hash.unwrap_or_else(|| {
+            best_block_genesis_hash
+                .as_ref()
+                .expect("best block genesis state hash")
+        });
+
+        let mut start = [0; StateHash::LEN + U32_LEN + U32_LEN + PublicKey::LEN];
+        start[..StateHash::LEN].copy_from_slice(genesis_state_hash.0.as_bytes());
+        start[StateHash::LEN..][..U32_LEN].copy_from_slice(&epoch.to_be_bytes());
+
+        if let Direction::Reverse = direction {
+            // start at the end of the epoch
+            start[StateHash::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
+            start[StateHash::LEN..][U32_LEN..][U32_LEN..]
+                .copy_from_slice(PublicKey::upper_bound().0.as_bytes());
+        }
+
+        self.database.iterator_cf(
+            self.block_pk_epoch_slots_produced_count_sort_cf(),
             IteratorMode::From(start.as_slice(), direction),
         )
     }

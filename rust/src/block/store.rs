@@ -351,6 +351,19 @@ pub trait BlockStore {
         direction: Direction,
     ) -> DBIterator<'_>;
 
+    /// Iterator for per epoch counts of slots produced
+    /// ```
+    /// CF: [block_pk_epoch_slots_produced_count_sort_cf]
+    ///
+    /// key: {genesis}{epoch}{num}{pk}
+    /// val: b""
+    fn epoch_slots_produced_iterator(
+        &self,
+        epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
+        direction: Direction,
+    ) -> DBIterator<'_>;
+
     //////////////////
     // Block counts //
     //////////////////
