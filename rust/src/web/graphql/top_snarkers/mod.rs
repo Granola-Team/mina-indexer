@@ -2,7 +2,7 @@
 
 use super::{db, pk::PK_};
 use crate::{
-    base::{public_key::PublicKey, state_hash::StateHash},
+    base::{public_key::PublicKey, state_hash::StateHash, username::Username},
     block::store::BlockStore,
     snark_work::store::SnarkStore,
     store::IndexerStore,
@@ -127,13 +127,13 @@ impl TopSnarkersQueryRoot {
             Err(e) => return Err(async_graphql::Error::from(e)),
         };
 
-        let sort_by = sort_by.unwrap_or_default();
+        TopSnarkersQueryInput::verify_inputs(query.as_ref())?;
         TopSnarkersQueryInput::handler(
             db,
             query.as_ref(),
             epoch,
             &genesis_state_hash,
-            sort_by,
+            sort_by.unwrap_or_default(),
             limit,
         )
     }
@@ -221,6 +221,28 @@ impl TopSnarkersQueryInput {
         }
 
         Ok(snarkers)
+    }
+
+    fn verify_inputs(query: Option<&Self>) -> Result<()> {
+        if let Some(public_key) = query.and_then(|q| q.public_key.as_ref()) {
+            if !PublicKey::is_valid(public_key as &str) {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid public key: {}",
+                    public_key
+                )));
+            }
+        }
+
+        if let Some(username) = query.and_then(|q| q.username.as_ref()) {
+            if !Username::is_valid(username as &str) {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid username: {}",
+                    username
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     fn matches(query: Option<&Self>, top_snarker: &TopSnarker) -> bool {
