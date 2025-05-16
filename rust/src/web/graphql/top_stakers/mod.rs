@@ -110,7 +110,7 @@ impl TopStakersQueryRoot {
             Some(ledger_hash) => ledger_hash,
             None => {
                 return Err(async_graphql::Error::new(format!(
-                    "ledger hash unknown for epoch {} genesis {}",
+                    "Ledger hash unknown for epoch {} genesis {}",
                     epoch, genesis_state_hash
                 )))
             }
@@ -142,31 +142,53 @@ impl TopStakersQueryInput {
     ) -> Result<Vec<TopStakerAccount>> {
         use TopStakersSortByInput::*;
 
-        let mut accounts = Vec::new();
         let direction = match sort_by {
             NumCanonicalBlocksProducedAsc | NumSlotsProducedAsc => Direction::Forward,
             NumCanonicalBlocksProducedDesc | NumSlotsProducedDesc => Direction::Reverse,
         };
+        let iter = match sort_by {
+            NumCanonicalBlocksProducedAsc | NumCanonicalBlocksProducedDesc => db
+                .canonical_epoch_blocks_produced_iterator(
+                    Some(epoch),
+                    Some(genesis_state_hash),
+                    direction,
+                ),
+            NumSlotsProducedAsc | NumSlotsProducedDesc => {
+                db.epoch_slots_produced_iterator(Some(epoch), Some(genesis_state_hash), direction)
+            }
+        };
 
-        for (key, _) in db
-            .canonical_epoch_blocks_produced_iterator(
-                Some(epoch),
-                Some(genesis_state_hash),
-                direction,
-            )
-            .flatten()
-        {
+        let mut top_stakers = Vec::new();
+        for (key, _) in iter.flatten() {
             if key[..StateHash::LEN] != *genesis_state_hash.0.as_bytes()
                 || key[StateHash::LEN..][..U32_LEN] != epoch.to_be_bytes()
-                || accounts.len() >= limit
+                || top_stakers.len() >= limit
             {
                 // gone beyond desired region or limit
                 break;
             }
 
-            let num = u32_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U32_LEN])?;
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
-
+            let num_canonical_blocks_produced = match sort_by {
+                NumCanonicalBlocksProducedAsc | NumCanonicalBlocksProducedDesc => {
+                    u32_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U32_LEN])?
+                }
+                _ => db.get_block_production_pk_canonical_epoch_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash),
+                )?,
+            };
+            let num_slots_produced = match sort_by {
+                NumSlotsProducedAsc | NumSlotsProducedDesc => {
+                    u32_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U32_LEN])?
+                }
+                _ => db.get_pk_epoch_slots_produced_count(
+                    &pk,
+                    Some(epoch),
+                    Some(genesis_state_hash),
+                )?,
+            };
             let delegations = db
                 .get_epoch_delegations(&pk, epoch, genesis_state_hash)?
                 .expect("epoch delegations");
@@ -174,13 +196,13 @@ impl TopStakersQueryInput {
             let top_staker = TopStakerAccount::new(
                 db,
                 db.get_block_production_pk_epoch_count(&pk, Some(epoch), Some(genesis_state_hash))?,
-                num,
+                num_canonical_blocks_produced,
                 db.get_block_production_pk_supercharged_epoch_count(
                     &pk,
                     Some(epoch),
                     Some(genesis_state_hash),
                 )?,
-                db.get_pk_epoch_slots_produced_count(&pk, Some(epoch), Some(genesis_state_hash))?,
+                num_slots_produced,
                 pk,
                 StakesDelegationTotals {
                     total_currency,
@@ -201,11 +223,11 @@ impl TopStakersQueryInput {
             );
 
             if TopStakersQueryInput::matches(query, &top_staker) {
-                accounts.push(top_staker);
+                top_stakers.push(top_staker);
             }
         }
 
-        Ok(accounts)
+        Ok(top_stakers)
     }
 
     fn verify_inputs(query: Option<&Self>) -> Result<()> {
@@ -257,7 +279,7 @@ impl TopStakersQueryInput {
 
 impl TopStakerAccount {
     fn new(
-        db: &std::sync::Arc<crate::store::IndexerStore>,
+        db: &Arc<IndexerStore>,
         num_blocks_produced: u32,
         num_canonical_blocks_produced: u32,
         num_supercharged_blocks_produced: u32,
