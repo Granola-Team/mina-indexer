@@ -346,8 +346,8 @@ pub trait BlockStore {
     /// val: b""
     fn canonical_epoch_blocks_produced_iterator(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
         direction: Direction,
     ) -> DBIterator<'_>;
 

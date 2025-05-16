@@ -1095,8 +1095,8 @@ impl BlockStore for IndexerStore {
 
     fn canonical_epoch_blocks_produced_iterator(
         &self,
-        genesis_state_hash: Option<&StateHash>,
         epoch: Option<u32>,
+        genesis_state_hash: Option<&StateHash>,
         direction: Direction,
     ) -> DBIterator<'_> {
         let epoch = epoch.unwrap_or(self.get_current_epoch().expect("current epoch"));

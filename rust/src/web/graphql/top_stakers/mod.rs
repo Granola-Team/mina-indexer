@@ -10,7 +10,7 @@ use crate::{
     block::store::BlockStore,
     ledger::store::staking::StakingLedgerStore,
     store::IndexerStore,
-    utility::store::common::{from_be_bytes, U32_LEN},
+    utility::store::common::{u32_from_be_bytes, U32_LEN},
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
@@ -40,6 +40,11 @@ pub enum TopStakersSortByInput {
     NumCanonicalBlocksProducedDesc,
     /// Sort by number of canonical blocks produced ascending
     NumCanonicalBlocksProducedAsc,
+
+    /// Sort by number of slot produced descending
+    NumSlotsProducedDesc,
+    /// Sort by number of slot produced ascending
+    NumSlotsProducedAsc,
 }
 
 #[derive(Default)]
@@ -135,16 +140,18 @@ impl TopStakersQueryInput {
         total_currency: u64,
         limit: usize,
     ) -> Result<Vec<TopStakerAccount>> {
+        use TopStakersSortByInput::*;
+
         let mut accounts = Vec::new();
         let direction = match sort_by {
-            TopStakersSortByInput::NumCanonicalBlocksProducedAsc => Direction::Forward,
-            TopStakersSortByInput::NumCanonicalBlocksProducedDesc => Direction::Reverse,
+            NumCanonicalBlocksProducedAsc | NumSlotsProducedAsc => Direction::Forward,
+            NumCanonicalBlocksProducedDesc | NumSlotsProducedDesc => Direction::Reverse,
         };
 
         for (key, _) in db
             .canonical_epoch_blocks_produced_iterator(
-                Some(genesis_state_hash),
                 Some(epoch),
+                Some(genesis_state_hash),
                 direction,
             )
             .flatten()
@@ -157,7 +164,7 @@ impl TopStakersQueryInput {
                 break;
             }
 
-            let num = from_be_bytes(key[StateHash::LEN..][U32_LEN..][..U32_LEN].to_vec());
+            let num = u32_from_be_bytes(&key[StateHash::LEN..][U32_LEN..][..U32_LEN])?;
             let pk = PublicKey::from_bytes(&key[StateHash::LEN..][U32_LEN..][U32_LEN..])?;
 
             let delegations = db
