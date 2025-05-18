@@ -20,7 +20,7 @@ if ARGV.first == "kill"
   pids.map { |pid| system("kill", "-9", pid) }
 end
 
-DEPLOY_TYPE = ARGV[0] # 'prod' or 'test'
+DEPLOY_TYPE = ARGV[0] # Only accepts 'test'
 BUILD_TYPE = "dev"
 
 require "#{__dir__}/ops-common"
@@ -46,7 +46,7 @@ def show(type, which)
     deploy_dir
   end
 
-  if type == "prod" || type == "test"
+  if type == "test"
     if Dir.exist?(dir)
       system("ls", "-l", dir)
       exit 0

@@ -17,7 +17,6 @@ import "#{TOP}/ops/stage-blocks.rake"
 
 REGRESSION_TEST = "#{TOP}/tests/regression-test.rb"
 DEPLOY_TIER3 = "#{TOP}/ops/deploy-tier3.rb"
-DEPLOY_PROD = "#{TOP}/ops/deploy-prod.rb"
 UTILS = "#{TOP}/ops/utils.rb"
 
 RUST_SRC_FILES = Dir.glob("rust/**/*").reject { |path| path.include?("rust/target/") }
@@ -41,7 +40,6 @@ NIX_FILES = %W[
 ]
 SHELL_SCRIPTS = %W[
   ops/ci/tier3
-  ops/ci/prod
   ops/ci/tier1
   ops/ci/tier2
   tests/regression.bash
@@ -85,16 +83,12 @@ end
 
 # Task aliases
 
-task sp: "show:prod"
 task st: "show:test"
 
-task cp: "clean:prod"
 task ct: "clean:test"
 
 task bt: :dev
 task btc: "dev:continue"
-
-task dlp: "deploy:local_prod_dev"
 
 task tier1: "test:tier1"
 task tier2: "test:tier2"
@@ -223,7 +217,7 @@ end
 # Build tasks
 namespace :build do
   desc "Perform a Nix build"
-  task :prod do
+  task :nix do
     puts "--- Performing Nix build"
     run("nom build")
   end
@@ -264,13 +258,6 @@ namespace :show do
     run("#{UTILS} pids show")
   end
 
-  desc "Show prod directories"
-  task :prod, [:which] do |_, args|
-    which = args[:which] || "one"
-    puts "Showing prod directory"
-    run("#{UTILS} prod show #{which}")
-  end
-
   desc "Show test directories"
   task :test, [:which] do |_, args|
     which = args[:which] || "one"
@@ -290,13 +277,6 @@ namespace :clean do
     cargo_output("--version")
     cargo_output("clean")
     puts "Consider also 'git clean -xdfn'"
-  end
-
-  desc "Clean mina-indexer-prod subdirectory"
-  task :prod, [:which] do |_, args|
-    which = args[:which] || "one"
-    puts "Cleaning prod directory"
-    run("#{UTILS} prod clean #{which}")
   end
 
   desc "Clean mina-indexer-test subdirectory"
@@ -396,7 +376,7 @@ namespace :test do
 
   namespace :tier3 do
     desc "Run the 3rd tier of tests with Nix-built binary"
-    task :prod, [:blocks] => "build:prod" do |_, args|
+    task :ci, [:blocks] => "build:nix" do |_, args|
       blocks = args[:blocks] || "5000"
       puts "--- Performing tier3 regression tests with Nix-built binary"
       run("#{DEPLOY_TIER3} nix #{blocks}")
@@ -413,25 +393,7 @@ namespace :test do
   end
 end
 
-# Deploy tasks
-namespace :deploy do
-  desc "Run a server as if in production with the Nix-built binary"
-  task :local_prod, [:blocks] => "build:prod" do |_, args|
-    blocks = args[:blocks] || "5000"
-    puts "--- Deploying prod indexer"
-    run("#{DEPLOY_PROD} nix #{blocks}")
-  end
-
-  desc "Run a server as if in production with the release-built binary"
-  task :local_prod_dev, [:blocks] do |_, args|
-    blocks = args[:blocks] || "5000"
-    Rake::Task["test:tier3:dev"].invoke(blocks)
-    puts "--- Deploying local prod indexer"
-    run("#{DEPLOY_PROD} release #{blocks}")
-  end
-end
-
-desc "Shutdown a running local test/prod indexer"
+desc "Shutdown a running local test indexer"
 task :shutdown, [:which] do |_, args|
   which = args[:which] || "test"
   puts "Shutting down #{which} indexer"
@@ -439,8 +401,8 @@ task :shutdown, [:which] do |_, args|
   puts "Successfully shutdown. You may also want to do 'rake clean:#{which}'"
 end
 
-desc "Kill all running local test/prod indexers"
+desc "Kill all running Indexers"
 task :kill do
-  puts "Killing indexer PID(s)"
+  puts "Killing all running Indexers"
   run("#{UTILS} kill")
 end
