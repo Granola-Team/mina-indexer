@@ -714,10 +714,7 @@ duration < 1000
 POST {{url}}
 ```graphql
 {
-  blocks(
-    limit: 1
-    query: { protocolState: { consensusState: { epoch: 0 } } }
-  ) {
+  blocks(limit: 1, query: { protocolState: { consensusState: { epoch: 0 } } }) {
     stateHash
     protocolState {
       consensusState {

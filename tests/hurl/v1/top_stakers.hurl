@@ -58,10 +58,7 @@ duration < 100
 POST {{url}}
 ```graphql
 {
-  topStakers(
-    limit: 3
-    sortBy: NUM_SLOTS_PRODUCED_DESC
-  ) {
+  topStakers(limit: 3, sortBy: NUM_SLOTS_PRODUCED_DESC) {
     public_key
     num_slots_produced
   }

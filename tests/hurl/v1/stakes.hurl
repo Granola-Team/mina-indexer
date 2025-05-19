@@ -538,10 +538,7 @@ duration < 500
 POST {{url}}
 ```graphql
 {
-  stakes(query: {
-    epoch: 0
-    username: "MinaExplorer"
-  }) {
+  stakes(query: { epoch: 0, username: "MinaExplorer" }) {
     public_key
     username
     nonce
