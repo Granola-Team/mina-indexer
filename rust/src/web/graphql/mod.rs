@@ -43,7 +43,7 @@ pub struct Root(
     stakes::StakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
-    feetransfers::FeetransferQueryRoot,
+    #[graphql(deprecation = "Use internalCommands instead.")] feetransfers::FeetransferQueryRoot,
     internal_commands::InternalCommandQueryRoot,
     snarks::SnarkQueryRoot,
     staged_ledgers::StagedLedgerQueryRoot,
