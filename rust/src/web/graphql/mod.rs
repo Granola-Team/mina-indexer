@@ -11,6 +11,7 @@ pub mod blocks;
 pub mod events;
 pub mod feetransfers;
 pub mod gen;
+pub mod internal_commands;
 pub mod snarks;
 pub mod staged_ledgers;
 pub mod stakes;
@@ -43,6 +44,7 @@ pub struct Root(
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
     feetransfers::FeetransferQueryRoot,
+    internal_commands::InternalCommandQueryRoot,
     snarks::SnarkQueryRoot,
     staged_ledgers::StagedLedgerQueryRoot,
     tokens::TokensQueryRoot,
