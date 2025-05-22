@@ -267,7 +267,11 @@ impl TopStakersQueryInput {
             }
 
             if let Some(username) = username {
-                if top_staker.public_key.username != *username {
+                if let Some(staker_username) = top_staker.public_key.username.as_ref() {
+                    if staker_username != username {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             }

@@ -876,7 +876,7 @@ mod tests {
             .map(|account| {
                 (
                     account.account.public_key.public_key,
-                    account.account.public_key.username,
+                    account.account.public_key.username.unwrap(),
                 )
             })
             .collect::<Vec<_>>();

@@ -6,61 +6,62 @@ use crate::{
 };
 use async_graphql::SimpleObject;
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 #[graphql(name = "PublicKey")]
 pub struct PK {
     pub public_key: String,
-    pub username: String,
+    pub username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct PK_ {
     #[graphql(name = "public_key")]
     pub public_key: String,
-    pub username: String,
+    pub username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct DelegatePK {
     pub delegate: String,
-    pub delegate_username: String,
+    pub delegate_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct CreatorPK {
     pub creator: String,
-    pub creator_username: String,
+    pub creator_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct CoinbaseReceiverPK {
     pub coinbase_receiver: String,
-    pub coinbase_receiver_username: String,
+    pub coinbase_receiver_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct ProverPK {
     pub prover: String,
-    pub prover_username: String,
+    pub prover_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct RecipientPK {
     pub recipient: String,
-    pub recipient_username: String,
+    pub recipient_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct SenderPK {
     pub sender: String,
-    pub sender_username: String,
+    pub sender_username: Option<String>,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, SimpleObject, Serialize)]
 pub struct WinnerPK {
     pub winner: String,
-    pub winner_username: String,
+    pub winner_username: Option<String>,
 }
 
 ///////////
@@ -68,62 +69,58 @@ pub struct WinnerPK {
 ///////////
 
 impl PK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         Self {
-            username: db
-                .get_username(&pk)
-                .expect("username")
-                .unwrap_or_default()
-                .0,
+            username: db.get_username(&pk).expect("username").map(|u| u.0),
             public_key: pk.0,
         }
     }
 }
 
 impl PK_ {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl DelegatePK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl CreatorPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl CoinbaseReceiverPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl ProverPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl RecipientPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl SenderPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }
 
 impl WinnerPK {
-    pub fn new(db: &std::sync::Arc<IndexerStore>, pk: PublicKey) -> Self {
+    pub fn new(db: &Arc<IndexerStore>, pk: PublicKey) -> Self {
         PK::new(db, pk).into()
     }
 }

@@ -260,7 +260,11 @@ impl TopSnarkersQueryInput {
             }
 
             if let Some(username) = username {
-                if top_snarker.public_key.username != *username {
+                if let Some(snarker_username) = top_snarker.public_key.username.as_ref() {
+                    if snarker_username != username {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
             }
