@@ -51,6 +51,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         indexer_store.get_num_accounts()?.unwrap() as usize
     );
 
+    // check zkapp accounts
     let num_best_zkapps = {
         let mut num = 0;
 
@@ -65,7 +66,6 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         num
     };
 
-    // check zkapp accounts
     assert_eq!(
         num_best_zkapps,
         indexer_store
@@ -77,6 +77,33 @@ async fn check_token_accounts() -> anyhow::Result<()> {
         num_best_zkapps,
         indexer_store.get_num_zkapp_accounts()?.unwrap() as usize
     );
+
+    assert_eq!(num_best_zkapps, 2);
+
+    // check MINA zkapp accounts
+    let num_best_mina_zkapps = {
+        let mut num = 0;
+
+        for account in best_ledger
+            .get_token_ledger(&mina_token)
+            .unwrap()
+            .accounts
+            .values()
+        {
+            if account.is_zkapp_account() {
+                num += 1;
+            }
+        }
+
+        num
+    };
+
+    assert_eq!(
+        num_best_mina_zkapps,
+        indexer_store.get_num_mina_zkapp_accounts()?.unwrap() as usize
+    );
+
+    assert_eq!(num_best_mina_zkapps, 2);
 
     // check MINA token ledger
     assert_eq!(
