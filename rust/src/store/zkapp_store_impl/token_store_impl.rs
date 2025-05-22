@@ -88,6 +88,7 @@ impl ZkappTokenStore for IndexerStore {
                             token_account.token.as_ref().unwrap(),
                             None,
                             Some(token_account.to_owned()),
+                            false,
                         )
                         .unwrap();
 
@@ -292,6 +293,7 @@ impl ZkappTokenStore for IndexerStore {
                             diff_token,
                             None,
                             Some(token_account.to_owned()),
+                            false,
                         )
                         .unwrap();
 

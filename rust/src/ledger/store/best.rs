@@ -37,6 +37,7 @@ pub trait BestLedgerStore {
         token: &TokenAddress,
         before: Option<(bool, u64)>,
         after: Option<Account>,
+        is_new_account: bool,
     ) -> Result<()>;
 
     /// Update the best ledger token accounts

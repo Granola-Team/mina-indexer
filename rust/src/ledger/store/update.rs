@@ -43,6 +43,7 @@ impl DbAccountUpdate {
         for AccountUpdate {
             account_diffs,
             token_diffs,
+            new_accounts,
             ..
         } in apply.into_iter()
         {
@@ -138,7 +139,13 @@ impl DbAccountUpdate {
                     };
                 }
 
-                db.update_best_account(&pk, &token, before_values, Some(after))?;
+                db.update_best_account(
+                    &pk,
+                    &token,
+                    before_values,
+                    Some(after),
+                    new_accounts.contains(&(pk.clone(), token.clone())),
+                )?;
             }
 
             // apply token diffs
@@ -167,7 +174,6 @@ impl DbAccountUpdate {
             account_diffs,
             token_diffs,
             new_accounts,
-            new_zkapp_accounts,
             ..
         } in unapply
         {
@@ -302,7 +308,7 @@ impl DbAccountUpdate {
                     };
                 }
 
-                db.update_best_account(&pk, &token, before_values, Some(after))?;
+                db.update_best_account(&pk, &token, before_values, Some(after), false)?;
             }
 
             // unapply token diffs
@@ -313,8 +319,8 @@ impl DbAccountUpdate {
             }
 
             // remove accounts
-            for (pk, token) in new_accounts.iter().chain(new_zkapp_accounts.iter()) {
-                db.update_best_account(pk, token, None, None)?;
+            for (pk, token) in new_accounts.iter() {
+                db.update_best_account(pk, token, None, None, false)?;
             }
 
             // adjust MINA token supply

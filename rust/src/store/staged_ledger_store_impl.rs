@@ -317,7 +317,7 @@ impl StagedLedgerStore for IndexerStore {
         // initialize account balances for best ledger & sorting
         for (token, token_ledger) in genesis_ledger.tokens.iter() {
             for (pk, acct) in token_ledger.accounts.iter() {
-                self.update_best_account(pk, token, None, Some(acct.clone()))?;
+                self.update_best_account(pk, token, None, Some(acct.clone()), true)?;
             }
         }
 

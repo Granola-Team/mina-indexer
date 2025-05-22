@@ -63,33 +63,40 @@ impl BestLedgerStore for IndexerStore {
         token: &TokenAddress,
         before: Option<(bool, u64)>,
         after: Option<Account>,
+        is_new_account: bool,
     ) -> Result<()> {
         // remove account
         if after.is_none() {
-            if let Some(before) = before {
-                // generic token account
-                let account_key = best_account_key(token, pk);
-                let sort_key = best_account_sort_key(token, before.1, pk);
+            let (is_zkapp, balance) = before.unwrap_or_else(|| {
+                let account = self
+                    .get_best_account(pk, token)
+                    .unwrap()
+                    .expect("best ledger account");
+                (account.is_zkapp_account(), account.balance.0)
+            });
 
-                // delete account
+            // generic token account
+            let account_key = best_account_key(token, pk);
+            let sort_key = best_account_sort_key(token, balance, pk);
+
+            // delete account
+            self.database
+                .delete_cf(self.best_ledger_accounts_cf(), account_key)?;
+            self.database
+                .delete_cf(self.best_ledger_accounts_balance_sort_cf(), sort_key)?;
+
+            // zkapp account
+            if is_zkapp {
+                self.decrement_num_zkapp_accounts()?;
+
+                // delete
                 self.database
-                    .delete_cf(self.best_ledger_accounts_cf(), account_key)?;
+                    .delete_cf(self.zkapp_best_ledger_accounts_cf(), account_key)?;
                 self.database
-                    .delete_cf(self.best_ledger_accounts_balance_sort_cf(), sort_key)?;
+                    .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
 
-                // zkapp account
-                if before.0 {
-                    self.decrement_num_zkapp_accounts()?;
-
-                    // delete
-                    self.database
-                        .delete_cf(self.zkapp_best_ledger_accounts_cf(), account_key)?;
-                    self.database
-                        .delete_cf(self.zkapp_best_ledger_accounts_balance_sort_cf(), sort_key)?;
-
-                    if token.0 == MINA_TOKEN_ADDRESS {
-                        self.decrement_num_mina_zkapp_accounts()?;
-                    }
+                if token.0 == MINA_TOKEN_ADDRESS {
+                    self.decrement_num_mina_zkapp_accounts()?;
                 }
             }
 
@@ -131,7 +138,7 @@ impl BestLedgerStore for IndexerStore {
         )?;
 
         // zkapp account
-        if after.is_zkapp_account() {
+        if is_new_account && after.is_zkapp_account() {
             self.increment_num_zkapp_accounts()?;
 
             if token.0 == MINA_TOKEN_ADDRESS {
@@ -500,6 +507,10 @@ impl BestLedgerStore for IndexerStore {
         let old = self.get_num_mina_accounts()?.unwrap_or_default();
         self.set_num_mina_accounts(old + 1)
     }
+
+    /////////////////////////
+    // MINA zkapp accounts //
+    /////////////////////////
 
     fn update_num_mina_zkapp_accounts(&self, adjust: i32) -> Result<()> {
         use std::cmp::Ordering::*;
