@@ -42,9 +42,9 @@ async fn hardfork() -> anyhow::Result<()> {
     println!("=== Root Branch ===");
     println!("{}", state.root_branch);
 
-    assert_eq!(state.root_branch.len(), 18);
+    assert_eq!(state.root_branch.len(), 20);
     assert_eq!(state.root_branch.height(), 14);
-    assert_eq!(state.root_branch.leaves().len(), 4);
+    assert_eq!(state.root_branch.leaves().len(), 6);
 
     // dangling branches
     assert_eq!(state.dangling_branches.len(), 0);
@@ -59,7 +59,7 @@ async fn hardfork() -> anyhow::Result<()> {
     assert_eq!(
         best_chain,
         vec![
-            "3NKZ5poCAjtGqg9hHvAVZ7QwriqJsL8mpQsSHFGzqW6ddEEjYfvW",
+            "3NLXcoYjz1bqK3QzKZYmQxa7kZ7CyLqLisGLgHH6vikHokW3xYz6",
             "3NLjpotw6aZ2r7Twccgr7cceXiPkdH5LqdugWCpq9tL1ZZLeDsJV",
             "3NKP2tSFCcQ5G1wDZUaFcU5KpYPmorvnHndSQ3CbBgirZ7HTK7Nm",
             "3NK3EzoJEv4udD8DpTks8osNZwGuB9GEnDWC5kf4Wd2kXrapjaKR",
