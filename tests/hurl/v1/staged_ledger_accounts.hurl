@@ -31,7 +31,7 @@ jsonpath "$.data.stagedLedgerAccounts[0].balance_nanomina" == 75000000000000000
 jsonpath "$.data.stagedLedgerAccounts[0].delegate" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
 jsonpath "$.data.stagedLedgerAccounts[0].nonce" == 0
 jsonpath "$.data.stagedLedgerAccounts[0].publicKey" == "B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3"
-jsonpath "$.data.stagedLedgerAccounts[0].username" == "Unknown"
+jsonpath "$.data.stagedLedgerAccounts[0].username" == null
 
 # last datum
 jsonpath "$.data.stagedLedgerAccounts[99].balance" == 1693980.63775165
@@ -75,7 +75,7 @@ jsonpath "$.data.stagedLedgerAccounts[0].balance_nanomina" == 75000000000000000
 jsonpath "$.data.stagedLedgerAccounts[0].delegate" == "B62qqhURJQo3CvWC3WFo9LhUhtcaJWLBcJsaA3DXaU2GH5KgXujZiwB"
 jsonpath "$.data.stagedLedgerAccounts[0].nonce" == 0
 jsonpath "$.data.stagedLedgerAccounts[0].publicKey" == "B62qpbZkvpHZ1a5nsTbANuRtrdw4YraTyA4nvJDm6HpP1YMC9QStxX3"
-jsonpath "$.data.stagedLedgerAccounts[0].username" == "Unknown"
+jsonpath "$.data.stagedLedgerAccounts[0].username" == null
 
 jsonpath "$.data.stagedLedgerAccounts[99].balance" == 1693980.63775165
 jsonpath "$.data.stagedLedgerAccounts[99].balance_nanomina" == 1693980637751650

@@ -250,13 +250,13 @@ jsonpath "$.data.stakes" count == 10
 jsonpath "$.data.stakes[0].public_key" == "B62qptmpH9PVe76ZEfS1NWVV27XjZJEJyr8mWZFjfohxppmS11DfKFG"
 jsonpath "$.data.stakes[0].balance" == 83482371.13484836
 jsonpath "$.data.stakes[0].balanceNanomina" == 83482371134848360
-jsonpath "$.data.stakes[0].username" == "Unknown"
+jsonpath "$.data.stakes[0].username" == null
 
 # last datum
 jsonpath "$.data.stakes[9].public_key" == "B62qq3TQ8AP7MFYPVtMx5tZGF3kWLJukfwG1A1RGvaBW1jfTPTkDBW6"
 jsonpath "$.data.stakes[9].balance" == 1104.686899999
 jsonpath "$.data.stakes[9].balanceNanomina" == 1104686899999
-jsonpath "$.data.stakes[9].username" == "Unknown"
+jsonpath "$.data.stakes[9].username" == null
 
 duration < 10000
 
