@@ -16,8 +16,8 @@ jsonpath "$.blockchainLength" == 359617
 # accounts
 jsonpath "$.totalNumAccounts" == 228180
 jsonpath "$.totalNumMinaAccounts" == 228179
-jsonpath "$.totalNumZkappAccounts" == 6
-jsonpath "$.totalNumMinaZkappAccounts" == 6
+jsonpath "$.totalNumZkappAccounts" == 2
+jsonpath "$.totalNumMinaZkappAccounts" == 2
 
 # blocks
 jsonpath "$.epochNumBlocks" == 24

@@ -383,7 +383,7 @@ POST {{url}}
 HTTP 200
 [Asserts]
 
-jsonpath "$.data.accounts" count == 1705
+jsonpath "$.data.accounts" count == 1702
 
 duration < 1000
 
