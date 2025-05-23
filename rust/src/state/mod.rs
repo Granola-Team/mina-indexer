@@ -320,9 +320,10 @@ impl IndexerState {
         info!("Genesis ledger added to indexer store");
 
         // update genesis best block
-        config
-            .indexer_store
-            .set_best_block(&genesis_block.state_hash())?;
+        config.indexer_store.set_best_block(
+            &genesis_block.state_hash(),
+            genesis_block.blockchain_length(),
+        )?;
 
         // apply genesis block to genesis ledger and keep its ledger diff
         let root_branch = Branch::new_genesis_block(Block::from_precomputed(&genesis_block, 0))?;
@@ -420,7 +421,7 @@ impl IndexerState {
                     .expect("ledger add succeeds");
 
                 store
-                    .set_best_block(&root_block.state_hash())
+                    .set_best_block(&root_block.state_hash(), root_block.blockchain_length())
                     .expect("set best block to root block");
             }
 
@@ -506,7 +507,7 @@ impl IndexerState {
                     }
 
                     indexer_store.add_block(&block, block_bytes)?;
-                    indexer_store.set_best_block(&block.state_hash())?;
+                    indexer_store.set_best_block(&block.state_hash(), block.blockchain_length())?;
                     indexer_store.add_canonical_block(
                         block.blockchain_length(),
                         block.global_slot_since_genesis(),
@@ -654,7 +655,9 @@ impl IndexerState {
                 return Ok(false);
             };
 
-            if let Some(username_updates) = self.update_best_block_in_store(&best_tip.state_hash)? {
+            if let Some(username_updates) =
+                self.update_best_block_in_store(&best_tip.state_hash, best_tip.blockchain_length)?
+            {
                 for (pk, username) in username_updates.iter() {
                     // only use MINA token
                     if let Some(account) = self.ledger.get_mut_account(pk, &TokenAddress::default())
@@ -1166,9 +1169,10 @@ impl IndexerState {
     pub fn update_best_block_in_store(
         &self,
         state_hash: &StateHash,
+        block_height: u32,
     ) -> Result<Option<HashMap<PublicKey, Username>>> {
         if let Some(indexer_store) = self.indexer_store.as_ref() {
-            indexer_store.set_best_block(state_hash)?;
+            indexer_store.set_best_block(state_hash, block_height)?;
 
             return Ok(indexer_store
                 .get_block_username_updates(state_hash)?

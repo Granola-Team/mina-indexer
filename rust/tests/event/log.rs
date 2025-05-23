@@ -62,7 +62,10 @@ async fn test() -> anyhow::Result<()> {
                         } => (best_tip, canonical_blocks),
                     };
 
-                    state1.update_best_block_in_store(&best_tip.state_hash)?;
+                    state1.update_best_block_in_store(
+                        &best_tip.state_hash,
+                        best_tip.blockchain_length,
+                    )?;
                     new_canonical_blocks.iter().for_each(|block| {
                         if let Some(store) = state1.indexer_store.as_ref() {
                             store

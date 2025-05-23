@@ -1392,6 +1392,9 @@ impl ColumnFamilyHelpers for IndexerStore {
     }
 
     /// CF for tracking when an account was added to the staged ledger
+    /// ```
+    /// key: [PublicKey] bytes
+    /// val: [StateHashWithHeight] serde bytes
     fn staged_ledger_accounts_min_block_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("staged-ledger-accounts-min-block")

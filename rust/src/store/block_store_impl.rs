@@ -257,7 +257,7 @@ impl BlockStore for IndexerStore {
         }))
     }
 
-    fn set_best_block(&self, state_hash: &StateHash) -> Result<()> {
+    fn set_best_block(&self, state_hash: &StateHash, block_height: u32) -> Result<()> {
         trace!("Setting best block {state_hash}");
         if let Some(old) = self.get_best_block_hash()? {
             if old == *state_hash {
@@ -267,7 +267,7 @@ impl BlockStore for IndexerStore {
             // reorg updates
             let reorg_blocks = self.reorg_blocks(&old, state_hash)?;
             self.update_block_canonicities(&reorg_blocks)?;
-            self.update_block_best_accounts(state_hash, &reorg_blocks)?;
+            self.update_block_best_accounts(state_hash, block_height, &reorg_blocks)?;
             self.update_block_snarks(&reorg_blocks)?;
             self.update_block_usernames(&reorg_blocks)?;
             self.update_internal_commands(&reorg_blocks)?;

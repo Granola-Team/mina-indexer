@@ -199,6 +199,7 @@ impl BestLedgerStore for IndexerStore {
     fn update_block_best_accounts(
         &self,
         state_hash: &StateHash,
+        block_height: u32,
         blocks: &DbBlockUpdate,
     ) -> Result<()> {
         let account_updates = DbUpdate {
@@ -242,11 +243,20 @@ impl BestLedgerStore for IndexerStore {
                 .collect(),
         };
 
-        self.update_best_accounts(state_hash, account_updates)
+        self.update_best_accounts(state_hash, block_height, account_updates)
     }
 
-    fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()> {
-        trace!("Updating best ledger accounts for block {state_hash}");
+    fn update_best_accounts(
+        &self,
+        state_hash: &StateHash,
+        block_height: u32,
+        updates: DbAccountUpdate,
+    ) -> Result<()> {
+        trace!(
+            "Updating best ledger accounts for block height {} hash {}",
+            block_height,
+            state_hash,
+        );
 
         // count all accounts
         let apply_acc = updates
@@ -315,8 +325,8 @@ impl BestLedgerStore for IndexerStore {
             self.update_num_zkapp_accounts(zkapp_adjust)?;
         }
 
-        DbAccountUpdate::unapply_updates(self, updates.unapply, state_hash)?;
-        DbAccountUpdate::apply_updates(self, updates.apply, state_hash)
+        DbAccountUpdate::unapply_updates(self, updates.unapply, state_hash, block_height)?;
+        DbAccountUpdate::apply_updates(self, updates.apply, state_hash, block_height)
     }
 
     fn add_pk_delegate(&self, pk: &PublicKey, delegate: &PublicKey) -> Result<()> {
