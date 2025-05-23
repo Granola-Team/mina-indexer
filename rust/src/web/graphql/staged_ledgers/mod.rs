@@ -5,11 +5,12 @@ use super::{
     pk::{DelegatePK, PK},
 };
 use crate::{
-    base::state_hash::StateHash,
+    base::{public_key::PublicKey, state_hash::StateHash},
     canonicity::store::CanonicityStore,
     ledger::{account::Account, store::staged::StagedLedgerStore, token::TokenAddress, LedgerHash},
     store::IndexerStore,
 };
+use anyhow::Context as aContext;
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
 #[derive(InputObject)]
@@ -31,13 +32,11 @@ pub struct StagedLedgerQueryInput {
     blockchain_length: Option<u32>,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum StagedLedgerSortByInput {
-    #[graphql(name = "BALANCE_ASC")]
-    BalanceAsc,
-
-    #[graphql(name = "BALANCE_DESC")]
+    #[default]
     BalanceDesc,
+    BalanceAsc,
 }
 
 #[derive(SimpleObject)]
@@ -58,8 +57,7 @@ pub struct StagedLedgerWithMeta {
 
 #[derive(SimpleObject)]
 pub struct StagedLedgerAccount {
-    /// Value account public key
-    #[graphql(name = "public_key")]
+    /// Value account public key/username
     #[graphql(flatten)]
     pub public_key: PK,
 
@@ -67,15 +65,18 @@ pub struct StagedLedgerAccount {
     #[graphql(flatten)]
     pub delegate: DelegatePK,
 
-    /// Value balance (MINA)
+    /// Value balance
     pub balance: f64,
 
-    /// Value balance
-    #[graphql(name = "balance_nanomina")]
-    pub balance_nanomina: u64,
+    /// Value balance (nano)
+    #[graphql(name = "balance_nano")]
+    pub balance_nano: u64,
 
     /// Value nonce
     pub nonce: u32,
+
+    /// Value token address
+    pub token: String,
 }
 
 #[derive(Default)]
@@ -101,23 +102,57 @@ impl StagedLedgerQueryRoot {
             });
 
         // pk staged account query
-        if let Some(pk) = query.as_ref().and_then(|q| q.public_key.clone()) {
-            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.clone()) {
+        if let Some(pk) = query.as_ref().and_then(|q| q.public_key.as_ref()) {
+            // validate public key
+            let pk = match PublicKey::new(pk) {
+                Ok(pk) => pk,
+                Err(_) => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid public key: {}",
+                        pk,
+                    )))
+                }
+            };
+
+            if let Some(state_hash) = query.as_ref().and_then(|q| q.state_hash.as_ref()) {
+                // validate state hash
+                let state_hash = match StateHash::new(state_hash) {
+                    Ok(state_hash) => state_hash,
+                    Err(_) => {
+                        return Err(async_graphql::Error::new(format!(
+                            "Invalid state hash: {}",
+                            state_hash,
+                        )))
+                    }
+                };
+
                 return Ok(db
-                    .get_staged_account(&pk.into(), &token, &state_hash.into())?
+                    .get_staged_account(&pk, &token, &state_hash)?
                     .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
-            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.clone()) {
-                if let Some(state_hash) =
-                    db.get_staged_ledger_block_state_hash(&ledger_hash.into())?
+            } else if let Some(ledger_hash) = query.as_ref().and_then(|q| q.ledger_hash.as_ref()) {
+                // validate ledger hash
+                let ledger_hash = match LedgerHash::new(ledger_hash) {
+                    Ok(ledger_hash) => ledger_hash,
+                    Err(_) => {
+                        return Err(async_graphql::Error::new(format!(
+                            "Invalid ledger hash: {}",
+                            ledger_hash
+                        )))
+                    }
+                };
+
+                if let Some(state_hash) = db
+                    .get_staged_ledger_block_state_hash(&ledger_hash)?
+                    .as_ref()
                 {
                     return Ok(db
-                        .get_staged_account(&pk.into(), &token, &state_hash)?
+                        .get_staged_account(&pk, &token, state_hash)?
                         .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
                 }
             } else if let Some(block_height) = query.as_ref().and_then(|q| q.blockchain_length) {
-                if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)? {
+                if let Some(state_hash) = db.get_canonical_hash_at_height(block_height)?.as_ref() {
                     return Ok(db
-                        .get_staged_account(&pk.into(), &token, &state_hash)?
+                        .get_staged_account(&pk, &token, state_hash)?
                         .map(|acct| vec![StagedLedgerAccount::new(db, acct)]));
                 }
             }
@@ -137,7 +172,7 @@ impl StagedLedgerQueryRoot {
                     Err(_) => {
                         return Err(async_graphql::Error::new(format!(
                             "Invalid state hash: {}",
-                            state_hash
+                            state_hash,
                         )))
                     }
                 };
@@ -150,7 +185,7 @@ impl StagedLedgerQueryRoot {
                     Err(_) => {
                         return Err(async_graphql::Error::new(format!(
                             "Invalid ledger hash: {}",
-                            ledger_hash
+                            ledger_hash,
                         )))
                     }
                 };
@@ -169,12 +204,13 @@ impl StagedLedgerQueryRoot {
                 .map(|token_ledger| {
                     token_ledger
                         .accounts
-                        .to_owned()
-                        .into_values()
+                        .values()
+                        .cloned()
                         .map(|account| StagedLedgerAccount::new(db, account))
                         .collect()
                 })
-                .expect("MINA token ledger")
+                .with_context(|| format!("token {}", token))
+                .expect("token ledger")
         });
 
         reorder(&mut accounts, sort_by);
@@ -184,31 +220,35 @@ impl StagedLedgerQueryRoot {
     }
 }
 
-fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
-    if let Some(sort_by) = sort_by {
-        match sort_by {
-            StagedLedgerSortByInput::BalanceAsc => accts.sort_by_cached_key(|x| {
-                (x.balance_nanomina, x.nonce, x.public_key.public_key.clone())
-            }),
-            StagedLedgerSortByInput::BalanceDesc => {
-                reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
-                accts.reverse();
-            }
-        }
-    }
-}
-
 impl StagedLedgerAccount {
     /// Account creation fee deducted here
     fn new(db: &std::sync::Arc<IndexerStore>, account: Account) -> Self {
         let account = account.deduct_mina_account_creation_fee();
 
         Self {
-            balance_nanomina: account.balance.0,
+            balance_nano: account.balance.0,
             balance: account.balance.to_f64(),
             nonce: account.nonce.map_or(0, |n| n.0),
             delegate: DelegatePK::new(db, account.delegate),
             public_key: PK::new(db, account.public_key),
+            token: account.token.unwrap_or_default().0,
+        }
+    }
+}
+
+/////////////
+// helpers //
+/////////////
+
+fn reorder(accts: &mut [StagedLedgerAccount], sort_by: Option<StagedLedgerSortByInput>) {
+    if let Some(sort_by) = sort_by {
+        match sort_by {
+            StagedLedgerSortByInput::BalanceAsc => accts
+                .sort_by_cached_key(|x| (x.balance_nano, x.nonce, x.public_key.public_key.clone())),
+            StagedLedgerSortByInput::BalanceDesc => {
+                reorder(accts, Some(StagedLedgerSortByInput::BalanceAsc));
+                accts.reverse();
+            }
         }
     }
 }
