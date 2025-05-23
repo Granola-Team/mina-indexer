@@ -39,6 +39,7 @@ impl DbAccountUpdate {
         db: &IndexerStore,
         apply: Vec<AccountUpdate>,
         state_hash: &StateHash,
+        block_height: u32,
     ) -> Result<()> {
         for AccountUpdate {
             account_diffs,
@@ -139,6 +140,9 @@ impl DbAccountUpdate {
                     };
                 }
 
+                // update staged ledger account
+                db.set_staged_account(&pk, &token, state_hash, block_height, &after)?;
+
                 db.update_best_account(
                     &pk,
                     &token,
@@ -168,6 +172,7 @@ impl DbAccountUpdate {
         db: &IndexerStore,
         unapply: Vec<AccountUpdate>,
         state_hash: &StateHash,
+        block_height: u32,
     ) -> Result<()> {
         // unapply account & token diffs, remove accounts
         for AccountUpdate {
@@ -308,6 +313,16 @@ impl DbAccountUpdate {
                     };
                 }
 
+                if new_accounts.contains(&(pk.clone(), token.clone())) {
+                    db.remove_staged_account(
+                        &pk,
+                        &token,
+                        state_hash,
+                        block_height,
+                        after.balance.0,
+                    )?;
+                }
+
                 db.update_best_account(&pk, &token, before_values, Some(after), false)?;
             }
 
@@ -333,7 +348,7 @@ impl DbAccountUpdate {
     }
 }
 
-use super::best::BestLedgerStore;
+use super::{best::BestLedgerStore, staged::StagedLedgerStore};
 use std::collections::HashMap;
 
 /// Aggregate diffs per token account

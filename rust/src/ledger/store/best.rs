@@ -41,7 +41,12 @@ pub trait BestLedgerStore {
     ) -> Result<()>;
 
     /// Update the best ledger token accounts
-    fn update_best_accounts(&self, state_hash: &StateHash, updates: DbAccountUpdate) -> Result<()>;
+    fn update_best_accounts(
+        &self,
+        state_hash: &StateHash,
+        block_height: u32,
+        updates: DbAccountUpdate,
+    ) -> Result<()>;
 
     /// Update the best ledger tokens
     fn apply_best_token_diffs(
@@ -57,6 +62,7 @@ pub trait BestLedgerStore {
     fn update_block_best_accounts(
         &self,
         state_hash: &StateHash,
+        block_height: u32,
         blocks: &DbBlockUpdate,
     ) -> Result<()>;
 

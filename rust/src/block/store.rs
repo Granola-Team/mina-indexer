@@ -33,7 +33,7 @@ pub trait BlockStore {
     ///
     /// This funciton is called every time we learn about a new best block.
     /// It handles the reorg logic, recomputing several important CFs.
-    fn set_best_block(&self, state_hash: &StateHash) -> Result<()>;
+    fn set_best_block(&self, state_hash: &StateHash, block_height: u32) -> Result<()>;
 
     /// Get best block from the store
     fn get_best_block(&self) -> Result<Option<PrecomputedBlock>>;
