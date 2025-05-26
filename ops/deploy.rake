@@ -66,6 +66,7 @@ file SNAPSHOT_NAME => [DEPLOY_DIR] do |t|
   else
     abort("No snapshot downloaded. Aborting.")
   end
+  FileUtils.touch(t.name)
 end
 
 desc "Restore the snapshot."
@@ -80,8 +81,8 @@ file RESTORE_DIR => [DEPLOY_DIR, EXE, SNAPSHOT_NAME] do |t|
   puts "Restore complete."
 end
 
-desc "Deploy the mina-indexer."
-file PID_FILE => [DEPLOY_DIR, LOG_DIR, EXE, RESTORE_DIR] do |t|
+desc "Create the database directory."
+file DB_DIR => [DEPLOY_DIR, RESTORE_DIR] do |t|
   Dir.chdir(DEPLOY_DIR)
 
   # Send the currently running Indexer the shutdown command.
@@ -97,8 +98,23 @@ file PID_FILE => [DEPLOY_DIR, LOG_DIR, EXE, RESTORE_DIR] do |t|
 
   # Make the restored snapshot be the database directory.
   #
-  FileUtils.rm_rf(DB_DIR)
   FileUtils.mv(RESTORE_DIR, DB_DIR)
+end
+
+desc "Deploy the mina-indexer."
+file PID_FILE => [DEPLOY_DIR, LOG_DIR, EXE, DB_DIR] do |t|
+  Dir.chdir(DEPLOY_DIR)
+
+  # Send the currently running Indexer the shutdown command.
+  #
+  invoke_mina_indexer(
+    "server", "shutdown"
+  ) || puts("Shutting down (via command line) failed. Moving on.")
+
+  # Maybe the shutdown worked, maybe it didn't. Either way:
+  #
+  puts "Give the process 1 second to clean up."
+  sleep 1
 
   # Daemonize the EXE.
   #
