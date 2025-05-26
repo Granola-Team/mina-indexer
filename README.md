@@ -1,34 +1,14 @@
 # The Mina Indexer
 
-<table align="center">
-    <tr>
-        <td align="center">Tier 1</td>
-        <td align="center">Tier 2</td>
-        <td align="center">Tier 3</td>
-        <td align="center">Production</td>
-        <td align="center">License</td>
-    </tr>
-    <tr>
-        <!-- Buildkite - tier 1 -->
-        <td><a href="https://buildkite.com/granola/mina-indexer/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
-        <!-- Buildkite - tier 2 -->
-        <td><a href="https://buildkite.com/granola/mina-indexer-tier-2/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
-        <!-- Buildkite - tier 3 -->
-        <td><a href="https://buildkite.com/granola/mina-indexer-tier-3/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a></td>
-        <!-- Buildkite - prod -->
-        <td><a href="https://buildkite.com/granola/mina-indexer-production/builds?branch=prod"><img src="https://badge.buildkite.com/b6feacdeff37ab75b03eca73e2c0d7f15826baf695f2ef39c5.svg"></a></td>
-        <!-- Apache license -->
-        <td><a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a></td>
-    </tr>
-</table>
+<a href="https://buildkite.com/granola/mina-indexer-tier-1/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a>
+<a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
 
 Constructs and serves indices of the Mina blockchain.
 
-**Note:** As the project is in active development, be aware that the
-public APIs and functionalities are subject to change.
-
 The Mina Indexer uses precomputed blocks (logged by a Mina node) as the source
 of truth for the blockchain.
+
+See an instance of the Mina Indexer in action at [MinaSearch](https://minasearch.com).
 
 ## Development Prerequisites
 
