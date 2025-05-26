@@ -3,6 +3,7 @@
 require "etc"
 require "json"
 require "open3"
+require_relative "get-blockchain-length"
 
 class Rehasher
   MINA_TXN_HASHER = "mina_txn_hasher.exe"
@@ -28,20 +29,6 @@ class Rehasher
       abort("Can't operate on symlinks. Aborting.")
     else
       abort("Invalid file #{path}. Aborting.")
-    end
-  end
-
-  def get_blockchain_length(json_data)
-    len = json_data.dig("protocol_state", "body", "consensus_state", "blockchain_length")
-    if len
-      len.to_i
-    else
-      len = json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")
-      if len
-        len.to_i
-      else
-        abort("Error extracting blockchain length")
-      end
     end
   end
 

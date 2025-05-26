@@ -4,6 +4,7 @@ require "json"
 require "fileutils"
 require "open3"
 require "etc"
+require_relative "get-blockchain-length"
 
 # Remove both `proofs` and `protocol_state_proof` and add a v2 hash for any transaction.
 class PcbUpdater
@@ -72,11 +73,6 @@ class PcbUpdater
     puts "Wrote #{outfile}"
   rescue => e
     abort "Error processing #{path}: #{e.message}"
-  end
-
-  def get_blockchain_length(json_data)
-    json_data.dig("data", "protocol_state", "body", "consensus_state", "blockchain_length")&.to_i ||
-      raise("Error extracting blockchain length")
   end
 
   # Recursively remove proofs from the JSON
