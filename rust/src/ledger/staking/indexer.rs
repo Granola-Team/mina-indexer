@@ -178,8 +178,8 @@ mod tests {
     use crate::ledger::staking;
     use std::path::PathBuf;
 
-    #[tokio::test]
-    async fn check_ledger_hash() -> anyhow::Result<()> {
+    #[test]
+    fn check_ledger_hash() -> anyhow::Result<()> {
         let path = PathBuf::from("../tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json");
         let staking_ledger = staking::StakingLedger::parse_file(&path)?;
 
