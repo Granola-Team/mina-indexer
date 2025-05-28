@@ -747,7 +747,6 @@ impl IndexerState {
 
         if increment_blocks {
             self.blocks_processed += 1;
-            self.handle_epoch_block(block);
         }
 
         // forward extension on root branch
@@ -758,6 +757,10 @@ impl IndexerState {
                     ExtensionType::RootComplex(block) => block.clone(),
                     _ => unreachable!(),
                 };
+
+                if best_tip.state_hash != self.best_tip.state_hash {
+                    self.handle_epoch_block(block);
+                }
 
                 return Ok((
                     root_extension,
