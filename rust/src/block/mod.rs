@@ -37,6 +37,7 @@ pub struct Block {
     pub blockchain_length: u32,
     pub genesis_state_hash: StateHash,
     pub global_slot_since_genesis: u32,
+    pub epoch: u32,
     pub hash_last_vrf_output: VrfOutput,
 }
 
@@ -47,18 +48,20 @@ pub struct BlockWithoutHeight {
     pub state_hash: StateHash,
     pub blockchain_length: u32,
     pub global_slot_since_genesis: u32,
+    pub epoch: u32,
 }
 
 impl Block {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock, height: u32) -> Self {
+    pub fn from_precomputed(block: &PrecomputedBlock, height: u32) -> Self {
         Self {
             height,
-            state_hash: precomputed_block.state_hash(),
-            parent_hash: precomputed_block.previous_state_hash(),
-            blockchain_length: precomputed_block.blockchain_length(),
-            hash_last_vrf_output: precomputed_block.hash_last_vrf_output(),
-            global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
-            genesis_state_hash: precomputed_block.genesis_state_hash(),
+            state_hash: block.state_hash(),
+            parent_hash: block.previous_state_hash(),
+            blockchain_length: block.blockchain_length(),
+            hash_last_vrf_output: block.hash_last_vrf_output(),
+            global_slot_since_genesis: block.global_slot_since_genesis(),
+            genesis_state_hash: block.genesis_state_hash(),
+            epoch: block.epoch_count(),
         }
     }
 
@@ -75,18 +78,20 @@ impl From<Block> for BlockWithoutHeight {
             state_hash: value.state_hash,
             global_slot_since_genesis: value.global_slot_since_genesis,
             blockchain_length: value.blockchain_length,
+            epoch: value.epoch,
         }
     }
 }
 
 impl BlockWithoutHeight {
-    pub fn from_precomputed(precomputed_block: &PrecomputedBlock) -> Self {
+    pub fn from_precomputed(block: &PrecomputedBlock) -> Self {
         Self {
             canonicity: None,
-            state_hash: precomputed_block.state_hash(),
-            parent_hash: precomputed_block.previous_state_hash(),
-            blockchain_length: precomputed_block.blockchain_length(),
-            global_slot_since_genesis: precomputed_block.global_slot_since_genesis(),
+            state_hash: block.state_hash(),
+            parent_hash: block.previous_state_hash(),
+            blockchain_length: block.blockchain_length(),
+            global_slot_since_genesis: block.global_slot_since_genesis(),
+            epoch: block.epoch_count(),
         }
     }
 
@@ -98,6 +103,7 @@ impl BlockWithoutHeight {
             parent_hash: block.parent_hash,
             blockchain_length: block.blockchain_length,
             global_slot_since_genesis: block.global_slot_since_genesis,
+            epoch: block.epoch,
         }
     }
 
@@ -128,6 +134,7 @@ impl From<PrecomputedBlock> for Block {
             hash_last_vrf_output: value.hash_last_vrf_output(),
             genesis_state_hash: value.genesis_state_hash(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
+            epoch: value.epoch_count(),
         }
     }
 }
@@ -142,6 +149,7 @@ impl From<&PrecomputedBlock> for Block {
             hash_last_vrf_output: value.hash_last_vrf_output(),
             genesis_state_hash: value.genesis_state_hash(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
+            epoch: value.epoch_count(),
         }
     }
 }
@@ -154,6 +162,7 @@ impl From<&PrecomputedBlock> for BlockWithoutHeight {
             state_hash: value.state_hash(),
             blockchain_length: value.blockchain_length(),
             global_slot_since_genesis: value.global_slot_since_genesis(),
+            epoch: value.epoch_count(),
         }
     }
 }

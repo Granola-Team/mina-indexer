@@ -33,6 +33,7 @@ fn add_and_get_events() -> anyhow::Result<()> {
         state_hash: "state_hash".into(),
         genesis_state_hash: "genesis_hash".into(),
         height: 0,
+        epoch: 0,
         blockchain_length: 1,
         global_slot_since_genesis: 0,
         hash_last_vrf_output: VrfOutput::new("last_vrf_output".as_bytes().to_vec()),
