@@ -261,6 +261,7 @@ pub trait BlockStore {
     fn get_next_global_slot_produced(
         &self,
         genesis_state_hash: &StateHash,
+        epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<Option<u32>>;
 
@@ -269,6 +270,7 @@ pub trait BlockStore {
     fn get_prev_global_slot_produced(
         &self,
         genesis_state_hash: &StateHash,
+        epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<u32>;
 

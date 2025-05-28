@@ -1419,7 +1419,7 @@ impl TransactionQueryInput {
             (None, None) => 0,
         };
         let min_bound = db
-            .get_next_global_slot_produced(genesis_state_hash, min_bound)?
+            .get_next_global_slot_produced(genesis_state_hash, None, min_bound)?
             .expect("min global slot produced");
 
         let max_bound = match (
@@ -1437,7 +1437,7 @@ impl TransactionQueryInput {
                 .get_best_block_global_slot()?
                 .expect("best block global slot"),
         };
-        let max_bound = db.get_prev_global_slot_produced(genesis_state_hash, max_bound)?;
+        let max_bound = db.get_prev_global_slot_produced(genesis_state_hash, None, max_bound)?;
 
         Ok((min_bound, max_bound))
     }

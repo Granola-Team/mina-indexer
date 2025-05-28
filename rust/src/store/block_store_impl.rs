@@ -997,16 +997,18 @@ impl BlockStore for IndexerStore {
     fn get_next_global_slot_produced(
         &self,
         genesis_state_hash: &StateHash,
+        epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<Option<u32>> {
-        trace!(
-            "Getting next slot produced at or above slot {} genesis {}",
-            global_slot,
-            genesis_state_hash
-        );
-
-        let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
         let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+
+        trace!(
+            "Getting next slot produced at or above epoch {} slot {} genesis {}",
+            epoch,
+            epoch_slot,
+            genesis_state_hash,
+        );
 
         if let Some((key, _)) = self
             .database
@@ -1034,16 +1036,18 @@ impl BlockStore for IndexerStore {
     fn get_prev_global_slot_produced(
         &self,
         genesis_state_hash: &StateHash,
+        epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<u32> {
+        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+        let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
+
         trace!(
-            "Getting previous slot produced at or below slot {} genesis {}",
+            "Getting previous slot produced at or below epoch {} slot {} genesis {}",
+            epoch,
             global_slot,
             genesis_state_hash,
         );
-
-        let epoch = global_slot / MAINNET_EPOCH_SLOT_COUNT;
-        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
 
         if let Some((key, _)) = self
             .database
