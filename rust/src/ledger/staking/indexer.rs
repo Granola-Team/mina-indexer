@@ -29,17 +29,17 @@ impl StakingLedger {
     /// - balance
     /// - nonce
     /// - public key
-    pub fn from_ledger(ledger: &Ledger) -> anyhow::Result<Self> {
+    pub fn from_ledger(ledger: &Ledger) -> Self {
         let mut staking_accounts = Vec::with_capacity(ledger.len());
 
         for token_ledger in ledger.tokens.values() {
             for account in token_ledger.accounts.values() {
-                staking_accounts.push(account.clone().into());
+                staking_accounts.push(account.clone().deduct_mina_account_creation_fee().into());
             }
         }
 
         staking_accounts.sort();
-        Ok(Self(staking_accounts))
+        Self(staking_accounts)
     }
 
     pub fn ledger_hash(&self) -> LedgerHash {
@@ -187,7 +187,7 @@ impl From<(StakingAccount, &IndexerStore)> for super::StakingAccount {
 #[cfg(test)]
 mod tests {
     use super::StakingLedger;
-    use crate::ledger::staking;
+    use crate::ledger::{genesis::GenesisLedger, staking, Ledger};
     use std::path::PathBuf;
 
     #[test]
@@ -201,6 +201,20 @@ mod tests {
             "jxxKfx81sRrNBmZfXyMVVYYNQFHEvrKiX6RiSJUchfzNDnxjAY5"
         );
 
+        Ok(())
+    }
+
+    #[test]
+    fn check_staking_ledger() -> anyhow::Result<()> {
+        let path = PathBuf::from("../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json");
+        let epoch_0_staking_ledger = staking::StakingLedger::parse_file(&path)?;
+        let epoch_0_staking_ledger: StakingLedger = epoch_0_staking_ledger.into();
+
+        let genesis_ledger = GenesisLedger::new_v1()?;
+        let genesis_ledger: Ledger = genesis_ledger.into();
+        let genesis_staking_ledger = StakingLedger::from_ledger(&genesis_ledger);
+
+        assert_eq!(epoch_0_staking_ledger, genesis_staking_ledger);
         Ok(())
     }
 }
