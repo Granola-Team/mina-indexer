@@ -41,7 +41,7 @@ impl StakingLedgerParser {
     }
 
     /// Only parse the staking ledger if it's not already in the db
-    pub async fn next_ledger(
+    pub fn next_ledger(
         &mut self,
         store: Option<&std::sync::Arc<IndexerStore>>,
     ) -> anyhow::Result<Option<StakingLedger>> {
@@ -58,14 +58,14 @@ impl StakingLedgerParser {
                     .is_none()
                 {
                     // add the missing staking ledger
-                    return StakingLedger::parse_file(&next_path).await.map(Some);
+                    return StakingLedger::parse_file(&next_path).map(Some);
                 } else {
                     continue;
                 }
             }
 
             // parse all staking ledgers if no store
-            return StakingLedger::parse_file(&next_path).await.map(Some);
+            return StakingLedger::parse_file(&next_path).map(Some);
         }
 
         Ok(None)
@@ -82,8 +82,8 @@ mod tests {
     };
     use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
-    #[tokio::test]
-    async fn parser() -> anyhow::Result<()> {
+    #[test]
+    fn parser() -> anyhow::Result<()> {
         let ledgers_dir: PathBuf = "../tests/data/staking_ledgers".into();
         let mut ledger_parser = StakingLedgerParser::new(&ledgers_dir)?;
 
@@ -134,7 +134,7 @@ mod tests {
 
         let mut res = HashSet::new();
 
-        while let Some(staking_ledger) = ledger_parser.next_ledger(None).await? {
+        while let Some(staking_ledger) = ledger_parser.next_ledger(None)? {
             res.insert(StakingAccountInfo {
                 epoch: staking_ledger.epoch,
                 ledger_hash: staking_ledger.ledger_hash.to_owned(),
