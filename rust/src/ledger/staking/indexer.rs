@@ -92,6 +92,18 @@ impl PartialOrd for StakingAccount {
 // conversions //
 /////////////////
 
+impl From<super::StakingLedger> for StakingLedger {
+    fn from(value: super::StakingLedger) -> Self {
+        let mut ledger = Self(Vec::with_capacity(value.staking_ledger.len()));
+        for account in value.staking_ledger.into_values() {
+            ledger.0.push(account.into());
+        }
+
+        ledger.0.sort();
+        ledger
+    }
+}
+
 impl From<(StakingLedger, u32, Network, &IndexerStore)> for super::StakingLedger {
     fn from(value: (StakingLedger, u32, Network, &IndexerStore)) -> Self {
         let ledger_hash = value.0.ledger_hash();
@@ -182,16 +194,10 @@ mod tests {
     fn check_ledger_hash() -> anyhow::Result<()> {
         let path = PathBuf::from("../tests/data/staking_ledgers/mainnet-42-jxYFH645cwMMMDmDe7KnvTuKJ5Ev8zZbWtA73fDFn7Jyh8p6SwH.json");
         let staking_ledger = staking::StakingLedger::parse_file(&path)?;
-
-        let mut ledger = StakingLedger(Vec::with_capacity(staking_ledger.staking_ledger.len()));
-        for account in staking_ledger.staking_ledger.into_values() {
-            ledger.0.push(account.into());
-        }
-
-        ledger.0.sort();
+        let staking_ledger: StakingLedger = staking_ledger.into();
 
         assert_eq!(
-            ledger.ledger_hash().0,
+            staking_ledger.ledger_hash().0,
             "jxxKfx81sRrNBmZfXyMVVYYNQFHEvrKiX6RiSJUchfzNDnxjAY5"
         );
 
