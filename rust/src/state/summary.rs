@@ -18,6 +18,8 @@ pub trait Summary {
     fn num_dangling(&self) -> u32;
     fn max_dangling_height(&self) -> u32;
     fn max_dangling_length(&self) -> u32;
+    fn epoch(&self) -> u32;
+    fn epoch_canonical_blocks(&self) -> u32;
     fn db_stats(&self) -> DbStats;
 }
 
@@ -54,6 +56,8 @@ pub struct WitnessTreeSummaryShort {
     pub num_dangling: u32,
     pub max_dangling_height: u32,
     pub max_dangling_length: u32,
+    pub epoch: u32,
+    pub epoch_canonical_blocks: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +73,8 @@ pub struct WitnessTreeSummaryVerbose {
     pub num_dangling: u32,
     pub max_dangling_height: u32,
     pub max_dangling_length: u32,
+    pub epoch: u32,
+    pub epoch_canonical_blocks: u32,
     pub witness_tree: String,
 }
 
@@ -126,6 +132,8 @@ impl From<WitnessTreeSummaryVerbose> for WitnessTreeSummaryShort {
             num_dangling: value.num_dangling,
             max_dangling_height: value.max_dangling_height,
             max_dangling_length: value.max_dangling_length,
+            epoch: value.epoch,
+            epoch_canonical_blocks: value.epoch_canonical_blocks,
         }
     }
 }
@@ -208,6 +216,14 @@ impl Summary for SummaryShort {
         self.witness_tree.canonical_root_length
     }
 
+    fn epoch(&self) -> u32 {
+        self.witness_tree.epoch
+    }
+
+    fn epoch_canonical_blocks(&self) -> u32 {
+        self.witness_tree.epoch_canonical_blocks
+    }
+
     fn db_stats(&self) -> DbStats {
         self.db_stats.as_ref().unwrap().clone()
     }
@@ -272,6 +288,14 @@ impl Summary for SummaryVerbose {
 
     fn canonical_root_length(&self) -> u32 {
         self.witness_tree.canonical_root_length
+    }
+
+    fn epoch(&self) -> u32 {
+        self.witness_tree.epoch
+    }
+
+    fn epoch_canonical_blocks(&self) -> u32 {
+        self.witness_tree.epoch_canonical_blocks
     }
 
     fn db_stats(&self) -> DbStats {
