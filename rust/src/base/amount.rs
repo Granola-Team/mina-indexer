@@ -5,6 +5,7 @@ use crate::{
     utility::functions::nanomina_to_mina,
 };
 use anyhow::anyhow;
+use log::error;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, AddAssign, Sub, SubAssign};
@@ -58,6 +59,9 @@ impl Add<i64> for Amount {
         let abs = rhs.unsigned_abs();
 
         if rhs < 0 {
+            if self.0 < abs {
+                panic!("Amount: u64 underflow in Add<i64>")
+            }
             Self(self.0 - abs)
         } else {
             Self(self.0 + abs)
@@ -66,18 +70,15 @@ impl Add<i64> for Amount {
 }
 
 impl Sub<Amount> for Amount {
-    type Output = Amount;
+    type Output = Option<Amount>;
 
     fn sub(self, rhs: Amount) -> Self::Output {
-        Self(self.0.saturating_sub(rhs.0))
-    }
-}
-
-impl Sub<u64> for Amount {
-    type Output = Amount;
-
-    fn sub(self, rhs: u64) -> Self::Output {
-        Self(self.0 - rhs)
+        if self.0 < rhs.0 {
+            error!("Underflow in Sub<Amount>: self.0: {} rhs.0: {}", self.0, rhs.0);
+            None
+        } else {
+            Some(Self(self.0 - rhs.0))
+        }
     }
 }
 
@@ -98,6 +99,9 @@ impl AddAssign<i64> for Amount {
         let abs = rhs.unsigned_abs();
 
         if rhs < 0 {
+            if self.0 < abs {
+                panic!("Underflow in AddAssign<i64>")
+            }
             *self -= abs;
         } else {
             *self += abs;
@@ -107,6 +111,9 @@ impl AddAssign<i64> for Amount {
 
 impl SubAssign<u64> for Amount {
     fn sub_assign(&mut self, rhs: u64) {
+        if self.0 < rhs {
+            panic!("Underflow in SubAssign<u64>")
+        }
         *self = Self(self.0 - rhs)
     }
 }
@@ -118,6 +125,9 @@ impl SubAssign<i64> for Amount {
         if rhs < 0 {
             *self += abs;
         } else {
+            if self.0 < abs {
+                panic!("Underflow in SubAssign<i64>")
+            }
             *self -= abs;
         }
     }
