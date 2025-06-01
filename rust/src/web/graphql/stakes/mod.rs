@@ -721,7 +721,7 @@ impl StakesLedgerAccountWithMeta {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use super::{StakesDelegationTotals, StakesLedgerAccountWithMeta, StakesQueryInput};
     use crate::{

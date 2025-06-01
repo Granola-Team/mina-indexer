@@ -1560,14 +1560,6 @@ test_block_children() {
 	assert '3NKqMEewA8gvEiW7So7nZ3DN6tPnmCtHpWuAzADN5ff9wiqkGf45' $(echo "$children" | jq -r .[3].state_hash)
 }
 
-test_load_v1() {
-	test_hurl_v1 true
-}
-
-test_load_v2() {
-	test_hurl_v2 true
-}
-
 # Test v1 GQL functionality
 test_hurl_v1() {
 	stage_blocks v1 120 "$BLOCKS_DIR"
@@ -1959,10 +1951,7 @@ for test_name in "$@"; do
 	"test_clean_kill") test_clean_kill ;;
 	"test_version_file") test_version_file ;;
 	"test_do_not_ingest_orphan_blocks") test_do_not_ingest_orphan_blocks ;;
-	# Tier 2 tests:
 	"test_best_chain_many_blocks") test_best_chain_many_blocks ;;
-	"test_load_v1") test_load_v1 ;;
-	"test_load_v2") test_load_v2 ;;
 	*)
 		echo "Unknown test: $test_name"
 		exit 1

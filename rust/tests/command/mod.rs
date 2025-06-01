@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod store;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod zkapp;

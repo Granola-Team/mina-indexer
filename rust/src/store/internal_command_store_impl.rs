@@ -686,7 +686,7 @@ impl<'a> CsvRecordInternalCommand<'a> {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use super::InternalCommandStore;
     use crate::{

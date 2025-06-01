@@ -1,4 +1,4 @@
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod actions;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod events;

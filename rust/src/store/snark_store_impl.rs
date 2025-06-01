@@ -1402,7 +1402,7 @@ fn start_key(
     start
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use super::SnarkStore;
     use crate::store::IndexerStore;

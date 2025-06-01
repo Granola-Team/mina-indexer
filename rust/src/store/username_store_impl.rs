@@ -189,7 +189,7 @@ impl UsernameStore for IndexerStore {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use crate::{
         base::{public_key::PublicKey, username::Username},

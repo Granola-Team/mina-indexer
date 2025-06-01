@@ -7,7 +7,7 @@ mod canonicity;
 mod command;
 mod event;
 mod ledger;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod protocol;
 mod snark_work;
 mod state;

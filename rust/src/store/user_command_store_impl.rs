@@ -1529,7 +1529,7 @@ impl<'a> TxnCsvRecord<'a> {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::block::precomputed::PcbVersion;

@@ -1,5 +1,5 @@
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod blocks;
 mod chain_discovery;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod ledgers;

@@ -51,12 +51,12 @@ test_names = %w[
   version_file
   hurl_v1
   hurl_v2
+  best_chain_many_blocks
 ]
 
 puts "Regression testing..."
 
 tests = if ARGV.empty?
-  # Run all tests, but not the long-running ones.
   test_names
 elsif ARGV.length == 2 && ARGV.first == "continue"
   # Run the supplied test and remaining

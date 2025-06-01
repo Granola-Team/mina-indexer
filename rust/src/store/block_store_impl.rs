@@ -1988,7 +1988,7 @@ fn display_direction(direction: Direction) -> String {
     }
 }
 
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod tests {
     use crate::{
         block::{

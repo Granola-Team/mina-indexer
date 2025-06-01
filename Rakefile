@@ -41,7 +41,6 @@ NIX_FILES = %W[
 SHELL_SCRIPTS = %W[
   ops/ci/tier3
   ops/ci/tier1
-  ops/ci/tier2
   tests/regression.bash
   tests/recovery.sh
   ops/traverse-canonical-chain.sh
@@ -89,8 +88,6 @@ task ct: "clean:test"
 
 task bt: :dev
 task btc: "dev:continue"
-
-task tier2: "test:tier2"
 
 task :default do
   run "rake -T"
@@ -310,69 +307,25 @@ task :test_unit, [:subtest] => CARGO_DEPS do |_, args|
   cargo_output("nextest run #{subtest} --failure-output immediate")
 end
 
-desc "Run the 1st tier of tests"
-task test: [:lint, :test_unit] do
-  puts "--- Performing tier 1 regression tests"
-  run("#{REGRESSION_TEST} dev \
-    hurl_v1 \
-    account_balance_cli \
-    best_chain_v1 \
-    rest_accounts_summary")
+desc "Run the basic tests after linting"
+task test: [:lint, :test_unit]
+
+desc "Run the system test(s), either all of them or one named test"
+task :test_system, [:subtest] => "build:release" do |_, args|
+  puts "--- Checking for prereqs"
+  run("jq --version")
+  run("check-jsonschema --version")
+  run("hurl --version")
+  subtest = args[:subtest] || ""
+  puts "--- Performing system tests #{subtest}"
+  run("#{REGRESSION_TEST} release #{subtest}")
 end
+
+desc "Run the CI tests"
+task ci: [:test, :test_system]
 
 # Test tasks
 namespace :test do
-  namespace :unit do
-    desc "Run unit tests"
-    desc "Run all feature unit tests (debug build)"
-    task :tier2, [:test] do |_, args|
-      test = args[:test] || ""
-      puts "--- Performing all feature unit test(s)"
-      cargo_output("nextest --version")
-      cargo_output("nextest run --all-features #{test}")
-    end
-  end
-
-  desc "Run regression test(s), either all of them or one named specific test"
-  task :regression, [:subtest] do |_, args|
-    subtest = args[:subtest] || ""
-    puts "--- Performing regression tests #{subtest}"
-    run("#{REGRESSION_TEST} release #{subtest}")
-  end
-
-  # tier 2 regression tests
-  tier2_regression_tests = ["load_v1", "load_v2", "best_chain_many_blocks", "all"]
-
-  # Create regression test tasks dynamically
-  namespace :regression do
-    # Define a helper method to create regression test tasks
-    def define_regression_test(name)
-      desc "Run #{name} regression test"
-      task name do
-        test_name = (name == "all") ? nil : name
-        Rake::Task["test:regression"].reenable
-        Rake::Task["test:regression"].invoke(test_name)
-      end
-    end
-
-    tier2_regression_tests.each do |test|
-      define_regression_test(test)
-    end
-  end
-
-  desc "Run the 2nd tier of tests"
-  task tier2: ["test:unit:tier2"] do
-    puts "--- Checking for tier-2 prereqs"
-    run("jq --version")
-    run("check-jsonschema --version")
-    run("hurl --version")
-    Rake::Task["build:release"].invoke
-    puts "--- Running tier-2 tests"
-    tier2_regression_tests.map { |test|
-      Rake::Task["test:regression:#{test}"].invoke
-    }
-  end
-
   namespace :tier3 do
     desc "Run the 3rd tier of tests with Nix-built binary"
     task :ci, [:blocks] => "build:nix" do |_, args|

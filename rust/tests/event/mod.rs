@@ -1,12 +1,12 @@
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod log;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod memoize_ledger;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod replay;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod store;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod sync;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod witness_tree;

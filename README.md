@@ -41,7 +41,6 @@ Execute [unit tests](/rust/tests) to validate code functionality with:
 
 ```bash
 rake test
-rake test:unit:tier2
 ```
 
 ### Regression Tests
@@ -53,10 +52,11 @@ features after updates, use:
 rake dev
 ```
 
-To perform the test battery that the [(tier-1) CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
+To perform the test battery that the [CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
 
 ```bash
-rake tier1
+rake test
+rake test_system
 ```
 
 ## Deployment

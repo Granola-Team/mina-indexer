@@ -1,6 +1,6 @@
 mod dangling_branches;
 mod hardfork;
 mod ledger;
-#[cfg(all(test, feature = "tier2"))]
+#[cfg(test)]
 mod orphaned_blocks;
 mod root_branch;
