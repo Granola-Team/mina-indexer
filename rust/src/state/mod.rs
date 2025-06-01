@@ -1143,6 +1143,7 @@ impl IndexerState {
 
                     tokio::task::spawn(async move {
                         Self::process_staking_ledger(&path, &indexer_store, &mut staking_ledgers)
+                            .await
                     })
                 })
                 .collect();
@@ -1155,7 +1156,7 @@ impl IndexerState {
         Ok(())
     }
 
-    pub fn process_staking_ledger(
+    pub async fn process_staking_ledger(
         path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &mut HashSet<(u32, LedgerHash)>,
@@ -1167,7 +1168,7 @@ impl IndexerState {
             .get_staking_ledger_hash_by_epoch(epoch, &StakingLedger::genesis_state_hash(&hash))?
             .is_none()
         {
-            let staking_ledger = StakingLedger::parse_file(path)?;
+            let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
 
             staking_ledgers.insert((staking_ledger.epoch, staking_ledger.ledger_hash.to_owned()));
