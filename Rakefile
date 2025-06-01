@@ -90,7 +90,6 @@ task ct: "clean:test"
 task bt: :dev
 task btc: "dev:continue"
 
-task tier1: "test:tier1"
 task tier2: "test:tier2"
 
 task :default do
@@ -302,19 +301,29 @@ namespace :dev do
   end
 end
 
+task :test_unit, [:subtest] => CARGO_DEPS do |_, args|
+  puts "--- Invoking 'rspec ops/spec'"
+  run("rspec ops/spec/*-spec.rb")
+  puts "--- Performing tier 1 unit test(s)"
+  cargo_output("nextest --version")
+  subtest = args[:subtest] || ""
+  cargo_output("nextest run #{subtest} --failure-output immediate")
+end
+
+desc "Run the 1st tier of tests"
+task test: [:lint, :test_unit] do
+  puts "--- Performing tier 1 regression tests"
+  run("#{REGRESSION_TEST} dev \
+    hurl_v1 \
+    account_balance_cli \
+    best_chain_v1 \
+    rest_accounts_summary")
+end
+
 # Test tasks
 namespace :test do
   namespace :unit do
     desc "Run unit tests"
-    task :tier1, [:test] => CARGO_DEPS do |_, args|
-      test = args[:test] || ""
-      puts "--- Invoking 'rspec ops/spec'"
-      run("rspec ops/spec/*-spec.rb")
-      puts "--- Performing tier 1 unit test(s)"
-      cargo_output("nextest --version")
-      cargo_output("nextest run #{test} --failure-output immediate")
-    end
-
     desc "Run all feature unit tests (debug build)"
     task :tier2, [:test] do |_, args|
       test = args[:test] || ""
@@ -349,16 +358,6 @@ namespace :test do
     tier2_regression_tests.each do |test|
       define_regression_test(test)
     end
-  end
-
-  desc "Run the 1st tier of tests"
-  task tier1: [:lint, "test:unit:tier1"] do
-    puts "--- Performing tier 1 regression tests"
-    run("#{REGRESSION_TEST} dev \
-      hurl_v1 \
-      account_balance_cli \
-      best_chain_v1 \
-      rest_accounts_summary")
   end
 
   desc "Run the 2nd tier of tests"

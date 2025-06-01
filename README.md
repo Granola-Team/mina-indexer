@@ -40,7 +40,7 @@ another path.
 Execute [unit tests](/rust/tests) to validate code functionality with:
 
 ```bash
-rake test:unit:tier1
+rake test
 rake test:unit:tier2
 ```
 
