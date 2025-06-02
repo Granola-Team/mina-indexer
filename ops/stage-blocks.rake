@@ -3,6 +3,12 @@ STAGE_BLOCKS = "#{__dir__}/stage-blocks.rb"
 
 task stage_blocks: ["stage_blocks:list"]
 
+def run(cmd, *args)
+  success = system(cmd, *args)
+  abort "Command failed: #{cmd} #{args.join(" ")}" unless success
+  success
+end
+
 namespace :stage_blocks do
   desc "List available tasks"
   task :list do

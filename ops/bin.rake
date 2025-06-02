@@ -36,6 +36,12 @@ def read_pid_file
   File.read(PID_FILE).strip if File.exist?(PID_FILE)
 end
 
+def run(cmd, *args, dir: __dir__)
+  success = system(cmd, *args, chdir: dir)
+  abort "Command failed: #{cmd} #{args.join(" ")}" unless success
+  success
+end
+
 def process_running?(pid)
   return false unless pid
   run("ps -p #{pid} > /dev/null 2>&1")

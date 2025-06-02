@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2046,SC2086,SC2002,2120
 
-# To debug, uncomment:
-# set -x
-
 set -euo pipefail
 
 IDXR="$1"
@@ -21,7 +18,8 @@ export GIT_COMMIT_HASH
 STAKING_LEDGERS="$SRC/tests/data/staking_ledgers"
 SUMMARY_SCHEMA="$SRC/tests/data/json-schemas/summary.json"
 
-RAKEFILE="$SRC/Rakefile"
+BIN_RAKEFILE="$SRC/ops/bin.rake"
+STAGE_BLOCKS_RAKEFILE="$SRC/ops/stage-blocks.rake"
 
 # The rest of this script's logic assumes that the testing is done from within
 # this temporary directory.
@@ -44,34 +42,34 @@ HARDFORK_GENESIS_STATE_HASH=3NK4BpDSekaqsG6tx8Nse2zJchRft2JpnbvMiog55WCr5xJZaKeP
 #
 idxr() {
 	args=$(echo "$*" | tr ' ' ',')
-	rake -f "$RAKEFILE" "bin:run[$IDXR,$args]"
+	rake -f "$BIN_RAKEFILE" "bin:run[$IDXR,$args]"
 }
 
 start_v1() {
 	args=$(echo "$*" | tr ' ' ',')
-	rake -f "$RAKEFILE" "bin:start_v1[$IDXR,$args]"
+	rake -f "$BIN_RAKEFILE" "bin:start_v1[$IDXR,$args]"
 }
 
 start_v2() {
-	rake -f "$RAKEFILE" "bin:start_v2[$IDXR]"
+	rake -f "$BIN_RAKEFILE" "bin:start_v2[$IDXR]"
 }
 
 start() {
 	args=$(echo "$*" | tr ' ' ',')
-	rake -f "$RAKEFILE" "bin:start[$IDXR,$args]"
+	rake -f "$BIN_RAKEFILE" "bin:start[$IDXR,$args]"
 }
 
 shutdown_idxr() {
-	rake -f "$RAKEFILE" "bin:shutdown[$IDXR]"
+	rake -f "$BIN_RAKEFILE" "bin:shutdown[$IDXR]"
 }
 
 ephemeral_port() {
-	rake -f "$RAKEFILE" "bin:ephemeral_port"
+	rake -f "$BIN_RAKEFILE" "bin:ephemeral_port"
 }
 
 database_create() {
 	args=$(echo "$*" | tr ' ' ',')
-	rake -f "$RAKEFILE" "bin:database_create[$IDXR,$args]"
+	rake -f "$BIN_RAKEFILE" "bin:database_create[$IDXR,$args]"
 }
 
 stage_blocks() {
@@ -80,7 +78,7 @@ stage_blocks() {
 	shift
 
 	args=$(echo "$*" | tr ' ' ',')
-	rake -f "$RAKEFILE" "stage_blocks:${task}[$args]"
+	rake -f "$STAGE_BLOCKS_RAKEFILE" "stage_blocks:${task}[$args]"
 }
 
 # Assert helpers
@@ -1125,7 +1123,7 @@ test_best_chain_many_blocks() {
 	stage_blocks v1 5000 "$BLOCKS_DIR"
 
 	start_v1
-	rake -f "$RAKEFILE" bin:wait_forever_for_socket
+	rake -f "$BIN_RAKEFILE" bin:wait_forever_for_socket
 
 	# write best chain to file
 	file=./best_chain.json
