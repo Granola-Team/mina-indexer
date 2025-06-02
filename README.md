@@ -1,9 +1,9 @@
 # The Mina Indexer
 
-<a href="https://buildkite.com/granola/mina-indexer-tier-1/builds?branch=main"><img src="https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg"></a>
-<a href="https://github.com/Granola-Team/mina-indexer/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-APACHE-blue.svg"></a>
+Constructs and serves indices of the Mina blockchain via GraphQL.
 
-Constructs and serves indices of the Mina blockchain.
+![Build Badge](https://badge.buildkite.com/c2da30c5a1deb1ff6e0ca09c5ec33f7bd0a5b57ea35df4fc15.svg)
+![LICENCE Badge](https://img.shields.io/badge/license-APACHE-blue.svg)
 
 The Mina Indexer uses precomputed blocks (logged by a Mina node) as the source
 of truth for the blockchain.
@@ -52,7 +52,7 @@ features after updates, use:
 rake dev
 ```
 
-To perform the test battery that the [CI](https://buildkite.com/granola/mina-indexer-tier-1) runs, use:
+To perform the test battery that the CI runs, use:
 
 ```bash
 rake test

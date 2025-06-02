@@ -40,7 +40,7 @@ NIX_FILES = %W[
 ]
 SHELL_SCRIPTS = %W[
   ops/ci/tier3
-  ops/ci/tier1
+  ops/ci/build-and-test
   tests/regression.bash
   tests/recovery.sh
   ops/traverse-canonical-chain.sh
@@ -301,7 +301,7 @@ end
 task :test_unit, [:subtest] => CARGO_DEPS do |_, args|
   puts "--- Invoking 'rspec ops/spec'"
   run("rspec ops/spec/*-spec.rb")
-  puts "--- Performing tier 1 unit test(s)"
+  puts "--- Performing unit test(s)"
   cargo_output("nextest --version")
   subtest = args[:subtest] || ""
   cargo_output("nextest run #{subtest} --failure-output immediate")
