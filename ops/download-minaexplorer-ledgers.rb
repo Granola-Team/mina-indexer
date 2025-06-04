@@ -17,6 +17,7 @@ require "open-uri"
 dest = ARGV[0]
 
 ledgers = [
+  ["24", "jwKbLH2f2xRAqgV1ohz618idSEmbARLJyjRUdnNFrsTwRVqVJCb"],
   ["23", "jwGzgaRhjAwZvfowL6LhqC6mHEZ7mCeXd6Ps4njfUQYAvYcRRoQ"],
   ["22", "jxyJvcM4j4Mi2hNh6aLTB6wPChm5KtaaYGZBhTurWWBJ1278z5X"],
   ["21", "jxFEmi9RUo7SArPwupC3QWdWPdoCYEWwhQhkMg9EeCM6QQV5HFs"],
@@ -119,7 +120,8 @@ ledgers = [
   ["4", "jwPwVsSPZ2tmmGbp8UrWGmDgFDrrzTPpYcjpWosckmcVZV2kcW7"],
   ["3", "jxRySSfk8kJZVj46zveaToDUJUC2GtprmeK7poqWymEzB6d2Tun"],
   ["2", "jwAAZcXndLYxb8w4LTU2d4K1qT3dL8Ck2jKzVEf9t9GAyXweQRG"],
-  ["1", "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"]
+  ["1", "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"],
+  ["0", "jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee"]
 ]
 
 FileUtils.mkdir_p(dest)
