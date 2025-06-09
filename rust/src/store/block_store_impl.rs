@@ -159,7 +159,7 @@ impl BlockStore for IndexerStore {
         self.add_epoch_slots_produced(
             &block.genesis_state_hash(),
             block.epoch_count(),
-            block.global_slot_since_genesis() % MAINNET_EPOCH_SLOT_COUNT,
+            epoch_slot(block.global_slot_since_genesis()),
             &block.block_creator(),
         )?;
 
@@ -1000,7 +1000,7 @@ impl BlockStore for IndexerStore {
         epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<Option<u32>> {
-        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+        let epoch_slot = epoch_slot(global_slot);
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
 
         trace!(
@@ -1039,7 +1039,7 @@ impl BlockStore for IndexerStore {
         epoch: Option<u32>,
         global_slot: u32,
     ) -> Result<u32> {
-        let epoch_slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+        let epoch_slot = epoch_slot(global_slot);
         let epoch = epoch.unwrap_or_else(|| self.get_current_epoch().expect("current epoch"));
 
         trace!(

@@ -2,9 +2,7 @@
 
 pub mod block;
 
-use super::{
-    db, get_block_canonicity, millis_to_iso_date_string, pk::PK, MAINNET_EPOCH_SLOT_COUNT,
-};
+use super::{db, get_block_canonicity, millis_to_iso_date_string, pk::PK};
 use crate::{
     base::{public_key::PublicKey, state_hash::StateHash},
     block::{precomputed::PrecomputedBlock, store::BlockStore},

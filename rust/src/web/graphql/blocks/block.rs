@@ -1,6 +1,6 @@
 //! GraphQL block representation
 
-use super::{millis_to_iso_date_string, MAINNET_EPOCH_SLOT_COUNT, PK};
+use super::{millis_to_iso_date_string, PK};
 use crate::{
     block::precomputed::PrecomputedBlock,
     command::{
@@ -8,6 +8,7 @@ use crate::{
         signed::SignedCommandWithData,
         store::UserCommandStore,
     },
+    constants::epoch_slot,
     ledger::coinbase::Coinbase,
     snark_work::{store::SnarkStore, SnarkWorkSummary},
     store::IndexerStore,
@@ -422,7 +423,7 @@ impl BlockWithoutCanonicity {
         let last_vrf_output = block.last_vrf_output();
         let min_window_density = block.min_window_density();
         let slot_since_genesis = block.global_slot_since_genesis();
-        let slot = slot_since_genesis % MAINNET_EPOCH_SLOT_COUNT;
+        let slot = epoch_slot(slot_since_genesis);
 
         // next epoch data
         let next_epoch_seed = block.next_epoch_seed();

@@ -66,6 +66,7 @@ pub const MAINNET_CHAIN_ID: &str =
     "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1";
 
 pub const MAINNET_LAST_EPOCH: u32 = 79;
+pub const MAINNET_LAST_GLOBAL_SLOT: u32 = 564479;
 
 // post hardfork
 
@@ -118,6 +119,15 @@ pub fn from_timestamp_millis(millis: i64) -> DateTime<Utc> {
 pub fn millis_to_global_slot(millis: i64) -> u32 {
     let millis_since_genesis = millis as u64 - MAINNET_GENESIS_TIMESTAMP;
     (millis_since_genesis / MAINNET_BLOCK_SLOT_TIME_MILLIS) as u32
+}
+
+/// Get the epoch slot number from the global slot number
+pub fn epoch_slot(global_slot: u32) -> u32 {
+    if global_slot <= MAINNET_LAST_GLOBAL_SLOT {
+        global_slot % MAINNET_EPOCH_SLOT_COUNT
+    } else {
+        (global_slot - 420) % MAINNET_EPOCH_SLOT_COUNT
+    }
 }
 
 pub mod berkeley {

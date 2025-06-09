@@ -3,7 +3,7 @@ use crate::{
     block::{precomputed::PrecomputedBlock, store::BlockStore},
     chain::{store::ChainStore, ChainId},
     command::{internal::store::InternalCommandStore, store::UserCommandStore},
-    constants::{MAINNET_EPOCH_SLOT_COUNT, VERSION},
+    constants::{epoch_slot, VERSION},
     ledger::store::best::BestLedgerStore,
     snark_work::store::SnarkStore,
     store::{
@@ -259,7 +259,7 @@ impl BlockchainSummary {
         let min_window_density = best_tip.min_window_density();
         let next_epoch_ledger_hash = best_tip.next_epoch_ledger_hash().0;
         let previous_state_hash = best_tip.previous_state_hash().0;
-        let slot = global_slot % MAINNET_EPOCH_SLOT_COUNT;
+        let slot = epoch_slot(global_slot);
         let snarked_ledger_hash = best_tip.snarked_ledger_hash().0;
         let staged_ledger_hash = best_tip.staged_ledger_hash().0;
         let staking_epoch_ledger_hash = best_tip.staking_epoch_ledger_hash().0;
