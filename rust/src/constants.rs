@@ -65,7 +65,6 @@ pub const MAINNET_DIGEST_BLOCKCHAIN_STEP: &str = "06d85d220ad13e03d51ef357d2c9d5
 pub const MAINNET_CHAIN_ID: &str =
     "5f704cc0c82e0ed70e873f0893d7e06f148524e3f0bdae2afb02e7819a0c24d1";
 
-pub const MAINNET_LAST_EPOCH: u32 = 79;
 pub const MAINNET_LAST_GLOBAL_SLOT: u32 = 564479;
 
 // post hardfork

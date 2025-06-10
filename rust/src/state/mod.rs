@@ -543,8 +543,6 @@ impl IndexerState {
                         )?;
                     }
 
-                    self.persist_staking_ledger()?;
-
                     // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
                         self.root_branch = Branch::new(&block)?;
@@ -661,7 +659,37 @@ impl IndexerState {
                             best_tip,
                             canonical_blocks,
                         } => {
-                            self.persist_staking_ledger()?;
+                            // write staking ledger data
+                            if self.epoch_canonical_blocks == MAINNET_CANONICAL_THRESHOLD + 1 {
+                                assert_eq!(
+                                    self.canonical_root_block().blockchain_length
+                                        + MAINNET_CANONICAL_THRESHOLD
+                                        + 1,
+                                    self.best_tip_block().blockchain_length,
+                                );
+
+                                let next_epoch_staking_ledger =
+                                    indexer::StakingLedger::from_ledger(&self.ledger);
+
+                                if let Some(store) = self.indexer_store.as_ref() {
+                                    // memoize staged ledger
+                                    store.add_staged_ledger_at_state_hash(
+                                        &self.best_tip.state_hash,
+                                        &self.ledger,
+                                        self.best_tip_block().blockchain_length,
+                                    )?;
+
+                                    let next_epoch_staking_ledger: StakingLedger = (
+                                        next_epoch_staking_ledger,
+                                        self.epoch,
+                                        self.version.network.clone(),
+                                        store.as_ref(),
+                                    )
+                                        .into();
+                                    store.add_staking_ledger(next_epoch_staking_ledger)?;
+                                }
+                            }
+
                             (best_tip, canonical_blocks)
                         }
                     }
@@ -1214,53 +1242,6 @@ impl IndexerState {
         ));
 
         Ok(std::fs::write(path, serde_json::to_vec(&staking_ledger)?)?)
-    }
-
-    /// When the moment is right, persists the next epoch staking ledger to the
-    /// indexer store
-    fn persist_staking_ledger(&self) -> anyhow::Result<()> {
-        if self.should_persist_next_epoch_ledger() {
-            assert_eq!(
-                self.canonical_root_block().blockchain_length + MAINNET_CANONICAL_THRESHOLD + 1,
-                self.best_tip_block().blockchain_length,
-            );
-
-            if let Some(store) = self.indexer_store.as_ref() {
-                let next_epoch_staking_ledger =
-                    if self.version.chain_id.0 == MAINNET_CHAIN_ID && self.epoch == 0 {
-                        let genesis_ledger = GenesisLedger::new_v1()?;
-                        let genesis_ledger: Ledger = genesis_ledger.into();
-                        indexer::StakingLedger::from_ledger(&genesis_ledger)
-                    } else {
-                        indexer::StakingLedger::from_ledger(&self.ledger)
-                    };
-
-                let next_epoch_staking_ledger = (
-                    next_epoch_staking_ledger,
-                    self.next_epoch(),
-                    self.version.network.clone(),
-                    store.as_ref(),
-                )
-                    .into();
-
-                store.add_staking_ledger(next_epoch_staking_ledger)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn should_persist_next_epoch_ledger(&self) -> bool {
-        self.epoch == self.next_epoch()
-            && self.epoch_canonical_blocks == MAINNET_CANONICAL_THRESHOLD + 1
-    }
-
-    fn next_epoch(&self) -> u32 {
-        if self.version.chain_id.0 == MAINNET_CHAIN_ID && self.epoch < MAINNET_LAST_EPOCH {
-            self.epoch + 1
-        } else {
-            (self.epoch + 1) % (MAINNET_LAST_EPOCH + 1)
-        }
     }
 
     /// Sync from an existing db
