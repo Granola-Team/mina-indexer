@@ -262,7 +262,7 @@ impl StakingLedger {
     }
 
     /// Parse a valid (compressed) ledger file
-    pub fn parse_file(path: &Path) -> anyhow::Result<Self> {
+    pub async fn parse_file(path: &Path) -> anyhow::Result<Self> {
         let mut bytes = std::fs::read(path)?;
         let is_compressed = path.extension().is_some_and(|ext| ext == "gz");
 
@@ -414,10 +414,10 @@ mod tests {
     };
     use std::{collections::HashSet, path::PathBuf};
 
-    #[test]
-    fn parse_file() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn parse_file() -> anyhow::Result<()> {
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path)?;
+        let staking_ledger = StakingLedger::parse_file(&path).await?;
 
         assert_eq!(staking_ledger.epoch, 0);
         assert_eq!(staking_ledger.network, Network::Mainnet);
@@ -429,12 +429,12 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn calculate_delegations() -> anyhow::Result<()> {
+    #[tokio::test]
+    async fn calculate_delegations() -> anyhow::Result<()> {
         use crate::base::public_key::PublicKey;
 
         let path: PathBuf = "../tests/data/staking_ledgers/mainnet-0-jx7buQVWFLsXTtzRgSxbYcT8EYLS8KCZbLrfDcJxMtyy4thw2Ee.json".into();
-        let staking_ledger = StakingLedger::parse_file(&path)?;
+        let staking_ledger = StakingLedger::parse_file(&path).await?;
 
         let AggregatedEpochStakeDelegations {
             epoch,

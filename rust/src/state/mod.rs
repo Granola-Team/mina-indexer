@@ -713,10 +713,6 @@ impl IndexerState {
                     _ => unreachable!(),
                 };
 
-                if best_tip.state_hash != self.best_tip.state_hash {
-                    self.handle_epoch_block(block);
-                }
-
                 return Ok((
                     root_extension,
                     Some(WitnessTreeEvent::UpdateBestTip {

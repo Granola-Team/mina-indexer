@@ -475,7 +475,7 @@ async fn retry_parse_precomputed_block(path: &Path) -> anyhow::Result<Precompute
 async fn retry_parse_staking_ledger(path: &Path) -> anyhow::Result<StakingLedger> {
     let num_attempts = 5;
     for attempt in 1..num_attempts {
-        match StakingLedger::parse_file(path) {
+        match StakingLedger::parse_file(path).await {
             Ok(ledger) => return Ok(ledger),
             Err(e) => {
                 warn!("Attempt {attempt}: {e}. Retrying in 1s...");
