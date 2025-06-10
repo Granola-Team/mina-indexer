@@ -9,7 +9,6 @@ pub mod accounts;
 pub mod actions;
 pub mod blocks;
 pub mod events;
-pub mod feetransfers;
 pub mod gen;
 pub mod internal_commands;
 pub mod snarks;
@@ -43,7 +42,6 @@ pub struct Root(
     stakes::StakesQueryRoot,
     accounts::AccountQueryRoot,
     transactions::TransactionsQueryRoot,
-    #[graphql(deprecation = "Use internalCommands instead.")] feetransfers::FeetransferQueryRoot,
     internal_commands::InternalCommandQueryRoot,
     snarks::SnarkQueryRoot,
     staged_ledgers::StagedLedgerQueryRoot,
