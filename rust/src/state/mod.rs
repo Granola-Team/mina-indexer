@@ -117,12 +117,6 @@ pub struct IndexerState {
 
     /// PCB versions & chain ids for various networks
     pub chain_data: ChainData,
-
-    /// Epoch of best block
-    pub epoch: u32,
-
-    /// Number of canonical blocks in current epoch
-    pub epoch_canonical_blocks: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -362,8 +356,6 @@ impl IndexerState {
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
-            epoch: 0,
-            epoch_canonical_blocks: 1, // genesis block
         })
     }
 
@@ -402,8 +394,6 @@ impl IndexerState {
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
-            epoch: 0,
-            epoch_canonical_blocks: 0,
         })
     }
 
@@ -471,8 +461,6 @@ impl IndexerState {
             staking_ledgers: HashSet::new(),
             version: IndexerVersion::default(),
             chain_data: ChainData::default(),
-            epoch: root_block.epoch_count(),
-            epoch_canonical_blocks: 1, // root block
         })
     }
 
@@ -691,24 +679,25 @@ impl IndexerState {
     /// Adds the block to the witness tree & skips store operations
     pub fn add_block_to_witness_tree(
         &mut self,
-        block: &PrecomputedBlock,
+        precomputed_block: &PrecomputedBlock,
         increment_blocks: bool,
         insert_diff: bool,
     ) -> Result<(ExtensionType, Option<WitnessTreeEvent>)> {
-        let incoming_length = block.blockchain_length();
+        let incoming_length = precomputed_block.blockchain_length();
         if self.root_branch.root_block().blockchain_length > incoming_length {
             error!(
                 "Block {} is too low to be added to the witness tree",
-                block.summary(),
+                precomputed_block.summary()
             );
-
             return Ok((ExtensionType::BlockNotAdded, None));
         }
 
         // put the pcb's ledger diff in the map
         if insert_diff {
-            self.diffs_map
-                .insert(block.state_hash(), LedgerDiff::from_precomputed(block));
+            self.diffs_map.insert(
+                precomputed_block.state_hash(),
+                LedgerDiff::from_precomputed(precomputed_block),
+            );
         }
 
         if increment_blocks {
@@ -716,8 +705,8 @@ impl IndexerState {
         }
 
         // forward extension on root branch
-        if self.is_length_within_root_bounds(block) {
-            if let Some(root_extension) = self.root_extension(block)? {
+        if self.is_length_within_root_bounds(precomputed_block) {
+            if let Some(root_extension) = self.root_extension(precomputed_block)? {
                 let best_tip = match &root_extension {
                     ExtensionType::RootSimple(block) => block.clone(),
                     ExtensionType::RootComplex(block) => block.clone(),
@@ -741,14 +730,19 @@ impl IndexerState {
         // if a dangling branch has been extended (forward or reverse) check for new
         // connections to other dangling branches
         if let Some((extended_branch_index, new_node_id, direction)) =
-            self.dangling_extension(block)?
+            self.dangling_extension(precomputed_block)?
         {
             return self
-                .update_dangling(block, extended_branch_index, new_node_id, direction)
+                .update_dangling(
+                    precomputed_block,
+                    extended_branch_index,
+                    new_node_id,
+                    direction,
+                )
                 .map(|ext| (ext, None));
         }
 
-        self.new_dangling(block).map(|ext| (ext, None))
+        self.new_dangling(precomputed_block).map(|ext| (ext, None))
     }
 
     /// Extends the root branch forward, potentially causing dangling branches
@@ -1097,6 +1091,7 @@ impl IndexerState {
 
                     tokio::task::spawn(async move {
                         Self::process_staking_ledger(&path, &indexer_store, &mut staking_ledgers)
+                            .await
                     })
                 })
                 .collect();
@@ -1109,7 +1104,7 @@ impl IndexerState {
         Ok(())
     }
 
-    pub fn process_staking_ledger(
+    pub async fn process_staking_ledger(
         path: &Path,
         store: &Arc<IndexerStore>,
         staking_ledgers: &mut HashSet<(u32, LedgerHash)>,
@@ -1121,7 +1116,7 @@ impl IndexerState {
             .get_staking_ledger_hash_by_epoch(epoch, &StakingLedger::genesis_state_hash(&hash))?
             .is_none()
         {
-            let staking_ledger = StakingLedger::parse_file(path)?;
+            let staking_ledger = StakingLedger::parse_file(path).await?;
             let summary = staking_ledger.summary();
 
             staking_ledgers.insert((staking_ledger.epoch, staking_ledger.ledger_hash.to_owned()));
@@ -1652,20 +1647,6 @@ impl IndexerState {
         Ok(())
     }
 
-    fn handle_epoch_block(&mut self, block: &PrecomputedBlock) {
-        use std::cmp::Ordering;
-
-        let block_epoch = block.epoch_count();
-        match block_epoch.cmp(&self.epoch) {
-            Ordering::Equal => self.epoch_canonical_blocks += 1,
-            Ordering::Greater => {
-                self.epoch = block_epoch;
-                self.epoch_canonical_blocks = 1;
-            }
-            Ordering::Less => (),
-        }
-    }
-
     pub fn summary_short(&self) -> SummaryShort {
         let mut max_dangling_height = 0;
         let mut max_dangling_length = 0;
@@ -1697,8 +1678,6 @@ impl IndexerState {
             num_dangling: self.dangling_branches.len() as u32,
             max_dangling_height,
             max_dangling_length,
-            epoch: self.epoch,
-            epoch_canonical_blocks: self.epoch_canonical_blocks,
         };
 
         let (max_staking_ledger_epoch, max_staking_ledger_hash) = {
@@ -1753,8 +1732,6 @@ impl IndexerState {
             num_dangling: self.dangling_branches.len() as u32,
             max_dangling_height,
             max_dangling_length,
-            epoch: self.epoch,
-            epoch_canonical_blocks: self.epoch_canonical_blocks,
             witness_tree: format!("{self}"),
         };
 
