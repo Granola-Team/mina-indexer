@@ -50,7 +50,6 @@ impl Branch {
             genesis_state_hash: root_hash.clone(),
             parent_hash: root_prev_hash,
             height: 0,
-            epoch: 0,
             blockchain_length,
             global_slot_since_genesis,
             hash_last_vrf_output: genesis_last_vrf_output,
