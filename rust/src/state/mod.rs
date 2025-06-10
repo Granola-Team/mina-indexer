@@ -1235,7 +1235,7 @@ impl IndexerState {
     {
         use crate::ledger::staking::indexer::StakingLedger;
 
-        let staking_ledger = StakingLedger::from_ledger(&self.ledger);
+        let staking_ledger = StakingLedger::from_ledger(&self.ledger)?;
         let path: std::path::PathBuf = staking_ledger_dir.as_ref().join(format!(
             "{}-{}-{}.json",
             self.version.network, self.epoch, staking_ledger_hash
