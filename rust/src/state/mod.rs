@@ -19,7 +19,7 @@ use crate::{
     ledger::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
-        staking::{indexer, parser::StakingLedgerParser, StakingLedger},
+        staking::{parser::StakingLedgerParser, StakingLedger},
         store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
         Ledger, LedgerHash,
@@ -494,38 +494,37 @@ impl IndexerState {
         info!("Initializing indexer with canonical chain blocks");
 
         let total_time = Instant::now();
-        let mut ledger_diffs = vec![];
+        if let Some(indexer_store) = self.indexer_store.as_ref() {
+            let mut ledger_diffs = vec![];
 
-        if block_parser.num_deep_canonical_blocks > self.reporting_freq {
-            info!(
-                "Adding blocks to the witness tree, reporting every {}",
-                self.reporting_freq
-            );
-        } else {
-            info!("Adding blocks to the witness tree...");
-        }
+            if block_parser.num_deep_canonical_blocks > self.reporting_freq {
+                info!(
+                    "Adding blocks to the witness tree, reporting every {}",
+                    self.reporting_freq
+                );
+            } else {
+                info!("Adding blocks to the witness tree...");
+            }
 
-        // process deep canonical blocks first bypassing the witness tree
-        while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
-            if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
-                block_parser.next_block().await?
-            {
+            // process deep canonical blocks first bypassing the witness tree
+            while self.blocks_processed <= block_parser.num_deep_canonical_blocks {
                 self.blocks_processed += 1;
-                self.bytes_processed += block_bytes;
-
-                self.handle_epoch_block(&block);
                 self.report_from_block_count(block_parser, total_time);
+
                 self.compact_db_every_n_blocks(100_000)?;
 
-                let state_hash = block.state_hash();
+                if let Some((ParsedBlock::DeepCanonical(block), block_bytes)) =
+                    block_parser.next_block().await?
+                {
+                    let state_hash = block.state_hash();
+                    self.bytes_processed += block_bytes;
 
-                // apply diff + add to db
-                let diff = LedgerDiff::from_precomputed(&block);
-                if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
-                    ledger_diffs.push((diff.clone(), block.accounts_accessed()));
-                }
+                    // apply diff + add to db
+                    let diff = LedgerDiff::from_precomputed(&block);
+                    if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
+                        ledger_diffs.push((diff.clone(), block.accounts_accessed()));
+                    }
 
-                if let Some(indexer_store) = self.indexer_store.as_ref() {
                     indexer_store.add_block(&block, block_bytes)?;
                     indexer_store.set_best_block(&block.state_hash(), block.blockchain_length())?;
                     indexer_store.add_canonical_block(
@@ -566,12 +565,12 @@ impl IndexerState {
                     bail!("Block unexpectedly missing");
                 }
             }
-        }
 
-        assert_eq!(
-            self.blocks_processed,
-            block_parser.num_deep_canonical_blocks + 1, // +1 genesis
-        );
+            assert_eq!(
+                self.blocks_processed,
+                block_parser.num_deep_canonical_blocks + 1
+            ); // +1 genesis
+        }
 
         self.report_from_block_count(block_parser, total_time);
         info!("Finished processing canonical chain");
@@ -668,40 +667,7 @@ impl IndexerState {
                         WitnessTreeEvent::UpdateBestTip {
                             best_tip,
                             canonical_blocks,
-                        } => {
-                            // write staking ledger data
-                            if self.epoch_canonical_blocks == MAINNET_CANONICAL_THRESHOLD + 1 {
-                                assert_eq!(
-                                    self.canonical_root_block().blockchain_length
-                                        + MAINNET_CANONICAL_THRESHOLD
-                                        + 1,
-                                    self.best_tip_block().blockchain_length,
-                                );
-
-                                let next_epoch_staking_ledger =
-                                    indexer::StakingLedger::from_ledger(&self.ledger)?;
-
-                                if let Some(store) = self.indexer_store.as_ref() {
-                                    // memoize staged ledger
-                                    store.add_staged_ledger_at_state_hash(
-                                        &self.best_tip.state_hash,
-                                        &self.ledger,
-                                        self.best_tip_block().blockchain_length,
-                                    )?;
-
-                                    let next_epoch_staking_ledger: StakingLedger = (
-                                        next_epoch_staking_ledger,
-                                        self.epoch,
-                                        self.version.network.clone(),
-                                        store.as_ref(),
-                                    )
-                                        .into();
-                                    store.add_staking_ledger(next_epoch_staking_ledger)?;
-                                }
-                            }
-
-                            (best_tip, canonical_blocks)
-                        }
+                        } => (best_tip, canonical_blocks),
                     }
                 } else {
                     return Ok(true);
@@ -1236,25 +1202,6 @@ impl IndexerState {
         }
 
         Ok(None)
-    }
-
-    pub fn write_staking_ledger<P>(
-        &self,
-        staking_ledger_hash: LedgerHash,
-        staking_ledger_dir: P,
-    ) -> anyhow::Result<()>
-    where
-        P: AsRef<Path>,
-    {
-        use crate::ledger::staking::indexer::StakingLedger;
-
-        let staking_ledger = StakingLedger::from_ledger(&self.ledger)?;
-        let path: std::path::PathBuf = staking_ledger_dir.as_ref().join(format!(
-            "{}-{}-{}.json",
-            self.version.network, self.epoch, staking_ledger_hash
-        ));
-
-        Ok(std::fs::write(path, serde_json::to_vec(&staking_ledger)?)?)
     }
 
     /// Sync from an existing db
