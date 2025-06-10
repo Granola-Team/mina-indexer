@@ -26,7 +26,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingLedger {
     pub epoch: u32,
     pub network: Network,
@@ -36,7 +36,7 @@ pub struct StakingLedger {
     pub staking_ledger: HashMap<PublicKey, StakingAccount>,
 }
 
-#[derive(Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StakingAccount {
     pub pk: PublicKey,
     pub balance: u64,
@@ -44,8 +44,6 @@ pub struct StakingAccount {
     pub username: Option<String>,
     pub token: Option<TokenAddress>,
     pub permissions: StakingPermissions,
-    pub receipt_chain_hash: ReceiptChainHash,
-    pub voting_for: StateHash,
     pub nonce: Option<Nonce>,
     pub timing: Option<Timing>,
     pub zkapp: Option<ZkappAccount>,
@@ -156,9 +154,7 @@ impl From<StakingAccountJson> for StakingAccount {
             delegate: value.delegate.unwrap_or_else(|| value.pk.to_owned()),
             pk: value.pk,
             username: value.username,
-            voting_for: value.voting_for,
             permissions: value.permissions,
-            receipt_chain_hash: value.receipt_chain_hash,
             zkapp: None,
         }
     }
@@ -247,6 +243,93 @@ impl StakingLedger {
         "jxxZUYeVFQriATHvBCrxmtfwtboFtMbXALVkE4y546MPy597QDD",
     ];
 
+    const INDEXER_V1_STAKING_LEDGER_HASHES: [&str; 79] = [
+        "jxxxNeqaQyM1BVu294ZqzbwVECELDQVN498fV5rmCacu3iv24Dw",
+        "jxxGpLJLehTSBVC85PUqW6RV2qLsCqHrBMo1uBXZFTX1664t1if",
+        "jxx7WpgjQ7aR2ZTtVKyMYun2MuVufcwZ5qNL7USXSiMKbANnBpN",
+        "jxxQ3gVyBzfKQW5aKamgZx2QsbC5SsmEVda5nXLza5nM5u6MSHX",
+        "jxxHAKexUW1RQm4wPPYBKN2mMuDqJ4EHZgtNcTN285hsYhdpcts",
+        "jxxHesGYuqGXxCd5ybYgqu8JR8HwZDJzJRcGB8R8JyQga3dyrq1",
+        "jxxAWopWKgHxvPbAispzYg2SZfqX3Wi1xezsMNLzfEar5b9rtwj",
+        "jxx9i3okiZomk4TgdExqUEzywiSybN3xcwgt9MgdBD9rG96zxGB",
+        "jxxNv8R7WnkjMb7WgmnmKXLkRZP2uHweEG6aJRR9LJbUZpgQW2H",
+        "jxxMHMipCRokBn6oiARScPnqXVYHbcv29eEB1yqDtKGqBVDotGC",
+        "jxx6SnybX5mYHS1TfAfcCxFqoH5nQsSGi52P9d3ofprZoxpgFho",
+        "jxx66EeQsEdEHdFsawZtc4fryWKtgMjhCsWyYYQtNGL2o5K6T1o",
+        "jxx4oaonFBJ1F8rMbrhR399xMRDahta7SZBhQbP47pDj3DKjEBw",
+        "jxxBV4MR5dQSDZZ6WLsJXHWLCVjaNpDPCbhM991bkzgHQmzq7bw",
+        "jxxFjKdwT5DCRQs5owA5EaZu5UFfbSEBG2hzgGbcrA5X7K9vSn5",
+        "jxxCwba8iMz4C7ShpFFvSEmDbNyrxUfbUU7E6mv56XkQUffAoVC",
+        "jxxLs7TWbVKtAM99ZR2vwyZ5yJJSj3jzNNXMmBCzj2TaVohkshx",
+        "jxxSPcPT9cu2A2AX1VYciyQfp99K2eL2dz3Hhvq9QkwaZRDPFXQ",
+        "jxxMRZUiJpr5M9agyTCTLzh4J8MvmLAAWNTgnSHa6VXsShukXJq",
+        "jxx2dumHjqJdoQV7uTnNjMzYniZVvd4GcUPCLiGvuwPAhWsFV1x",
+        "jxxFSNV5H1P8WpaYYt868y8u7xi2ZXqkU6A9pXQeHj8ipVyi4ey",
+        "jxxGYXew6ZDPgvHPWrkUJrpZQ6S8nATEGUKHMR8M4JBcJ8ZmGyu",
+        "jxxRsPnaJqtPui4fMk2NJnzYbgiJug4uZ1qX3NLKgQPbWZ7iUHM",
+        "jxxDCbjvjjxghucZnp17HVucrKeBMFfrmq9WjUPQggCARk39Jvp",
+        "jxxNjnNUUQkBr9AsiCKCtvHWGWZbah6gPWiSHSm1TXQQwY4XgYH",
+        "jxx3xfYbKWg9W3jDUvuxvhw5tfG8HjaKrYzGtu1v2zakSY7qe6f",
+        "jxx8M5GuRrnY1ghYDSv4muzHsTLKkuv7tsJm9kyNuhXfDXvGt1Q",
+        "jxxQmp2Zim8yDknkAFdFzVX7y7VdicFSrXK4gaNZMte5onLiijG",
+        "jxxJGUC4DE4SRxUn2EoeyGPEVXpcMVdD3k7Pux7j7fTvee7eU7o",
+        "jxxN5GDvtc1dvVr68tTn1dWp54TZxvev7muEb8Kz5ouoZR3iowx",
+        "jxxDfh6SZMm7S9f9kiRwfPMfD5x8FfjvspkxAzKgiQQsWgBK18U",
+        "jxxDN1CqjfSebcznYsCtWpZRK7wB4dxgRoycZ2UyyJ6REzVR5Pd",
+        "jxx9hmqHhzCEW9uGkyzfaM7smdSnbPeradDVmX3pgV9EELoXEJ8",
+        "jxxBu4C2Un9WEeJAX6UE6WDu9ypsQRnGy3TfPm8rg9vJ8GDHJrB",
+        "jxxMKAvSDKV7vnQjFXZXzZZzeMnmwMa4vqz1BE1dDLZZ3mmMkBP",
+        "jxx8bAX63DruGqWxxfYWzk8TRLMZG1WVSJwLAWcsqucU6HdVBcF",
+        "jxxLBVVLCCfrMx26CeRkdNd8Vt17gTcbV9UMjNdZjhS6PUeDyKE",
+        "jxx4T7T88sAdPbTQtGfyJh4UUMvBGDUAJtTTBYHNta7zMqA7irm",
+        "jxx37TjAzXnL7cu9QFeypfB2FVjsq98waiiXfF1XjCEGQm2WayV",
+        "jxx9rBHctBMGNR6YhuKSwxpwd4NwFJtzismJ1zGfPw2yemzqPkz",
+        "jxx5vmgbzBM25fYKVWP4x51mCjtQyg8QCXknUu97UHgfLGixLKJ",
+        "jxxBpdeV8mEHEdJGiEbSHz6gbwSoHybQbRExE2tzBFLgxGtwDkR",
+        "jxxD4toHJ4dJ5sSDGG6bgEypiLivLZeBUVG27422TZzxSnCNXLw",
+        "jxxAcLu5UsAsZuSnMcRsxfoxN1QK4TCqmPb1qBBHmanfgNCbx28",
+        "jxxCqGk6YhQtHFc3wJ5MZvFhzC3M6THsepQfYg2GtEVukmFzC3y",
+        "jxxK4KwQdYvzT6UsoJZSsg2uXCpEyJQ6LoWfxkSV1cSU3CrgoUw",
+        "jxxC35iaXh5BnNXTuXHk2YaPY8ihTw4V57Bmm1AyrL2Xn8eV2uC",
+        "jxxFwQwopESHV1hNC7DUuvRn3pbtVQrUXncwVFUtjELChFpMb4r",
+        "jxxPoq58LaDBPoNaentftdNnt1vSwHdnrJdTHjpnuH1c8yarLWd",
+        "jxxLqvPA1nsRcmJiK3roAYVgv1Uqw6NxHXix5w3WWwKUXGqZUnk",
+        "jxxRB3MVk4me56uGj8UEjZF7jecgPpyS4AKG6jL3cpMFhMLf9zP",
+        "jxx5p7dNmPXSg187oXmoZtT6SMkB8YpW14MFeSLzcHTRU55QxAi",
+        "jxxxTf4VHGVfzXorv5nW5gAviWcAcWMyFit3ecjaiXNW8gz7ZjX",
+        "jxx4vSmSmZBbmKf8t4y2W6FVAgyqDntoxNnUjxhmeCPbKmv1DN9",
+        "jxxRCPVNFCUb82e3PS1pSm4cKjHT6uCv9YNw3vD3qRizrfQKHVZ",
+        "jxxL6EU6d24kaPchbnAxv36gv1NJeNfTpF35kUFYudrpCositBd",
+        "jxxKC6KBC9JTcyswHpji7au4RhyhKJ95ceeQomFBWRxv9fprnh7",
+        "jxx21wCmRCY55mxnzGmidEsoK6dNBWYKWiBjuNyieHHbi5JbLTE",
+        "jxx4KSpeTwmmnjXafgreo114pMpCBVdGAk5K1Hx2BAtQ1JGYuhh",
+        "jxxFjjLt2WSwQedQuToVPkMcxf4Y33Q768hLq1MRi1YWkpWRSUs",
+        "jxx14iduxSXFcPMRQ4sSCEhc5ASV87kMmCBHuHW9ZmcjPdwnLwC",
+        "jxxJNooZRsvFMaXBFSM17aPCYS5P8zeAensygfJYP9VYfT558HT",
+        "jxx9kVUe1N99nsmCdchuRkaPD1w2hcN7cQQgbmB7xbfJJ3rKUYm",
+        "jxxQZv3vSr75hH9gudU1AtM6xA3whcvh3xsjVYztrM5Mq3rrWiV",
+        "jxxJjN12Y7vJi1TGcS3pTz6477oKnB5ACNctzCwu2d77TyeG2VZ",
+        "jxx53H18NpBmP4G8uGAv6FkUgNSCW9yRABjEv8jsCNPWLfftYnK",
+        "jxxFqPbob1tp5QmwP3MbGiqW2pUHHk25MGvJWZyDLEHHi1K3YwU",
+        "jxxGLm8MBMdP4PGJuq5RCHvAeKdyFLczBkF7PMxjPbPV1v6Zvnf",
+        "jxx5x75myfgPYPZXGVDD1Pw8hwsu6DKg7v69N4KXesGpSTFGBoU",
+        "jxx5XBRtEn4A1N6WhiafTwfAzH7GWwGvUKAugzQU7mg3ukrTRy4",
+        "jxxBkt36aYKZvkRvYn76phEqw8LoQiXwz1UQSr3sMDApLX2Fxy5",
+        "jxxxvZ9q3rWKyFnfXnXJUEpBv6U6tc73phXzTQGLdPs6swxK1xM",
+        "jxxHHq3eeajp1wuXkoD2e3grENQYjooX2TtPyVGGEH9mL1iGJee",
+        "jxx2HfRi951mx8NTRhtbcoDfQ8e1y5csPXopkGYoTdFnf3LHaTY",
+        "jxxDTpovThtHdG4D7xtKJKxCRv1542EQrdwdiZzr5iM5U7TMeEJ",
+        "jxxLh458agXGjdRsyCXJ98EHRf5uzQtZHTDsVyJvLuz8duy3Whs",
+        "jxxD7YC6742ghb51voaDD1824TR2UFSgRzhsS2nTMPcxAfaiTBJ",
+        "jxxC4X9JzGmrq5EF5XRxtjAjALYeRihFVr3KoVMSRJzCBf4X754",
+        "jxx7BhN4hvDHidvYqpT9px3L67CkiXGqjjoupLQ5ChsfyhJfppc",
+    ];
+
+    pub fn is_v1_staking_ledger(ledger_hash: &LedgerHash) -> bool {
+        Self::V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str))
+            || Self::INDEXER_V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str))
+    }
+
     pub fn is_valid<P>(path: P) -> bool
     where
         P: AsRef<Path>,
@@ -289,10 +372,10 @@ impl StakingLedger {
         trace!("Parsing staking ledger {:?}", file_name);
 
         let (network, epoch, ledger_hash) = Self::split_ledger_path(path);
-        let is_pre_hardfork = Self::V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str));
+        let is_pre_hardfork = Self::is_v1_staking_ledger(&ledger_hash);
 
         let staking_ledger: Vec<StakingAccountJson> = serde_json::from_slice(&bytes)
-            .with_context(|| format!("Failed reading staking ledger {}", path.display()))?;
+            .with_context(|| format!("Failed reading staking ledger {:#?}", path))?;
 
         let staking_ledger: HashMap<PublicKey, StakingAccount> = staking_ledger
             .into_iter()
@@ -319,7 +402,7 @@ impl StakingLedger {
     }
 
     pub fn genesis_state_hash(ledger_hash: &LedgerHash) -> StateHash {
-        if Self::V1_STAKING_LEDGER_HASHES.contains(&(&ledger_hash.0 as &str)) {
+        if Self::is_v1_staking_ledger(ledger_hash) {
             MAINNET_GENESIS_HASH.into()
         } else {
             HARDFORK_GENESIS_HASH.into()
@@ -495,5 +578,36 @@ mod tests {
         assert_eq!(pk_delegations.delegates, expected_delegates);
 
         Ok(())
+    }
+
+    #[ignore = "only used to generate indexer staking ledger hashes"]
+    #[test]
+    fn generate_staking_ledger_hashes() -> anyhow::Result<()> {
+        let pre_hardfork_hashes =
+            glob::glob("../../staking_ledgers/pre-hardfork/mainnet-*-*.json")?
+                .flatten()
+                .map(|path| {
+                    let staking_ledger = StakingLedger::parse_file(&path).unwrap();
+                    let staking_ledger: super::indexer::StakingLedger = staking_ledger.into();
+
+                    staking_ledger.ledger_hash().unwrap().0
+                })
+                .collect::<Vec<String>>();
+
+        let post_hardfork_hashes =
+            glob::glob("../../staking_ledgers/post-hardfork/mainnet-*-*.json")?
+                .flatten()
+                .map(|path| {
+                    let staking_ledger = StakingLedger::parse_file(&path).unwrap();
+                    let staking_ledger: super::indexer::StakingLedger = staking_ledger.into();
+
+                    staking_ledger.ledger_hash().unwrap().0
+                })
+                .collect::<Vec<String>>();
+
+        panic!(
+            "pre-hardfork {:#?}\n\npost-hardfork {:#?}",
+            pre_hardfork_hashes, post_hardfork_hashes
+        )
     }
 }
