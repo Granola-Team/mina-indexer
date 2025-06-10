@@ -1,6 +1,5 @@
 //! Staking ledger representation
 
-pub mod indexer;
 pub mod parser;
 pub mod permissions;
 
