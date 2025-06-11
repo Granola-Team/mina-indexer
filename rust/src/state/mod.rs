@@ -20,7 +20,7 @@ use crate::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
         staking::{parser::StakingLedgerParser, StakingLedger},
-        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
+        store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
         Ledger, LedgerHash,
     },
@@ -539,12 +539,20 @@ impl IndexerState {
 
                     // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
+                        if !ledger_diffs.is_empty() {
+                            for (diff, accounts_accessed) in ledger_diffs.iter() {
+                                self.ledger._apply_diff_check(diff, accounts_accessed)?;
+                            }
+
+                            ledger_diffs.clear();
+                        }
+
                         self.root_branch = Branch::new(&block)?;
                         self.ledger
                             ._apply_diff_check(&diff, &block.accounts_accessed())?;
 
                         self.best_tip = Tip {
-                            state_hash: self.root_branch.root_block().state_hash.clone(),
+                            state_hash,
                             node_id: self.root_branch.root.clone(),
                         };
                         self.canonical_root = self.best_tip.clone();
@@ -635,6 +643,26 @@ impl IndexerState {
             }
         }
 
+        let best_ledger = self.best_ledger();
+        debug!(
+            "Witness tree MINA zkapp accounts = {}",
+            best_ledger.zkapp_mina_account_len()
+        );
+        debug!(
+            "Witness tree zkapp accounts = {}",
+            best_ledger.zkapp_account_len()
+        );
+
+        let store = self.indexer_store.as_ref().unwrap();
+        debug!(
+            "Indexer store MINA zkapp accounts = {}",
+            store.get_num_mina_zkapp_accounts()?.unwrap_or_default()
+        );
+        debug!(
+            "Indexer store zkapp accounts = {}",
+            store.get_num_zkapp_accounts()?.unwrap_or_default()
+        );
+
         Ok(())
     }
 
@@ -715,7 +743,6 @@ impl IndexerState {
 
         if increment_blocks {
             self.blocks_processed += 1;
-            self.handle_epoch_block(block);
         }
 
         // forward extension on root branch
