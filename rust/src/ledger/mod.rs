@@ -64,6 +64,25 @@ impl Ledger {
         })
     }
 
+    pub fn zkapp_account_len(&self) -> usize {
+        self.tokens.iter().fold(0, |acc, (_, token_ledger)| {
+            acc + token_ledger
+                .accounts
+                .values()
+                .filter(|acct| acct.is_zkapp_account())
+                .count()
+        })
+    }
+
+    pub fn zkapp_mina_account_len(&self) -> usize {
+        self.get_token_ledger(&TokenAddress::default())
+            .unwrap()
+            .accounts
+            .values()
+            .filter(|acct| acct.is_zkapp_account())
+            .count()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.tokens.is_empty()
     }
