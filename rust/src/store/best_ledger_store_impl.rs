@@ -406,7 +406,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
-                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                    (old + adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
@@ -414,7 +414,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ACCOUNTS_KEY,
-                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                    (old - adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
         }
@@ -469,7 +469,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_mina_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_MINA_ACCOUNTS_KEY,
-                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                    (old + adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
@@ -477,7 +477,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_mina_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_MINA_ACCOUNTS_KEY,
-                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                    (old - adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
         }
@@ -532,7 +532,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY,
-                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                    (old + adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
@@ -540,7 +540,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_mina_zkapp_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_MINA_ZKAPP_ACCOUNTS_KEY,
-                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                    (old - adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
         }
@@ -595,7 +595,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
-                    old.saturating_add(adjust.unsigned_abs()).to_be_bytes(),
+                    (old + adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
             Less => {
@@ -603,7 +603,7 @@ impl BestLedgerStore for IndexerStore {
                 let old = self.get_num_zkapp_accounts()?.unwrap_or_default();
                 self.database.put(
                     Self::TOTAL_NUM_ZKAPP_ACCOUNTS_KEY,
-                    old.saturating_sub(adjust.unsigned_abs()).to_be_bytes(),
+                    (old - adjust.unsigned_abs()).to_be_bytes(),
                 )?;
             }
         }
