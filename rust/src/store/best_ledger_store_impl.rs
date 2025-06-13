@@ -138,11 +138,13 @@ impl BestLedgerStore for IndexerStore {
         )?;
 
         // zkapp account
-        if is_new_account && after.is_zkapp_account() {
-            self.increment_num_zkapp_accounts()?;
+        if after.is_zkapp_account() {
+            if before.map(|(zk, _)| !zk).unwrap_or(is_new_account) {
+                self.increment_num_zkapp_accounts()?;
 
-            if token.0 == MINA_TOKEN_ADDRESS {
-                self.increment_num_mina_zkapp_accounts()?;
+                if token.0 == MINA_TOKEN_ADDRESS {
+                    self.increment_num_mina_zkapp_accounts()?;
+                }
             }
 
             // store new zkapp account
