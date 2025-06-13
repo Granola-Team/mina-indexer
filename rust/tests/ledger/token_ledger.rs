@@ -8,6 +8,7 @@ use mina_indexer::{
         token::TokenAddress,
     },
     mina_blocks::v2::{zkapp::app_state::ZkappState, VerificationKey, ZkappAccount},
+    store::column_families::ColumnFamilyHelpers,
 };
 use std::{path::PathBuf, str::FromStr};
 
@@ -22,7 +23,9 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     let mut bp = BlockParser::new_testing(blocks_dir)?;
 
     // ingest the blocks
-    state.add_blocks(&mut bp).await?;
+    state
+        .initialize_with_canonical_chain_discovery(&mut bp)
+        .await?;
 
     let indexer_store = state.indexer_store.as_ref().unwrap();
     let best_ledger = state.best_ledger();
@@ -52,58 +55,38 @@ async fn check_token_accounts() -> anyhow::Result<()> {
     );
 
     // check zkapp accounts
-    let num_best_zkapps = {
-        let mut num = 0;
+    let num_best_zkapps = best_ledger.zkapp_account_len();
 
-        for token_ledger in best_ledger.tokens.values() {
-            for account in token_ledger.accounts.values() {
-                if account.is_zkapp_account() {
-                    num += 1;
-                }
-            }
-        }
-
-        num
-    };
-
+    assert_eq!(num_best_zkapps, 2);
     assert_eq!(
         num_best_zkapps,
         indexer_store
             .zkapp_best_ledger_account_balance_iterator(speedb::IteratorMode::End)
             .count(),
     );
-
+    assert_eq!(
+        num_best_zkapps,
+        indexer_store
+            .database
+            .iterator_cf(
+                indexer_store.zkapp_best_ledger_accounts_cf(),
+                speedb::IteratorMode::End
+            )
+            .count(),
+    );
     assert_eq!(
         num_best_zkapps,
         indexer_store.get_num_zkapp_accounts()?.unwrap() as usize
     );
 
-    assert_eq!(num_best_zkapps, 2);
-
     // check MINA zkapp accounts
-    let num_best_mina_zkapps = {
-        let mut num = 0;
+    let num_best_mina_zkapps = best_ledger.zkapp_mina_account_len();
 
-        for account in best_ledger
-            .get_token_ledger(&mina_token)
-            .unwrap()
-            .accounts
-            .values()
-        {
-            if account.is_zkapp_account() {
-                num += 1;
-            }
-        }
-
-        num
-    };
-
+    assert_eq!(num_best_mina_zkapps, 2);
     assert_eq!(
         num_best_mina_zkapps,
         indexer_store.get_num_mina_zkapp_accounts()?.unwrap() as usize
     );
-
-    assert_eq!(num_best_mina_zkapps, 2);
 
     // check MINA token ledger
     assert_eq!(
