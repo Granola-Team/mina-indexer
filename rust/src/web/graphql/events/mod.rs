@@ -1,7 +1,17 @@
 //! GraphQL `getEvents` endpoint
 
-use super::{date_time::DateTime, db};
+use super::{block::BlockInfo, db, txn::TxnInfo};
+use crate::{
+    base::public_key::PublicKey,
+    block::store::BlockStore,
+    canonicity::store::CanonicityStore,
+    command::store::UserCommandStore,
+    ledger::token::TokenAddress,
+    mina_blocks::v2::zkapp::event::ZkappEventWithMeta,
+    store::{zkapp::events::ZkappEventStore, IndexerStore},
+};
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
+use speedb::Direction;
 
 #[derive(InputObject, Debug)]
 pub struct EventsQueryInput {
@@ -25,35 +35,17 @@ pub enum EventsSortByInput {
     BlockHeightAsc,
 }
 
+/// Value event
 #[derive(SimpleObject, Debug)]
 pub struct Event {
-    pub block_info: BlockInfo,
-    pub event_data: EventData,
-    pub transaction_info: TxnInfo,
-}
+    /// Value event data
+    pub event: String,
 
-#[derive(SimpleObject, Debug)]
-pub struct BlockInfo {
-    pub state_hash: String,
-    pub timestamp: DateTime,
-    pub ledger_hash: String,
-    pub height: u32,
-    pub parent_hash: String,
-    pub chain_status: String,
-    pub distance_from_max_block_height: u32,
-    pub global_slot_since_genesis: u32,
-}
+    /// Value event txn
+    pub txn: TxnInfo,
 
-#[derive(SimpleObject, Debug)]
-pub struct EventData {
-    pub data: String,
-}
-
-#[derive(SimpleObject, Debug)]
-pub struct TxnInfo {
-    pub status: String,
-    pub hash: String,
-    pub memo: String,
+    /// Value event block
+    pub block: BlockInfo,
 }
 
 #[derive(Default)]
@@ -66,18 +58,103 @@ impl EventsQueryRoot {
     async fn get_actions(
         &self,
         ctx: &Context<'_>,
-        query: Option<EventsQueryInput>,
+        query: EventsQueryInput,
         sort_by: Option<EventsSortByInput>,
         #[graphql(default = 100)] limit: usize,
     ) -> Result<Option<Vec<Event>>> {
         let db = db(ctx);
 
-        todo!(
-            "getEvents:\n  db:      {:?}\n  query:   {:?}\n  sort_by: {:?}\n  limit:   {:?}",
-            db,
-            query,
-            sort_by,
-            limit
-        )
+        let public_key = match PublicKey::new(&query.public_key) {
+            Ok(public_key) => public_key,
+            Err(_) => {
+                return Err(async_graphql::Error::new(format!(
+                    "Invalid public key: {}",
+                    &query.public_key
+                )))
+            }
+        };
+        let token = match query.token.as_ref() {
+            Some(token) => match TokenAddress::new(token) {
+                Some(token) => token,
+                None => {
+                    return Err(async_graphql::Error::new(format!(
+                        "Invalid token: {}",
+                        token
+                    )))
+                }
+            },
+            None => TokenAddress::default(),
+        };
+
+        let direction = match sort_by.unwrap_or_default() {
+            EventsSortByInput::BlockHeightAsc => Direction::Forward,
+            EventsSortByInput::BlockHeightDesc => Direction::Reverse,
+        };
+        let mut actions = Vec::with_capacity(limit);
+
+        for (_, value) in db.events_iterator(&public_key, &token, direction).flatten() {
+            let action: ZkappEventWithMeta = serde_json::from_slice(&value)?;
+            if query.matches(&action) {
+                actions.push(Event::new(db, action)?);
+            }
+        }
+
+        Ok(Some(actions))
+    }
+}
+
+impl Event {
+    fn new(db: &IndexerStore, event: ZkappEventWithMeta) -> async_graphql::Result<Self> {
+        let canonicity = db
+            .get_block_canonicity(&event.state_hash)?
+            .unwrap()
+            .to_string();
+        let global_slot = db.get_block_global_slot(&event.state_hash)?.unwrap();
+
+        let cmd = db
+            .get_user_command_state_hash(&event.txn_hash, &event.state_hash)?
+            .unwrap();
+        let memo = cmd.command.memo();
+        let status = format!("{:?}", cmd.status);
+
+        Ok(Self {
+            event: event.event.0,
+            txn: TxnInfo {
+                memo,
+                status,
+                txn_hash: event.txn_hash.to_string(),
+            },
+            block: BlockInfo {
+                canonicity,
+                global_slot,
+                state_hash: event.state_hash.0,
+                height: event.block_height,
+            },
+        })
+    }
+}
+
+impl EventsQueryInput {
+    fn matches(&self, event: &ZkappEventWithMeta) -> bool {
+        let Self {
+            public_key: _,
+            token: _,
+            start_block_height,
+            end_block_height,
+        } = self;
+
+        if let Some(start_block_height) = start_block_height {
+            if event.block_height < *start_block_height {
+                return false;
+            }
+        }
+
+        if let Some(end_block_height) = end_block_height {
+            if event.block_height >= *end_block_height {
+                return false;
+            }
+        }
+
+        true
     }
 }
