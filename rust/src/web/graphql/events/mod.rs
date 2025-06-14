@@ -9,6 +9,7 @@ use crate::{
     ledger::token::TokenAddress,
     mina_blocks::v2::zkapp::event::ZkappEventWithMeta,
     store::{zkapp::events::ZkappEventStore, IndexerStore},
+    utility::store::zkapp::events::zkapp_event_index,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
@@ -26,6 +27,12 @@ pub struct EventsQueryInput {
 
     /// Input end block height
     pub end_block_height: Option<u32>,
+
+    /// Input start event index
+    pub start_event_index: Option<u32>,
+
+    /// Input end event index
+    pub end_event_index: Option<u32>,
 }
 
 #[derive(Default, Enum, Copy, Clone, Debug, Eq, PartialEq)]
@@ -91,13 +98,15 @@ impl EventsQueryRoot {
         };
 
         let mut events = Vec::with_capacity(limit);
-        for (_, value) in db.events_iterator(&public_key, &token, direction).flatten() {
+        for (key, value) in db.events_iterator(&public_key, &token, direction).flatten() {
             if events.len() >= limit {
                 break;
             }
 
+            let index = zkapp_event_index(&key);
             let event: ZkappEventWithMeta = serde_json::from_slice(&value)?;
-            if query.matches(&event) {
+
+            if query.matches(&event, index) {
                 events.push(Event::new(db, event)?);
             }
         }
@@ -138,14 +147,17 @@ impl Event {
 }
 
 impl EventsQueryInput {
-    fn matches(&self, event: &ZkappEventWithMeta) -> bool {
+    fn matches(&self, event: &ZkappEventWithMeta, index: u32) -> bool {
         let Self {
             public_key: _,
             token: _,
             start_block_height,
             end_block_height,
+            start_event_index,
+            end_event_index,
         } = self;
 
+        // block height
         if let Some(start_block_height) = start_block_height {
             if event.block_height < *start_block_height {
                 return false;
@@ -154,6 +166,19 @@ impl EventsQueryInput {
 
         if let Some(end_block_height) = end_block_height {
             if event.block_height >= *end_block_height {
+                return false;
+            }
+        }
+
+        // index
+        if let Some(start_event_index) = start_event_index {
+            if index < *start_event_index {
+                return false;
+            }
+        }
+
+        if let Some(end_event_index) = end_event_index {
+            if index >= *end_event_index {
                 return false;
             }
         }

@@ -21,6 +21,13 @@ pub fn zkapp_actions_pk_num_key(
     token_pk_key(token, pk)
 }
 
+pub fn zkapp_action_index(key: &[u8]) -> u32 {
+    let mut bytes = [0; U32_LEN];
+    bytes.copy_from_slice(&key[TokenAddress::LEN..][PublicKey::LEN..]);
+
+    u32::from_be_bytes(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

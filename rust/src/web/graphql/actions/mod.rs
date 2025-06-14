@@ -9,6 +9,7 @@ use crate::{
     ledger::token::TokenAddress,
     mina_blocks::v2::zkapp::action_state::ActionStateWithMeta,
     store::{zkapp::actions::ZkappActionStore, IndexerStore},
+    utility::store::zkapp::actions::zkapp_action_index,
 };
 use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 use speedb::Direction;
@@ -26,6 +27,12 @@ pub struct ActionsQueryInput {
 
     /// Input end block height
     pub end_block_height: Option<u32>,
+
+    /// Input start action index
+    pub start_action_index: Option<u32>,
+
+    /// Input end action index
+    pub end_action_index: Option<u32>,
 }
 
 #[derive(Default, Enum, Copy, Clone, Debug, Eq, PartialEq)]
@@ -90,7 +97,7 @@ impl ActionsQueryRoot {
         };
 
         let mut actions = Vec::with_capacity(limit);
-        for (_, value) in db
+        for (key, value) in db
             .actions_iterator(&public_key, &token, direction)
             .flatten()
         {
@@ -98,8 +105,10 @@ impl ActionsQueryRoot {
                 break;
             }
 
+            let index = zkapp_action_index(&key);
             let action: ActionStateWithMeta = serde_json::from_slice(&value)?;
-            if query.matches(&action) {
+
+            if query.matches(&action, index) {
                 actions.push(Action::new(db, action)?);
             }
         }
@@ -140,14 +149,17 @@ impl Action {
 }
 
 impl ActionsQueryInput {
-    fn matches(&self, action: &ActionStateWithMeta) -> bool {
+    fn matches(&self, action: &ActionStateWithMeta, index: u32) -> bool {
         let Self {
             public_key: _,
             token: _,
             start_block_height,
             end_block_height,
+            start_action_index,
+            end_action_index,
         } = self;
 
+        // block height
         if let Some(start_block_height) = start_block_height {
             if action.block_height < *start_block_height {
                 return false;
@@ -156,6 +168,19 @@ impl ActionsQueryInput {
 
         if let Some(end_block_height) = end_block_height {
             if action.block_height >= *end_block_height {
+                return false;
+            }
+        }
+
+        // index
+        if let Some(start_action_index) = start_action_index {
+            if index < *start_action_index {
+                return false;
+            }
+        }
+
+        if let Some(end_action_index) = end_action_index {
+            if index >= *end_action_index {
                 return false;
             }
         }
