@@ -20,7 +20,7 @@ use crate::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
         staking::{parser::StakingLedgerParser, StakingLedger},
-        store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
+        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
         Ledger, LedgerHash,
     },
@@ -548,9 +548,6 @@ impl IndexerState {
                         }
 
                         self.root_branch = Branch::new(&block)?;
-                        self.ledger
-                            ._apply_diff_check(&diff, &block.accounts_accessed())?;
-
                         self.best_tip = Tip {
                             state_hash,
                             node_id: self.root_branch.root.clone(),
@@ -642,27 +639,6 @@ impl IndexerState {
                 }
             }
         }
-
-        let best_ledger = self.best_ledger();
-        debug!(
-            "Witness tree MINA zkapp accounts = {}",
-            best_ledger.zkapp_mina_account_len()
-        );
-        debug!(
-            "Witness tree zkapp accounts = {}",
-            best_ledger.zkapp_account_len()
-        );
-
-        let store = self.indexer_store.as_ref().unwrap();
-        debug!(
-            "Indexer store MINA zkapp accounts = {}",
-            store.get_num_mina_zkapp_accounts()?.unwrap_or_default()
-        );
-        debug!(
-            "Indexer store zkapp accounts = {}",
-            store.get_num_zkapp_accounts()?.unwrap_or_default()
-        );
-
         Ok(())
     }
 
