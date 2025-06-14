@@ -1,8 +1,19 @@
+//! Zkapp action representation
+
+use crate::{base::state_hash::StateHash, command::TxnHash};
 use serde::{Deserialize, Serialize};
 
 /// 32 bytes
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ActionState(pub String);
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ActionStateWithMeta {
+    pub action: ActionState,
+    pub txn_hash: TxnHash,
+    pub state_hash: StateHash,
+    pub block_height: u32,
+}
 
 /////////////////
 // conversions //

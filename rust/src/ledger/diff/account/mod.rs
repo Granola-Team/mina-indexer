@@ -5,7 +5,7 @@ pub mod zkapp;
 use crate::{
     base::nonce::Nonce,
     block::precomputed::PrecomputedBlock,
-    command::{Command, CommandWithStateHash, UserCommandWithStatus, UserCommandWithStatusT},
+    command::{Command, CommandWithMeta, TxnHash, UserCommandWithStatus, UserCommandWithStatusT},
     constants::MINA_TOKEN_ADDRESS,
     ledger::{
         coinbase::Coinbase,
@@ -100,7 +100,8 @@ pub struct PaymentDiff {
     pub amount: Amount,
     pub update_type: UpdateType,
     pub public_key: PublicKey,
-    pub token: TokenAddress,
+    pub token: Option<TokenAddress>,
+    pub txn_hash: Option<TxnHash>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -108,6 +109,7 @@ pub struct DelegationDiff {
     pub nonce: Nonce,
     pub delegator: PublicKey,
     pub delegate: PublicKey,
+    pub txn_hash: TxnHash,
 }
 
 // internal command diffs
@@ -122,6 +124,7 @@ pub struct CoinbaseDiff {
 pub struct FailedTransactionNonceDiff {
     pub public_key: PublicKey,
     pub nonce: Nonce,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
@@ -172,7 +175,7 @@ impl TokenAccount for AccountDiff {
             | Self::FeeTransfer(_)
             | Self::FailedTransactionNonce(_)
             | Self::ZkappFeePayerNonce(_) => TokenAddress::default(),
-            Self::Payment(diff) => diff.token.clone(),
+            Self::Payment(diff) => diff.token.clone().unwrap_or_default(),
             Self::Zkapp(diff) => diff.token.clone(),
             Self::ZkappPayment(diff) => diff.token(),
             Self::ZkappState(diff) => diff.token.clone(),
@@ -191,8 +194,9 @@ impl TokenAccount for AccountDiff {
 }
 
 impl AccountDiff {
-    pub fn from_command(command: CommandWithStateHash, global_slot: u32) -> Vec<Vec<Self>> {
-        let CommandWithStateHash { command, .. } = command;
+    pub fn from_command(command_with_meta: CommandWithMeta, global_slot: u32) -> Vec<Vec<Self>> {
+        let txn_hash = command_with_meta.txn_hash.to_owned();
+        let CommandWithMeta { command, .. } = command_with_meta;
         let creation_fee_paid = command.creation_fee_paid().unwrap_or_default();
 
         match command {
@@ -202,13 +206,15 @@ impl AccountDiff {
                         public_key: payment.receiver,
                         amount: payment.amount,
                         update_type: UpdateType::Credit,
-                        token: TokenAddress::default(), // always MINA
+                        txn_hash: Some(txn_hash.to_owned()),
+                        token: None, // always MINA
                     }),
                     Self::Payment(PaymentDiff {
                         public_key: payment.source,
                         amount: payment.amount,
                         update_type: UpdateType::Debit(Some(payment.nonce + 1)),
-                        token: TokenAddress::default(), // always MINA
+                        txn_hash: Some(txn_hash.to_owned()),
+                        token: None, // always MINA
                     }),
                 ]]
             }
@@ -217,10 +223,11 @@ impl AccountDiff {
                     delegator: delegation.delegator,
                     delegate: delegation.delegate,
                     nonce: delegation.nonce + 1,
+                    txn_hash,
                 })]]
             }
             Command::Zkapp(zkapp) => {
-                AccountDiff::from_zkapp(&zkapp, global_slot, creation_fee_paid)
+                AccountDiff::from_zkapp(&zkapp, global_slot, creation_fee_paid, txn_hash)
             }
         }
     }
@@ -312,13 +319,15 @@ impl AccountDiff {
                             public_key: coinbase_receiver.clone(),
                             amount: (*fee).into(),
                             update_type: UpdateType::Credit,
-                            token: TokenAddress::default(), // always MINA
+                            txn_hash: None,
+                            token: None, // always MINA
                         }),
                         Self::FeeTransfer(PaymentDiff {
                             public_key: pk.clone(),
                             amount: (*fee).into(),
                             update_type: UpdateType::Debit(None),
-                            token: TokenAddress::default(), // always MINA
+                            txn_hash: None,
+                            token: None, // always MINA
                         }),
                     ]);
                 }
@@ -367,13 +376,15 @@ impl AccountDiff {
                             public_key: prover.clone(),
                             amount: *total_fee,
                             update_type: UpdateType::Credit,
-                            token: TokenAddress::default(), // always MINA
+                            txn_hash: None,
+                            token: None, // always MINA
                         }),
                         AccountDiff::FeeTransfer(PaymentDiff {
                             public_key: precomputed_block.coinbase_receiver(),
                             amount: *total_fee,
                             update_type: UpdateType::Debit(None),
-                            token: TokenAddress::default(), // always MINA
+                            txn_hash: None,
+                            token: None, // always MINA
                         }),
                     ]);
                 }
@@ -451,11 +462,42 @@ impl AccountDiff {
         }
     }
 
+    pub fn txn_hash(&self) -> Option<TxnHash> {
+        match self {
+            Self::Payment(diff) | Self::FeeTransfer(diff) | Self::FeeTransferViaCoinbase(diff) => {
+                diff.txn_hash.clone()
+            }
+            Self::Delegation(diff) => Some(diff.txn_hash.clone()),
+            Self::Coinbase(_) => None,
+            Self::FailedTransactionNonce(diff) => Some(diff.txn_hash.clone()),
+            Self::Zkapp(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappPayment(ZkappPaymentDiff::Payment { payment: diff, .. }) => {
+                diff.txn_hash.clone()
+            }
+            Self::ZkappPayment(ZkappPaymentDiff::IncrementNonce(diff)) => {
+                Some(diff.txn_hash.clone())
+            }
+            Self::ZkappState(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappPermissions(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappVerificationKey(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappProvedState(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappUri(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappTokenSymbol(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappTiming(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappVotingFor(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappActions(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappEvents(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappIncrementNonce(diff) => Some(diff.txn_hash.clone()),
+            Self::ZkappFeePayerNonce(diff) => Some(diff.txn_hash.clone()),
+        }
+    }
+
     pub fn from(
         sender: &str,
         receiver: &str,
         diff_type: AccountDiffType,
         amount: u64,
+        txn_hash: Option<TxnHash>,
     ) -> Vec<Vec<Self>> {
         match diff_type {
             AccountDiffType::Payment(nonce) => vec![vec![
@@ -463,18 +505,21 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
-                    token: TokenAddress::default(),
+                    txn_hash: txn_hash.clone(),
+                    token: None,
                 }),
                 Self::Payment(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(Some(nonce)),
-                    token: TokenAddress::default(),
+                    txn_hash,
+                    token: None,
                 }),
             ]],
             AccountDiffType::Delegation(nonce) => vec![vec![Self::Delegation(DelegationDiff {
-                delegate: sender.into(),
-                delegator: receiver.into(),
+                delegator: sender.into(),
+                delegate: receiver.into(),
+                txn_hash: txn_hash.unwrap_or_default(),
                 nonce,
             })]],
             AccountDiffType::Coinbase => vec![vec![Self::Coinbase(CoinbaseDiff {
@@ -486,13 +531,15 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
-                    token: TokenAddress::default(),
+                    txn_hash: txn_hash.clone(),
+                    token: None,
                 }),
                 Self::FeeTransfer(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(None),
-                    token: TokenAddress::default(),
+                    txn_hash: txn_hash.clone(),
+                    token: None,
                 }),
             ]],
             AccountDiffType::FeeTransferViaCoinbase => vec![vec![
@@ -500,13 +547,15 @@ impl AccountDiff {
                     public_key: receiver.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Credit,
-                    token: TokenAddress::default(),
+                    txn_hash: txn_hash.clone(),
+                    token: None,
                 }),
                 Self::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: sender.into(),
                     amount: amount.into(),
                     update_type: UpdateType::Debit(None),
-                    token: TokenAddress::default(),
+                    txn_hash: txn_hash.clone(),
+                    token: None,
                 }),
             ]],
             AccountDiffType::Zkapp { token, nonce } => {
@@ -521,7 +570,8 @@ impl AccountDiff {
                                 update_type: UpdateType::Credit,
                                 public_key: receiver.into(),
                                 amount: amount.into(),
-                                token: token.to_owned(),
+                                txn_hash: txn_hash.clone(),
+                                token: Some(token.to_owned()),
                             },
                         },
                         ZkappPaymentDiff::Payment {
@@ -530,7 +580,8 @@ impl AccountDiff {
                                 update_type: UpdateType::Debit(None),
                                 public_key: sender.into(),
                                 amount: amount.into(),
-                                token,
+                                txn_hash,
+                                token: Some(token),
                             },
                         },
                     ],
@@ -574,7 +625,8 @@ impl PaymentDiff {
                 update_type: UpdateType::Credit,
                 public_key: cb_diff.public_key,
                 amount: cb_diff.amount,
-                token: TokenAddress::default(), // always MINA
+                txn_hash: None,
+                token: None, // always MINA
             }],
             AccountDiff::Delegation(_)
             | AccountDiff::FailedTransactionNonce(_)
@@ -628,6 +680,7 @@ impl AccountDiff {
         zkapp: &ZkappCommandData,
         global_slot: u32,
         creation_fee_paid: bool,
+        txn_hash: TxnHash,
     ) -> Vec<Vec<Self>> {
         let nonce = zkapp.fee_payer.body.nonce;
 
@@ -635,6 +688,7 @@ impl AccountDiff {
         let mut diffs = vec![AccountDiff::ZkappFeePayerNonce(ZkappFeePayerNonceDiff {
             public_key: zkapp.fee_payer.body.public_key.to_owned(),
             nonce: nonce + 1,
+            txn_hash: txn_hash.to_owned(),
         })];
 
         for update in zkapp.account_updates.iter() {
@@ -642,6 +696,7 @@ impl AccountDiff {
                 &update.elt,
                 global_slot,
                 creation_fee_paid,
+                txn_hash.to_owned(),
             ));
 
             recurse_calls(
@@ -649,13 +704,19 @@ impl AccountDiff {
                 update.elt.calls.iter(),
                 global_slot,
                 creation_fee_paid,
+                txn_hash.to_owned(),
             );
         }
 
         vec![diffs]
     }
 
-    fn from_zkapp_account_update(elt: &Elt, global_slot: u32, creation_fee_paid: bool) -> Self {
+    fn from_zkapp_account_update(
+        elt: &Elt,
+        global_slot: u32,
+        creation_fee_paid: bool,
+        txn_hash: TxnHash,
+    ) -> Self {
         let public_key = elt.account_update.body.public_key.to_owned();
 
         let mut payment_diffs = vec![];
@@ -669,10 +730,11 @@ impl AccountDiff {
             payment_diffs.push(ZkappPaymentDiff::Payment {
                 creation_fee_paid,
                 payment: PaymentDiff {
+                    amount,
                     public_key: public_key.to_owned(),
                     update_type: UpdateType::Debit(None),
-                    token: token.to_owned(),
-                    amount,
+                    token: Some(token.to_owned()),
+                    txn_hash: Some(txn_hash.to_owned()),
                 },
             });
         }
@@ -684,15 +746,17 @@ impl AccountDiff {
                 public_key: public_key.to_owned(),
                 token: token.to_owned(),
                 creation_fee_paid,
+                txn_hash: txn_hash.to_owned(),
             }));
         };
 
         payment_diffs.push(ZkappPaymentDiff::Payment {
             creation_fee_paid,
             payment: PaymentDiff {
-                public_key: public_key.to_owned(),
-                token: token.to_owned(),
                 amount,
+                public_key: public_key.to_owned(),
+                token: Some(token.to_owned()),
+                txn_hash: Some(txn_hash.to_owned()),
                 update_type: elt
                     .account_update
                     .body
@@ -793,6 +857,7 @@ impl AccountDiff {
             app_state_diff,
             global_slot,
             creation_fee_paid,
+            txn_hash,
             nonce: None,
         }))
     }
@@ -806,8 +871,8 @@ impl std::fmt::Debug for PaymentDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} | {:?} | {}",
-            self.public_key, self.update_type, self.amount.0
+            "{} | {:?} | {} | {:?} | {:?}",
+            self.public_key, self.update_type, self.amount.0, self.txn_hash, self.token
         )
     }
 }
@@ -816,8 +881,8 @@ impl std::fmt::Debug for DelegationDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} -({})-> {}",
-            self.delegate, self.nonce, self.delegator
+            "{} -({})-> {} | {}",
+            self.delegate, self.nonce, self.delegator, self.txn_hash
         )
     }
 }
@@ -830,7 +895,11 @@ impl std::fmt::Debug for CoinbaseDiff {
 
 impl std::fmt::Debug for FailedTransactionNonceDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} | {}", self.public_key, self.nonce)
+        write!(
+            f,
+            "{} | {} | {}",
+            self.public_key, self.nonce, self.txn_hash
+        )
     }
 }
 
@@ -900,10 +969,14 @@ impl std::fmt::Debug for AccountDiff {
                     f,
                     "{:<27}{payment:?}{}",
                     "ZkappPayment:",
-                    if payment.token.0 == MINA_TOKEN_ADDRESS {
+                    if payment
+                        .token
+                        .as_ref()
+                        .is_none_or(|t| t.0 == MINA_TOKEN_ADDRESS)
+                    {
                         "".to_string()
                     } else {
-                        format!(" | {}", payment.token.0)
+                        format!(" | {}", payment.token.as_ref().unwrap().0)
                     }
                 )
             }
@@ -952,15 +1025,23 @@ fn recurse_calls<'a>(
     calls: impl Iterator<Item = &'a Call>,
     global_slot: u32,
     creation_fee_paid: bool,
+    txn_hash: TxnHash,
 ) {
     for call in calls {
         diffs.push(AccountDiff::from_zkapp_account_update(
             call.elt.as_ref(),
             global_slot,
             creation_fee_paid,
+            txn_hash.to_owned(),
         ));
 
-        recurse_calls(diffs, call.elt.calls.iter(), global_slot, creation_fee_paid);
+        recurse_calls(
+            diffs,
+            call.elt.calls.iter(),
+            global_slot,
+            creation_fee_paid,
+            txn_hash.to_owned(),
+        );
     }
 }
 

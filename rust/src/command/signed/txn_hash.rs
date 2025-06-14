@@ -1,7 +1,7 @@
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(untagged)]
 pub enum TxnHash {
     V1(String),
@@ -107,6 +107,17 @@ impl<'de> Deserialize<'de> for TxnHash {
                 Self::V2(txn_hash)
             }
         })
+    }
+}
+
+/////////////
+// default //
+/////////////
+
+impl Default for TxnHash {
+    fn default() -> Self {
+        let suffix = "X".repeat(Self::V1_LEN - Self::V1_PREFIX.len());
+        Self::V1(Self::V1_PREFIX.to_string() + &suffix)
     }
 }
 

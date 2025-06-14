@@ -285,7 +285,7 @@ impl PrecomputedBlock {
     pub fn command_hashes(&self) -> Vec<TxnHash> {
         self.commands()
             .iter()
-            .map(|cmd| cmd.hash().expect("command hash"))
+            .map(|cmd| cmd.txn_hash().expect("command hash"))
             .collect()
     }
 

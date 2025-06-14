@@ -388,7 +388,7 @@ impl SignedCommandWithData {
         global_slot_since_genesis: u32,
     ) -> Self {
         let status = user_cmd.status_data();
-        let txn_hash = user_cmd.hash();
+        let txn_hash = user_cmd.txn_hash();
         let command = SignedCommand::from(user_cmd);
 
         Self {
@@ -529,10 +529,11 @@ impl From<SignedCommandWithStateHash> for Command {
     }
 }
 
-impl From<SignedCommandWithStateHash> for CommandWithStateHash {
-    fn from(value: SignedCommandWithStateHash) -> Self {
+impl From<SignedCommandWithData> for CommandWithMeta {
+    fn from(value: SignedCommandWithData) -> Self {
         Self {
             state_hash: value.state_hash.clone(),
+            txn_hash: value.txn_hash.clone(),
             command: value.into(),
         }
     }

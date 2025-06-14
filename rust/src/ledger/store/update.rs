@@ -128,11 +128,27 @@ impl DbAccountUpdate {
 
                         // these diffs do not modify the account
                         ZkappActions(diff) => {
-                            db.add_actions(&diff.public_key, &diff.token, &diff.actions)?;
+                            db.add_actions(
+                                &diff.public_key,
+                                &diff.token,
+                                &diff.actions,
+                                state_hash,
+                                block_height,
+                                &diff.txn_hash,
+                            )?;
+
                             after
                         }
                         ZkappEvents(diff) => {
-                            db.add_events(&diff.public_key, &diff.token, &diff.events)?;
+                            db.add_events(
+                                &diff.public_key,
+                                &diff.token,
+                                &diff.events,
+                                state_hash,
+                                block_height,
+                                &diff.txn_hash,
+                            )?;
+
                             after
                         }
                         // zkapp account diffs should be expanded

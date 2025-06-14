@@ -3,15 +3,14 @@
 use super::{AccountDiff, DelegationDiff, PaymentDiff};
 use crate::{
     base::nonce::Nonce,
+    command::TxnHash,
     constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
     ledger::{
         account::{Permissions, Timing, VotingFor},
         token::{TokenAddress, TokenSymbol},
         PublicKey,
     },
-    mina_blocks::v2::{
-        zkapp::action_state::ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri,
-    },
+    mina_blocks::v2::{ActionState, AppState, VerificationKey, ZkappEvent, ZkappUri},
 };
 use serde::{Deserialize, Serialize};
 
@@ -48,6 +47,7 @@ pub struct ZkappDiff {
     pub events: Vec<ZkappEvent>,
     pub global_slot: u32,
     pub creation_fee_paid: bool,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -64,6 +64,7 @@ pub struct ZkappStateDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub diffs: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -71,6 +72,7 @@ pub struct ZkappVerificationKeyDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub verification_key: VerificationKey,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -78,6 +80,7 @@ pub struct ZkappProvedStateDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub proved_state: bool,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -85,6 +88,7 @@ pub struct ZkappPermissionsDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub permissions: Permissions,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -92,6 +96,7 @@ pub struct ZkappUriDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub zkapp_uri: ZkappUri,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -99,6 +104,7 @@ pub struct ZkappTokenSymbolDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub token_symbol: TokenSymbol,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -106,6 +112,7 @@ pub struct ZkappTimingDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub timing: Timing,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -113,6 +120,7 @@ pub struct ZkappVotingForDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub voting_for: VotingFor,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -121,6 +129,7 @@ pub struct ZkappActionsDiff {
     pub public_key: PublicKey,
     pub actions: Vec<ActionState>,
     pub global_slot: u32,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -128,6 +137,7 @@ pub struct ZkappEventsDiff {
     pub token: TokenAddress,
     pub public_key: PublicKey,
     pub events: Vec<ZkappEvent>,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
@@ -135,12 +145,14 @@ pub struct ZkappIncrementNonceDiff {
     pub public_key: PublicKey,
     pub token: TokenAddress,
     pub creation_fee_paid: bool,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Default, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
 pub struct ZkappFeePayerNonceDiff {
     pub public_key: PublicKey,
     pub nonce: Nonce,
+    pub txn_hash: TxnHash,
 }
 
 ///////////
@@ -162,6 +174,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.app_state_diff,
+            self.txn_hash.to_owned(),
         );
 
         // delegate
@@ -170,6 +183,7 @@ impl ZkappDiff {
             self.public_key.to_owned(),
             self.nonce.unwrap_or_default(),
             self.delegate,
+            self.txn_hash.to_owned(),
         );
 
         // verification key
@@ -178,6 +192,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.verification_key,
+            self.txn_hash.to_owned(),
         );
 
         Self::expand_proved_state_diff(
@@ -185,6 +200,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.proved_state,
+            self.txn_hash.to_owned(),
         );
 
         // permissions
@@ -193,6 +209,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.permissions,
+            self.txn_hash.to_owned(),
         );
 
         // zkapp uri
@@ -201,6 +218,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.zkapp_uri,
+            self.txn_hash.to_owned(),
         );
 
         // token symbol
@@ -209,6 +227,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.token_symbol,
+            self.txn_hash.to_owned(),
         );
 
         // timing
@@ -217,6 +236,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.timing,
+            self.txn_hash.to_owned(),
         );
 
         // voting for
@@ -225,6 +245,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.voting_for,
+            self.txn_hash.to_owned(),
         );
 
         // actions
@@ -234,6 +255,7 @@ impl ZkappDiff {
             self.public_key.to_owned(),
             self.actions,
             self.global_slot,
+            self.txn_hash.to_owned(),
         );
 
         // events
@@ -242,6 +264,7 @@ impl ZkappDiff {
             self.token.to_owned(),
             self.public_key.to_owned(),
             self.events,
+            self.txn_hash.to_owned(),
         );
 
         account_diffs
@@ -263,12 +286,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         app_state_diff: [Option<AppState>; ZKAPP_STATE_FIELD_ELEMENTS_NUM],
+        txn_hash: TxnHash,
     ) {
         if !app_state_diff.iter().all(|state| state.is_none()) {
             account_diffs.push(AccountDiff::ZkappState(ZkappStateDiff {
                 token,
                 public_key: pk,
                 diffs: app_state_diff,
+                txn_hash,
             }));
         }
     }
@@ -278,12 +303,14 @@ impl ZkappDiff {
         pk: PublicKey,
         nonce: Nonce,
         delegate: Option<PublicKey>,
+        txn_hash: TxnHash,
     ) {
         if let Some(delegate) = delegate {
             account_diffs.push(AccountDiff::Delegation(DelegationDiff {
                 nonce,
                 delegator: pk,
                 delegate,
+                txn_hash,
             }));
         }
     }
@@ -293,6 +320,7 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         verification_key: Option<VerificationKey>,
+        txn_hash: TxnHash,
     ) {
         if let Some(verification_key) = verification_key {
             account_diffs.push(AccountDiff::ZkappVerificationKey(
@@ -300,6 +328,7 @@ impl ZkappDiff {
                     token,
                     public_key: pk,
                     verification_key,
+                    txn_hash,
                 },
             ));
         }
@@ -310,12 +339,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         proved_state: bool,
+        txn_hash: TxnHash,
     ) {
         if proved_state {
             account_diffs.push(AccountDiff::ZkappProvedState(ZkappProvedStateDiff {
                 token,
                 public_key: pk,
                 proved_state,
+                txn_hash,
             }));
         }
     }
@@ -325,12 +356,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         permissions: Option<Permissions>,
+        txn_hash: TxnHash,
     ) {
         if let Some(permissions) = permissions {
             account_diffs.push(AccountDiff::ZkappPermissions(ZkappPermissionsDiff {
                 token,
                 public_key: pk,
                 permissions,
+                txn_hash,
             }));
         }
     }
@@ -340,12 +373,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         zkapp_uri: Option<ZkappUri>,
+        txn_hash: TxnHash,
     ) {
         if let Some(zkapp_uri) = zkapp_uri {
             account_diffs.push(AccountDiff::ZkappUri(ZkappUriDiff {
                 token,
                 public_key: pk,
                 zkapp_uri,
+                txn_hash,
             }));
         }
     }
@@ -355,12 +390,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         token_symbol: Option<TokenSymbol>,
+        txn_hash: TxnHash,
     ) {
         if let Some(token_symbol) = token_symbol {
             account_diffs.push(AccountDiff::ZkappTokenSymbol(ZkappTokenSymbolDiff {
                 token,
                 public_key: pk,
                 token_symbol,
+                txn_hash,
             }));
         }
     }
@@ -370,12 +407,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         timing: Option<Timing>,
+        txn_hash: TxnHash,
     ) {
         if let Some(timing) = timing {
             account_diffs.push(AccountDiff::ZkappTiming(ZkappTimingDiff {
                 token,
                 public_key: pk,
                 timing,
+                txn_hash,
             }));
         }
     }
@@ -385,12 +424,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         voting_for: Option<VotingFor>,
+        txn_hash: TxnHash,
     ) {
         if let Some(voting_for) = voting_for {
             account_diffs.push(AccountDiff::ZkappVotingFor(ZkappVotingForDiff {
                 token,
                 public_key: pk,
                 voting_for,
+                txn_hash,
             }));
         }
     }
@@ -401,6 +442,7 @@ impl ZkappDiff {
         pk: PublicKey,
         actions: Vec<ActionState>,
         global_slot: u32,
+        txn_hash: TxnHash,
     ) {
         if !actions.is_empty() {
             account_diffs.push(AccountDiff::ZkappActions(ZkappActionsDiff {
@@ -408,6 +450,7 @@ impl ZkappDiff {
                 public_key: pk,
                 actions,
                 global_slot,
+                txn_hash,
             }));
         }
     }
@@ -417,12 +460,14 @@ impl ZkappDiff {
         token: TokenAddress,
         pk: PublicKey,
         events: Vec<ZkappEvent>,
+        txn_hash: TxnHash,
     ) {
         if !events.is_empty() {
             account_diffs.push(AccountDiff::ZkappEvents(ZkappEventsDiff {
                 token,
                 public_key: pk,
                 events,
+                txn_hash,
             }));
         }
     }
@@ -438,7 +483,10 @@ impl ZkappPaymentDiff {
 
     pub fn token(&self) -> TokenAddress {
         match self {
-            Self::Payment { payment, .. } => payment.token.to_owned(),
+            Self::Payment { payment, .. } => payment
+                .token
+                .to_owned()
+                .unwrap_or_else(TokenAddress::default),
             Self::IncrementNonce(diff) => diff.token.to_owned(),
         }
     }
@@ -469,7 +517,11 @@ impl ZkappStateDiff {
 
 impl std::fmt::Debug for ZkappFeePayerNonceDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} | {}", self.public_key, self.nonce)
+        write!(
+            f,
+            "{} | {} | {}",
+            self.public_key, self.nonce, self.txn_hash
+        )
     }
 }
 

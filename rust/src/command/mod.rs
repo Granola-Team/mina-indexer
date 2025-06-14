@@ -31,6 +31,7 @@ use blake2::digest::VariableOutput;
 use log::trace;
 use mina_serialization_versioned::Versioned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use signed::{SignedCommandWithCreationData, SignedCommandWithKind};
 use std::{collections::BTreeSet, io::Write};
 
@@ -61,9 +62,10 @@ pub enum Command {
 }
 
 #[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CommandWithStateHash {
+pub struct CommandWithMeta {
     pub command: Command,
     pub state_hash: StateHash,
+    pub txn_hash: TxnHash,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize)]
@@ -82,7 +84,7 @@ pub struct Delegation {
     pub delegate: PublicKey,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CommandStatusData {
     Applied {
         auxiliary_data: Option<mina_rs::TransactionStatusAuxiliaryData>,
@@ -216,7 +218,7 @@ pub struct AccountUpdate {
 }
 
 pub trait UserCommandWithStatusT {
-    fn to_command(&self, state_hash: StateHash) -> CommandWithStateHash;
+    fn to_command(&self, state_hash: StateHash) -> CommandWithMeta;
 
     fn is_applied(&self) -> bool;
 
@@ -244,7 +246,7 @@ pub trait UserCommandWithStatusT {
 
     fn signer(&self) -> PublicKey;
 
-    fn hash(&self) -> Result<TxnHash>;
+    fn txn_hash(&self) -> Result<TxnHash>;
 
     fn receiver_account_creation_fee_paid(&self) -> bool;
 
@@ -328,7 +330,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         signed.all_command_public_keys().contains(pk)
     }
 
-    fn to_command(&self, state_hash: StateHash) -> CommandWithStateHash {
+    fn to_command(&self, state_hash: StateHash) -> CommandWithMeta {
         match self {
             Self::V1(v1) => match &v1.t.data.t.t {
                 mina_rs::UserCommand1::SignedCommand(v1) => {
@@ -341,7 +343,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                                 amount,
                                 ..
                             } = &v1.t.t;
-                            CommandWithStateHash {
+                            CommandWithMeta {
                                 state_hash,
                                 command: Command::Payment(Payment {
                                     source: source_pk.to_owned().into(),
@@ -351,6 +353,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                                     is_new_receiver_account: self
                                         .receiver_account_creation_fee_paid(),
                                 }),
+                                txn_hash: self.txn_hash().expect("txn hash"),
                             }
                         }
                         StakeDelegation(v1) => {
@@ -358,13 +361,14 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                                 delegator,
                                 new_delegate,
                             } = v1.t.to_owned();
-                            CommandWithStateHash {
+                            CommandWithMeta {
                                 state_hash,
                                 command: Command::Delegation(Delegation {
                                     delegator: delegator.into(),
                                     delegate: new_delegate.into(),
                                     nonce: self.nonce(),
                                 }),
+                                txn_hash: self.txn_hash().expect("txn hash"),
                             }
                         }
                     }
@@ -375,7 +379,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                     SignedCommandPayloadBody::Payment(v2::staged_ledger_diff::PaymentPayload {
                         receiver_pk,
                         amount,
-                    }) => CommandWithStateHash {
+                    }) => CommandWithMeta {
                         state_hash,
                         command: Command::Payment(Payment {
                             nonce: self.nonce(),
@@ -384,22 +388,25 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
                             receiver: receiver_pk.to_owned(),
                             is_new_receiver_account: self.receiver_account_creation_fee_paid(),
                         }),
+                        txn_hash: self.txn_hash().expect("txn hash"),
                     },
                     SignedCommandPayloadBody::StakeDelegation((
                         _,
                         v2::staged_ledger_diff::StakeDelegationPayload { new_delegate },
-                    )) => CommandWithStateHash {
+                    )) => CommandWithMeta {
                         state_hash,
                         command: Command::Delegation(Delegation {
                             nonce: self.nonce(),
                             delegator: self.sender(),
                             delegate: new_delegate.to_owned(),
                         }),
+                        txn_hash: self.txn_hash().expect("txn hash"),
                     },
                 },
-                UserCommandData::ZkappCommandData(v1) => CommandWithStateHash {
+                UserCommandData::ZkappCommandData(v1) => CommandWithMeta {
                     state_hash,
                     command: Command::Zkapp(v1.to_owned()),
+                    txn_hash: self.txn_hash().expect("txn hash"),
                 },
             },
         }
@@ -576,7 +583,7 @@ impl UserCommandWithStatusT for UserCommandWithStatus {
         }
     }
 
-    fn hash(&self) -> Result<TxnHash> {
+    fn txn_hash(&self) -> Result<TxnHash> {
         match self {
             Self::V1(v1) => {
                 let UserCommand1::SignedCommand(ref signed_cmd) = v1.t.data.t.t;
@@ -893,6 +900,15 @@ impl From<UserCommandWithStatus> for Command {
 // debug/display //
 ///////////////////
 
+impl std::fmt::Debug for Command {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
+        write!(f, "{}", to_string_pretty(&json).unwrap())
+    }
+}
+
 impl std::fmt::Debug for CommandType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{self}")
@@ -913,11 +929,33 @@ impl std::fmt::Display for CommandType {
     }
 }
 
+impl std::fmt::Debug for UserCommandWithStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use serde_json::*;
+
+        let json: Value = self.clone().into();
+        write!(f, "{}", to_string_pretty(&json).unwrap())
+    }
+}
+
+impl std::fmt::Debug for CommandStatusData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Applied { .. } => "Applied".to_string(),
+                Self::Failed(fails, _) => format!("Failed {:#?}", fails),
+            }
+        )
+    }
+}
+
 //////////////////////
 // JSON conversions //
 //////////////////////
 
-impl From<CommandStatusData> for serde_json::Value {
+impl From<CommandStatusData> for Value {
     fn from(value: CommandStatusData) -> Self {
         use serde_json::*;
 
@@ -960,7 +998,7 @@ impl From<CommandStatusData> for serde_json::Value {
     }
 }
 
-impl From<Command> for serde_json::Value {
+impl From<Command> for Value {
     fn from(value: Command) -> Self {
         use serde_json::*;
 
@@ -1009,16 +1047,7 @@ pub fn to_zkapp_json(data: &ZkappCommandData) -> Value {
     to_mina_json(json)
 }
 
-impl std::fmt::Debug for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use serde_json::*;
-
-        let json: Value = self.clone().into();
-        write!(f, "{}", to_string_pretty(&json).unwrap())
-    }
-}
-
-impl From<UserCommandWithStatus> for serde_json::Value {
+impl From<UserCommandWithStatus> for Value {
     fn from(value: UserCommandWithStatus) -> Self {
         use serde_json::*;
 
@@ -1036,19 +1065,11 @@ impl From<UserCommandWithStatus> for serde_json::Value {
         Value::Object(object)
     }
 }
+/////////////
+// helpers //
+/////////////
 
-impl std::fmt::Debug for UserCommandWithStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use serde_json::*;
-
-        let json: Value = self.clone().into();
-        write!(f, "{}", to_string_pretty(&json).unwrap())
-    }
-}
-
-fn to_auxiliary_json(
-    auxiliary_data: &Option<mina_rs::TransactionStatusAuxiliaryData>,
-) -> serde_json::Value {
+fn to_auxiliary_json(auxiliary_data: &Option<mina_rs::TransactionStatusAuxiliaryData>) -> Value {
     use serde_json::*;
 
     let mut auxiliary_obj = Map::new();
@@ -1090,9 +1111,7 @@ fn to_auxiliary_json(
     Value::Object(auxiliary_obj)
 }
 
-fn to_balance_json(
-    balance_data: &Option<mina_rs::TransactionStatusBalanceData>,
-) -> serde_json::Value {
+fn to_balance_json(balance_data: &Option<mina_rs::TransactionStatusBalanceData>) -> Value {
     use serde_json::*;
 
     let mut balance_obj = Map::new();
@@ -1127,8 +1146,6 @@ fn to_balance_json(
 
     Value::Object(balance_obj)
 }
-
-use serde_json::Value;
 
 fn convert(test: bool, value: Value) -> Value {
     match value {
@@ -1870,7 +1887,7 @@ mod test {
                     return None;
                 }
 
-                cmd.hash().ok()
+                cmd.txn_hash().ok()
             })
             .collect::<Vec<_>>();
 

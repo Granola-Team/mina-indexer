@@ -1,9 +1,13 @@
 //! Zkapp action store trait
 
 use crate::{
-    base::public_key::PublicKey, ledger::token::TokenAddress, mina_blocks::v2::ActionState,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    command::TxnHash,
+    ledger::token::TokenAddress,
+    mina_blocks::v2::{zkapp::action_state::ActionStateWithMeta, ActionState},
     store::Result,
 };
+use speedb::{DBIterator, Direction};
 
 pub trait ZkappActionStore {
     /// Add actions to the token account
@@ -14,6 +18,9 @@ pub trait ZkappActionStore {
         pk: &PublicKey,
         token: &TokenAddress,
         actions: &[ActionState],
+        state_hash: &StateHash,
+        block_height: u32,
+        txn_hash: &TxnHash,
     ) -> Result<u32>;
 
     /// Get the `index`th action for the token account
@@ -22,14 +29,14 @@ pub trait ZkappActionStore {
         pk: &PublicKey,
         token: &TokenAddress,
         index: u32,
-    ) -> Result<Option<ActionState>>;
+    ) -> Result<Option<ActionStateWithMeta>>;
 
     /// Set the `index`th action for the token account
     fn set_action(
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        action: &ActionState,
+        action: &ActionStateWithMeta,
         index: u32,
     ) -> Result<()>;
 
@@ -43,4 +50,16 @@ pub trait ZkappActionStore {
 
     /// Remove the action at the specified index from the account
     fn remove_action(&self, pk: &PublicKey, token: &TokenAddress, index: u32) -> Result<()>;
+
+    // Iterators //
+    ///////////////
+
+    /// Iterator over pk/token actions from start height (inclusive) to end
+    /// height (exclusive)
+    fn actions_iterator(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+        direction: Direction,
+    ) -> DBIterator<'_>;
 }

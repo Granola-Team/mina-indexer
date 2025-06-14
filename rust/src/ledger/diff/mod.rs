@@ -8,7 +8,7 @@ use super::{coinbase::Coinbase, token::TokenAddress, LedgerHash, PublicKey};
 use crate::{
     base::state_hash::StateHash,
     block::{precomputed::PrecomputedBlock, AccountCreated},
-    command::UserCommandWithStatusT,
+    command::{TxnHash, UserCommandWithStatusT},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -77,6 +77,7 @@ impl LedgerDiff {
                         FailedTransactionNonceDiff {
                             public_key: user_cmd_with_status.sender(),
                             nonce: user_cmd_with_status.nonce() + 1,
+                            txn_hash: user_cmd_with_status.txn_hash().unwrap(),
                         },
                     )]]
                 }
@@ -204,10 +205,12 @@ impl LedgerDiff {
         acc
     }
 
-    pub fn from(value: &[(&str, &str, AccountDiffType, u64)]) -> Vec<Vec<AccountDiff>> {
+    pub fn from(
+        value: &[(&str, &str, AccountDiffType, u64, Option<TxnHash>)],
+    ) -> Vec<Vec<AccountDiff>> {
         value
             .iter()
-            .flat_map(|(s, r, t, a)| AccountDiff::from(s, r, t.clone(), *a))
+            .flat_map(|(s, r, t, a, h)| AccountDiff::from(s, r, t.clone(), *a, h.clone()))
             .collect()
     }
 }

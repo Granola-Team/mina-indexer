@@ -1,8 +1,19 @@
+//! Zkapp event representation
+
+use crate::{base::state_hash::StateHash, command::TxnHash};
 use serde::{Deserialize, Serialize};
 
 /// 32 bytes
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
-pub struct ZkappEvent(String);
+pub struct ZkappEvent(pub String);
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash, Serialize, Deserialize)]
+pub struct ZkappEventWithMeta {
+    pub event: ZkappEvent,
+    pub txn_hash: TxnHash,
+    pub state_hash: StateHash,
+    pub block_height: u32,
+}
 
 //////////
 // impl //
@@ -31,6 +42,16 @@ where
         assert_eq!(event.len(), Self::LEN);
 
         Self(event)
+    }
+}
+
+/////////////
+// default //
+/////////////
+
+impl std::default::Default for ZkappEvent {
+    fn default() -> Self {
+        Self(Self::PREFIX.to_string() + &"0".repeat(Self::LEN - 2))
     }
 }
 

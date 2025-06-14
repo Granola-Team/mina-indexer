@@ -57,7 +57,7 @@ impl UserCommandStore for IndexerStore {
         // per command
         for command in &user_commands {
             let is_zkapp = command.is_zkapp_command();
-            let txn_hash = command.hash()?;
+            let txn_hash = command.txn_hash()?;
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command

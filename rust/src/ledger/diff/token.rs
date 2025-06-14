@@ -55,13 +55,14 @@ impl From<ZkappPaymentDiff> for Option<TokenDiff> {
                     public_key,
                     amount,
                     token,
+                    ..
                 },
             ..
         } = value
         {
             return Some(TokenDiff {
-                token,
                 public_key,
+                token: token.unwrap_or_default(),
                 diff: TokenDiffType::Supply({
                     let amt_i64 = amount.0 as i64;
                     if update_type == UpdateType::Credit {

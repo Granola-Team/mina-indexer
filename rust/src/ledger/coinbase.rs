@@ -6,7 +6,6 @@ use crate::{
     constants::*,
     ledger::{
         diff::account::{AccountDiff, PaymentDiff, UpdateType},
-        token::TokenAddress,
         PublicKey,
     },
     mina_blocks::v2,
@@ -103,13 +102,15 @@ impl Coinbase {
                 public_key: transfer.receiver_pk.clone(),
                 amount: transfer.fee.into(),
                 update_type: UpdateType::Credit,
-                token: TokenAddress::default(), // always MINA
+                txn_hash: None,
+                token: None, // always MINA
             },
             PaymentDiff {
                 public_key: self.receiver.clone(),
                 amount: transfer.fee.into(),
                 update_type: UpdateType::Debit(None),
-                token: TokenAddress::default(), // always MINA
+                txn_hash: None,
+                token: None, // always MINA
             },
         ]
     }

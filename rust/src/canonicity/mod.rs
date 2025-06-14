@@ -20,6 +20,24 @@ pub enum Canonicity {
     Pending,
 }
 
+///////////////////
+// debug/display //
+///////////////////
+
+impl std::fmt::Display for Canonicity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Canonical => "Canonical",
+                Self::Orphaned => "Orphaned",
+                Self::Pending => "Pending",
+            }
+        )
+    }
+}
+
 impl std::fmt::Debug for CanonicityDiff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
