@@ -5,17 +5,24 @@ use async_graphql::{Context, Enum, InputObject, Object, Result, SimpleObject};
 
 #[derive(InputObject, Debug)]
 pub struct EventsQueryInput {
-    pub address: Option<String>,
+    /// Input public key
+    pub public_key: String,
+
+    /// Input token address
+    pub token: Option<String>,
+
+    /// Input start block height
+    pub start_block_height: Option<u32>,
+
+    /// Input end block height
+    pub end_block_height: Option<u32>,
 }
 
 #[derive(Default, Enum, Copy, Clone, Debug, Eq, PartialEq)]
 pub enum EventsSortByInput {
-    #[graphql(name = "BLOCKHEIGHT_ASC")]
-    BlockHeightAsc,
-
     #[default]
-    #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
+    BlockHeightAsc,
 }
 
 #[derive(SimpleObject, Debug)]

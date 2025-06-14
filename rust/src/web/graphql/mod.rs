@@ -1,9 +1,11 @@
 //! GraphQL server & helpers
 
+mod block;
 mod date_time;
 mod long;
 mod pk;
 mod timing;
+mod txn;
 
 pub mod accounts;
 pub mod actions;
