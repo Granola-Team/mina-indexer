@@ -19,7 +19,7 @@ use crate::{
         diff::LedgerDiff,
         genesis::GenesisLedger,
         staking::{parser::StakingLedgerParser, StakingLedger},
-        store::{best::BestLedgerStore, staged::StagedLedgerStore, staking::StakingLedgerStore},
+        store::{staged::StagedLedgerStore, staking::StakingLedgerStore},
         token::{Token, TokenAddress},
         Ledger, LedgerHash,
     },
@@ -503,7 +503,7 @@ impl IndexerState {
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
                     if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
-                        ledger_diffs.push(diff);
+                        ledger_diffs.push(diff.clone());
                     }
 
                     indexer_store.add_block(&block, block_bytes)?;
@@ -532,17 +532,10 @@ impl IndexerState {
 
                     // update root branch on last deep canonical block
                     if self.blocks_processed > block_parser.num_deep_canonical_blocks {
-                        if !ledger_diffs.is_empty() {
-                            for diff in ledger_diffs.iter() {
-                                self.ledger._apply_diff(diff)?;
-                            }
-
-                            ledger_diffs.clear();
-                        }
-
                         self.root_branch = Branch::new(&block)?;
+                        self.ledger._apply_diff(&diff)?;
                         self.best_tip = Tip {
-                            state_hash,
+                            state_hash: self.root_branch.root_block().state_hash.clone(),
                             node_id: self.root_branch.root.clone(),
                         };
                         self.canonical_root = self.best_tip.clone();
@@ -632,27 +625,6 @@ impl IndexerState {
                 }
             }
         }
-
-        let best_ledger = self.best_ledger();
-        debug!(
-            "Witness tree MINA zkapp accounts = {}",
-            best_ledger.zkapp_mina_account_len()
-        );
-        debug!(
-            "Witness tree zkapp accounts = {}",
-            best_ledger.zkapp_account_len()
-        );
-
-        let store = self.indexer_store.as_ref().unwrap();
-        debug!(
-            "Indexer store MINA zkapp accounts = {}",
-            store.get_num_mina_zkapp_accounts()?.unwrap_or_default()
-        );
-        debug!(
-            "Indexer store zkapp accounts = {}",
-            store.get_num_zkapp_accounts()?.unwrap_or_default()
-        );
-
         Ok(())
     }
 
