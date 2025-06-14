@@ -1,8 +1,9 @@
 use crate::{generators::*, helpers::store::*};
 use mina_indexer::{
-    base::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    command::TxnHash,
     ledger::token::TokenAddress,
-    mina_blocks::v2::zkapp::action_state::ActionState,
+    mina_blocks::v2::zkapp::action_state::{ActionState, ActionStateWithMeta},
     store::{zkapp::actions::ZkappActionStore, IndexerStore},
 };
 use quickcheck::Arbitrary;
@@ -21,6 +22,11 @@ fn action_store_test() -> anyhow::Result<()> {
     ];
     let actions_length = actions.len() as u32;
 
+    // set block/txn
+    let state_hash = StateHash::default();
+    let block_height = u32::arbitrary(g);
+    let txn_hash = TxnHash::default();
+
     // set token account
     let pk = PublicKey::default();
     let token = TokenAddress::default();
@@ -32,7 +38,8 @@ fn action_store_test() -> anyhow::Result<()> {
     // before
     assert_eq!(None, indexer_store.get_num_actions(&pk, &token)?);
 
-    let actions_added = indexer_store.add_actions(&pk, &token, &actions)?;
+    let actions_added =
+        indexer_store.add_actions(&pk, &token, &actions, &state_hash, block_height, &txn_hash)?;
     assert_eq!(actions_added, actions_length);
 
     // after
@@ -48,7 +55,12 @@ fn action_store_test() -> anyhow::Result<()> {
     for (idx, action) in actions.iter().cloned().enumerate() {
         assert_eq!(
             indexer_store.get_action(&pk, &token, idx as u32)?.unwrap(),
-            action
+            ActionStateWithMeta {
+                action,
+                block_height,
+                txn_hash: txn_hash.clone(),
+                state_hash: state_hash.clone(),
+            }
         );
     }
 
@@ -58,7 +70,14 @@ fn action_store_test() -> anyhow::Result<()> {
 
     let index = u32::arbitrary(g);
     let index = index % actions_length;
+
     let set_action = <TestGen<ActionState>>::arbitrary(g).0;
+    let set_action = ActionStateWithMeta {
+        action: set_action,
+        txn_hash,
+        state_hash,
+        block_height,
+    };
 
     indexer_store.set_action(&pk, &token, &set_action, index)?;
     assert_eq!(

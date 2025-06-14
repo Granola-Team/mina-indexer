@@ -1074,7 +1074,8 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: credit_amount,
             update_type: UpdateType::Credit,
-            token: TokenAddress::default(),
+            txn_hash: None,
+            token: None,
         });
         assert_eq!(payment_diff_credit.amount(), 1000);
 
@@ -1083,7 +1084,8 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: debit_amount,
             update_type: UpdateType::Debit(Some(Nonce(1))),
-            token: TokenAddress::default(),
+            txn_hash: None,
+            token: None,
         });
         assert_eq!(payment_diff_debit.amount(), -500);
 
@@ -1099,7 +1101,8 @@ mod tests {
             public_key: PublicKey::new("B62qkMUJyt7LmPnfu8in6qshaQSvTgLgNjx6h7YySRJ28wJegJ82n6u")?,
             amount: credit_amount,
             update_type: UpdateType::Credit,
-            token: TokenAddress::default(),
+            txn_hash: None,
+            token: None,
         });
         assert_eq!(fee_transfer_diff_credit.amount(), 1000);
 
@@ -1111,7 +1114,8 @@ mod tests {
                 )?,
                 amount: debit_amount,
                 update_type: UpdateType::Debit(None),
-                token: TokenAddress::default(),
+                txn_hash: None,
+                token: None,
             });
         assert_eq!(fee_transfer_via_coinbase_diff_debit.amount(), -500);
 
@@ -1119,6 +1123,7 @@ mod tests {
             nonce: Nonce(42),
             delegator: PublicKey::new("B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi")?,
             delegate: PublicKey::new("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz")?,
+            txn_hash: TxnHash::default(),
         });
         assert_eq!(delegation_diff.amount(), 0);
 
@@ -1128,6 +1133,7 @@ mod tests {
                     "B62qpYZ5BUaXq7gkUksirDA5c7okVMBY6VrQbj7YHLARWiBvu6A2fqi",
                 )?,
                 nonce: Nonce(10),
+                txn_hash: TxnHash::default(),
             });
 
         assert_eq!(failed_tx_nonce_diff.amount(), 0);
@@ -1159,13 +1165,15 @@ mod tests {
                     public_key: snarker,
                     amount: fee.into(),
                     update_type: UpdateType::Credit,
-                    token: TokenAddress::default(),
+                    txn_hash: None,
+                    token: None,
                 }),
                 AccountDiff::FeeTransferViaCoinbase(PaymentDiff {
                     public_key: receiver,
                     amount: fee.into(),
                     update_type: UpdateType::Debit(None),
-                    token: TokenAddress::default(),
+                    txn_hash: None,
+                    token: None,
                 }),
             ],
         ];
@@ -1186,7 +1194,7 @@ mod tests {
         let receiver_public_key =
             PublicKey::from("B62qjoDXHMPZx8AACUrdaKVyDcn7uxbym1kxodgMXztn6iJC2yqEKbs");
 
-        let payment_command = CommandWithStateHash {
+        let payment_command = CommandWithMeta {
             state_hash,
             command: Command::Payment(Payment {
                 nonce,
@@ -1195,6 +1203,7 @@ mod tests {
                 receiver: receiver_public_key.clone(),
                 is_new_receiver_account: true,
             }),
+            txn_hash: TxnHash::default(),
         };
 
         let expected_result = vec![vec![
@@ -1202,13 +1211,15 @@ mod tests {
                 amount,
                 public_key: receiver_public_key.clone(),
                 update_type: UpdateType::Credit,
-                token: TokenAddress::default(),
+                txn_hash: Some(TxnHash::default()),
+                token: None,
             }),
             AccountDiff::Payment(PaymentDiff {
                 amount,
                 public_key: source_public_key,
                 update_type: UpdateType::Debit(Some(nonce + 1)),
-                token: TokenAddress::default(),
+                txn_hash: Some(TxnHash::default()),
+                token: None,
             }),
         ]];
 
@@ -1229,13 +1240,14 @@ mod tests {
         let delegate_public_key =
             PublicKey::from("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz");
 
-        let delegation_command = CommandWithStateHash {
+        let delegation_command = CommandWithMeta {
             state_hash,
             command: Command::Delegation(Delegation {
                 delegator: delegator_public_key.clone(),
                 delegate: delegate_public_key.clone(),
                 nonce,
             }),
+            txn_hash: TxnHash::default(),
         };
 
         assert_eq!(
@@ -1244,6 +1256,7 @@ mod tests {
                 delegator: delegator_public_key,
                 delegate: delegate_public_key,
                 nonce: nonce + 1,
+                txn_hash: TxnHash::default(),
             })]]
         );
     }
@@ -1272,7 +1285,8 @@ mod tests {
             public_key: PublicKey::new("B62qqmveaSLtpcfNeaF9KsEvLyjsoKvnfaHy4LHyApihPVzR3qDNNEG")?,
             amount: Amount(536900000000),
             update_type: UpdateType::Debit(Some(nonce)),
-            token: TokenAddress::default(),
+            txn_hash: None,
+            token: None,
         };
         let account_diff = AccountDiff::Payment(payment_diff);
         let result = account_diff.public_key();
@@ -1290,6 +1304,7 @@ mod tests {
             nonce: Nonce(42),
             delegator: delegator.clone(),
             delegate: PublicKey::from("B62qjSytpSK7aEauBprjXDSZwc9ai4YMv9tpmXLQK14Vy941YV36rMz"),
+            txn_hash: TxnHash::default(),
         };
         let account_diff = AccountDiff::Delegation(delegation_diff);
         let result = account_diff.public_key();
@@ -1311,30 +1326,35 @@ mod tests {
                 "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
                 Payment(Nonce(180447)),
                 1000,
+                TxnHash::new("CkpZqm4w9XD7kRzvUNiGTAje1F9vdVq7jWXbCcbEitp4kpm7ERv7q").ok(),
             ),
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
                 "B62qjYanmV7y9njVeH5UHkz3GYBm7xKir1rAnoY4KsEYUGLMiU45FSM",
                 Payment(Nonce(180448)),
                 1000,
+                TxnHash::new("CkpYYyRsGwbHZ8n8JTaD5kwZUgrLCtohRW58jWMK3d1pNwokqfVZo").ok(),
             ),
             (
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 Coinbase,
                 MAINNET_COINBASE_REWARD,
+                None,
             ),
             (
                 "B62qre3erTHfzQckNuibViWQGyyKwZseztqrjPZBv6SQF384Rg6ESAy",
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 FeeTransfer,
                 2000000,
+                None,
             ),
             (
                 "B62qkofKBUonysS9kvTM2q42P7qR1opURprUuGjPbuuifrPyi61Paob",
                 "B62qqsMmiJPjodmXxZuvXpEYRv4sBQLFDz1aHYesVmybTqyfZzWnd2n",
                 FeeTransferViaCoinbase,
                 1e9 as u64,
+                None,
             ),
         ]);
 
@@ -1451,6 +1471,7 @@ mod tests {
         let zkapps = block.zkapp_commands();
         let zkapp_cmd = zkapps.first().unwrap();
 
+        let txn_hash = zkapp_cmd.txn_hash()?;
         if let UserCommandWithStatus::V2(box_cmd) = zkapp_cmd {
             if let UserCommand {
                 data: (_, UserCommandData::ZkappCommandData(zkapp)),
@@ -1462,6 +1483,7 @@ mod tests {
                         public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
                             .into(),
                         nonce: 59.into(),
+                        txn_hash: txn_hash.clone(),
                     }),
                     ZkappPayment(ZkappPaymentDiff::Payment {
                         creation_fee_paid: true,
@@ -1470,7 +1492,8 @@ mod tests {
                             update_type: UpdateType::Debit(None),
                             public_key: "B62qkikiZXisUGspBunSnKQn5FRaUPkLUBbxkBY64Xn6AnaSwgKab5h"
                                 .into(),
-                            token: TokenAddress::default(),
+                            txn_hash: Some(txn_hash.clone()),
+                            token: Some(TokenAddress::default()),
                         },
                     }),
                     ZkappPayment(ZkappPaymentDiff::Payment {
@@ -1480,11 +1503,13 @@ mod tests {
                             update_type: UpdateType::Credit,
                             public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
                                 .into(),
-                            token: TokenAddress::default(),
+                            txn_hash: Some(txn_hash.clone()),
+                            token: Some(TokenAddress::default()),
                         },
                     }),
                     ZkappEvents(ZkappEventsDiff {
                         token: TokenAddress::default(),
+                        txn_hash: txn_hash.clone(),
                         public_key: "B62qjwDWxjf4LtJ4YWJQDdTNPqZ69ZyeCzbpAFKN7EoZzYig5ZRz8JE"
                             .into(),
                         events: vec![
@@ -1511,8 +1536,8 @@ mod tests {
                                 .into(),
                             token: TokenAddress::new(
                                 "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
-                            )
-                            .unwrap(),
+                            ),
+                            txn_hash: Some(txn_hash.clone()),
                         },
                     }),
                     ZkappPayment(ZkappPaymentDiff::Payment {
@@ -1524,16 +1549,17 @@ mod tests {
                                 .into(),
                             token: TokenAddress::new(
                                 "xBxjFpJkbWpbGua7Lf36S1NLhffFoEChyP3pz6SYKnx7dFCTwg",
-                            )
-                            .unwrap(),
+                            ),
+                            txn_hash: Some(txn_hash.clone()),
                         },
                     }),
                 ]];
 
                 let diffs = AccountDiff::from_command(
-                    CommandWithStateHash {
+                    CommandWithMeta {
                         command: Command::Zkapp(zkapp.clone()),
                         state_hash,
+                        txn_hash,
                     },
                     global_slot,
                 );

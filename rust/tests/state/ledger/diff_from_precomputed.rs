@@ -62,18 +62,21 @@ async fn account_diffs() -> anyhow::Result<()> {
                 public_key,
                 amount,
                 update_type,
+                txn_hash: _,
                 token: _,
             })
             | FeeTransfer(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
+                txn_hash: _,
                 token: _,
             })
             | FeeTransferViaCoinbase(PaymentDiff {
                 public_key,
                 amount,
                 update_type,
+                txn_hash: _,
                 token: _,
             }) => {
                 println!("\n* Payment");
@@ -108,6 +111,7 @@ async fn account_diffs() -> anyhow::Result<()> {
                 delegate,
                 delegator,
                 nonce,
+                txn_hash: _,
             }) => {
                 println!("\n* Delegation");
                 println!("delegate:  {delegate}");
@@ -127,6 +131,7 @@ async fn account_diffs() -> anyhow::Result<()> {
             FailedTransactionNonce(FailedTransactionNonceDiff {
                 public_key,
                 nonce: new_nonce,
+                txn_hash: _,
             }) => {
                 println!("\n* Failed transaction");
                 println!("public_key: {public_key}");

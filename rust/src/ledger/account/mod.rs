@@ -783,6 +783,7 @@ mod tests {
     use super::{Account, Amount};
     use crate::{
         base::{public_key::PublicKey, state_hash::StateHash},
+        command::TxnHash,
         constants::ZKAPP_STATE_FIELD_ELEMENTS_NUM,
         ledger::{
             account::{Permission, Permissions, Timing},
@@ -867,10 +868,11 @@ mod tests {
             payment_diffs: vec![ZkappPaymentDiff::Payment {
                 creation_fee_paid: false,
                 payment: PaymentDiff {
+                    amount,
                     public_key: pk.clone(),
                     update_type: UpdateType::Debit(None),
-                    amount,
-                    token: TokenAddress::default(),
+                    txn_hash: None,
+                    token: None,
                 },
             }],
             ..Default::default()
@@ -1015,11 +1017,13 @@ mod tests {
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 verification_key: verification_key.clone(),
+                txn_hash: TxnHash::default(),
             }),
             AccountDiff::ZkappProvedState(ZkappProvedStateDiff {
                 token: TokenAddress::default(),
                 public_key: pk.clone(),
                 proved_state: true,
+                txn_hash: TxnHash::default(),
             }),
         ];
 
@@ -1068,6 +1072,7 @@ mod tests {
             token: TokenAddress::default(),
             public_key: pk.clone(),
             permissions: permissions.clone(),
+            txn_hash: TxnHash::default(),
         });
 
         // account after applying diff

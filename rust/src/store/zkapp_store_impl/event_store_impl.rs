@@ -1,19 +1,21 @@
 //! Zkapp event store impol
 
 use crate::{
-    base::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    command::TxnHash,
     ledger::token::TokenAddress,
-    mina_blocks::v2::ZkappEvent,
+    mina_blocks::v2::{zkapp::event::ZkappEventWithMeta, ZkappEvent},
     store::{
         column_families::ColumnFamilyHelpers, zkapp::events::ZkappEventStore, IndexerStore, Result,
     },
     utility::store::{
-        common::from_be_bytes,
+        common::{from_be_bytes, U32_LEN},
         zkapp::events::{zkapp_events_key, zkapp_events_pk_num_key},
     },
 };
 use anyhow::Context;
 use log::trace;
+use speedb::Direction;
 
 impl ZkappEventStore for IndexerStore {
     fn add_events(
@@ -21,6 +23,9 @@ impl ZkappEventStore for IndexerStore {
         pk: &PublicKey,
         token: &TokenAddress,
         events: &[ZkappEvent],
+        state_hash: &StateHash,
+        block_height: u32,
+        txn_hash: &TxnHash,
     ) -> Result<u32> {
         trace!("Adding events to token account ({pk}, {token}): {events:?}");
 
@@ -28,8 +33,15 @@ impl ZkappEventStore for IndexerStore {
         let mut num = idx;
 
         // add each event
-        for event in events.iter() {
-            self.set_event(pk, token, event, num)?;
+        for event in events.iter().cloned() {
+            let event = ZkappEventWithMeta {
+                event,
+                txn_hash: txn_hash.to_owned(),
+                state_hash: state_hash.to_owned(),
+                block_height,
+            };
+
+            self.set_event(pk, token, &event, num)?;
             num += 1;
         }
 
@@ -48,7 +60,7 @@ impl ZkappEventStore for IndexerStore {
         pk: &PublicKey,
         token: &TokenAddress,
         index: u32,
-    ) -> Result<Option<ZkappEvent>> {
+    ) -> Result<Option<ZkappEventWithMeta>> {
         trace!("Getting event {index} for token account ({pk}, {token})");
 
         Ok(self
@@ -65,7 +77,7 @@ impl ZkappEventStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
-        event: &ZkappEvent,
+        event: &ZkappEventWithMeta,
         index: u32,
     ) -> Result<()> {
         trace!("Setting event {index} for token account ({pk}, {token})");
@@ -117,5 +129,32 @@ impl ZkappEventStore for IndexerStore {
         Ok(self
             .database
             .delete_cf(self.zkapp_events_cf(), zkapp_events_key(token, pk, index))?)
+    }
+
+    ///////////////
+    // Iterators //
+    ///////////////
+
+    fn events_iterator(
+        &self,
+        pk: &PublicKey,
+        token: &TokenAddress,
+        direction: Direction,
+    ) -> speedb::DBIterator<'_> {
+        const LEN: usize = TokenAddress::LEN + PublicKey::LEN + U32_LEN;
+
+        let mut start = [0; LEN + 1];
+        match direction {
+            Direction::Forward => start[..LEN].copy_from_slice(&zkapp_events_key(token, pk, 0)),
+            Direction::Reverse => {
+                start[..LEN].copy_from_slice(&zkapp_events_key(token, pk, u32::MAX));
+                start[LEN] = 1;
+            }
+        };
+
+        self.database.iterator_cf(
+            self.zkapp_events_cf(),
+            speedb::IteratorMode::From(&start, direction),
+        )
     }
 }

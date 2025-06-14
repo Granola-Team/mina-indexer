@@ -345,6 +345,7 @@ mod tests {
     };
     use crate::{
         base::{nonce::Nonce, public_key::PublicKey, state_hash::StateHash},
+        command::TxnHash,
         constants::MINA_SCALE,
         ledger::{token::TokenAddress, TokenLedger},
         utility::functions::nanomina_to_mina,
@@ -411,13 +412,15 @@ mod tests {
                     amount,
                     public_key: public_key.clone(),
                     update_type: UpdateType::Credit,
-                    token: TokenAddress::default(),
+                    txn_hash: None,
+                    token: None,
                 }),
                 AccountDiff::Payment(PaymentDiff {
                     amount,
                     public_key: PublicKey::default(),
                     update_type: UpdateType::Debit(None),
-                    token: TokenAddress::default(),
+                    txn_hash: None,
+                    token: None,
                 }),
             ]],
             token_diffs: vec![],
@@ -459,6 +462,7 @@ mod tests {
                 delegator: public_key.clone(),
                 delegate: delegate.clone(),
                 nonce: prev_nonce + 1,
+                txn_hash: TxnHash::default(),
             })]],
             token_diffs: vec![],
             accounts_created: vec![],

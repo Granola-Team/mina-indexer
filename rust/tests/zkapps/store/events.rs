@@ -1,8 +1,9 @@
 use crate::{generators::*, helpers::store::*};
 use mina_indexer::{
-    base::public_key::PublicKey,
+    base::{public_key::PublicKey, state_hash::StateHash},
+    command::TxnHash,
     ledger::token::TokenAddress,
-    mina_blocks::v2::ZkappEvent,
+    mina_blocks::v2::{zkapp::event::ZkappEventWithMeta, ZkappEvent},
     store::{zkapp::events::ZkappEventStore, IndexerStore},
 };
 use quickcheck::Arbitrary;
@@ -21,6 +22,11 @@ fn event_store_test() -> anyhow::Result<()> {
     ];
     let events_length = events.len() as u32;
 
+    // set block/txn
+    let state_hash = StateHash::default();
+    let block_height = u32::arbitrary(g);
+    let txn_hash = TxnHash::default();
+
     // set token account
     let pk = PublicKey::default();
     let token = TokenAddress::default();
@@ -32,7 +38,8 @@ fn event_store_test() -> anyhow::Result<()> {
     // before
     assert_eq!(None, indexer_store.get_num_events(&pk, &token)?);
 
-    let events_added = indexer_store.add_events(&pk, &token, &events)?;
+    let events_added =
+        indexer_store.add_events(&pk, &token, &events, &state_hash, block_height, &txn_hash)?;
     assert_eq!(events_added, events_length);
 
     // after
@@ -48,7 +55,12 @@ fn event_store_test() -> anyhow::Result<()> {
     for (idx, event) in events.iter().cloned().enumerate() {
         assert_eq!(
             indexer_store.get_event(&pk, &token, idx as u32)?.unwrap(),
-            event
+            ZkappEventWithMeta {
+                event,
+                block_height,
+                txn_hash: txn_hash.clone(),
+                state_hash: state_hash.clone(),
+            }
         );
     }
 
@@ -58,7 +70,14 @@ fn event_store_test() -> anyhow::Result<()> {
 
     let index = u32::arbitrary(g);
     let index = index % events_length;
+
     let set_event = <TestGen<ZkappEvent>>::arbitrary(g).0;
+    let set_event = ZkappEventWithMeta {
+        event: set_event,
+        block_height,
+        txn_hash,
+        state_hash,
+    };
 
     indexer_store.set_event(&pk, &token, &set_event, index)?;
     assert_eq!(
