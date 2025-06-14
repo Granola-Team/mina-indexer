@@ -85,21 +85,24 @@ impl EventsQueryRoot {
             },
             None => TokenAddress::default(),
         };
-
         let direction = match sort_by.unwrap_or_default() {
             EventsSortByInput::BlockHeightAsc => Direction::Forward,
             EventsSortByInput::BlockHeightDesc => Direction::Reverse,
         };
-        let mut actions = Vec::with_capacity(limit);
 
+        let mut events = Vec::with_capacity(limit);
         for (_, value) in db.events_iterator(&public_key, &token, direction).flatten() {
-            let action: ZkappEventWithMeta = serde_json::from_slice(&value)?;
-            if query.matches(&action) {
-                actions.push(Event::new(db, action)?);
+            if events.len() >= limit {
+                break;
+            }
+
+            let event: ZkappEventWithMeta = serde_json::from_slice(&value)?;
+            if query.matches(&event) {
+                events.push(Event::new(db, event)?);
             }
         }
 
-        Ok(Some(actions))
+        Ok(Some(events))
     }
 }
 

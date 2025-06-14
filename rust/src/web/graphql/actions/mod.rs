@@ -84,17 +84,20 @@ impl ActionsQueryRoot {
             },
             None => TokenAddress::default(),
         };
-
         let direction = match sort_by.unwrap_or_default() {
             ActionsSortByInput::BlockHeightAsc => Direction::Forward,
             ActionsSortByInput::BlockHeightDesc => Direction::Reverse,
         };
-        let mut actions = Vec::with_capacity(limit);
 
+        let mut actions = Vec::with_capacity(limit);
         for (_, value) in db
             .actions_iterator(&public_key, &token, direction)
             .flatten()
         {
+            if actions.len() >= limit {
+                break;
+            }
+
             let action: ActionStateWithMeta = serde_json::from_slice(&value)?;
             if query.matches(&action) {
                 actions.push(Action::new(db, action)?);
