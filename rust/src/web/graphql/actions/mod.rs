@@ -1,4 +1,4 @@
-//! GraphQL `getActions` endpoint
+//! GraphQL `actions` endpoint
 
 use super::{block::BlockInfo, db, txn::TxnInfo};
 use crate::{
@@ -61,7 +61,7 @@ pub struct ActionsQueryRoot;
 impl ActionsQueryRoot {
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
-    async fn get_actions(
+    async fn actions(
         &self,
         ctx: &Context<'_>,
         query: ActionsQueryInput,

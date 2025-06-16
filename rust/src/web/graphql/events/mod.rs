@@ -1,4 +1,4 @@
-//! GraphQL `getEvents` endpoint
+//! GraphQL `events` endpoint
 
 use super::{block::BlockInfo, db, txn::TxnInfo};
 use crate::{
@@ -62,7 +62,7 @@ pub struct EventsQueryRoot;
 impl EventsQueryRoot {
     // Cache for 1 hour
     #[graphql(cache_control(max_age = 3600))]
-    async fn get_actions(
+    async fn events(
         &self,
         ctx: &Context<'_>,
         query: EventsQueryInput,
