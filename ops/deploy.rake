@@ -28,7 +28,7 @@ def invoke_mina_indexer(*args) # standard:disable Style/ArgumentsForwarding
   system({"RUST_BACKTRACE" => "full"}, command_line) # standard:disable Style/ArgumentsForwarding
 end
 
-def in_deploy_dir()
+def in_deploy_dir
   FileUtils.mkdir_p(DEPLOY_DIR)
   Dir.chdir(DEPLOY_DIR)
 end
@@ -52,7 +52,7 @@ end
 
 desc "Fetch the snapshot."
 file SNAPSHOT_NAME do |t|
-  in_deploy_dir()
+  in_deploy_dir
   snapshot_basename = File.basename(t.name)
   puts "Fetching snapshot..."
   granola_rclone(
@@ -82,7 +82,7 @@ end
 
 desc "Create the database directory."
 file DB_DIR => [RESTORE_DIR] do |t|
-  in_deploy_dir()
+  in_deploy_dir
 
   # Send the currently running Indexer the shutdown command.
   #
@@ -103,7 +103,7 @@ end
 
 desc "Deploy the mina-indexer."
 file PID_FILE => [LOG_DIR, EXE, DB_DIR] do |t|
-  in_deploy_dir()
+  in_deploy_dir
 
   # Send the currently running Indexer the shutdown command.
   #
