@@ -154,7 +154,10 @@ impl ZkappActionStore for IndexerStore {
             Direction::Reverse => {
                 let index = index.unwrap_or(u32::MAX);
                 start[..LEN].copy_from_slice(&zkapp_actions_key(token, pk, index));
-                start[LEN] = 1;
+
+                if index == u32::MAX {
+                    start[LEN] = 1;
+                }
             }
         };
 
