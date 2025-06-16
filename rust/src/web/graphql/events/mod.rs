@@ -92,13 +92,21 @@ impl EventsQueryRoot {
             },
             None => TokenAddress::default(),
         };
+
         let direction = match sort_by.unwrap_or_default() {
             EventsSortByInput::BlockHeightAsc => Direction::Forward,
             EventsSortByInput::BlockHeightDesc => Direction::Reverse,
         };
+        let index = match direction {
+            Direction::Forward => query.start_event_index,
+            Direction::Reverse => query.end_event_index,
+        };
 
         let mut events = Vec::with_capacity(limit);
-        for (key, value) in db.events_iterator(&public_key, &token, direction).flatten() {
+        for (key, value) in db
+            .events_iterator(&public_key, &token, index, direction)
+            .flatten()
+        {
             if events.len() >= limit {
                 break;
             }

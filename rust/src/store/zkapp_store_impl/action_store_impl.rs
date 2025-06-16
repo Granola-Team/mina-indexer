@@ -140,15 +140,20 @@ impl ZkappActionStore for IndexerStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
+        index: Option<u32>,
         direction: Direction,
     ) -> speedb::DBIterator<'_> {
         const LEN: usize = TokenAddress::LEN + PublicKey::LEN + U32_LEN;
 
         let mut start = [0; LEN + 1];
         match direction {
-            Direction::Forward => start[..LEN].copy_from_slice(&zkapp_actions_key(token, pk, 0)),
+            Direction::Forward => {
+                let index = index.unwrap_or_default();
+                start[..LEN].copy_from_slice(&zkapp_actions_key(token, pk, index))
+            }
             Direction::Reverse => {
-                start[..LEN].copy_from_slice(&zkapp_actions_key(token, pk, u32::MAX));
+                let index = index.unwrap_or(u32::MAX);
+                start[..LEN].copy_from_slice(&zkapp_actions_key(token, pk, index));
                 start[LEN] = 1;
             }
         };

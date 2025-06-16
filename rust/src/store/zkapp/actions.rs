@@ -60,6 +60,7 @@ pub trait ZkappActionStore {
         &self,
         pk: &PublicKey,
         token: &TokenAddress,
+        index: Option<u32>,
         direction: Direction,
     ) -> DBIterator<'_>;
 }

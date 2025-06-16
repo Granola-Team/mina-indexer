@@ -91,14 +91,19 @@ impl ActionsQueryRoot {
             },
             None => TokenAddress::default(),
         };
+
         let direction = match sort_by.unwrap_or_default() {
             ActionsSortByInput::BlockHeightAsc => Direction::Forward,
             ActionsSortByInput::BlockHeightDesc => Direction::Reverse,
         };
+        let index = match direction {
+            Direction::Forward => query.start_action_index,
+            Direction::Reverse => query.end_action_index,
+        };
 
         let mut actions = Vec::with_capacity(limit);
         for (key, value) in db
-            .actions_iterator(&public_key, &token, direction)
+            .actions_iterator(&public_key, &token, index, direction)
             .flatten()
         {
             if actions.len() >= limit {
