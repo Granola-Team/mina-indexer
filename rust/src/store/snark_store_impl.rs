@@ -46,7 +46,6 @@ impl SnarkStore for IndexerStore {
 
         let state_hash = block.state_hash();
         let epoch = block.epoch_count();
-        let global_slot = block.global_slot_since_genesis();
         let block_height = block.blockchain_length();
         let genesis_state_hash = block.genesis_state_hash();
         let completed_works = SnarkWorkSummary::from_precomputed(block);
@@ -74,17 +73,6 @@ impl SnarkStore for IndexerStore {
                 snark_fee_sort_key(
                     snark.fee.0,
                     block_height,
-                    &snark.prover,
-                    &state_hash,
-                    prover_index,
-                ),
-                b"",
-            )?;
-            self.database.put_cf(
-                self.snark_work_fees_global_slot_sort_cf(),
-                snark_fee_sort_key(
-                    snark.fee.0,
-                    global_slot,
                     &snark.prover,
                     &state_hash,
                     prover_index,
@@ -132,7 +120,6 @@ impl SnarkStore for IndexerStore {
 
                     let snark: SnarkWorkSummary = snark.clone().into();
                     self.set_snark_by_prover_block_height(&snark, block_height, index as u32)?;
-                    self.set_snark_by_prover_global_slot(&snark, global_slot, index as u32)?;
                     self.increment_snarks_counts(&snark, epoch, &genesis_state_hash)?;
                 }
             }
@@ -676,26 +663,6 @@ impl SnarkStore for IndexerStore {
         )?)
     }
 
-    fn set_snark_by_prover_global_slot(
-        &self,
-        snark: &SnarkWorkSummary,
-        global_slot: u32,
-        index: u32,
-    ) -> Result<()> {
-        trace!(
-            "Setting SNARK global slot {} at index {} for prover {}",
-            global_slot,
-            index,
-            snark.prover,
-        );
-
-        Ok(self.database.put_cf(
-            self.snark_prover_global_slot_sort_cf(),
-            snark_prover_sort_key(&snark.prover, global_slot, index),
-            serde_json::to_vec(snark)?,
-        )?)
-    }
-
     fn get_snark_prover_total_fees(
         &self,
         pk: &PublicKey,
@@ -1095,11 +1062,6 @@ impl SnarkStore for IndexerStore {
             .iterator_cf(self.snark_work_fees_block_height_sort_cf(), mode)
     }
 
-    fn snark_fees_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.snark_work_fees_global_slot_sort_cf(), mode)
-    }
-
     fn snark_prover_max_fee_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_prover_max_fee_sort_cf(), mode)
@@ -1154,11 +1116,6 @@ impl SnarkStore for IndexerStore {
     fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.snark_prover_block_height_sort_cf(), mode)
-    }
-
-    fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.snark_prover_global_slot_sort_cf(), mode)
     }
 
     //////////////////

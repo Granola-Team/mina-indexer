@@ -74,18 +74,8 @@ pub trait InternalCommandStore {
     /// Internal commands iterator via block height
     fn internal_commands_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Internal commands iterator via global slot
-    fn internal_commands_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
     /// Account internal commands iterator via block height
     fn internal_commands_pk_block_height_iterator(
-        &self,
-        pk: PublicKey,
-        direction: Direction,
-    ) -> DBIterator<'_>;
-
-    /// Account internal commands iterator via global slot
-    fn internal_commands_pk_global_slot_iterator(
         &self,
         pk: PublicKey,
         direction: Direction,

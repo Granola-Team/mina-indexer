@@ -316,14 +316,6 @@ pub trait BlockStore {
     /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn block_creator_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator for block creators via global slot
-    /// ```
-    /// key: {creator}{slot}{state_hash}
-    /// val: b""
-    /// ```
-    /// Use [block_sort_key_state_hash_suffix] to extract state hash
-    fn block_creator_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
     /// Iterator for coinbase receivers via block height
     /// ```
     /// key: {pk}{height}{state_hash}
@@ -331,14 +323,6 @@ pub trait BlockStore {
     /// ```
     /// Use [block_sort_key_state_hash_suffix] to extract state hash
     fn coinbase_receiver_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
-    /// Iterator for coinbase receivers via global slot
-    /// ```
-    /// key: {pk}{slot}{state_hash}
-    /// val: b""
-    /// ```
-    /// Use [block_sort_key_state_hash_suffix] to extract state hash
-    fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     /// Iterator for per epoch counts of canonical blocks produced
     /// ```

@@ -42,6 +42,8 @@ impl UserCommandStore for IndexerStore {
         trace!("Adding user commands from block {}", block.summary());
 
         let epoch = block.epoch_count();
+        let block_height = block.blockchain_length();
+        let global_slot = block.global_slot_since_genesis();
         let state_hash = block.state_hash();
         let genesis_state_hash = block.genesis_state_hash();
 
@@ -58,15 +60,17 @@ impl UserCommandStore for IndexerStore {
         for command in &user_commands {
             let is_zkapp = command.is_zkapp_command();
             let txn_hash = command.txn_hash()?;
+            let nonce = command.nonce().0;
+
             trace!("Adding user command {txn_hash} block {}", block.summary());
 
             // add signed command
             let signed_command_with_data = SignedCommandWithData::from(
                 command.clone(),
                 &state_hash.0,
-                block.blockchain_length(),
+                block_height,
                 block.timestamp(),
-                block.global_slot_since_genesis(),
+                global_slot,
             );
 
             let value = serde_json::to_vec(&signed_command_with_data)?;
@@ -90,29 +94,14 @@ impl UserCommandStore for IndexerStore {
             // add index for block height sorting
             batch.put_cf(
                 self.user_commands_height_sort_cf(),
-                txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
+                txn_sort_key(block_height, &txn_hash, &state_hash),
                 &value,
             );
 
             if is_zkapp {
                 batch.put_cf(
                     self.zkapp_commands_height_sort_cf(),
-                    txn_sort_key(block.blockchain_length(), &txn_hash, &state_hash),
-                    &value,
-                );
-            }
-
-            // add index for global slot sorting
-            batch.put_cf(
-                self.user_commands_slot_sort_cf(),
-                txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
-                &value,
-            );
-
-            if is_zkapp {
-                batch.put_cf(
-                    self.zkapp_commands_slot_sort_cf(),
-                    txn_sort_key(block.global_slot_since_genesis(), &txn_hash, &state_hash),
+                    txn_sort_key(block_height, &txn_hash, &state_hash),
                     &value,
                 );
             }
@@ -121,18 +110,7 @@ impl UserCommandStore for IndexerStore {
             for token in command.tokens().iter() {
                 batch.put_cf(
                     self.user_commands_per_token_height_sort_cf(),
-                    token_txn_sort_key(token, block.blockchain_length(), &txn_hash, &state_hash),
-                    &value,
-                );
-
-                batch.put_cf(
-                    self.user_commands_per_token_slot_sort_cf(),
-                    token_txn_sort_key(
-                        token,
-                        block.global_slot_since_genesis(),
-                        &txn_hash,
-                        &state_hash,
-                    ),
+                    token_txn_sort_key(token, block_height, &txn_hash, &state_hash),
                     &value,
                 );
             }
@@ -149,32 +127,14 @@ impl UserCommandStore for IndexerStore {
             batch.put_cf(
                 self.user_commands_txn_hash_to_global_slot_cf(),
                 txn_hash.ref_inner().as_bytes(),
-                block.global_slot_since_genesis().to_be_bytes(),
+                global_slot.to_be_bytes(),
             );
 
             // add sender index
             let sender = command.sender();
             batch.put_cf(
                 self.txn_from_height_sort_cf(),
-                pk_txn_sort_key(
-                    &sender,
-                    block.blockchain_length(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
-                &value,
-            );
-
-            batch.put_cf(
-                self.txn_from_slot_sort_cf(),
-                pk_txn_sort_key(
-                    &sender,
-                    block.global_slot_since_genesis(),
-                    command.nonce().0,
-                    &txn_hash,
-                    &state_hash,
-                ),
+                pk_txn_sort_key(&sender, block_height, nonce, &txn_hash, &state_hash),
                 &value,
             );
 
@@ -182,24 +142,7 @@ impl UserCommandStore for IndexerStore {
             for receiver in command.receiver() {
                 batch.put_cf(
                     self.txn_to_height_sort_cf(),
-                    pk_txn_sort_key(
-                        &receiver,
-                        block.blockchain_length(),
-                        command.nonce().0,
-                        &txn_hash,
-                        &state_hash,
-                    ),
-                    &value,
-                );
-                batch.put_cf(
-                    self.txn_to_slot_sort_cf(),
-                    pk_txn_sort_key(
-                        &receiver,
-                        block.global_slot_since_genesis(),
-                        command.nonce().0,
-                        &txn_hash,
-                        &state_hash,
-                    ),
+                    pk_txn_sort_key(&receiver, block_height, nonce, &txn_hash, &state_hash),
                     &value,
                 );
             }
@@ -218,9 +161,9 @@ impl UserCommandStore for IndexerStore {
                     SignedCommandWithData::from(
                         c.clone(),
                         &state_hash.0,
-                        block.blockchain_length(),
+                        block_height,
                         block.timestamp(),
-                        block.global_slot_since_genesis(),
+                        global_slot,
                     )
                 })
                 .collect();
@@ -536,21 +479,6 @@ impl UserCommandStore for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: [SignedCommandWithData] serde bytes
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// ```
-    /// Use with [txn_sort_key]
-    fn user_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.user_commands_slot_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {token}{height}{txn_hash}{state_hash}
     /// - val: [SignedCommandWithData] serde bytes
     /// where
@@ -575,36 +503,6 @@ impl UserCommandStore for IndexerStore {
 
         self.database.iterator_cf(
             self.user_commands_per_token_height_sort_cf(),
-            IteratorMode::From(&start, direction),
-        )
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{slot}{txn_hash}{state_hash}
-    /// - val: [SignedCommandWithData] serde bytes
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// ```
-    /// Use with [token_txn_sort_key]
-    fn user_commands_per_token_slot_iterator(
-        &self,
-        token: &TokenAddress,
-        direction: Direction,
-    ) -> DBIterator<'_> {
-        let mut start = [0u8; TokenAddress::LEN + U32_LEN + 1];
-        start[..TokenAddress::LEN].copy_from_slice(token.0.as_bytes());
-
-        if let Direction::Reverse = direction {
-            // need to go beyond all possible keys with this token prefix
-            start[TokenAddress::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[TokenAddress::LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
-        };
-
-        self.database.iterator_cf(
-            self.user_commands_per_token_slot_sort_cf(),
             IteratorMode::From(&start, direction),
         )
     }
@@ -639,33 +537,6 @@ impl UserCommandStore for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {sender}{slot}{txn_hash}{state_hash}
-    /// - val: amount
-    /// where
-    /// - sender:     [PublicKey] bytes
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// - amount:     [u64] BE bytes
-    fn txn_from_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
-        // set start key
-        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
-        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
-
-        // get upper bound if reverse
-        if let Direction::Reverse = direction {
-            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
-        }
-
-        let mode = IteratorMode::From(&start, direction);
-        self.database
-            .iterator_cf(self.txn_from_slot_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {receiver}{height}{txn_hash}{state_hash}
     /// - val: amount
     /// where
@@ -693,32 +564,6 @@ impl UserCommandStore for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {receiver}{slot}{txn_hash}{state_hash}
-    /// - val: amount
-    /// where
-    /// - receiver:   [PublicKey] bytes
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// - amount:     [u64] BE bytes
-    fn txn_to_slot_iterator(&self, pk: &PublicKey, direction: Direction) -> DBIterator<'_> {
-        // set start key
-        let mut start = [0u8; PublicKey::LEN + U32_LEN + U32_LEN + 1];
-        start[..PublicKey::LEN].copy_from_slice(pk.0.as_bytes());
-
-        // get upper bound if reverse
-        if let Direction::Reverse = direction {
-            start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[PublicKey::LEN..][U32_LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-            start[PublicKey::LEN..][U32_LEN..][U32_LEN..].copy_from_slice("Z".as_bytes());
-        }
-
-        let mode = IteratorMode::From(&start, direction);
-        self.database.iterator_cf(self.txn_to_slot_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {height}{txn_hash}{state_hash}
     /// - val: b""
     /// where
@@ -728,19 +573,6 @@ impl UserCommandStore for IndexerStore {
     fn zkapp_commands_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.zkapp_commands_height_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: b""
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
-    /// - state_hash: [StateHash] bytes
-    fn zkapp_commands_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.zkapp_commands_slot_sort_cf(), mode)
     }
 
     /////////////////////////

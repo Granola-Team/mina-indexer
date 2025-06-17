@@ -33,7 +33,6 @@ impl InternalCommandStore for IndexerStore {
         // block data
         let epoch = block.epoch_count();
         let state_hash = block.state_hash();
-        let global_slot = block.global_slot_since_genesis();
         let block_height = block.blockchain_length();
         let genesis_state_hash = block.genesis_state_hash();
 
@@ -77,18 +76,6 @@ impl InternalCommandStore for IndexerStore {
                 ),
                 &value,
             )?;
-
-            self.database.put_cf(
-                self.internal_commands_pk_global_slot_sort_cf(),
-                internal_commmand_pk_sort_key(
-                    &pk,
-                    global_slot,
-                    &state_hash,
-                    i as u32,
-                    int_cmd.kind(),
-                ),
-                &value,
-            )?;
         }
 
         Ok(())
@@ -106,13 +93,10 @@ impl InternalCommandStore for IndexerStore {
         );
 
         let state_hash = block.state_hash();
-        let global_slot = block.global_slot_since_genesis();
         let block_height = block.blockchain_length();
 
-        // value
-        let value = serde_json::to_vec(internal_command)?;
-
         // store
+        let value = serde_json::to_vec(internal_command)?;
         self.database.put_cf(
             self.internal_commands_cf(),
             internal_commmand_block_key(&state_hash, index),
@@ -123,13 +107,6 @@ impl InternalCommandStore for IndexerStore {
         self.database.put_cf(
             self.internal_commands_block_height_sort_cf(),
             internal_commmand_sort_key(block_height, &state_hash, index),
-            &value,
-        )?;
-
-        // sort by global slot
-        self.database.put_cf(
-            self.internal_commands_global_slot_sort_cf(),
-            internal_commmand_sort_key(global_slot, &state_hash, index),
             &value,
         )?;
 
@@ -326,22 +303,6 @@ impl InternalCommandStore for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {global_slot}{state_hash}{index}
-    /// - val: [InternalCommandWithData] serde bytes
-    /// where
-    /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - index:       [u32] BE bytes
-    /// - kind:        0, 1, or 2
-    /// ```
-    /// Use with [internal_commmand_sort_key]
-    fn internal_commands_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.internal_commands_global_slot_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {recipient}{height}{state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
@@ -372,40 +333,6 @@ impl InternalCommandStore for IndexerStore {
 
         self.database
             .iterator_cf(self.internal_commands_pk_block_height_sort_cf(), mode)
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {recipient}{global_slot}{state_hash}{index}
-    /// - val: [InternalCommandWithData] serde bytes
-    /// where
-    /// - recipient:   [PublicKey] bytes
-    /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - index:       [u32] BE bytes
-    /// ```
-    /// Use with [internal_commmand_pk_sort_key]
-    fn internal_commands_pk_global_slot_iterator(
-        &self,
-        pk: PublicKey,
-        direction: Direction,
-    ) -> DBIterator<'_> {
-        let pk_bytes = pk.to_bytes();
-        let mut start = [0; PublicKey::LEN + U32_LEN + 1];
-        let mode = match direction {
-            Direction::Forward => IteratorMode::From(&pk_bytes, direction),
-            Direction::Reverse => {
-                start[..PublicKey::LEN].copy_from_slice(&pk_bytes);
-                start[PublicKey::LEN..][..U32_LEN].copy_from_slice(&u32::MAX.to_be_bytes());
-
-                // need to start after the target account
-                start[PublicKey::LEN..][U32_LEN..].copy_from_slice("D".as_bytes());
-                IteratorMode::From(&start, direction)
-            }
-        };
-
-        self.database
-            .iterator_cf(self.internal_commands_pk_global_slot_sort_cf(), mode)
     }
 
     /////////////////////////////
@@ -752,12 +679,6 @@ mod tests {
         // check pk internal commands
         let pk_internal_cmds: Vec<_> = store
             .internal_commands_pk_block_height_iterator(pk.clone(), speedb::Direction::Reverse)
-            .flatten()
-            .collect();
-        assert_eq!(pk_internal_cmds, vec![]);
-
-        let pk_internal_cmds: Vec<_> = store
-            .internal_commands_pk_global_slot_iterator(pk.clone(), speedb::Direction::Reverse)
             .flatten()
             .collect();
         assert_eq!(pk_internal_cmds, vec![]);

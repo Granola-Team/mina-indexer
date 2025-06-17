@@ -136,22 +136,10 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("coinbase-receiver-height-sort column family exists")
     }
 
-    fn block_coinbase_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("coinbase-receiver-slot-sort")
-            .expect("coinbase-receiver-slot-sort column family exists")
-    }
-
     fn block_creator_height_sort_cf(&self) -> &ColumnFamily {
         self.database
             .cf_handle("block-creator-height-sort")
             .expect("block-creator-height-sort column family exists")
-    }
-
-    fn block_creator_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("block-creator-slot-sort")
-            .expect("block-creator-slot-sort column family exists")
     }
 
     /// CF for storing blocks at a fixed height:
@@ -308,22 +296,6 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: [SignedCommandWithData] serde bytes
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// ```
-    /// Use with [txn_sort_key]
-    fn user_commands_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("user-commands-slot-sort")
-            .expect("user-commands-slot-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {token}{height}{txn_hash}{state_hash}
     /// - val: [SignedCommandWithData] serde bytes
     /// where
@@ -336,22 +308,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("user-commands-per-token-height-sort")
             .expect("user-commands-per-token-height-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {token}{slot}{txn_hash}{state_hash}
-    /// - val: [SignedCommandWithData] serde bytes
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes
-    /// - state_hash: [StateHash] bytes
-    /// ```
-    /// Use with [token_txn_sort_key]
-    fn user_commands_per_token_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("user-commands-per-token-slot-sort")
-            .expect("user-commands-per-token-slot-sort column family exists")
     }
 
     /// Key-value pairs
@@ -382,24 +338,6 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {sender}{global_slot}{txn_hash}{state_hash}
-    /// - val: amount
-    /// where
-    /// - sender:      [PublicKey] bytes
-    /// - global_slot: [u32] BE bytes
-    /// - txn_hash:    [TxnHash::V1_LEN] bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - amount:      [u64] BE bytes
-    /// ```
-    /// Use with [pk_txn_sort_key]
-    fn txn_from_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("txn-from-slot-sort")
-            .expect("txn-from-slot-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {sender}{block_height}{nonce}{txn_hash}{state_hash}
     /// - val: amount
     /// where
@@ -415,25 +353,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("txn-from-height-sort")
             .expect("txn-from-height-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {receiver}{global_slot}{nonce}{txn_hash}{state_hash}
-    /// - val: amount
-    /// where
-    /// - receiver:    [PublicKey] bytes
-    /// - global_slot: [u32] BE bytes
-    /// - nonce:       [u32] BE bytes
-    /// - txn_hash:    [TxnHash::V1_LEN] bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - amount:      [u64] BE bytes
-    /// ```
-    /// Use with [pk_txn_sort_key]
-    fn txn_to_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("txn-to-slot-sort")
-            .expect("txn-to-slot-sort column family exists")
     }
 
     /// Key-value pairs
@@ -492,20 +411,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("zkapp-commands-height-sort")
             .expect("zkapp-commands-height-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {slot}{txn_hash}{state_hash}
-    /// - val: [SignedCommandWith] serde bytes
-    /// where
-    /// - slot:       [u32] BE bytes
-    /// - txn_hash:   [TxnHash::V1_LEN] bytes (right-padded)
-    /// - state_hash: [StateHash] bytes
-    fn zkapp_commands_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("zkapp-commands-slot-sort")
-            .expect("zkapp-commands-slot-sort column family exists")
     }
 
     /////////////////////
@@ -1165,23 +1070,6 @@ impl ColumnFamilyHelpers for IndexerStore {
 
     /// Key-value pairs
     /// ```
-    /// - key: {global_slot}{state_hash}{index}
-    /// - val: [InternalCommandWithData] serde bytes
-    /// where
-    /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - index:       [u32] BE bytes
-    /// - kind:        0, 1, or 2
-    /// ```
-    /// Use with [internal_commmand_sort_key]
-    fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("internal-commands-global-slot-sort")
-            .expect("internal-commands-global-slot-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
     /// - key: {recipient}{height}{state_hash}{index}
     /// - val: [InternalCommandWithData] serde bytes
     /// where
@@ -1195,23 +1083,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("internal-commands-pk-block-height-sort")
             .expect("internal-commands-pk-block-height-sort column family exists")
-    }
-
-    /// Key-value pairs
-    /// ```
-    /// - key: {recipient}{global_slot}{state_hash}{index}
-    /// - val: [InternalCommandWithData] serde bytes
-    /// where
-    /// - recipient:   [PublicKey] bytes
-    /// - global_slot: [u32] BE bytes
-    /// - state_hash:  [StateHash] bytes
-    /// - index:       [u32] BE bytes
-    /// ```
-    /// Use with [internal_commmand_pk_sort_key]
-    fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("internal-commands-pk-global-slot-sort")
-            .expect("internal-commands-pk-global-slot-sort column family exists")
     }
 
     //////////////////////////
@@ -1783,23 +1654,6 @@ impl ColumnFamilyHelpers for IndexerStore {
             .expect("snark-prover-block-height-sort column family exists")
     }
 
-    /// CF for storing/sorting SNARKs by prover & global slot
-    /// ```
-    /// key: {prover}{global_slot}{index}
-    /// val: snark
-    /// where
-    /// - prover:      [PublicKey] bytes
-    /// - global_slot: [u32] BE bytes
-    /// - index:       [u32] BE bytes
-    /// - snark:       [SnarkWorkSummary] serde bytes
-    /// ```
-    /// Use [ snark_prover_sort_key]
-    fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("snark-prover-global-slot-sort")
-            .expect("snark-prover-global-slot-sort column family exists")
-    }
-
     /// CF for sorting snark fees by block height
     /// ```
     /// key: {fee}{height}{pk}{hash}{index}
@@ -1816,24 +1670,6 @@ impl ColumnFamilyHelpers for IndexerStore {
         self.database
             .cf_handle("snark-work-fees-block-height-sort")
             .expect("snark-work-fees-block-height-sort column family exists")
-    }
-
-    /// CF for sorting snark fees by global slot
-    /// ```
-    /// key: {fee}{slot}{pk}{hash}{index}
-    /// val: b""
-    /// where
-    /// - fee:   [u64] BE bytes
-    /// - slot:  [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
-    /// - hash:  [StateHash] bytes
-    /// - index: [u32] BE bytes
-    /// ```
-    /// Use [snark_fee_sort_key]
-    fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily {
-        self.database
-            .cf_handle("snark-work-fees-global-slot-sort")
-            .expect("snark-work-fees-global-slot-sort column family exists")
     }
 
     ////////////////////////

@@ -58,14 +58,8 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting block creators by block height
     fn block_creator_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting block creators by global slot
-    fn block_creator_slot_sort_cf(&self) -> &ColumnFamily;
-
     /// CF for sorting coinbase receivers by block height
     fn block_coinbase_height_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting coinbase receivers by global slot
-    fn block_coinbase_slot_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for sorting blocks by blockchain length.
     /// Used with [blocks_height_iterator]
@@ -137,23 +131,11 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting user commands by blockchain length
     fn user_commands_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting user commands by global slot
-    fn user_commands_slot_sort_cf(&self) -> &ColumnFamily;
-
     /// CF for sorting user commands per token by blockchain length
     fn user_commands_per_token_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting user commands per token by global slot
-    fn user_commands_per_token_slot_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting user commands by sender public key
-    fn txn_from_slot_sort_cf(&self) -> &ColumnFamily;
-
     /// CF for sorting user commands by sender public key
     fn txn_from_height_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting user commands by receiver public key
-    fn txn_to_slot_sort_cf(&self) -> &ColumnFamily;
 
     /// CF for sorting user commands by sender public key
     fn txn_to_height_sort_cf(&self) -> &ColumnFamily;
@@ -171,9 +153,6 @@ pub trait ColumnFamilyHelpers {
 
     /// CF for sorting zkapp commands by blockchain length
     fn zkapp_commands_height_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting zkapp commands by global slot
-    fn zkapp_commands_slot_sort_cf(&self) -> &ColumnFamily;
 
     /////////////////////
     // Zkapp store CFs //
@@ -318,14 +297,8 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting internal commands by block height
     fn internal_commands_block_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting internal commands by global slot
-    fn internal_commands_global_slot_sort_cf(&self) -> &ColumnFamily;
-
     /// CF for sorting internal commands by account & block height
     fn internal_commands_pk_block_height_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting internal commands by account & global slot
-    fn internal_commands_pk_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     ///////////////////////////
     // Best ledger store CFs //
@@ -469,14 +442,8 @@ pub trait ColumnFamilyHelpers {
     /// CF for sorting SNARKS by prover & block height
     fn snark_prover_block_height_sort_cf(&self) -> &ColumnFamily;
 
-    /// CF for sorting SNARKS by prover & global slot
-    fn snark_prover_global_slot_sort_cf(&self) -> &ColumnFamily;
-
     /// CF for sorting SNARK work fees & block height
     fn snark_work_fees_block_height_sort_cf(&self) -> &ColumnFamily;
-
-    /// CF for sorting SNARK work fees & global slot
-    fn snark_work_fees_global_slot_sort_cf(&self) -> &ColumnFamily;
 
     ////////////////////
     // Username store //

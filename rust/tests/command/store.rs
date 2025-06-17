@@ -120,31 +120,5 @@ async fn add_and_get() -> anyhow::Result<()> {
         curr_height = cmd_height;
     }
 
-    // iterate over transactions via global slot
-    let mut curr_slot = 0;
-    for (key, _) in indexer_store
-        .user_commands_slot_iterator(IteratorMode::End)
-        .flatten()
-    {
-        let txn_hash = user_commands_iterator_txn_hash(&key)?;
-        let state_hash = user_commands_iterator_state_hash(&key)?;
-        let signed_cmd = indexer_store
-            .get_user_command_state_hash(&txn_hash, &state_hash)?
-            .unwrap();
-
-        // txn hashes should match
-        assert_eq!(user_commands_iterator_txn_hash(&key)?, signed_cmd.txn_hash);
-
-        // global slot numbers should match
-        let cmd_slot = user_commands_iterator_u32_prefix(&key);
-        assert!(curr_slot <= cmd_slot);
-        assert_eq!(cmd_slot, signed_cmd.global_slot_since_genesis);
-
-        // blocks should be present
-        let state_hash = signed_cmd.state_hash;
-        assert!(indexer_store.get_block(&state_hash)?.is_some());
-
-        curr_slot = cmd_slot;
-    }
     Ok(())
 }

@@ -233,10 +233,12 @@ impl BlocksQueryRoot {
             end[PublicKey::LEN..].copy_from_slice(&u32::MAX.to_be_bytes());
 
             let iter = match sort_by {
-                BlockHeightAsc => db.coinbase_receiver_block_height_iterator(From(start, Forward)),
-                BlockHeightDesc => db.coinbase_receiver_block_height_iterator(From(&end, Reverse)),
-                GlobalSlotAsc => db.coinbase_receiver_global_slot_iterator(From(start, Forward)),
-                GlobalSlotDesc => db.coinbase_receiver_global_slot_iterator(From(&end, Reverse)),
+                BlockHeightAsc | GlobalSlotAsc => {
+                    db.coinbase_receiver_block_height_iterator(From(start, Forward))
+                }
+                BlockHeightDesc | GlobalSlotDesc => {
+                    db.coinbase_receiver_block_height_iterator(From(&end, Reverse))
+                }
             };
 
             for (key, _) in iter.flatten() {
@@ -299,10 +301,12 @@ impl BlocksQueryRoot {
             end[PublicKey::LEN..].copy_from_slice(&upper_bound.to_be_bytes());
 
             let iter = match sort_by {
-                BlockHeightAsc => db.block_creator_block_height_iterator(From(start, Forward)),
-                BlockHeightDesc => db.block_creator_block_height_iterator(From(&end, Reverse)),
-                GlobalSlotAsc => db.block_creator_global_slot_iterator(From(start, Forward)),
-                GlobalSlotDesc => db.block_creator_global_slot_iterator(From(&end, Reverse)),
+                BlockHeightAsc | GlobalSlotAsc => {
+                    db.block_creator_block_height_iterator(From(start, Forward))
+                }
+                BlockHeightDesc | GlobalSlotDesc => {
+                    db.block_creator_block_height_iterator(From(&end, Reverse))
+                }
             };
 
             for (key, _) in iter.flatten() {

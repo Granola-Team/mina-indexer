@@ -887,16 +887,16 @@ impl TransactionQueryInput {
             }
             (BlockHeightDesc, Some(true)) => db.zkapp_commands_height_iterator(IteratorMode::End),
             (GlobalSlotAsc | DateTimeAsc, None | Some(false)) => {
-                db.user_commands_slot_iterator(IteratorMode::Start)
+                db.user_commands_height_iterator(IteratorMode::Start)
             }
             (GlobalSlotAsc | DateTimeAsc, Some(true)) => {
-                db.zkapp_commands_slot_iterator(IteratorMode::Start)
+                db.zkapp_commands_height_iterator(IteratorMode::Start)
             }
             (GlobalSlotDesc | DateTimeDesc, None | Some(false)) => {
-                db.user_commands_slot_iterator(IteratorMode::End)
+                db.user_commands_height_iterator(IteratorMode::End)
             }
             (GlobalSlotDesc | DateTimeDesc, Some(true)) => {
-                db.zkapp_commands_slot_iterator(IteratorMode::End)
+                db.zkapp_commands_height_iterator(IteratorMode::End)
             }
         };
 
@@ -1020,21 +1020,7 @@ impl TransactionQueryInput {
             match sort_by {
                 BlockHeightAsc | BlockHeightDesc => (min_bound, max_bound.saturating_add(1)),
                 GlobalSlotAsc | GlobalSlotDesc | DateTimeAsc | DateTimeDesc => {
-                    let min_slots = db
-                        .get_block_global_slots_from_height(min_bound)?
-                        .expect("global slots at min height");
-                    let max_slots = db
-                        .get_block_global_slots_from_height(max_bound)?
-                        .expect("global slots at max height");
-                    (
-                        min_slots.iter().min().copied().unwrap_or_default(),
-                        max_slots
-                            .iter()
-                            .max()
-                            .copied()
-                            .unwrap_or(u32::MAX)
-                            .saturating_add(1),
-                    )
+                    (min_bound, max_bound.saturating_add(1))
                 }
             }
         };
@@ -1223,7 +1209,7 @@ impl TransactionQueryInput {
                 db.user_commands_per_token_height_iterator(token, direction)
             }
             DateTimeAsc | GlobalSlotAsc | DateTimeDesc | GlobalSlotDesc => {
-                db.user_commands_per_token_slot_iterator(token, direction)
+                db.user_commands_per_token_height_iterator(token, direction)
             }
         };
 
@@ -1287,9 +1273,9 @@ impl TransactionQueryInput {
             }
             _ => {
                 if query.from.is_some() {
-                    db.txn_from_slot_iterator(&pk, direction)
+                    db.txn_from_height_iterator(&pk, direction)
                 } else {
-                    db.txn_to_slot_iterator(&pk, direction)
+                    db.txn_to_height_iterator(&pk, direction)
                 }
             }
         };
@@ -1347,16 +1333,16 @@ impl TransactionQueryInput {
                 db.zkapp_commands_height_iterator(IteratorMode::From(&max.to_be_bytes(), direction))
             }
             (GlobalSlotAsc | DateTimeAsc, None | Some(false)) => {
-                db.user_commands_slot_iterator(IteratorMode::From(&min.to_be_bytes(), direction))
+                db.user_commands_height_iterator(IteratorMode::From(&min.to_be_bytes(), direction))
             }
             (GlobalSlotAsc | DateTimeAsc, Some(true)) => {
-                db.zkapp_commands_slot_iterator(IteratorMode::From(&min.to_be_bytes(), direction))
+                db.zkapp_commands_height_iterator(IteratorMode::From(&min.to_be_bytes(), direction))
             }
             (GlobalSlotDesc | DateTimeDesc, None | Some(false)) => {
-                db.user_commands_slot_iterator(IteratorMode::From(&max.to_be_bytes(), direction))
+                db.user_commands_height_iterator(IteratorMode::From(&max.to_be_bytes(), direction))
             }
             (GlobalSlotDesc | DateTimeDesc, Some(true)) => {
-                db.zkapp_commands_slot_iterator(IteratorMode::From(&max.to_be_bytes(), direction))
+                db.zkapp_commands_height_iterator(IteratorMode::From(&max.to_be_bytes(), direction))
             }
         })
     }

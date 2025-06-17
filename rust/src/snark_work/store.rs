@@ -72,14 +72,6 @@ pub trait SnarkStore {
         index: u32,
     ) -> Result<()>;
 
-    /// Set the SNARK for the prover in `global_slot` at `index`
-    fn set_snark_by_prover_global_slot(
-        &self,
-        snark: &SnarkWorkSummary,
-        global_slot: u32,
-        index: u32,
-    ) -> Result<()>;
-
     /// Get the SNARK prover's total fees for all SNARKs sold
     /// below the specified block height
     fn get_snark_prover_total_fees(
@@ -232,18 +224,6 @@ pub trait SnarkStore {
     /// - index:  [u32] BE bytes
     fn snark_fees_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
-    /// Iterator over SNARKs sorted by fee & global slot
-    /// ```
-    /// key: {fee}{slot}{pk}{hash}{index}
-    /// val: b""
-    /// where
-    /// - fee:   [u64] BE bytes
-    /// - slot:  [u32] BE bytes
-    /// - pk:    [PublicKey] bytes
-    /// - hash:  [StateHash] bytes
-    /// - index: [u32] BE bytes
-    fn snark_fees_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
     /// Iterator over SNARK provers by all-time max fee
     /// ```
     /// key: {fee}{prover}
@@ -329,17 +309,6 @@ pub trait SnarkStore {
     /// - index:  [u32] BE bytes
     /// - snark:  [SnarkWorkSummary] serde bytes
     fn snark_prover_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
-
-    /// Iterator over SNARKs by prover, sorted by global slot & index
-    /// ```
-    /// key: {prover}{slot}{index}
-    /// val: snark
-    /// where
-    /// - prover: [PublicKey] bytes
-    /// - slot:   [u32] BE bytes
-    /// - index:  [u32] BE bytes
-    /// - snark:  [SnarkWorkSummary] serde bytes
-    fn snark_prover_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_>;
 
     //////////////////
     // SNARK counts //

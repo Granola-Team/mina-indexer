@@ -525,16 +525,6 @@ impl BlockStore for IndexerStore {
             b"",
         );
 
-        // global slot sort
-        batch.put_cf(
-            self.block_creator_slot_sort_cf(),
-            pk_block_sort_key(
-                &block_creator,
-                block.global_slot_since_genesis(),
-                &state_hash,
-            ),
-            b"",
-        );
         Ok(())
     }
 
@@ -566,17 +556,6 @@ impl BlockStore for IndexerStore {
         batch.put_cf(
             self.block_coinbase_height_sort_cf(),
             pk_block_sort_key(&coinbase_receiver, block.blockchain_length(), &state_hash),
-            b"",
-        );
-
-        // global slot sort
-        batch.put_cf(
-            self.block_coinbase_slot_sort_cf(),
-            pk_block_sort_key(
-                &coinbase_receiver,
-                block.global_slot_since_genesis(),
-                &state_hash,
-            ),
             b"",
         );
 
@@ -1091,19 +1070,9 @@ impl BlockStore for IndexerStore {
             .iterator_cf(self.block_creator_height_sort_cf(), mode)
     }
 
-    fn block_creator_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.block_creator_slot_sort_cf(), mode)
-    }
-
     fn coinbase_receiver_block_height_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
         self.database
             .iterator_cf(self.block_coinbase_height_sort_cf(), mode)
-    }
-
-    fn coinbase_receiver_global_slot_iterator(&self, mode: IteratorMode) -> DBIterator<'_> {
-        self.database
-            .iterator_cf(self.block_coinbase_slot_sort_cf(), mode)
     }
 
     fn canonical_epoch_blocks_produced_iterator(

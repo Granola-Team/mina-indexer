@@ -76,12 +76,13 @@ pub struct Block {
     pub block: BlockWithoutCanonicity,
 }
 
-#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+#[derive(Default, Enum, Copy, Clone, Eq, PartialEq)]
 pub enum BlockSortByInput {
-    #[graphql(name = "BLOCKHEIGHT_ASC")]
-    BlockHeightAsc,
+    #[default]
     #[graphql(name = "BLOCKHEIGHT_DESC")]
     BlockHeightDesc,
+    #[graphql(name = "BLOCKHEIGHT_ASC")]
+    BlockHeightAsc,
 
     #[graphql(name = "GLOBALSLOT_ASC")]
     GlobalSlotAsc,
