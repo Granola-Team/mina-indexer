@@ -17,6 +17,7 @@ require "open-uri"
 dest = ARGV[0]
 
 ledgers = [
+  ["25", "jxMFuoiz2pCzKib7NY1JDeR8Q1YxDSWzVMHGK5hTpXP4tuV8nh5"],
   ["24", "jwKbLH2f2xRAqgV1ohz618idSEmbARLJyjRUdnNFrsTwRVqVJCb"],
   ["23", "jwGzgaRhjAwZvfowL6LhqC6mHEZ7mCeXd6Ps4njfUQYAvYcRRoQ"],
   ["22", "jxyJvcM4j4Mi2hNh6aLTB6wPChm5KtaaYGZBhTurWWBJ1278z5X"],
