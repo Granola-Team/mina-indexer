@@ -625,6 +625,7 @@ impl IndexerState {
                 }
             }
         }
+
         Ok(())
     }
 

@@ -844,7 +844,7 @@ impl ZkappTokenStore for IndexerStore {
 
         Ok(self.database.put_cf(
             self.zkapp_tokens_holder_count_cf(),
-            TokenAddress::default().0.as_bytes(),
+            MINA_TOKEN_ADDRESS.as_bytes(),
             num.to_be_bytes(),
         )?)
     }
