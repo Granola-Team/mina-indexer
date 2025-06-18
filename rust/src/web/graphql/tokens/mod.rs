@@ -7,6 +7,7 @@ use super::{
 };
 use crate::{
     base::public_key::PublicKey,
+    constants::MINA_TOKEN_ADDRESS,
     ledger::{self, account, store::best::BestLedgerStore, token::TokenAddress},
     store::{zkapp::tokens::ZkappTokenStore, IndexerStore},
     utility::store::common::U64_LEN,
@@ -393,10 +394,13 @@ impl TokenHoldersQueryInput {
 impl TokenWithMeta {
     fn new(db: &Arc<IndexerStore>, token: ledger::token::Token) -> Self {
         Self {
-            num_holders: db
-                .get_token_holders_num(&token.token)
-                .expect("num token holders")
-                .unwrap_or_default(),
+            num_holders: if token.token.0 == MINA_TOKEN_ADDRESS {
+                db.get_num_mina_accounts()
+            } else {
+                db.get_token_holders_num(&token.token)
+            }
+            .expect("num token holders")
+            .unwrap_or_default(),
             total_num_txns: db
                 .get_token_txns_num(&token.token)
                 .expect("num token txns")

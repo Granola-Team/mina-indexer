@@ -28,7 +28,7 @@ jsonpath "$.data.tokens[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozG
 jsonpath "$.data.tokens[0].supply" == 1166062074840039233
 jsonpath "$.data.tokens[0].owner" == null
 jsonpath "$.data.tokens[0].symbol" == "MINA"
-jsonpath "$.data.tokens[0].num_holders" == 228183
+jsonpath "$.data.tokens[0].num_holders" == 228179
 jsonpath "$.data.tokens[0].total_num_txns" == 97 # we only count the post-hardfork MINA txns here
 jsonpath "$.data.tokens[0].total_num_locked" == 0
 jsonpath "$.data.tokens[0].total_num_tokens" == 2
@@ -112,7 +112,7 @@ jsonpath "$.data.tokens[0].token" == "wSHV2S4qX9jFsLjQo8r1BsMLH2ZRKsZx6EJd1sbozG
 jsonpath "$.data.tokens[0].supply" == 1166062074840039233
 jsonpath "$.data.tokens[0].owner" == null
 jsonpath "$.data.tokens[0].symbol" == "MINA"
-jsonpath "$.data.tokens[0].num_holders" == 228183
+jsonpath "$.data.tokens[0].num_holders" == 228179
 jsonpath "$.data.tokens[0].total_num_txns" == 97 # we only count the post-hardfork MINA txns here
 jsonpath "$.data.tokens[0].total_num_locked" == 0
 jsonpath "$.data.tokens[0].total_num_tokens" == 2
