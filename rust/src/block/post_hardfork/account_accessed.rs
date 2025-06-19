@@ -69,9 +69,7 @@ impl AccountAccessed {
             &account.token_symbol.clone().unwrap_or_default(),
             format!(
                 "Token symbol mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg,
-                account.token_symbol.clone().unwrap_or_default(),
-                self.account.token_symbol.clone().unwrap_or_default()
+                msg, account.token_symbol, self.account.token_symbol
             ),
         );
 
@@ -110,9 +108,6 @@ impl From<(u64, v2::AccountAccessed)> for AccountAccessed {
             delegate: value.1.delegate.unwrap_or(public_key),
             token: Some(value.1.token_id),
             token_symbol: Some(value.1.token_symbol),
-            receipt_chain_hash: Some(value.1.receipt_chain_hash),
-            voting_for: Some(value.1.voting_for.into()),
-            permissions: Some(value.1.permissions.into()),
             timing,
             zkapp: value.1.zkapp,
             ..Default::default()

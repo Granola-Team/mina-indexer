@@ -1,7 +1,7 @@
 //! Indexer amount type
 
 use crate::{
-    constants::{MINA_SCALE, MINA_SCALE_DEC},
+    constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_SCALE, MINA_SCALE_DEC},
     utility::functions::nanomina_to_mina,
 };
 use anyhow::anyhow;
@@ -28,6 +28,14 @@ impl Amount {
         decimal.set_scale(9).ok();
 
         decimal.to_f64().unwrap()
+    }
+
+    pub fn deduct_mina_account_creation_fee(&self, is_mina_creation_fee_paid: bool) -> u64 {
+        if is_mina_creation_fee_paid {
+            self.0
+        } else {
+            self.0 - MAINNET_ACCOUNT_CREATION_FEE.0
+        }
     }
 }
 

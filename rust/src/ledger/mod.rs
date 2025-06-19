@@ -123,7 +123,7 @@ impl Ledger {
 
     /// Insert a token account into the corresponding token ledger
     pub fn insert_account(&mut self, account: Account, token: &TokenAddress) {
-        if let Some(token_ledger) = self.tokens.get_mut(token) {
+        if let Some(token_ledger) = self.get_mut_token_ledger(token) {
             // insert account into existing token ledger
             token_ledger
                 .accounts
@@ -172,8 +172,7 @@ impl Ledger {
         let token = acct_diff.token();
 
         if let Some(account) = self
-            .tokens
-            .get_mut(&token)
+            .get_mut_token_ledger(&token)
             .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
             .or_else(|| {
                 Some(Account::empty(
@@ -231,8 +230,7 @@ impl Ledger {
             let token = acct_diff.token();
 
             if let Some(account_after) = self
-                .tokens
-                .get_mut(&token)
+                .get_mut_token_ledger(&token)
                 .and_then(|token_ledger| token_ledger.accounts.remove(&pk))
                 .or_else(|| {
                     Some(Account::empty(
@@ -247,12 +245,10 @@ impl Ledger {
                     &diff.state_hash,
                     diff.new_pk_balances.contains_key(&pk),
                 ) {
-                    self.tokens
-                        .get_mut(&token)
+                    self.get_mut_token_ledger(&token)
                         .and_then(|token_ledger| token_ledger.accounts.insert(pk, account));
                 } else {
-                    self.tokens
-                        .get_mut(&token)
+                    self.get_mut_token_ledger(&token)
                         .and_then(|token_ledger| token_ledger.accounts.remove(&pk));
                 }
             }

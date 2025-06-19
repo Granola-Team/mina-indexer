@@ -31,14 +31,16 @@ impl TokenLedger {
         self.accounts.is_empty()
     }
 
-    pub fn get_account(&mut self, pk: &PublicKey) -> Option<&Account> {
+    pub fn get_account(&self, pk: &PublicKey) -> Option<&Account> {
         self.accounts.get(pk)
     }
 
+    pub fn get_mut_account(&mut self, pk: &PublicKey) -> Option<&mut Account> {
+        self.accounts.get_mut(pk)
+    }
+
     pub fn new() -> Self {
-        Self {
-            accounts: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn apply_diff_from_precomputed(self, block: &PrecomputedBlock) -> anyhow::Result<Self> {
@@ -206,16 +208,9 @@ impl PartialEq for TokenLedger {
         for pk in self.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
                 println!(
-                    "[TokenLedger.eq mismatch] {pk:?} | {:?} | {:?}",
-                    self.accounts
-                        .get(pk)
-                        .cloned()
-                        .map(Account::deduct_mina_account_creation_fee),
-                    other
-                        .accounts
-                        .get(pk)
-                        .cloned()
-                        .map(Account::deduct_mina_account_creation_fee),
+                    "[TokenLedger.eq mismatch] {pk} | {} | {}",
+                    self.accounts.get(pk).unwrap(),
+                    other.accounts.get(pk).unwrap(),
                 );
 
                 return false;
@@ -225,16 +220,9 @@ impl PartialEq for TokenLedger {
         for pk in other.accounts.keys() {
             if self.accounts.get(pk) != other.accounts.get(pk) {
                 println!(
-                    "[TokenLedger.eq mismatch] {pk:?} | {:?} | {:?}",
-                    self.accounts
-                        .get(pk)
-                        .cloned()
-                        .map(Account::deduct_mina_account_creation_fee),
-                    other
-                        .accounts
-                        .get(pk)
-                        .cloned()
-                        .map(Account::deduct_mina_account_creation_fee),
+                    "[TokenLedger.eq mismatch] {pk} | {} | {}",
+                    self.accounts.get(pk).unwrap(),
+                    other.accounts.get(pk).unwrap(),
                 );
 
                 return false;
@@ -260,10 +248,20 @@ impl std::fmt::Display for TokenLedger {
 impl std::fmt::Debug for TokenLedger {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (pk, acct) in &self.accounts {
+            let is_mina_creation_fee_paid = acct
+                .token
+                .as_ref()
+                .is_none_or(|t| t.0 == MINA_TOKEN_ADDRESS)
+                && !acct.creation_fee_paid;
             writeln!(
                 f,
                 "{pk} -> {}",
-                acct.clone().deduct_mina_account_creation_fee().balance.0
+                if is_mina_creation_fee_paid {
+                    acct.balance
+                        .deduct_mina_account_creation_fee(is_mina_creation_fee_paid)
+                } else {
+                    acct.balance.0
+                }
             )?;
         }
 
