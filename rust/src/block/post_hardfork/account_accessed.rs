@@ -73,6 +73,17 @@ impl AccountAccessed {
             ),
         );
 
+        if self.account.timing.is_some() {
+            assert_eq(
+                &self.account.timing,
+                &account.timing,
+                format!(
+                    "Timing mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                    msg, account.timing, self.account.timing
+                ),
+            );
+        }
+
         if self.account.balance != account.balance
             || self.account.nonce.unwrap_or_default() != account.nonce.unwrap_or_default()
             || self.account.delegate != account.delegate
