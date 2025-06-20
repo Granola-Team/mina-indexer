@@ -118,6 +118,9 @@ pub struct IndexerState {
 
     /// PCB versions & chain ids for various networks
     pub chain_data: ChainData,
+
+    /// Check mode enabled
+    check_mode: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -163,6 +166,7 @@ pub struct IndexerStateConfig {
     pub ledger_cadence: u32,
     pub reporting_freq: u32,
     pub do_not_ingest_orphan_blocks: bool,
+    pub check_mode: bool,
 }
 
 impl IndexerStateConfig {
@@ -173,6 +177,7 @@ impl IndexerStateConfig {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        check_mode: bool,
     ) -> Self {
         Self {
             version,
@@ -181,6 +186,7 @@ impl IndexerStateConfig {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
+            check_mode,
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
             ledger_cadence: LEDGER_CADENCE,
@@ -197,6 +203,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        check_mode: bool,
     ) -> Result<Self> {
         Self::new_from_config(IndexerStateConfig::new(
             genesis_ledger,
@@ -205,6 +212,7 @@ impl IndexerState {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
+            check_mode,
         ))
     }
 
@@ -214,6 +222,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        check_mode: bool,
     ) -> Result<Self> {
         let genesis_ledger = GenesisLedger::new_v1()?;
         let version = IndexerVersion::v1();
@@ -225,6 +234,7 @@ impl IndexerState {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
+            check_mode,
         ))
     }
 
@@ -234,6 +244,7 @@ impl IndexerState {
         canonical_threshold: u32,
         transition_frontier_length: u32,
         do_not_ingest_orphan_blocks: bool,
+        check_mode: bool,
     ) -> Result<Self> {
         let genesis_ledger = GenesisLedger::new_v2()?;
         let version = IndexerVersion::v2();
@@ -245,6 +256,7 @@ impl IndexerState {
             canonical_threshold,
             transition_frontier_length,
             do_not_ingest_orphan_blocks,
+            check_mode,
         ))
     }
 
@@ -360,6 +372,7 @@ impl IndexerState {
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
+            check_mode: config.check_mode,
         })
     }
 
@@ -398,6 +411,7 @@ impl IndexerState {
             reporting_freq: config.reporting_freq,
             staking_ledgers: HashSet::new(),
             chain_data: ChainData::default(),
+            check_mode: config.check_mode,
         })
     }
 
@@ -407,9 +421,9 @@ impl IndexerState {
         root_block_bytes: u64,
         root_ledger: Option<&Ledger>,
         speedb_path: Option<&Path>,
-        transition_frontier_length: Option<u32>,
-        ledger_cadence: Option<u32>,
-        reporting_freq: Option<u32>,
+        // transition frontier length, ledger cadence, reporting frequency
+        init: Option<(u32, u32, u32)>,
+        check_mode: bool,
     ) -> Result<Self> {
         let root_branch = Branch::new_testing(root_block);
         let indexer_store = speedb_path.map(|path| {
@@ -452,10 +466,10 @@ impl IndexerState {
             canonical_root: tip.clone(),
             best_tip: tip,
             root_branch,
+            check_mode,
             dangling_branches: Vec::new(),
             indexer_store: indexer_store.map(Arc::new),
-            transition_frontier_length: transition_frontier_length
-                .unwrap_or(MAINNET_TRANSITION_FRONTIER_K),
+            transition_frontier_length: init.map_or(MAINNET_TRANSITION_FRONTIER_K, |init| init.0),
             prune_interval: PRUNE_INTERVAL_DEFAULT,
             canonical_threshold: MAINNET_CANONICAL_THRESHOLD,
             canonical_update_threshold: CANONICAL_UPDATE_THRESHOLD,
@@ -463,8 +477,8 @@ impl IndexerState {
             bytes_processed: root_block_bytes,
             genesis_bytes: root_block_bytes,
             init_time: Instant::now(),
-            ledger_cadence: ledger_cadence.unwrap_or(LEDGER_CADENCE),
-            reporting_freq: reporting_freq.unwrap_or(BLOCK_REPORTING_FREQ_NUM),
+            ledger_cadence: init.map_or(LEDGER_CADENCE, |init| init.1),
+            reporting_freq: init.map_or(BLOCK_REPORTING_FREQ_NUM, |init| init.2),
             staking_ledgers: HashSet::new(),
             version: IndexerVersion::default(),
             chain_data: ChainData::default(),
@@ -509,8 +523,14 @@ impl IndexerState {
 
                     // apply diff + add to db
                     let diff = LedgerDiff::from_precomputed(&block);
+                    let accounts_accessed = if self.check_mode {
+                        block.accounts_accessed()
+                    } else {
+                        vec![]
+                    };
+
                     if diff.state_hash.0 != HARDFORK_GENESIS_HASH {
-                        ledger_diffs.push((diff.clone(), block.accounts_accessed()));
+                        ledger_diffs.push((diff.clone(), accounts_accessed));
                     }
 
                     indexer_store.add_block(&block, block_bytes)?;
