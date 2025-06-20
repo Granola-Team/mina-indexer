@@ -359,16 +359,16 @@ task :kill do
   run("#{UTILS} kill")
 end
 
-# Check tasks
+# Check mode tasks
 
 desc "Dev build and run in check mode"
-task :check_dev do
+task :check_mode_dev do
   Rake::Task["build:dev"].invoke
   run("#{REGRESSION_TEST} dev check_mode")
 end
 
 desc "Release build and run in check mode"
-task :check do
+task :check_mode do
   Rake::Task["build:release"].invoke
   run("#{REGRESSION_TEST} release check_mode")
 end
