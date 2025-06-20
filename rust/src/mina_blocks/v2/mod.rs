@@ -168,7 +168,6 @@ impl ZkappAccount {
 impl crate::base::check::Check for ZkappAccount {
     fn check(&self, other: &Self) -> bool {
         // skip app_state
-        // skip proved_state
 
         if self.proved_state != other.proved_state {
             error!("Mismatching zkapp proved state");
