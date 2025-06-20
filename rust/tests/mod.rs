@@ -53,6 +53,7 @@ pub mod helpers {
                 MAINNET_CANONICAL_THRESHOLD,
                 MAINNET_TRANSITION_FRONTIER_K,
                 false,
+                false,
             )
         }
 
@@ -66,6 +67,7 @@ pub mod helpers {
                 indexer_store,
                 MAINNET_CANONICAL_THRESHOLD,
                 MAINNET_TRANSITION_FRONTIER_K,
+                false,
                 false,
             )
         }

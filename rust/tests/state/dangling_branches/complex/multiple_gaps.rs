@@ -69,7 +69,7 @@ async fn extension() -> anyhow::Result<()> {
 
     // root in branch branch
     let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, false)?;
 
     // other in dangling branch 0
     let (extension_type, _) = state.add_block_to_witness_tree(&other_block, true, true)?;

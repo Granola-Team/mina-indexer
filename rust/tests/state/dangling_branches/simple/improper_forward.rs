@@ -35,8 +35,7 @@ async fn extension() {
     );
 
     let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)
-            .unwrap();
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, false).unwrap();
 
     // root branch
     // - len = 1

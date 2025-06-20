@@ -29,6 +29,7 @@ async fn test() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         10,
         false,
+        false,
     );
     let mut new_state = IndexerState::new_without_genesis_events(config)?;
 

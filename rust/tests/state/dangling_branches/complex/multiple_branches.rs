@@ -81,7 +81,7 @@ async fn merge() -> anyhow::Result<()> {
     // ----------------
 
     let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, false)?;
 
     // ---------
     // add leaf0

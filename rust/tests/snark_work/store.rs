@@ -25,6 +25,7 @@ async fn store() -> anyhow::Result<()> {
         MAINNET_CANONICAL_THRESHOLD,
         MAINNET_TRANSITION_FRONTIER_K,
         false,
+        false,
     )?;
 
     let mut bp = BlockParser::new_with_canonical_chain_discovery(

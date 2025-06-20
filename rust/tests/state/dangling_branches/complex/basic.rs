@@ -66,7 +66,7 @@ async fn extension() -> anyhow::Result<()> {
 
     // root0_block will the be the root of the 0th dangling_branch
     let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, false)?;
 
     // --------
     // add leaf

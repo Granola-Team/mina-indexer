@@ -28,7 +28,7 @@ async fn hardfork() -> anyhow::Result<()> {
 
     // root the witness tree at the final pre-harfork v1 block
     let mut state =
-        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, None, None)?;
+        IndexerState::new_testing(&root_block, root_block_bytes, None, None, None, false)?;
 
     // ingest the remaining blocks
     while let Some((block, _)) = block_parser.next_block().await? {
