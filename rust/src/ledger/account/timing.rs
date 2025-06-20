@@ -19,6 +19,35 @@ pub struct Timing {
     pub initial_minimum_balance: Balance,
 }
 
+///////////
+// check //
+///////////
+
+impl crate::base::check::Check for Option<Timing> {
+    fn check(&self, other: &Self) -> bool {
+        match (self.as_ref(), other.as_ref()) {
+            (Some(self_timing), Some(timing)) => {
+                let check = self_timing != timing;
+                if check {
+                    log::error!("Mismatching timings {:?} {:?}", self_timing, timing);
+                }
+
+                return check;
+            }
+            (Some(timing), _) => {
+                log::error!("Mismatching timing {:?}", timing);
+            }
+            (_, Some(timing)) => {
+                log::warn!("Mismatching timing {:?}", timing);
+                return false;
+            }
+            _ => (),
+        }
+
+        self != other
+    }
+}
+
 ///////////////
 // arbitrary //
 ///////////////

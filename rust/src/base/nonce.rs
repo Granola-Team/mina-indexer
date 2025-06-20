@@ -43,6 +43,16 @@ impl Add<i32> for Nonce {
 }
 
 ///////////
+// check //
+///////////
+
+impl super::check::Check for Option<Nonce> {
+    fn check(&self, other: &Self) -> bool {
+        self.unwrap_or_default() != other.unwrap_or_default()
+    }
+}
+
+///////////
 // serde //
 ///////////
 

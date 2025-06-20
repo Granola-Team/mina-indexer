@@ -22,6 +22,34 @@ impl TokenSymbol {
 }
 
 ///////////
+// check //
+///////////
+
+impl crate::base::check::Check for Option<TokenSymbol> {
+    fn check(&self, other: &Self) -> bool {
+        match (self.as_ref(), other.as_ref()) {
+            (Some(self_symbol), Some(symbol)) => {
+                let check = self_symbol != symbol;
+                if check {
+                    log::error!("Mismatching token symbols {:?} {:?}", self, other);
+                }
+
+                check
+            }
+            (Some(symbol), _) | (_, Some(symbol)) => {
+                let check = !symbol.0.is_empty();
+                if check {
+                    log::error!("Mismatching token symbol {}", symbol);
+                }
+
+                check
+            }
+            _ => true,
+        }
+    }
+}
+
+///////////
 // serde //
 ///////////
 

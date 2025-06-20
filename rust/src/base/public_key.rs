@@ -1,3 +1,5 @@
+//! Public key representation
+
 use crate::{
     proof_systems::signer::pubkey::{CompressedPubKey, PubKey},
     protocol::serialization_types::signatures::{PublicKey2V1, PublicKeyV1},
@@ -53,6 +55,21 @@ impl PublicKey {
     /// [PublicKey] lower bound
     pub fn lower_bound() -> Self {
         Self("B62q000000000000000000000000000000000000000000000000000".into())
+    }
+}
+
+///////////
+// check //
+///////////
+
+impl super::check::Check for PublicKey {
+    fn check(&self, other: &Self) -> bool {
+        let check = self != other;
+        if check {
+            log::error!("Mismatching public keys {} {}", self, other)
+        }
+
+        check
     }
 }
 

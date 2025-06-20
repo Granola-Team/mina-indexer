@@ -15,6 +15,7 @@ use crate::{
         token::{TokenAddress, TokenSymbol},
     },
 };
+use log::error;
 use protocol_state::ProtocolState;
 use serde::{Deserialize, Serialize};
 use staged_ledger_diff::StagedLedgerDiff;
@@ -156,6 +157,76 @@ impl ZkappAccount {
         Self {
             proved_state,
             ..Default::default()
+        }
+    }
+}
+
+///////////
+// check //
+///////////
+
+impl crate::base::check::Check for ZkappAccount {
+    fn check(&self, other: &Self) -> bool {
+        // skip app_state
+        // skip proved_state
+
+        if self.proved_state != other.proved_state {
+            error!("Mismatching zkapp proved state");
+            return true;
+        }
+
+        if self.verification_key != other.verification_key {
+            error!(
+                "Mismatching zkapp verification keys {:?} {:?}",
+                self.verification_key, other.verification_key,
+            );
+            return true;
+        }
+
+        if self.zkapp_uri != other.zkapp_uri {
+            error!(
+                "Mismatching zkapp URIs {:?} {:?}",
+                self.zkapp_uri, other.zkapp_uri,
+            );
+            return true;
+        }
+
+        if self.zkapp_version != other.zkapp_version {
+            error!(
+                "Mismatching zkapp versions {:?} {:?}",
+                self.zkapp_version, other.zkapp_version,
+            );
+            return true;
+        }
+
+        if self.last_action_slot != other.last_action_slot {
+            error!(
+                "Mismatching zkapp last action slots {:?} {:?}",
+                self.last_action_slot, other.last_action_slot,
+            );
+            return true;
+        }
+
+        false
+    }
+}
+
+impl crate::base::check::Check for Option<ZkappAccount> {
+    fn check(&self, other: &Self) -> bool {
+        match (self.as_ref(), other.as_ref()) {
+            (Some(self_zkapp), Some(zkapp)) => {
+                let check = self_zkapp.check(zkapp);
+                if check {
+                    error!("Mismatching zkapps {:?} {:?}", self_zkapp, zkapp);
+                }
+
+                check
+            }
+            (Some(zkapp), _) | (_, Some(zkapp)) => {
+                error!("Mismatching zkapp {:?}", zkapp);
+                true
+            }
+            _ => false,
         }
     }
 }

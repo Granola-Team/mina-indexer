@@ -39,6 +39,34 @@ impl TokenAddress {
 }
 
 ///////////
+// check //
+///////////
+
+impl crate::base::check::Check for Option<TokenAddress> {
+    fn check(&self, other: &Self) -> bool {
+        match (self.as_ref(), other.as_ref()) {
+            (Some(self_token), Some(token)) => {
+                let check = self_token != token;
+                if check {
+                    log::error!("Mismatching tokens {} {}", self_token, token)
+                }
+
+                check
+            }
+            (Some(token), _) | (_, Some(token)) => {
+                let check = token.0 != MINA_TOKEN_ADDRESS;
+                if check {
+                    log::error!("Mismatching token {}", token)
+                }
+
+                check
+            }
+            _ => false,
+        }
+    }
+}
+
+///////////
 // serde //
 ///////////
 

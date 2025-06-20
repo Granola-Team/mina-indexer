@@ -1,8 +1,8 @@
 use crate::{
+    base::check::Check,
     ledger::account::{Account, Permissions},
     mina_blocks::v2,
 };
-use log::warn;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -14,91 +14,62 @@ pub struct AccountAccessed {
 
 impl AccountAccessed {
     pub fn assert_eq_account(&self, account: &Account, msg: &str) {
-        assert_eq(
-            &self.account.public_key,
+        self.account.public_key.log_check(
             &account.public_key,
-            format!(
+            &format!(
                 "PK mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, account.public_key, self.account.public_key
+                msg, account.public_key, self.account.public_key,
             ),
         );
-        assert_eq(
-            &self.account.token,
+        self.account.token.log_check(
             &account.token,
-            format!(
+            &format!(
                 "Token mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, account.token, self.account.token
+                msg, account.token, self.account.token,
             ),
         );
-        assert_eq(
-            &self.account.balance,
+        self.account.balance.log_check(
             &account.balance,
-            format!(
+            &format!(
                 "Balance mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg, account.balance, self.account.balance
+                msg, account.balance, self.account.balance,
             ),
         );
-        assert_eq(
-            &self.account.nonce.unwrap_or_default(),
-            &account.nonce.unwrap_or_default(),
-            format!(
+        self.account.nonce.log_check(
+            &account.nonce,
+            &format!(
                 "Nonce mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                msg,
-                account.nonce.unwrap_or_default(),
-                self.account.nonce.unwrap_or_default()
+                msg, account.nonce, self.account.nonce,
             ),
         );
-        assert_eq(
-            &self.account.delegate,
+        self.account.delegate.log_check(
             &account.delegate,
-            format!(
+            &format!(
                 "Delegate mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
                 msg, account.delegate, self.account.delegate
             ),
         );
-        assert_eq(
-            &self.account.zkapp,
+        self.account.zkapp.log_check(
             &account.zkapp,
-            format!(
+            &format!(
                 "Zkapp mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
                 msg, account.zkapp, self.account.zkapp
             ),
         );
-        assert_eq(
-            &self.account.token_symbol.clone().unwrap_or_default(),
-            &account.token_symbol.clone().unwrap_or_default(),
-            format!(
+        self.account.token_symbol.log_check(
+            &account.token_symbol,
+            &format!(
                 "Token symbol mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
                 msg, account.token_symbol, self.account.token_symbol
             ),
         );
-
-        if self.account.timing.is_some() {
-            assert_eq(
-                &self.account.timing,
-                &account.timing,
-                format!(
-                    "Timing mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
-                    msg, account.timing, self.account.timing
-                ),
-            );
-        }
-
-        if self.account.balance != account.balance
-            || self.account.nonce.unwrap_or_default() != account.nonce.unwrap_or_default()
-            || self.account.delegate != account.delegate
-            || self.account.zkapp != account.zkapp
-            || self.account.token_symbol.clone().unwrap_or_default()
-                != account.token_symbol.clone().unwrap_or_default()
-        {
-            panic!("Account mismatch!\n{:#?}", account)
-        }
-    }
-}
-
-fn assert_eq<T: PartialEq>(x: &T, y: &T, msg: String) {
-    if x != y {
-        warn!("{msg}")
+        self.account.timing.log_check(
+            &account.timing,
+            &format!(
+                "Timing mismatch: {}\nGOT: {:?}\nEXPECT: {:?}",
+                msg, account.timing, self.account.timing
+            ),
+        );
     }
 }
 
@@ -116,7 +87,7 @@ impl From<(u64, v2::AccountAccessed)> for AccountAccessed {
             public_key: public_key.to_owned(),
             balance: value.1.balance.0.into(),
             nonce: Some(value.1.nonce),
-            delegate: value.1.delegate.unwrap_or(public_key),
+            delegate: value.1.delegate.unwrap_or(public_key).into(),
             token: Some(value.1.token_id),
             token_symbol: Some(value.1.token_symbol),
             timing,

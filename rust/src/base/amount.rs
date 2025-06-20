@@ -175,6 +175,21 @@ impl<'de> Deserialize<'de> for Amount {
     }
 }
 
+///////////
+// check //
+///////////
+
+impl super::check::Check for Amount {
+    fn check(&self, other: &Self) -> bool {
+        let check = self != other;
+        if check {
+            log::error!("Mismatching amounts {} {}", self, other)
+        }
+
+        check
+    }
+}
+
 /////////////
 // display //
 /////////////
