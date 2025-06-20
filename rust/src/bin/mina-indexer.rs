@@ -349,6 +349,7 @@ fn process_indexer_configuration(
     let missing_block_recovery_exe = args.missing_block_recovery_exe;
     let missing_block_recovery_delay = args.missing_block_recovery_delay;
     let missing_block_recovery_batch = args.missing_block_recovery_batch.unwrap_or(false);
+    let check_mode = args.db.check_mode;
 
     // ensure blocks dir exists
     if let Some(ref blocks_dir) = blocks_dir {
@@ -367,20 +368,6 @@ fn process_indexer_configuration(
             process::exit(1);
         }
     }
-
-    // pick up protocol constants from the given file or use defaults
-    // let genesis_constants = args.db.genesis_constants;
-    // let constraint_system_digests = args.db.constraint_system_digests;
-    // let protocol_txn_version_digest = args.db.protocol_txn_version_digest;
-    // let protocol_network_version_digest =
-    // args.db.protocol_network_version_digest; let genesis_constants =
-    // protocol_constants(genesis_constants)?; let constraint_system_digests =
-    // constraint_system_digests.unwrap_or(
-    //     MAINNET_CONSTRAINT_SYSTEM_DIGESTS
-    //         .iter()
-    //         .map(|x| x.to_string())
-    //         .collect(),
-    // );
 
     // indexer version
     let network = args.db.network;
@@ -416,6 +403,7 @@ fn process_indexer_configuration(
         missing_block_recovery_delay,
         missing_block_recovery_batch,
         do_not_ingest_orphan_blocks,
+        check_mode,
     })
 }
 

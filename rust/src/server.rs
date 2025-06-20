@@ -74,6 +74,7 @@ pub struct IndexerConfiguration {
     pub missing_block_recovery_exe: Option<PathBuf>,
     pub missing_block_recovery_delay: Option<u64>,
     pub missing_block_recovery_batch: bool,
+    pub check_mode: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -127,6 +128,7 @@ impl IndexerConfiguration {
             reporting_freq,
             version,
             do_not_ingest_orphan_blocks,
+            check_mode,
             ..
         } = self;
 
@@ -164,6 +166,7 @@ impl IndexerConfiguration {
             canonical_update_threshold,
             ledger_cadence,
             reporting_freq,
+            check_mode,
         };
 
         let mut state = match initialization_mode {
@@ -222,6 +225,7 @@ impl IndexerConfiguration {
                         ledger_cadence,
                         reporting_freq,
                         do_not_ingest_orphan_blocks,
+                        check_mode,
                     })
                 {
                     let min_length_filter = state.replay_events(replay_state)?;
@@ -808,6 +812,7 @@ impl From<(ServerArgsJson, PathBuf)> for IndexerConfiguration {
             missing_block_recovery_exe: value.0.missing_block_recovery_exe.map(Into::into),
             missing_block_recovery_delay: value.0.missing_block_recovery_delay,
             missing_block_recovery_batch: value.0.missing_block_recovery_batch.unwrap_or_default(),
+            check_mode: value.0.check_mode,
         }
     }
 }

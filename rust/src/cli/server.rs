@@ -1,3 +1,5 @@
+//! Server commands
+
 use super::{database::DatabaseArgs, LogLevelFilter};
 use crate::constants::*;
 use std::{path::PathBuf, str::FromStr};
@@ -72,6 +74,7 @@ pub struct ServerArgsJson {
     pub missing_block_recovery_delay: Option<u64>,
     pub missing_block_recovery_batch: Option<bool>,
     pub network: String,
+    pub check_mode: bool,
 }
 
 //////////
@@ -127,6 +130,7 @@ impl From<ServerArgs> for ServerArgsJson {
             missing_block_recovery_batch: value.missing_block_recovery_batch,
             network: value.db.network.to_string(),
             do_not_ingest_orphan_blocks: value.db.do_not_ingest_orphan_blocks,
+            check_mode: value.db.check_mode,
         }
     }
 }
@@ -152,7 +156,9 @@ impl From<ServerArgsJson> for ServerArgs {
             config: None,
             network: (&value.network as &str).into(),
             do_not_ingest_orphan_blocks: value.do_not_ingest_orphan_blocks,
+            check_mode: value.check_mode,
         };
+
         Self {
             db,
             web_hostname: value.web_hostname,

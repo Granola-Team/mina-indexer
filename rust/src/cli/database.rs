@@ -1,3 +1,5 @@
+//! Database commands
+
 use crate::{chain::Network, cli::LogLevelFilter, constants::*};
 use std::path::PathBuf;
 
@@ -79,4 +81,8 @@ pub struct DatabaseArgs {
     /// Switch to not ingest orphan blocks
     #[arg(long, default_value_t = false)]
     pub do_not_ingest_orphan_blocks: bool,
+
+    /// Switch to enable check mode during db creation
+    #[arg(long, default_value_t = false)]
+    pub check_mode: bool,
 }
