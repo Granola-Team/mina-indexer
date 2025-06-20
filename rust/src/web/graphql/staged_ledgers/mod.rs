@@ -229,7 +229,7 @@ impl StagedLedgerAccount {
             balance_nano: account.balance.0,
             balance: account.balance.to_f64(),
             nonce: account.nonce.map_or(0, |n| n.0),
-            delegate: DelegatePK::new(db, account.delegate),
+            delegate: DelegatePK::new(db, account.delegate.0),
             public_key: PK::new(db, account.public_key),
             token: account.token.unwrap_or_default().0,
         }

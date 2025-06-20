@@ -316,7 +316,7 @@ impl AccountQueryInput {
         }
 
         if let Some(delegate) = delegate {
-            if *delegate != account.delegate.0 {
+            if *delegate != account.delegate.0 .0 {
                 return false;
             }
         }
@@ -513,7 +513,7 @@ impl Account {
 
         Self {
             public_key: PK::new(db, account.public_key),
-            delegate: DelegatePK::new(db, account.delegate),
+            delegate: DelegatePK::new(db, account.delegate.0),
             nonce: account.nonce.map_or(0, |n| n.0),
             balance: account.balance.0,
             time_locked: account.timing.is_some(),

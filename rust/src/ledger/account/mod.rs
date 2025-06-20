@@ -21,8 +21,8 @@ use super::{
 };
 use crate::{
     base::{
-        amount::Amount, nonce::Nonce, public_key::PublicKey, state_hash::StateHash,
-        username::Username,
+        amount::Amount, delegate::Delegate, nonce::Nonce, public_key::PublicKey,
+        state_hash::StateHash, username::Username,
     },
     block::genesis::GenesisBlock,
     constants::{MAINNET_ACCOUNT_CREATION_FEE, MINA_TOKEN_ADDRESS},
@@ -42,7 +42,7 @@ pub type Timing = timing::Timing;
 pub struct Account {
     pub public_key: PublicKey,
     pub balance: Amount,
-    pub delegate: PublicKey,
+    pub delegate: Delegate,
     pub genesis_account: Option<Amount>,
     pub creation_fee_paid: bool,
 
@@ -149,7 +149,7 @@ impl Account {
     pub fn empty(public_key: PublicKey, token: TokenAddress, creation_fee_paid: bool) -> Self {
         Self {
             public_key: public_key.clone(),
-            delegate: public_key,
+            delegate: public_key.into(),
             token: Some(token),
             creation_fee_paid,
             ..Default::default()
@@ -294,7 +294,7 @@ impl Account {
     /// A new `Account` instance with the updated delegate and nonce.
     pub fn delegation(self, delegate: PublicKey, updated_nonce: Nonce) -> Self {
         Self {
-            delegate,
+            delegate: delegate.into(),
             nonce: Some(updated_nonce),
             ..self
         }
@@ -308,7 +308,7 @@ impl Account {
             } else {
                 Some(diff.nonce - 1)
             },
-            delegate: self.public_key.clone(),
+            delegate: self.public_key.clone().into(),
             ..self
         }
     }
@@ -692,7 +692,7 @@ impl Account {
         Self {
             balance,
             public_key: block_creator.clone(),
-            delegate: block_creator,
+            delegate: block_creator.into(),
             genesis_account: Some(balance),
             token: Some(TokenAddress::default()),
             ..Default::default()
@@ -989,7 +989,7 @@ mod tests {
         assert_eq!(
             after,
             Account {
-                delegate,
+                delegate: delegate.into(),
                 nonce: Some(nonce),
                 ..before
             }

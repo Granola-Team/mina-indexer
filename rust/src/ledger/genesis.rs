@@ -206,8 +206,8 @@ impl GenesisLedger {
                 Account {
                     public_key,
                     balance,
-                    delegate,
                     nonce: account.nonce,
+                    delegate: delegate.into(),
                     token: account.token.map(TokenAddress::from),
                     receipt_chain_hash: account.receipt_chain_hash,
                     voting_for: account.voting_for,
@@ -407,7 +407,7 @@ mod tests {
         );
         assert_eq!(
             "B62qqdcf6K9HyBSaxqH5JVFJkc1SUEe1VzDc5kYZFQZXWSQyGHoino1",
-            account.delegate.0
+            account.delegate.0 .0
         );
 
         Ok(())

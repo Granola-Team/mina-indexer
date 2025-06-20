@@ -283,10 +283,10 @@ impl Ledger {
             ledger.accounts.insert(
                 pk.clone(),
                 Account {
-                    delegate,
                     public_key: pk,
                     balance: balance.into(),
                     nonce: nonce.map(Nonce),
+                    delegate: delegate.into(),
                     ..Default::default()
                 },
             );
@@ -434,7 +434,7 @@ mod tests {
             PublicKey::default(),
             Account {
                 public_key: PublicKey::default(),
-                delegate: PublicKey::default(),
+                delegate: PublicKey::default().into(),
                 balance: Amount(1_000_000_000_000_000_000u64),
                 ..Default::default()
             },
@@ -495,7 +495,7 @@ mod tests {
             index: 0,
             account: Account {
                 nonce: Some(prev_nonce + 1),
-                delegate: delegate.clone(),
+                delegate: delegate.clone().into(),
                 ..account_before
             },
         };

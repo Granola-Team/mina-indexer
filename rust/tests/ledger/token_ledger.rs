@@ -104,7 +104,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             Account {
                 balance: 100000000000000.into(),
                 public_key: pk.clone(),
-                delegate: pk.clone(),
+                delegate: pk.clone().into(),
                 token: Some(minu_token.clone()),
                 creation_fee_paid: true,
                 ..Default::default()
@@ -120,7 +120,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
             public_key: pk.clone(),
             balance: 0.into(),
             nonce: Some(1.into()),
-            delegate: pk,
+            delegate: pk.into(),
             token: Some(mina_token.clone()),
             token_symbol: Some("MINU".into()),
             creation_fee_paid: true,
@@ -166,7 +166,7 @@ async fn check_token_accounts() -> anyhow::Result<()> {
                 public_key: pk.clone(),
                 balance: 0.into(),
                 nonce: Some(1.into()),
-                delegate: pk,
+                delegate: pk.into(),
                 token: Some(mina_token.clone()),
                 creation_fee_paid: true,
                 permissions: Some(Permissions {

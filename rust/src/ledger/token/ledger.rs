@@ -143,7 +143,7 @@ impl TokenLedger {
             ledger.accounts.insert(
                 pk.clone(),
                 Account {
-                    delegate,
+                    delegate: delegate.into(),
                     public_key: pk,
                     balance: balance.into(),
                     nonce: nonce.map(Nonce),

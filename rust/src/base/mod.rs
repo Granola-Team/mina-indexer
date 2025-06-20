@@ -2,6 +2,7 @@
 
 pub mod amount;
 pub mod blockchain_length;
+pub mod delegate;
 pub mod nonce;
 pub mod numeric;
 pub mod public_key;
