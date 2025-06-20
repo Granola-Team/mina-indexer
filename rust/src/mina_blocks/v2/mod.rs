@@ -172,7 +172,6 @@ impl crate::base::check::Check for ZkappAccount {
 
         if self.proved_state != other.proved_state {
             error!("Mismatching zkapp proved state");
-            return true;
         }
 
         if self.verification_key != other.verification_key {

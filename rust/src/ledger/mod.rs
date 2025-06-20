@@ -257,8 +257,7 @@ impl Ledger {
     }
 
     pub fn time_locked_amount(&self, curr_global_slot: u32) -> Amount {
-        self.tokens
-            .get(&TokenAddress::default())
+        self.get_token_ledger(&TokenAddress::default())
             .map(|mina_ledger| {
                 {
                     mina_ledger.accounts.values().filter_map(|acct| {
