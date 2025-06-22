@@ -30,6 +30,7 @@ if !skippable
     "--ledger-cadence", "5000",
     "--database-dir", db_dir(BLOCKS_COUNT),
     "--blocks-dir", blocks_dir(BLOCKS_COUNT),
+    "--check-mode", # Comment out this line to speed up ingestion.
     "--staking-ledgers-dir", LEDGERS_DIR  # Comment out this line to skip staking ledger ingestion.
     # "--do-not-ingest-orphan-blocks"     # Comment out this line to ingest orphan blocks.
   ) || abort("database creation failed")
