@@ -19,6 +19,7 @@ test_names = %w[
   best_tip_v1
   best_tip_v2
   blocks
+  blocks_compare
   block_copy
   missing_blocks
   missing_block_recovery

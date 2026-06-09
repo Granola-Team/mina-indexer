@@ -174,6 +174,21 @@ pub enum Blocks {
         #[arg(long, default_value_t = false)]
         verbose: bool,
     },
+
+    /// Compare two blocks and report the better state hash
+    Compare {
+        /// First state hash to compare
+        #[arg(long)]
+        state_hash: String,
+
+        /// Second state hash to compare
+        #[arg(long)]
+        other_state_hash: String,
+
+        /// Path to write the result [default: stdout]
+        #[arg(long)]
+        path: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug, Encode, Decode)]

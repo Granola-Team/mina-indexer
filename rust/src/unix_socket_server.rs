@@ -470,6 +470,46 @@ pub async fn handle_connection(
                     }
                 }
             }
+            ClientCli::Blocks(Blocks::Compare {
+                state_hash,
+                other_state_hash,
+                path,
+            }) => {
+                debug!("Received block-compare command for {state_hash} and {other_state_hash}");
+                if !StateHash::is_valid(&state_hash) {
+                    invalid_state_hash(&state_hash)
+                } else if !StateHash::is_valid(&other_state_hash) {
+                    invalid_state_hash(&other_state_hash)
+                } else {
+                    let hash: StateHash = state_hash.clone().into();
+                    let other: StateHash = other_state_hash.clone().into();
+                    match db.block_cmp(&hash, &other) {
+                        // `block_cmp` orders blocks so that the better block is `Less`
+                        Ok(Some(ordering)) => {
+                            let better = if ordering == std::cmp::Ordering::Greater {
+                                &other_state_hash
+                            } else {
+                                &state_hash
+                            };
+                            if let Some(path) = path {
+                                debug!("Writing better block {better} to {path:?}");
+                                std::fs::write(&path, better)?;
+                                ServerCliResponse::Success(format!(
+                                    "Better block {better} written to {path:?}"
+                                ))
+                            } else {
+                                ServerCliResponse::Success(better.to_string())
+                            }
+                        }
+                        Ok(None) => ServerCliResponse::Success(format!(
+                            "Block missing from store: one of {state_hash} or {other_state_hash}"
+                        )),
+                        Err(e) => ServerCliResponse::Error(format!(
+                            "Failed to compare blocks '{state_hash}' and '{other_state_hash}': {e}"
+                        )),
+                    }
+                }
+            }
             ClientCli::Chain(Chain::Best {
                 num,
                 verbose,

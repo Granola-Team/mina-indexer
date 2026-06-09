@@ -142,6 +142,9 @@ test_indexer_cli_reports() {
 	idxr blocks children --help 2>&1 |
 		grep -iq "Usage: mina-indexer blocks children"
 
+	idxr blocks compare --help 2>&1 |
+		grep -iqF "Usage: mina-indexer blocks compare [OPTIONS] --state-hash <STATE_HASH> --other-state-hash <OTHER_STATE_HASH>"
+
 	idxr ledgers --help 2>&1 |
 		grep -iq "Usage: mina-indexer ledgers"
 
@@ -456,6 +459,54 @@ test_blocks() {
 
 	assert 9 $slot
 	assert 10 $height
+}
+
+# Indexer compares two blocks per consensus ordering
+test_blocks_compare() {
+	stage_blocks v1 10 "$BLOCKS_DIR"
+
+	start_v1
+
+	# Best tip at height 10 (canonical, longest chain in this fixture).
+	tip_hash=$(idxr summary --json | jq -r .witness_tree.best_tip_hash)
+	assert '3NKGgTk7en3347KH81yDra876GPAUSoSePrfVKPmwR1KHfMpvJC5' "$tip_hash"
+
+	# Two competing height-6 blocks: canonical vs orphaned sibling.
+	# (Same heights are exercised in test_block_children.)
+	h6_canonical='3NKqRR2BZFV7Ad5kxtGKNNL59neXohf4ZEC5EMKrrnijB1jy4R5v'
+	h6_orphan='3NKvdydTvLVDJ9PKAXrisjsXoZQvUy1V2sbComWyB2uyhARCJZ5M'
+
+	# Different heights: the longer chain wins, both argument orders.
+	winner=$(idxr blocks compare --state-hash $tip_hash --other-state-hash $h6_canonical)
+	assert "$tip_hash" "$winner"
+	winner=$(idxr blocks compare --state-hash $h6_canonical --other-state-hash $tip_hash)
+	assert "$tip_hash" "$winner"
+
+	# Same height, fork: canonical sibling wins, both argument orders.
+	winner=$(idxr blocks compare --state-hash $h6_canonical --other-state-hash $h6_orphan)
+	assert "$h6_canonical" "$winner"
+	winner=$(idxr blocks compare --state-hash $h6_orphan --other-state-hash $h6_canonical)
+	assert "$h6_canonical" "$winner"
+
+	# Comparing a block with itself returns that block.
+	winner=$(idxr blocks compare --state-hash $tip_hash --other-state-hash $tip_hash)
+	assert "$tip_hash" "$winner"
+
+	# Well-formed hash that is not in the store: reports missing.
+	missing_hash='3NMissingBlock00000000000000000000000000000000000000'
+	out=$(idxr blocks compare --state-hash $tip_hash --other-state-hash $missing_hash)
+	echo "$out" | grep -q "^Block missing from store: "
+
+	# Malformed hash: reports invalid.
+	out=$(idxr blocks compare --state-hash $tip_hash --other-state-hash not-a-state-hash)
+	echo "$out" | grep -q "^Invalid state hash: not-a-state-hash$"
+	out=$(idxr blocks compare --state-hash not-a-state-hash --other-state-hash $tip_hash)
+	echo "$out" | grep -q "^Invalid state hash: not-a-state-hash$"
+
+	# --path writes the winning state hash to the given file.
+	file=./compare_winner.txt
+	idxr blocks compare --state-hash $tip_hash --other-state-hash $h6_canonical --path $file
+	assert "$tip_hash" "$(cat $file)"
 }
 
 # Indexer handles copied blocks correctly
@@ -1932,6 +1983,7 @@ for test_name in "$@"; do
 	"test_best_tip_v1") test_best_tip_v1 ;;
 	"test_best_tip_v2") test_best_tip_v2 ;;
 	"test_blocks") test_blocks ;;
+	"test_blocks_compare") test_blocks_compare ;;
 	"test_block_copy") test_block_copy ;;
 	"test_missing_blocks") test_missing_blocks ;;
 	"test_missing_block_recovery") test_missing_block_recovery ;;
