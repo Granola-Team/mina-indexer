@@ -126,6 +126,9 @@ impl SnarkQueryRoot {
         let mut snarks = <Vec<SnarkWithCanonicity>>::new();
         let sort_by = sort_by.unwrap_or(SnarkSortByInput::BlockHeightDesc);
 
+        let epoch_num_snarks = db.get_snarks_epoch_count(None, None)?;
+        let total_num_snarks = db.get_snarks_total_count()?;
+
         // state hash
         if let Some(state_hash) = query
             .as_ref()
@@ -153,6 +156,8 @@ impl SnarkQueryRoot {
                                 prover: snark.prover,
                                 state_hash: state_hash.clone(),
                             },
+                            epoch_num_snarks,
+                            total_num_snarks,
                         )
                         .ok()
                         .flatten()
@@ -178,7 +183,17 @@ impl SnarkQueryRoot {
                     let block = get_block(db, state_hash);
                     SnarkWorkSummaryWithStateHash::from_precomputed(&block)
                         .into_iter()
-                        .filter_map(|s| snark_summary_matches_query(db, &query, s).ok().flatten())
+                        .filter_map(|s| {
+                            snark_summary_matches_query(
+                                db,
+                                &query,
+                                s,
+                                epoch_num_snarks,
+                                total_num_snarks,
+                            )
+                            .ok()
+                            .flatten()
+                        })
                         .collect::<Vec<SnarkWithCanonicity>>()
                 })
                 .collect();
@@ -237,9 +252,8 @@ impl SnarkQueryRoot {
                             snark: Snark::new(
                                 db,
                                 SnarkWorkSummaryWithStateHash::from(snark, state_hash),
-                                db.get_snarks_epoch_count(None, None)
-                                    .expect("epoch snarks count"),
-                                db.get_snarks_total_count().expect("total snarks count"),
+                                epoch_num_snarks,
+                                total_num_snarks,
                             ),
                         };
 
@@ -308,9 +322,8 @@ impl SnarkQueryRoot {
                             snark: Snark::new(
                                 db,
                                 SnarkWorkSummaryWithStateHash::from(snark, state_hash),
-                                db.get_snarks_epoch_count(None, None)
-                                    .expect("epoch snarks count"),
-                                db.get_snarks_total_count().expect("total snarks count"),
+                                epoch_num_snarks,
+                                total_num_snarks,
                             ),
                         };
 
@@ -390,9 +403,8 @@ impl SnarkQueryRoot {
                                 snark: Snark::new(
                                     db,
                                     SnarkWorkSummaryWithStateHash::from(snark, state_hash.clone()),
-                                    db.get_snarks_epoch_count(None, None)
-                                        .expect("epoch snarks count"),
-                                    db.get_snarks_total_count().expect("total snarks count"),
+                                    epoch_num_snarks,
+                                    total_num_snarks,
                                 ),
                             })
                             .collect()
@@ -440,9 +452,8 @@ impl SnarkQueryRoot {
                         snark: Snark::new(
                             db,
                             SnarkWorkSummaryWithStateHash::from(snark, state_hash.clone()),
-                            db.get_snarks_epoch_count(None, None)
-                                .expect("epoch snarks count"),
-                            db.get_snarks_total_count().expect("total snarks count"),
+                            epoch_num_snarks,
+                            total_num_snarks,
                         ),
                     })
                     .collect()
@@ -467,18 +478,14 @@ fn snark_summary_matches_query(
     db: &Arc<IndexerStore>,
     query: &Option<SnarkQueryInput>,
     snark: SnarkWorkSummaryWithStateHash,
+    epoch_num_snarks: u32,
+    total_num_snarks: u32,
 ) -> anyhow::Result<Option<SnarkWithCanonicity>> {
     let canonical = get_block_canonicity(db, &snark.state_hash);
     let snark_with_canonicity = SnarkWithCanonicity {
         pcb: get_block(db, &snark.state_hash),
         canonical,
-        snark: Snark::new(
-            db,
-            snark,
-            db.get_snarks_epoch_count(None, None)
-                .expect("epoch snarks count"),
-            db.get_snarks_total_count().expect("total snarks count"),
-        ),
+        snark: Snark::new(db, snark, epoch_num_snarks, total_num_snarks),
     };
 
     if query

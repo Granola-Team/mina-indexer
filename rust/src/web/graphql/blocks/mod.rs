@@ -48,11 +48,10 @@ impl BlocksQueryRoot {
             .as_ref()
             .and_then(|q| q.genesis_state_hash.clone())
             .map(Into::into);
+        let counts = get_counts(db, epoch, genesis_state_hash.as_ref())?;
 
         // no query filters => get the best block
         if query.is_none() {
-            let counts = get_counts(db, epoch, genesis_state_hash.as_ref())?;
-
             return Ok(db
                 .get_best_block()
                 .map(|b| b.map(|pcb| Block::from_precomputed(db, &pcb, counts)))?);
@@ -75,11 +74,7 @@ impl BlocksQueryRoot {
                 Some((pcb, _)) => pcb,
                 None => return Ok(None),
             };
-            let block = Block::from_precomputed(
-                db,
-                &pcb,
-                get_counts(db, epoch, genesis_state_hash.as_ref())?,
-            );
+            let block = Block::from_precomputed(db, &pcb, counts);
 
             if query.unwrap().matches(&block) {
                 return Ok(Some(block));
@@ -95,11 +90,7 @@ impl BlocksQueryRoot {
         {
             let state_hash = state_hash_suffix(&key)?;
             let pcb = get_block(db, &state_hash);
-            let block = Block::from_precomputed(
-                db,
-                &pcb,
-                get_counts(db, epoch, genesis_state_hash.as_ref())?,
-            );
+            let block = Block::from_precomputed(db, &pcb, counts);
 
             if query.as_ref().is_none_or(|q| q.matches(&block)) {
                 return Ok(Some(block));

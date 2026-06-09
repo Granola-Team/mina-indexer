@@ -324,6 +324,7 @@ impl StakesQueryRoot {
             }
         };
         let total_currency = db.get_total_currency(&ledger_hash)?.unwrap_or_default();
+        let epoch_counts = StakesEpochCounts::new(db, epoch, &ledger_hash)?;
 
         use StakesSortByInput::*;
         let mut accounts = Vec::with_capacity(limit);
@@ -358,6 +359,7 @@ impl StakesQueryRoot {
                             epoch,
                             ledger_hash.to_owned(),
                             total_currency,
+                            &epoch_counts,
                         );
 
                         if StakesQueryInput::matches(query.as_ref(), &account) {
@@ -427,6 +429,7 @@ impl StakesQueryRoot {
                     epoch,
                     ledger_hash.to_owned(),
                     total_currency,
+                    &epoch_counts,
                 );
 
                 if StakesQueryInput::matches(query.as_ref(), &account) {
@@ -588,6 +591,52 @@ impl StakesQueryInput {
     }
 }
 
+/// Counts shared by every account in a single `stakes` response.
+/// Read from the store once per query instead of once per account.
+pub struct StakesEpochCounts {
+    epoch_num_blocks: u32,
+    epoch_num_supercharged_blocks: u32,
+    total_num_blocks: u32,
+    total_num_supercharged_blocks: u32,
+    epoch_num_snarks: u32,
+    total_num_snarks: u32,
+    epoch_num_user_commands: u32,
+    total_num_user_commands: u32,
+    epoch_num_internal_commands: u32,
+    total_num_internal_commands: u32,
+    num_accounts: u32,
+}
+
+impl StakesEpochCounts {
+    pub fn new(
+        db: &Arc<IndexerStore>,
+        epoch: u32,
+        ledger_hash: &LedgerHash,
+    ) -> anyhow::Result<Self> {
+        let genesis_state_hash = StakingLedger::genesis_state_hash(ledger_hash);
+
+        Ok(Self {
+            epoch_num_blocks: db
+                .get_block_production_epoch_count(Some(epoch), Some(&genesis_state_hash))?,
+            epoch_num_supercharged_blocks: db.get_block_production_supercharged_epoch_count(
+                Some(epoch),
+                Some(&genesis_state_hash),
+            )?,
+            total_num_blocks: db.get_block_production_total_count()?,
+            total_num_supercharged_blocks: db.get_block_production_supercharged_total_count()?,
+            epoch_num_snarks: db.get_snarks_epoch_count(Some(epoch), Some(&genesis_state_hash))?,
+            total_num_snarks: db.get_snarks_total_count()?,
+            epoch_num_user_commands: db
+                .get_user_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))?,
+            total_num_user_commands: db.get_user_commands_total_count()?,
+            epoch_num_internal_commands: db
+                .get_internal_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))?,
+            total_num_internal_commands: db.get_internal_commands_total_count()?,
+            num_accounts: db.get_staking_ledger_accounts_count_epoch(epoch, &genesis_state_hash)?,
+        })
+    }
+}
+
 impl StakesLedgerAccountWithMeta {
     pub fn new(
         db: &Arc<IndexerStore>,
@@ -596,6 +645,7 @@ impl StakesLedgerAccountWithMeta {
         epoch: u32,
         ledger_hash: LedgerHash,
         total_currency: u64,
+        epoch_counts: &StakesEpochCounts,
     ) -> Self {
         let pk = &account.pk;
         let total_delegated_nanomina = delegations.as_ref().map_or(0, |d| d.total_delegated);
@@ -649,10 +699,7 @@ impl StakesLedgerAccountWithMeta {
             .get_internal_commands_pk_total_count(pk)
             .expect("pk total num internal commands");
 
-        let genesis_state_hash = StakingLedger::genesis_state_hash(&ledger_hash);
-        let num_accounts = db
-            .get_staking_ledger_accounts_count_epoch(epoch, &genesis_state_hash)
-            .expect("epoch staking account count");
+        let num_accounts = epoch_counts.num_accounts;
 
         Self {
             epoch,
@@ -683,37 +730,16 @@ impl StakesLedgerAccountWithMeta {
                 delegate_pks: delegates.into_iter().map(|pk| PK::new(db, pk)).collect(),
             },
             timing,
-            epoch_num_blocks: db
-                .get_block_production_epoch_count(Some(epoch), Some(&genesis_state_hash))
-                .expect("epoch block count"),
-            epoch_num_supercharged_blocks: db
-                .get_block_production_supercharged_epoch_count(
-                    Some(epoch),
-                    Some(&genesis_state_hash),
-                )
-                .expect("epoch supercharged block count"),
-            total_num_blocks: db
-                .get_block_production_total_count()
-                .expect("total block count"),
-            total_num_supercharged_blocks: db
-                .get_block_production_supercharged_total_count()
-                .expect("total supercharged block count"),
-            epoch_num_snarks: db
-                .get_snarks_epoch_count(Some(epoch), Some(&genesis_state_hash))
-                .expect("epoch snark count"),
-            total_num_snarks: db.get_snarks_total_count().expect("total snark count"),
-            epoch_num_user_commands: db
-                .get_user_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))
-                .expect("epoch user command count"),
-            total_num_user_commands: db
-                .get_user_commands_total_count()
-                .expect("total user command count"),
-            epoch_num_internal_commands: db
-                .get_internal_commands_epoch_count(Some(epoch), Some(&genesis_state_hash))
-                .expect("epoch internal command count"),
-            total_num_internal_commands: db
-                .get_internal_commands_total_count()
-                .expect("total internal command count"),
+            epoch_num_blocks: epoch_counts.epoch_num_blocks,
+            epoch_num_supercharged_blocks: epoch_counts.epoch_num_supercharged_blocks,
+            total_num_blocks: epoch_counts.total_num_blocks,
+            total_num_supercharged_blocks: epoch_counts.total_num_supercharged_blocks,
+            epoch_num_snarks: epoch_counts.epoch_num_snarks,
+            total_num_snarks: epoch_counts.total_num_snarks,
+            epoch_num_user_commands: epoch_counts.epoch_num_user_commands,
+            total_num_user_commands: epoch_counts.total_num_user_commands,
+            epoch_num_internal_commands: epoch_counts.epoch_num_internal_commands,
+            total_num_internal_commands: epoch_counts.total_num_internal_commands,
             epoch_num_accounts: num_accounts,
             num_accounts,
             epoch_total_currency: total_currency,
@@ -723,7 +749,9 @@ impl StakesLedgerAccountWithMeta {
 
 #[cfg(test)]
 mod tests {
-    use super::{StakesDelegationTotals, StakesLedgerAccountWithMeta, StakesQueryInput};
+    use super::{
+        StakesDelegationTotals, StakesEpochCounts, StakesLedgerAccountWithMeta, StakesQueryInput,
+    };
     use crate::{
         base::{public_key::PublicKey, state_hash::StateHash, username::Username},
         chain::Network,
@@ -846,6 +874,7 @@ mod tests {
         let query = || {
             let mut accounts = vec![];
             let username_pks = store.get_username_pks(&username.0)?.unwrap_or_default();
+            let epoch_counts = StakesEpochCounts::new(&store, epoch, &ledger_hash)?;
 
             for pk in username_pks {
                 if let Some(account) = store.get_staking_account(&pk, epoch, &genesis_state_hash)? {
@@ -856,6 +885,7 @@ mod tests {
                         epoch,
                         ledger_hash.to_owned(),
                         total_currency,
+                        &epoch_counts,
                     );
 
                     accounts.push(account);

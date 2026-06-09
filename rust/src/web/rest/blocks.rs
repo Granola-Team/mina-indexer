@@ -61,23 +61,16 @@ pub async fn get_blocks(
 
     if let Ok(Some(best_tip)) = db.get_best_block() {
         let mut best_chain: Vec<Block> = Vec::with_capacity(limit as usize);
+        let counts = get_counts(db, None, None).expect("counts");
 
         // Process best tip
-        best_chain.push(Block::from_precomputed(
-            db,
-            &best_tip,
-            get_counts(db, None, None).expect("counts"),
-        ));
+        best_chain.push(Block::from_precomputed(db, &best_tip, counts));
 
         let mut parent_state_hash = best_tip.previous_state_hash();
 
         while best_chain.len() < limit as usize {
             if let Ok(Some((block, _))) = db.get_block(&parent_state_hash) {
-                best_chain.push(Block::from_precomputed(
-                    db,
-                    &block,
-                    get_counts(db, None, None).expect("counts"),
-                ));
+                best_chain.push(Block::from_precomputed(db, &block, counts));
                 parent_state_hash = block.previous_state_hash();
             } else {
                 // No parent
