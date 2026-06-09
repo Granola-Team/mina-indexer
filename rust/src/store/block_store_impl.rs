@@ -625,7 +625,7 @@ impl BlockStore for IndexerStore {
                 Some(bytes) => blocks.push(StateHash::from_bytes(&bytes)?),
             }
         }
-        blocks.sort_by(|a, b| block_cmp(self, a, b));
+        blocks.sort_by_cached_key(|sh| block_sort_key(self, sh));
         Ok(blocks)
     }
 
@@ -676,7 +676,7 @@ impl BlockStore for IndexerStore {
             }
         }
 
-        blocks.sort_by(|a, b| block_cmp(self, a, b));
+        blocks.sort_by_cached_key(|sh| block_sort_key(self, sh));
         Ok(blocks)
     }
 
@@ -727,7 +727,7 @@ impl BlockStore for IndexerStore {
             }
         }
 
-        blocks.sort_by(|a, b| block_cmp(self, a, b));
+        blocks.sort_by_cached_key(|sh| block_sort_key(self, sh));
         Ok(blocks)
     }
 
@@ -741,7 +741,7 @@ impl BlockStore for IndexerStore {
                     self.get_block_parent_hash(b).ok().flatten() == Some(state_hash.clone())
                 })
                 .collect();
-            children.sort_by(|a, b| block_cmp(self, a, b));
+            children.sort_by_cached_key(|sh| block_sort_key(self, sh));
             return Ok(children);
         }
         bail!("Block missing from store {state_hash}")
@@ -1925,19 +1925,17 @@ fn is_genesis_hash(hash: &StateHash) -> bool {
     hash.0 == MAINNET_GENESIS_HASH || hash.0 == HARDFORK_GENESIS_HASH
 }
 
-fn block_cmp(db: &IndexerStore, a: &StateHash, b: &StateHash) -> std::cmp::Ordering {
-    use std::cmp::Ordering;
+// Canonical blocks sort before non-canonical ones; otherwise BlockComparison
+// orders by (length, vrf, state hash) per consensus.
+type BlockSortKey = (std::cmp::Reverse<bool>, BlockComparison);
 
-    let a_canonicity = db.get_block_canonicity(a).ok().flatten();
-    let b_canonicity = db.get_block_canonicity(b).ok().flatten();
-    let a_cmp = db.get_block_comparison(a).unwrap().unwrap();
-    let b_cmp = db.get_block_comparison(b).unwrap().unwrap();
-
-    match (a_canonicity, b_canonicity) {
-        (Some(Canonicity::Canonical), _) => Ordering::Less,
-        (_, Some(Canonicity::Canonical)) => Ordering::Greater,
-        _ => a_cmp.cmp(&b_cmp),
-    }
+fn block_sort_key(db: &IndexerStore, state_hash: &StateHash) -> BlockSortKey {
+    let is_canonical = matches!(
+        db.get_block_canonicity(state_hash).ok().flatten(),
+        Some(Canonicity::Canonical)
+    );
+    let comparison = db.get_block_comparison(state_hash).unwrap().unwrap();
+    (std::cmp::Reverse(is_canonical), comparison)
 }
 
 fn display_mode(mode: IteratorMode) -> String {
